@@ -22,6 +22,7 @@ import { describeTodoDay } from "../../../lib/todos/day";
 
 const noop = () => {};
 const DAY = describeTodoDay("2026-11-05"); // 목요일
+const NEXT_DAY = describeTodoDay("2026-11-06");
 
 function row(id: string, text: string | null, extra: Partial<RowView> = {}): RowView {
   return { id, text, done: false, saving: false, failed: false, checkFailed: false, category: null, ...extra };
@@ -155,6 +156,31 @@ const TODO_STATES: Record<string, Partial2> = {
   C26: { list: "ready", rows: BASIC, sheetOpen: true, newCategoryOpen: true, newCategoryDraft: "자격증", draft: "정보처리기사 원서" },
   // C-D11 포커스 사진: 할 일 12개(창 닫힘·열림)
   CD11: { list: "ready", rows: twelve(), sheetOpen: false },
+
+  // 5절 T 상태 가운데 C에서 그대로 쓰는 것(「입력 줄」을 「적는 창」으로 읽음, 12-6 머리말)
+  T5: { list: "ready", rows: BASIC, sheetOpen: true, draft: "포트폴리오 링크 정리하기" },
+  T6: {
+    list: "ready",
+    rows: twelve((i) => (i === 12 ? { text: "방금 적은 열두 번째 할 일", saving: true, savingSlow: true, category: "영어" } : {})),
+    sheetOpen: true,
+  },
+  T7: { list: "ready", rows: [...BASIC, row("f1", "저장하지 못한 할 일", { failed: true, category: "운동" })], sheetOpen: false },
+  T8: { list: "ready", rows: [row("c1", "이력서 파일 이름 바꾸기", { checkFailed: true }), ...BASIC.slice(1)], sheetOpen: false },
+  T11: { list: "ready", rows: BASIC, sheetOpen: true, draft: OVER_DRAFT },
+  T13: {
+    list: "ready",
+    rows: [...BASIC, row("f2", "저장하지 못한 할 일", { failed: true })],
+    sessionLost: true,
+    hasUnsaved: true,
+    sheetOpen: true,
+    draft: "적던 글",
+  },
+  "T13b-keep-rows": { list: "ready", rows: BASIC, sessionLost: true, sheetOpen: false },
+  "T13c-first-load": { list: "locked", rows: [], sessionLost: true, categories: "error", sheetOpen: false },
+  T15: { list: "ready", day: NEXT_DAY, rows: [row("n1", "새 하루의 첫 할 일")], sheetOpen: true, selectedCategoryId: "c1" },
+  T16: { list: "ready", rows: BASIC, draft: "적던 글", resume: true, logoutConfirm: true, sheetOpen: false },
+  T16b: { list: "ready", rows: [...BASIC, row("f3", "저장하지 못한 할 일", { failed: true })], logoutConfirm: true, sheetOpen: false },
+  "T16b-after-remove": { list: "ready", rows: BASIC, sheetOpen: false },
 };
 
 const LOGIN_STATES: Record<string, { notice: Parameters<typeof LoginActionsView>[0]["notice"]; busy: boolean }> = {

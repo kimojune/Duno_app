@@ -6,8 +6,15 @@ import { cleanupTodos } from "../integration/cleanup";
 import { loadIntegrationEnv, type IntegrationEnv } from "../integration/load-env";
 
 /**
- * 실제 흐름(production 빌드 + duno_dev 시험 계정): A로 로그인한 세션에서 적기 → 새로고침 뒤 남음 → 체크 → 새로고침 뒤 남음
- * → B 세션에서 A의 할 일이 안 보임 → 시험 데이터 정리.
+ * 실제 흐름(production 빌드 + duno_dev 시험 계정, 방향 C): A로 로그인한 세션에서 적는 창 열기 → 「+ 분야」로 분야 더하기
+ * → 그 분야를 고르고 적기 → 새로고침 뒤 글과 분야 표시가 남음 → 체크 → 새로고침 뒤 남음 → B 세션에서 A의 할 일·분야가 안 보임
+ * → 시험 데이터 정리.
+ *
+ * 분야 정리: categories는 지우는 권한(delete grant)이 없어 시험이 지울 수 없다. 그래서 실행마다 고유 접미사를 붙인 이름
+ * (「e2e분야<시각 36진수>」, 20자 안)으로 A에 분야 하나를 만들고 남긴다 — 실행마다 A의 분야가 1행 는다(상한 50, 임시).
+ * 할 일은 이번 실행에서 생긴 A의 행을 cleanupTodos로 지운다. 쌓인 시험 분야는 사람이 SQL 편집기에서 지운다
+ * (정리 SQL은 tests/integration/categories-rls.test.ts 머리 주석).
+ * 아직 돌리지 않는다(새 표가 개발 DB에 없다). 마이그레이션을 적용한 뒤 npm run e2e.
  *
  * 로그인은 화면(OAuth)으로 하지 않는다. Node에서 @supabase/ssr 서버 클라이언트로 signInWithPassword를 하고,
  * 그때 쓰려던 쿠키를 받아 브라우저 컨텍스트에 넣는다. 비밀번호·토큰을 page.evaluate·addInitScript로 브라우저에 넘기지 않는다.
@@ -72,8 +79,11 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
   const beforeIds = new Set((before.data ?? []).map((r: { id: string }) => r.id));
 
   const marker = `e2e-${Date.now().toString(36)}`;
-  const plain = `${marker} 이력서 고치기`;
+  const short = `${marker} 짧은 글`; // 분야 없음(기타): 줄 높이 56 확인용
+  const plain = `${marker} 이력서 고치기`; // 새로 더한 분야를 붙인다
   const tagged = `${marker} <b>굵게</b> <img src=x onerror="window.__xss=1">`;
+  const categoryName = `e2e분야${Date.now().toString(36)}`; // 고유 접미사, 20자 안(지울 수 없는 표라 겹치지 않게)
+  expect([...categoryName].length).toBeLessThanOrEqual(20);
 
   let ctxA: BrowserContext | undefined;
   let ctxB: BrowserContext | undefined;
@@ -93,13 +103,35 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     fs.mkdirSync("test-results/screens", { recursive: true });
     await page.screenshot({ path: "test-results/screens/live-T2-empty-360x800.png" });
 
-    // 적기: 일반 글과, 꺾쇠·스크립트가 든 글
-    for (const text of [plain, tagged]) {
-      await page.getByLabel("할 일 적기").fill(text);
+    // 적는 창 열기(C5): 단추를 누르면 포커스가 할 일 칸
+    await page.getByRole("button", { name: "할 일 적기" }).click();
+    const todoInput = page.getByRole("textbox", { name: "할 일 적기" });
+    await expect(todoInput).toBeFocused();
+
+    // 「+ 분야」로 분야 더하기(C12~C14): 새 칩이 생기고 골라진 채, 포커스는 할 일 칸
+    await expect(page.getByRole("button", { name: "+ 분야" })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "+ 분야" }).click();
+    await page.getByRole("textbox", { name: "새 분야 이름" }).fill(categoryName);
+    await page.getByRole("button", { name: "더하기" }).click();
+    const chip = page.getByRole("group", { name: "분야 (고르지 않으면 기타)" }).getByRole("button", { name: categoryName });
+    await expect(chip).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
+    await expect(todoInput).toBeFocused();
+
+    // 고른 분야로 적기(C7): 창은 열린 채, 칸은 비고, 고름은 풀리고, 새 줄 아래 분야 표시
+    await todoInput.fill(plain);
+    await page.getByRole("button", { name: "적기" }).click();
+    await expect(todoInput).toHaveValue("");
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
+    const plainRow = page.locator("li.todo-row", { has: page.getByText(plain, { exact: true }) });
+    await expect(plainRow.locator(".category-tag")).toHaveText(`분야 ${categoryName}`);
+
+    // 분야 없이 적기: 짧은 글과, 꺾쇠·스크립트가 든 글
+    for (const text of [short, tagged]) {
+      await todoInput.fill(text);
       await page.getByRole("button", { name: "적기" }).click();
-      await expect(page.getByLabel("할 일 적기")).toHaveValue(""); // 첫 누름에 칸이 빈다
+      await expect(todoInput).toHaveValue(""); // 첫 누름에 칸이 빈다
       await expect(page.getByText(text, { exact: true })).toBeVisible();
-      if (text === plain) {
+      if (text === short) {
         // P1: 새 줄 높이가 적은 직후와 저장 뒤 모두 56px(「저장하는 중」이 1초 안에는 자리를 차지하지 않는다)
         const rowBox = page.locator("li.todo-row", { has: page.getByText(text, { exact: true }) });
         const heightNow = (await rowBox.boundingBox())!.height;
@@ -110,9 +142,15 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     }
     await expect(page.getByText("저장하는 중")).toHaveCount(0, { timeout: 20_000 });
 
-    // 새로고침 뒤에도 남는다. 꺾쇠 글은 글자 그대로 보이고 요소가 생기지 않는다.
+    // 새로고침 뒤에도 남는다. 분야 표시도 남는다(D-135). 꺾쇠 글은 글자 그대로 보이고 요소가 생기지 않는다.
     await page.reload();
     await expect(page.getByText(plain, { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.locator("li.todo-row", { has: page.getByText(plain, { exact: true }) }).locator(".category-tag"),
+    ).toHaveText(`분야 ${categoryName}`);
+    await expect(
+      page.locator("li.todo-row", { has: page.getByText(short, { exact: true }) }).locator(".category-tag"),
+    ).toHaveCount(0); // 기타는 표시하지 않는다
     await expect(page.getByText(tagged, { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/screens/live-T3-after-add-360x800.png" });
     expect(await page.locator("main b, main img").count()).toBe(0);
@@ -140,6 +178,11 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     await pageB.goto("/");
     await expect(pageB.getByText(/\d+개 중 \d+개 끝냄/)).toBeVisible({ timeout: 20_000 });
     await expect(pageB.getByText(marker, { exact: false })).toHaveCount(0);
+    // B에게는 A의 분야도 보이지 않는다: 목록 분야 표시에도, B의 적는 창 칩에도
+    await expect(pageB.getByText(categoryName, { exact: false })).toHaveCount(0);
+    await pageB.getByRole("button", { name: "할 일 적기" }).click();
+    await expect(pageB.getByRole("button", { name: "+ 분야" })).toBeVisible({ timeout: 20_000 });
+    await expect(pageB.getByRole("button", { name: categoryName })).toHaveCount(0);
 
     // 로그아웃 → 로그인 화면, 뒤로 가기·캐시에 할 일이 남지 않는다
     // 뒤로 갈 기록이 확실히 있게, 서로 다른 주소(?from=todo)의 할 일 화면에서 로그아웃한다
