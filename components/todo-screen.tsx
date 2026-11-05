@@ -3,16 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "../app/actions";
-import { addTodo, getTodayTodos, setTodoDone } from "../app/todos/actions";
+import { addTodo, setTodoDone } from "../app/todos/actions";
+import { fetchToday } from "../lib/read-client";
+import type { TodayRead } from "../lib/today-types";
 import { describeTodoDay, todoDayFor } from "../lib/todos/day";
-import type { TodoDay, TodoItem, TodoResult } from "../lib/todos/types";
+import type { TodayTodos, TodoDay, TodoItem, TodoResult } from "../lib/todos/types";
 import { checkTodoText, countTodoChars } from "../lib/todos/validation";
 import { useAnnouncer } from "../lib/use-announcer";
 import { useOnline } from "../lib/use-online";
 import { loadedText, overLimitText, TODO_TEXT, TodoView, type RowView } from "./todo-view";
 
 /**
- * 할 일 화면의 진짜 동작. 서버 쪽 함수는 Server Action(app/todos/actions.ts)만 부른다.
+ * 할 일 화면의 진짜 동작.
+ * - 처음 목록은 서버 컴포넌트(app/page.tsx)가 DAL에서 읽어 initial로 넘긴다(없으면 처음에 한 번 GET으로 읽는다).
+ * - 다시 불러오기(화면이 다시 보일 때·연결이 돌아올 때·새벽 4시)는 GET /todos/today(lib/read-client)로 한다.
+ * - 읽기 결과에는 분야 목록도 함께 실려 오지만(C-D5) 1단계 화면은 할 일 칸만 쓴다(분야 칩은 방향 C 2단계).
+ *   Server Action은 줄 서서 하나씩 돌아, 적기·체크가 걸려 있으면 그 뒤에 줄 서기 때문이다(MO-17).
+ * - 쓰기(적기·체크)만 Server Action(app/todos/actions.ts)을 부른다.
  * 클라이언트는 user_id·날짜를 보내지 않는다. 브라우저 Supabase 클라이언트로 todos를 직접 읽고 쓰지 않는다.
  * 저장 전 글은 기기에 두지 않는다(D6): localStorage·sessionStorage·IndexedDB·서비스 워커 캐시 없음.
  */
@@ -52,28 +59,48 @@ async function safely<T>(call: () => Promise<TodoResult<T>>): Promise<TodoResult
   }
 }
 
-export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
-  const [rows, setRows] = useState<LocalRow[]>([]);
-  const [list, setList] = useState<"loading" | "ready" | "error" | "locked">("loading");
+type ListState = "loading" | "ready" | "error" | "locked";
+
+/** 서버가 넘긴 처음 결과로 목록 상태를 정한다(load가 결과를 받았을 때와 같은 규칙). 없으면 불러오는 중. */
+function initialListState(initial: TodoResult<TodayTodos> | undefined): ListState {
+  if (!initial) return "loading";
+  if (initial.ok) return "ready";
+  return initial.error === "unauthenticated" ? "locked" : "error";
+}
+
+export function TodoScreen({
+  direction = "A",
+  initial,
+}: {
+  direction?: "A" | "B";
+  /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
+  initial?: TodayRead;
+}) {
+  const initialTodos = initial?.todos;
+  const first = initialTodos?.ok ? initialTodos.data : null;
+  const [rows, setRows] = useState<LocalRow[]>(() => (first ? first.todos.map(fromItem) : []));
+  const [list, setList] = useState<ListState>(() => initialListState(initialTodos));
   // 머리 날짜는 목록을 받기 전에도 보인다. 화면과 서버가 같은 순수 함수(todoDayFor)를 쓴다.
-  const [day, setDay] = useState<TodoDay | null>(() => describeTodoDay(todoDayFor(new Date())));
+  const [day, setDay] = useState<TodoDay | null>(() => (first ? first.day : describeTodoDay(todoDayFor(new Date()))));
   const [draft, setDraft] = useState("");
   const [offlineHelp, setOfflineHelp] = useState(false);
-  const [sessionLost, setSessionLost] = useState(false);
+  const [sessionLost, setSessionLost] = useState(() => initialTodos?.ok === false && initialTodos.error === "unauthenticated");
   const [logoutConfirm, setLogoutConfirm] = useState(false);
-  const [live, announce] = useAnnouncer(TODO_TEXT.liveLoading);
+  const [live, announce] = useAnnouncer(first ? loadedText(first.todos.length) : TODO_TEXT.liveLoading);
   const online = useOnline();
   const router = useRouter(); // 다시 로그인: 서버가 세션을 다시 보고 로그인 화면을 그린다
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rowsRef = useRef<LocalRow[]>([]);
   const draftRef = useRef("");
-  const loadedRef = useRef(false);
+  const loadedRef = useRef(first !== null);
+  /** 서버가 처음 결과를 넘겼으면 처음 불러오기를 하지 않는다 */
+  const hadInitialRef = useRef(initial !== undefined);
   const loadSeqRef = useRef(0);
   /** 줄마다 마지막으로 보낸 체크 순번(D5: 마지막 값이 이긴다) */
   const toggleSeqRef = useRef(new Map<string, number>());
   /** 줄마다 서버가 확인한 마지막 끝냄 값(실패하면 여기로 돌린다) */
-  const confirmedRef = useRef(new Map<string, boolean>());
+  const confirmedRef = useRef(new Map<string, boolean>(first ? first.todos.map((t) => [t.id, t.done]) : []));
   /** 줄마다 가장 최근에 원한 값(연타해도 마지막 값이 맞게) */
   const desiredRef = useRef(new Map<string, boolean>());
   /** 최신 체크가 실패해 돌아간 줄(앞선 낡은 성공 응답이 늦게 오면 그 값에 맞춘다) */
@@ -99,7 +126,7 @@ export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
   const load = useCallback(
     async (mode: "first" | "silent") => {
       const seq = ++loadSeqRef.current;
-      const res = await safely(() => getTodayTodos());
+      const res = await safely(async () => (await fetchToday()).todos);
       if (seq !== loadSeqRef.current) return; // 더 새 불러오기가 있다
       if (!res.ok) {
         if (res.error === "unauthenticated") {
@@ -135,10 +162,10 @@ export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
     [announce],
   );
 
-  // 처음 불러오기
+  // 처음 불러오기: 서버 컴포넌트가 처음 목록을 넘기지 않았을 때만
   useEffect(() => {
+    if (hadInitialRef.current) return;
     // 서버에서 목록을 가져오는 일(바깥 시스템과 맞추기). setState는 await 뒤에서만 불린다.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load("first");
   }, [load]);
 
@@ -172,7 +199,14 @@ export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
 
   const send = useCallback(
     async (id: string, text: string) => {
+      let failureShown = false;
       const markFailed = () => {
+        // 이 시도의 실패는 한 번만 띄운다: 15초 한도로 띄운 뒤 늦게 온 실패 응답이 안내를 다시 읽히지 않고,
+        // 그사이 「다시」로 보낸 새 시도의 「저장하는 중」을 실패로 되돌리지 않는다(「다시」는 실패를 띄운 뒤에만 보인다).
+        if (failureShown) return;
+        failureShown = true;
+        // 이미 저장됐거나(앞 시도의 늦은 성공) 줄을 뺐으면, 남은 15초 타이머가 실패를 띄우지 않는다.
+        if (!pendingTextRef.current.has(id)) return;
         setRows((prev) => prev.map((r) => (r.id === id && r.status === "saving" ? { ...r, status: "failed", slow: false } : r)));
         announce(TODO_TEXT.saveFailed, { again: true });
       };
@@ -229,6 +263,8 @@ export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
   function retry(id: string) {
     const text = pendingTextRef.current.get(id);
     if (text === undefined) return;
+    // 「다시」는 줄과 함께 사라진다(저장하는 중). 포커스를 body로 떨어뜨리지 않고 그 줄 체크 칸에 둔다.
+    focusRequestRef.current = { kind: "row", id };
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "saving", slow: false } : r)));
     announce(TODO_TEXT.liveSaving);
     void send(id, text); // 같은 id, 같은 글
@@ -284,6 +320,8 @@ export function TodoScreen({ direction = "A" }: { direction?: "A" | "B" }) {
   }
 
   function reload() {
+    // 「다시 불러오기」는 안내와 함께 사라진다. 포커스를 body로 떨어뜨리지 않고 입력 칸에 둔다.
+    focusRequestRef.current = { kind: "input" };
     setList("loading");
     announce(TODO_TEXT.liveLoading);
     void load("first");

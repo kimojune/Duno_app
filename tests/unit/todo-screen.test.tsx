@@ -3,15 +3,22 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoDay, TodoItem, TodoResult } from "../../lib/todos/types";
 
-const getTodayTodos = vi.fn();
+const fetchTodayTodos = vi.fn();
 const addTodo = vi.fn();
 const setTodoDone = vi.fn();
 const signOut = vi.fn();
 const refresh = vi.fn();
+// MO-17 ①: 목록 다시 읽기는 Server Action이 아니라 GET(lib/read-client)이다. 쓰기만 Action을 가짜로 바꾼다.
+// 읽기 결과는 할 일 + 분야(C-D5)라, 가짜 fetchToday는 할 일 칸에 fetchTodayTodos가 준 값을 싣는다(1단계 화면은 할 일 칸만 쓴다).
 vi.mock("../../app/todos/actions", () => ({
-  getTodayTodos: (...a: unknown[]) => getTodayTodos(...a),
   addTodo: (...a: unknown[]) => addTodo(...a),
   setTodoDone: (...a: unknown[]) => setTodoDone(...a),
+}));
+vi.mock("../../lib/read-client", () => ({
+  fetchToday: async (...a: unknown[]) => ({
+    todos: await fetchTodayTodos(...a),
+    categories: { ok: true, data: { categories: [] } },
+  }),
 }));
 vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }) }));
@@ -23,7 +30,7 @@ const ID_A = "11111111-1111-4111-8111-111111111111";
 const ID_B = "22222222-2222-4222-8222-222222222222";
 
 function item(id: string, text: string, done = false): TodoItem {
-  return { id, readable: true, text, done, createdAt: "2026-11-05T01:00:00.000Z" };
+  return { id, readable: true, text, done, createdAt: "2026-11-05T01:00:00.000Z", categoryId: null };
 }
 const ok = <T,>(data: T): TodoResult<T> => ({ ok: true, data });
 const fail = (error: "unauthenticated" | "unavailable" | "too_long"): TodoResult<never> => ({ ok: false, error });
@@ -39,7 +46,7 @@ function deferred<T>() {
 }
 
 async function renderLoaded(todos: TodoItem[] = []) {
-  getTodayTodos.mockResolvedValue(ok({ day: DAY, todos }));
+  fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos }));
   render(<TodoScreen />);
   await screen.findByText(/개 중 \d개 끝냄/);
 }
@@ -55,7 +62,7 @@ function press() {
 }
 
 beforeEach(() => {
-  for (const m of [getTodayTodos, addTodo, setTodoDone, signOut, refresh]) m.mockReset();
+  for (const m of [fetchTodayTodos, addTodo, setTodoDone, signOut, refresh]) m.mockReset();
   setOnline(true);
   signOut.mockResolvedValue(undefined);
   Element.prototype.scrollIntoView = vi.fn(); // jsdom에는 없다
@@ -69,7 +76,7 @@ afterEach(() => {
 describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
   it("T1 불러오는 동안 목록 자리는 aria-busy, 뼈대는 aria-hidden이고, 끝나면 개수가 보인다", async () => {
     const d = deferred<TodoResult<{ day: TodoDay; todos: TodoItem[] }>>();
-    getTodayTodos.mockReturnValue(d.promise);
+    fetchTodayTodos.mockReturnValue(d.promise);
     const { container } = render(<TodoScreen />);
     expect(container.querySelector("main")?.getAttribute("aria-busy")).toBe("true");
     expect(container.querySelector(".todo-skeleton")?.getAttribute("aria-hidden")).toBe("true");
@@ -103,10 +110,10 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
   });
 
   it("풀 수 없는 행은 그 줄만 「읽을 수 없는 할 일」로 보이고 나머지 목록은 멀쩡하다", async () => {
-    getTodayTodos.mockResolvedValue(
+    fetchTodayTodos.mockResolvedValue(
       ok({
         day: DAY,
-        todos: [item(ID_A, "멀쩡한 글"), { id: ID_B, readable: false, text: null, done: false, createdAt: "2026-11-05T02:00:00.000Z" }],
+        todos: [item(ID_A, "멀쩡한 글"), { id: ID_B, readable: false, text: null, done: false, createdAt: "2026-11-05T02:00:00.000Z", categoryId: null }],
       }),
     );
     render(<TodoScreen />);
@@ -115,14 +122,14 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
   });
 
   it("T9 불러오기 실패는 role=alert와 「다시 불러오기」, 누르면 다시 불러온다", async () => {
-    getTodayTodos.mockResolvedValueOnce(fail("unavailable"));
+    fetchTodayTodos.mockResolvedValueOnce(fail("unavailable"));
     render(<TodoScreen />);
     const alert = await screen.findByText("할 일을 불러오지 못했어요.");
     expect(alert.closest("[role=alert]")).toBeTruthy();
-    getTodayTodos.mockResolvedValueOnce(ok({ day: DAY, todos: [item(ID_A, "돌아온 글")] }));
+    fetchTodayTodos.mockResolvedValueOnce(ok({ day: DAY, todos: [item(ID_A, "돌아온 글")] }));
     fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
     expect(await screen.findByText("돌아온 글")).toBeTruthy();
-    expect(getTodayTodos).toHaveBeenCalledTimes(2);
+    expect(fetchTodayTodos).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -247,11 +254,11 @@ describe("적기 (T6, T7, T11, D4)", () => {
     expect(setTodoDone).not.toHaveBeenCalled();
 
     setOnline(true);
-    getTodayTodos.mockClear();
+    fetchTodayTodos.mockClear();
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
-    await waitFor(() => expect(getTodayTodos).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchTodayTodos).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("인터넷 연결이 끊겼어요. 연결되면 적고 체크할 수 있어요.")).toBeNull();
     expect(input().value).toBe("지하철에서 적은 글"); // 입력 칸 글은 건드리지 않는다 (D10)
   });
@@ -294,7 +301,7 @@ describe("체크 (T8, D5)", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "인자 확인" }));
     await waitFor(() => expect(setTodoDone).toHaveBeenCalledTimes(1));
     expect(setTodoDone.mock.calls[0]).toEqual([ID_A, true]);
-    expect(getTodayTodos.mock.calls.every((c) => c.length === 0)).toBe(true);
+    expect(fetchTodayTodos.mock.calls.every((c) => c.length === 0)).toBe(true);
   });
 });
 
@@ -320,7 +327,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
   });
 
   it("T13 저장 못 한 글이 없으면 복사 단추와 「사라져요」 문장 없이 짧은 안내만", async () => {
-    getTodayTodos.mockResolvedValue(fail("unauthenticated"));
+    fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     render(<TodoScreen />);
     const alert = await screen.findByText("로그인이 풀렸어요. 다시 로그인해 주세요.");
     expect(alert.closest("[role=alert]")).toBeTruthy();
@@ -352,7 +359,7 @@ describe("다시 불러오기 (D10), 새 하루 (T15), 기기 저장 없음 (D6)
   it("화면이 다시 보일 때 목록을 다시 불러오고 입력 칸 글은 건드리지 않는다", async () => {
     await renderLoaded([item(ID_A, "처음 글")]);
     write("쓰던 글");
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "처음 글"), item(ID_B, "다른 기기에서 적은 글")] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "처음 글"), item(ID_B, "다른 기기에서 적은 글")] }));
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));
@@ -364,12 +371,12 @@ describe("다시 불러오기 (D10), 새 하루 (T15), 기기 저장 없음 (D6)
   it("T15 새벽 4시(서울)를 넘기면 날짜와 목록이 새 하루로 바뀌고 입력 칸 글은 그대로다", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(new Date("2026-11-05T18:59:00Z")); // 서울 11월 6일 03:59 → 두노 하루는 11월 5일
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "어제 글")] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "어제 글")] }));
     render(<TodoScreen />);
     await act(async () => {});
     expect(screen.getByText(/11월 5일/)).toBeTruthy();
     write("밤에 쓰던 글");
-    getTodayTodos.mockResolvedValue(
+    fetchTodayTodos.mockResolvedValue(
       ok({ day: { date: "2026-11-06", year: 2026, month: 11, dayOfMonth: 6, weekday: 5 }, todos: [] }),
     );
     await act(async () => {
@@ -399,7 +406,7 @@ describe("화면 검토 LOW 고침", () => {
     write("저장 못 한 글");
     press();
     await screen.findByText(/로그인이 풀렸어요/);
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "서버에 있던 글")] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "서버에 있던 글")] }));
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));
@@ -465,7 +472,7 @@ const resolversFor = () => {
 describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
   it("R1 확인 1: 3줄을 불러온 뒤 로그인이 풀려도 3줄·개수가 그대로이고 안내가 뜬다 (visibilitychange)", async () => {
     await renderLoaded([item(ID_A, "첫째"), item(ID_B, "둘째", true), item("33333333-3333-4333-8333-333333333333", "셋째")]);
-    getTodayTodos.mockResolvedValue(fail("unauthenticated"));
+    fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     fireVisible();
     const alert = await screen.findByText("로그인이 풀렸어요. 다시 로그인해 주세요.");
     expect(alert.closest("[role=alert]")).toBeTruthy();
@@ -476,17 +483,21 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
 
   it("R1 확인 1: online·pageshow(persisted)에서도 줄을 지우지 않는다", async () => {
     await renderLoaded([item(ID_A, "첫째")]);
-    getTodayTodos.mockResolvedValue(fail("unauthenticated"));
+    fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
     await screen.findByText(/로그인이 풀렸어요/);
     expect(screen.getByText("첫째")).toBeTruthy();
+    expect(fetchTodayTodos).toHaveBeenCalledTimes(2); // 처음 + online
     const event = new Event("pageshow") as Event & { persisted: boolean };
     event.persisted = true;
     act(() => {
       window.dispatchEvent(event);
     });
+    // pageshow가 실제로 다시 불러왔고(그 결과도 로그인 풀림), 그 뒤에도 줄이 남는지 본다.
+    // (예전에는 다시 불러왔는지 보지 않아, pageshow 처리가 없어도 통과했다)
+    await waitFor(() => expect(fetchTodayTodos).toHaveBeenCalledTimes(3));
     await act(async () => {});
     expect(screen.getByText("첫째")).toBeTruthy();
     expect(screen.getByText(/1개 중 0개 끝냄/)).toBeTruthy();
@@ -498,14 +509,14 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     write("못 저장한 글");
     press();
     await screen.findByText("저장하지 못했어요.");
-    getTodayTodos.mockResolvedValue(fail("unauthenticated"));
+    fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     fireVisible();
     await screen.findByText(/로그인이 풀렸어요/);
     expect(screen.getByText("못 저장한 글")).toBeTruthy();
   });
 
   it("R1 확인 2: 처음부터 로그인이 풀렸으면 빈 문구·개수 없이 안내만 있고 머리 줄은 날짜만이다", async () => {
-    getTodayTodos.mockResolvedValue(fail("unauthenticated"));
+    fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     const { container } = render(<TodoScreen />);
     await screen.findByText("로그인이 풀렸어요. 다시 로그인해 주세요.");
     expect(screen.queryByText("오늘 적은 할 일이 없어요.")).toBeNull();
@@ -564,7 +575,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
 
   it("R11 글자 수 넘음과 오프라인으로 막히면 도움말과 같은 글을 LiveRegion에도 넣는다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
     render(<TodoScreen />);
     await act(async () => {});
     write("가".repeat(230));
@@ -593,7 +604,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
 describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
   it("R5 저장 실패와 체크 실패 안내를 LiveRegion에도 넣는다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "체크할 글")] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "체크할 글")] }));
     render(<TodoScreen />);
     await act(async () => {});
     addTodo.mockResolvedValue(fail("unavailable"));
@@ -613,7 +624,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
 
   it("R6 15초 안에 답이 없으면 그 줄을 T7로 바꾸고, 「다시」는 같은 id이며, 늦은 성공이 오면 줄은 하나로 저장됨이 된다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
     render(<TodoScreen />);
     await act(async () => {});
     const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
@@ -680,7 +691,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
 describe("다듬기 1회차 P1 「저장하는 중」은 1초 뒤에만 보인다", () => {
   async function renderFake() {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
     render(<TodoScreen />);
     await act(async () => {});
   }
@@ -772,7 +783,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     cleanup();
 
     // 저장 중 줄만
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
     render(<TodoScreen />);
     await screen.findByText(/개 중 \d개 끝냄/);
     addTodo.mockReturnValue(new Promise(() => {}));
@@ -783,7 +794,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     cleanup();
 
     // 저장 못 한 줄만
-    getTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
     render(<TodoScreen />);
     await screen.findByText(/개 중 \d개 끝냄/);
     addTodo.mockResolvedValue(fail("unavailable"));
@@ -874,5 +885,152 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     write("다시 적은 글");
     expect(confirmBox()).toBeNull();
     expect(signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe("MO-17 LOW 고침", () => {
+  async function renderFake(todos: TodoItem[] = []) {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos }));
+    render(<TodoScreen />);
+    await act(async () => {});
+  }
+
+  it("늦게 온 저장 실패: 15초 뒤 「다시」로 보낸 새 시도가 저장 중인데 앞 시도의 실패가 늦게 와도 그 줄을 실패로 되돌리지 않는다", async () => {
+    await renderFake();
+    const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
+    addTodo.mockReturnValueOnce(first.promise).mockReturnValueOnce(new Promise(() => {}));
+    write("느린 글");
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    });
+    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "다시" }));
+    expect(addTodo).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+
+    first.resolve(fail("unavailable")); // 앞 시도의 실패가 늦게 도착
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(screen.queryByText("저장하지 못했어요.")).toBeNull(); // 새 시도는 아직 저장하는 중
+    expect(screen.getByText("저장하는 중")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "다시" })).toBeNull();
+  });
+
+  it("늦게 온 저장 실패: 15초 한도로 띄운 실패 안내를 늦은 실패 응답이 다시 읽히지 않는다", async () => {
+    await renderFake();
+    const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
+    addTodo.mockReturnValueOnce(first.promise);
+    write("느린 글");
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS + 100);
+    });
+    expect(liveText()).toBe("저장하지 못했어요.");
+    // 그 뒤 다른 안내가 나간다(글자 수 넘음)
+    write("가".repeat(230));
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(liveText()).toBe("200자까지 적을 수 있어요. 지금 230자예요.");
+    first.resolve(fail("unavailable")); // 늦은 실패 응답
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(liveText()).toBe("200자까지 적을 수 있어요. 지금 230자예요."); // 실패 안내를 다시 띄우지 않았다
+    expect(screen.getAllByText("저장하지 못했어요.")).toHaveLength(1); // 줄 안 안내는 그대로 하나
+  });
+
+  it("늦게 온 저장 실패: 빼 버린 줄의 늦은 실패는 아무것도 되살리지 않는다", async () => {
+    await renderFake();
+    const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
+    addTodo.mockReturnValueOnce(first.promise);
+    write("뺄 글");
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS + 100);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "빼기" }));
+    expect(screen.queryByText("뺄 글")).toBeNull();
+    write("가".repeat(230)); // 다른 안내를 하나 내보낸다
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(liveText()).toBe("200자까지 적을 수 있어요. 지금 230자예요.");
+    first.resolve(fail("unavailable"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(screen.queryByText("뺄 글")).toBeNull();
+    expect(document.querySelectorAll(".todo-row")).toHaveLength(0);
+    expect(liveText()).toBe("200자까지 적을 수 있어요. 지금 230자예요."); // 실패 안내가 다시 나가지 않았다
+  });
+
+  it("늦게 온 성공 뒤: 「다시」로 보낸 새 시도의 15초 타이머가 이미 저장된 줄에 실패 안내를 띄우지 않는다", async () => {
+    await renderFake();
+    const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
+    addTodo.mockReturnValueOnce(first.promise).mockReturnValueOnce(new Promise(() => {}));
+    write("느린 글");
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다시" }));
+    first.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "느린 글") })); // 앞 시도의 늦은 성공
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(liveText()).toBe("할 일을 저장했어요");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS + 200); // 새 시도의 15초 한도가 지난다
+    });
+    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(liveText()).toBe("할 일을 저장했어요");
+  });
+
+  it("정상 대조: 늦게 온 성공은 여전히 그 줄을 저장됨으로 바꾼다", async () => {
+    await renderFake();
+    const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
+    addTodo.mockReturnValueOnce(first.promise);
+    write("늦은 성공");
+    press();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    });
+    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    first.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "늦은 성공") }));
+    await act(async () => {});
+    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(screen.getAllByText("늦은 성공")).toHaveLength(1);
+  });
+
+  it("사라지는 단추의 포커스: 「다시」를 누르면 단추가 사라져도 포커스가 body가 아니라 그 줄 체크 칸에 있다", async () => {
+    await renderLoaded([]);
+    addTodo.mockResolvedValueOnce(fail("unavailable")).mockReturnValueOnce(new Promise(() => {}));
+    write("다시 보낼 글");
+    press();
+    await screen.findByText("저장하지 못했어요.");
+    const again = screen.getByRole("button", { name: "다시" });
+    again.focus();
+    fireEvent.click(again);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시" })).toBeNull());
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: "다시 보낼 글" }));
+  });
+
+  it("사라지는 단추의 포커스: 「다시 불러오기」를 누르면 안내가 사라져도 포커스가 입력 칸에 있다", async () => {
+    fetchTodayTodos.mockResolvedValueOnce(fail("unavailable"));
+    render(<TodoScreen />);
+    const reloadButton = await screen.findByRole("button", { name: "다시 불러오기" });
+    fetchTodayTodos.mockReturnValueOnce(new Promise(() => {})); // 불러오는 중에 머문다
+    reloadButton.focus();
+    fireEvent.click(reloadButton);
+    expect(screen.queryByRole("button", { name: "다시 불러오기" })).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(input());
   });
 });
