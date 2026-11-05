@@ -160,17 +160,28 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     // 서비스 워커가 준비될 때까지 기다린 뒤(다시 열어 탐색을 맡게 하고) 캐시를 본다
     await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
     await page.reload();
-    // reload 직후에는 서비스 워커가 아직 캐시를 채우는 중일 수 있어, 목록이 찰 때까지 web-first로 기다린 뒤 단언한다
+    // 이 화면이 서비스 워커의 손을 거쳤는지(controller)부터 본다. ready만으로는 이 페이지가 서비스 워커에 묶였다는 보장이 없다.
+    await expect
+      .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), { message: "화면이 서비스 워커에 묶였다" })
+      .toBe(true);
     const readCache = () =>
       page.evaluate(async () => {
         const urls: string[] = [];
         for (const name of await caches.keys()) for (const req of await (await caches.open(name)).keys()) urls.push(req.url);
         return urls;
       });
-    await expect.poll(async () => (await readCache()).length, { message: "캐시 목록이 비어 있지 않아야 한다" }).toBeGreaterThan(0);
+    // MO-17 LOW: 예전에는 「캐시가 비어 있지 않음」을 기다렸는데, 설치 때 미리 넣는 항목(offline.html 등)만으로 바로 참이라
+    // 아무것도 기다리지 않았다. 서비스 워커가 화면을 그리며 가로챈 요청을 실제로 저장한 흔적(/_next/static 항목)이 생길 때까지
+    // 기다린 뒤, 화면 HTML·RSC가 없는지 본다.
+    await expect
+      .poll(async () => (await readCache()).filter((u) => new URL(u).pathname.startsWith("/_next/static/")).length, {
+        message: "서비스 워커가 이 화면의 정적 파일을 캐시에 넣을 때까지 기다린다",
+      })
+      .toBeGreaterThan(0);
     const cached = await readCache();
-    expect(cached.length, "캐시 목록이 비어 있지 않아야 아래 단언이 의미가 있다").toBeGreaterThan(0);
     expect(cached.filter((u) => new URL(u).pathname === "/" || new URL(u).searchParams.has("_rsc"))).toEqual([]);
+    // 읽기 길(GET /todos/today, 사용자 데이터)도 캐시에 없다(악용 10)
+    expect(cached.filter((u) => new URL(u).pathname.startsWith("/todos/"))).toEqual([]);
   } finally {
     await ctxA?.close();
     await ctxB?.close();
