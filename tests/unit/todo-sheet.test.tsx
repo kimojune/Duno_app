@@ -1004,8 +1004,17 @@ describe("낭독 영역(2-6·4.1.3): role=status는 안내 전부터 있고, 같
 
   it("빈 안내 자리를 display:none으로 숨기지 않는다(접근성 트리에서 빠지지 않게, 정적 확인)", () => {
     const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
-    expect(css).toContain(".cat-notice");
-    expect(css).not.toMatch(/.cat-notice:emptys*{[^}]*displays*:s*none/);
+    // 정규식 이스케이프에 기대지 않는다: 공백류를 모두 지운 뒤 단순 문자열로 찾는다
+    const flat = [...css].filter((ch) => ch.trim() !== "").join("");
+    expect(flat).toContain(".cat-notice{"); // 양성 대조: 규칙 자체는 읽혔다
+    let at = flat.indexOf(".cat-notice:empty");
+    while (at !== -1) {
+      // 선택자 목록 안에 있어도 그 규칙 덩어리({ … })를 본다
+      const open = flat.indexOf("{", at);
+      const close = flat.indexOf("}", open);
+      expect(flat.slice(open, close + 1)).not.toContain("display:none");
+      at = flat.indexOf(".cat-notice:empty", close);
+    }
   });
 });
 

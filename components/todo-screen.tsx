@@ -371,15 +371,12 @@ export function TodoScreen({
     const mark = crypto.randomUUID();
     sheetMarkRef.current = mark;
     try {
-      const state = currentHistoryState();
-      const next = { ...withoutSheetMark(state), [SHEET_HISTORY_MARK]: mark };
-      if (typeof state[SHEET_HISTORY_MARK] === "string") {
-        // 지금 칸이 앞서 창을 열 때 쌓은 칸이다(창을 연 채 새로고침, 앞으로 가기로 돌아옴, 또는 「닫기」의 back()이 아직
-        // 돌지 않음). 칸을 더 쌓지 않고 이 칸을 이번 열기의 칸으로 삼는다 — 첫 뒤로 가기가 창을 닫고, 그다음에야 앱을 떠난다.
-        window.history.replaceState(next, "");
-      } else {
-        window.history.pushState(next, "");
-      }
+      // 늘 새 칸을 쌓는다(옛 표시는 빼고 이번 열기의 고유 표시를 붙인다). 지금 칸에 옛 표시가 있어도(창을 연 채 새로고침,
+      // 앞으로 가기로 돌아옴, 「닫기」의 back()이 아직 돌지 않음) 그 칸을 replaceState로 바꿔 쓰지 않는다: 새로고침된 칸의
+      // 아래 칸은 새로고침 전 문서의 칸이라, 그 칸으로 가는 back()·뒤로 가기는 popstate 없이 페이지를 다시 불러 글을 잃는다.
+      // 새 칸을 쌓으면 첫 뒤로 가기는 같은 문서 안의 popstate가 되고, 표시가 이번 창의 것과 달라 창이 닫힌다.
+      // 받아들인 것: 이 경우 창이 닫힌 뒤 앱을 떠나기까지 뒤로 가기를 한 번 더 눌러야 할 수 있다(옛 창 칸이 남는다).
+      window.history.pushState({ ...withoutSheetMark(currentHistoryState()), [SHEET_HISTORY_MARK]: mark }, "");
       historyPushedRef.current = true;
     } catch {
       historyPushedRef.current = false;
