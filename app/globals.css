@@ -275,8 +275,9 @@ button, input { font: inherit; color: inherit; }
   color: var(--color-text-sub);
   overflow-wrap: anywhere;
 }
-.cat-notice { font: var(--font-sub); color: var(--color-text); overflow-wrap: anywhere; }
-.cat-notice:empty { display: none; }
+/* 칩 줄 아래 한 줄 안내(C17·C18·C20). role="status" 영역이라 늘 그려 둔다(display:none이면 접근성 트리에서 빠져
+   낭독 도구가 바뀜을 놓칠 수 있다). 비었을 때는 여백·테두리가 없어 높이가 0이라 자리를 차지하지 않는다 */
+.cat-notice { margin: 0; padding: 0; font: var(--font-sub); color: var(--color-text); overflow-wrap: anywhere; }
 .sheet-todo-label { margin-top: var(--space-2); margin-bottom: var(--space-1); }
 
 /* 칩 줄(CategoryChipRow): 한 줄, 옆으로 민다. 안쪽 왼쪽 4·오른쪽 16(포커스 고리가 잘리지 않게, 「+ 분야」까지 닿게) */

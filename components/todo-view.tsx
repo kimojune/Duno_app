@@ -447,7 +447,11 @@ export function NewCategoryRow({
             enterKeyHint="done"
           />
           <p id="newcat-help" className="input-help">
-            {message ? <span role="status">{message}</span> : categoryCountText(props.newCategoryDraft)}
+            {/* 셈(15/20·넘음)은 낭독 영역 밖에 두고, 실패·오프라인·한도 안내는 늘 그려 둔 role="status" 안의 글만 바꾼다(4.1.3) */}
+            {message ? null : categoryCountText(props.newCategoryDraft)}
+            <span role="status" className="newcat-status">
+              {message ?? ""}
+            </span>
           </p>
         </div>
         <div className="newcat-actions">

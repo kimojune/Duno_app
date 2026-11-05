@@ -83,8 +83,26 @@ export const SAVE_TIMEOUT_MS = 15_000;
 export const CATEGORY_ADD_TIMEOUT_MS = SAVE_TIMEOUT_MS;
 /** (임시) 저장이 이 시간을 넘겨 걸릴 때만 「저장하는 중」을 눈에 보이게 한다(그 전에는 화면 읽기용으로만 있다) */
 export const SAVING_HINT_DELAY_MS = 1000;
-/** 창을 열 때 history에 쌓는 칸의 표시(C-D2) */
+/**
+ * 창을 열 때 history에 쌓는 칸의 표시(C-D2). 값은 열기마다 새로 만든 고유 문자열이다:
+ * 새로고침·앞으로 가기로 옛 표시가 붙은 칸에 돌아와도, 「이번에 연 창의 칸」과 헷갈리지 않게.
+ */
 export const SHEET_HISTORY_MARK = "dunoTodoSheet";
+
+type HistoryState = Record<string, unknown>;
+
+/** 지금 칸의 state를 복사한다(Next App Router가 넣어 둔 내부 state를 보존하려고). 객체가 아니면 빈 객체 */
+function currentHistoryState(): HistoryState {
+  const state: unknown = window.history.state;
+  return state && typeof state === "object" ? { ...(state as HistoryState) } : {};
+}
+
+/** 옛 창 표시를 뺀 복사본(옛 표시를 새 칸에 옮겨 붙이지 않는다) */
+function withoutSheetMark(state: HistoryState): HistoryState {
+  const copy = { ...state };
+  delete copy[SHEET_HISTORY_MARK];
+  return copy;
+}
 
 const UNAVAILABLE = { ok: false, error: "unavailable" } as const;
 
@@ -169,6 +187,10 @@ export function TodoScreen({
   const sheetOpenRef = useRef(false);
   /** 창을 열 때 history에 한 칸 쌓았고 아직 거두지 않았다 */
   const historyPushedRef = useRef(false);
+  /** 이번에 연 창의 칸 표시(열기마다 새 값) */
+  const sheetMarkRef = useRef<string | null>(null);
+  /** 「닫기」·Esc가 부른 history.back() 가운데 아직 popstate가 오지 않은 수 */
+  const pendingBacksRef = useRef(0);
   /** 이번 화면에서 더한 분야: 그 전에 떠난 다시 읽기 응답이 늦게 와도 칩을 지우지 않게 */
   const addedCategoryIdsRef = useRef(new Set<string>());
   const categoryAttemptRef = useRef<CategoryAttempt | null>(null);
@@ -331,19 +353,33 @@ export function TodoScreen({
     setCategoryNotice(""); // 창을 닫으면 한 줄 안내는 사라진다(12-6)
     flushSync(() => setSheetOpen(false));
     if (!keepFocus) document.getElementById("add-todo-button")?.focus();
+    sheetMarkRef.current = null;
     if (historyPushedRef.current) {
       historyPushedRef.current = false;
       // 「닫기」·Esc로 닫으면 연 때 쌓은 칸이 남아 있으니 거둔다. 뒤로 가기(popstate)는 이미 그 칸을 떠났다.
-      if (via !== "popstate") window.history.back();
+      // back()의 popstate는 나중에 온다. 그 popstate를 사용자의 뒤로 가기로 읽지 않게 센다.
+      if (via !== "popstate") {
+        pendingBacksRef.current += 1;
+        window.history.back();
+      }
     }
   }, []);
 
   function openSheet() {
     if (sheetOpenRef.current) return; // 연타해도 창 하나, history 한 칸
     sheetOpenRef.current = true;
+    const mark = crypto.randomUUID();
+    sheetMarkRef.current = mark;
     try {
-      const state: unknown = window.history.state;
-      window.history.pushState({ ...(state && typeof state === "object" ? state : {}), [SHEET_HISTORY_MARK]: true }, "");
+      const state = currentHistoryState();
+      const next = { ...withoutSheetMark(state), [SHEET_HISTORY_MARK]: mark };
+      if (typeof state[SHEET_HISTORY_MARK] === "string") {
+        // 지금 칸이 앞서 창을 열 때 쌓은 칸이다(창을 연 채 새로고침, 앞으로 가기로 돌아옴, 또는 「닫기」의 back()이 아직
+        // 돌지 않음). 칸을 더 쌓지 않고 이 칸을 이번 열기의 칸으로 삼는다 — 첫 뒤로 가기가 창을 닫고, 그다음에야 앱을 떠난다.
+        window.history.replaceState(next, "");
+      } else {
+        window.history.pushState(next, "");
+      }
       historyPushedRef.current = true;
     } catch {
       historyPushedRef.current = false;
@@ -356,9 +392,27 @@ export function TodoScreen({
   // 뒤로 가기: 창이 열려 있으면 창만 닫는다(글은 남김). 창이 닫혀 있으면 아무것도 하지 않는다.
   useEffect(() => {
     function onPopState() {
+      if (pendingBacksRef.current > 0) {
+        // 「닫기」·Esc가 부른 back()이 이제 도착했다(사용자의 뒤로 가기가 아니다).
+        pendingBacksRef.current -= 1;
+        const mark = sheetMarkRef.current;
+        if (sheetOpenRef.current && mark) {
+          // 그사이 창을 다시 열었다: 늦게 온 back()이 이번 창의 칸을 떠났으니, 지금 칸 위에 이번 창의 칸을 다시 쌓는다.
+          const state = currentHistoryState();
+          if (state[SHEET_HISTORY_MARK] !== mark) {
+            try {
+              window.history.pushState({ ...withoutSheetMark(state), [SHEET_HISTORY_MARK]: mark }, "");
+              historyPushedRef.current = true;
+            } catch {
+              historyPushedRef.current = false;
+            }
+          }
+        }
+        return;
+      }
       if (!sheetOpenRef.current) return;
-      const state = window.history.state as Record<string, unknown> | null;
-      if (state && state[SHEET_HISTORY_MARK]) return; // 아직 창 칸에 있다(앞으로 가기 등)
+      // 아직 이번에 연 창의 칸이면(앞으로 가기로 돌아옴 등) 그대로. 옛 표시가 붙은 칸은 이번 창의 칸이 아니다.
+      if (currentHistoryState()[SHEET_HISTORY_MARK] === sheetMarkRef.current) return;
       closeSheet("popstate");
     }
     window.addEventListener("popstate", onPopState);

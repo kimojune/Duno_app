@@ -204,7 +204,10 @@ for (const state of C_STATES) {
           for (const el of document.querySelectorAll<HTMLElement>("button, input.input, .check-hit")) {
             const r = el.getBoundingClientRect();
             if (r.height < 47.5) out.push(`${el.className || el.tagName}:h${r.height}`);
-            if (el.classList.contains("chip") && r.width < 47.5) out.push(`${el.className}:w${r.width}`);
+            // 칩과 체크 칸 누름 영역(.check-hit)은 폭도 48 이상(옛 T3, C6)
+            if ((el.classList.contains("chip") || el.classList.contains("check-hit")) && r.width < 47.5) {
+              out.push(`${el.className}:w${r.width}`);
+            }
           }
           return out;
         });
@@ -347,10 +350,16 @@ for (const state of C_STATES) {
         if (state.id === "C22") {
           const style = await page.locator(".todo-text").first().evaluate((el) => {
             const s = getComputedStyle(el);
-            return { overflowWrap: s.overflowWrap, textOverflow: s.textOverflow };
+            return {
+              overflowWrap: s.overflowWrap,
+              textOverflow: s.textOverflow,
+              lineClamp: s.getPropertyValue("-webkit-line-clamp") || "none",
+            };
           });
+          measurements[`${name}-text-style`] = style;
           expect(style.overflowWrap).toBe("anywhere");
           expect(style.textOverflow).toBe("clip");
+          expect(["none", "normal"]).toContain(style.lineClamp); // 옛 T4: 줄 수로 자르지 않는다
           // 체크 칸은 첫 줄 옆, 분야 표시는 글 아래
           const checkTop = (await page.locator(".check-hit").first().boundingBox())!.y;
           const textBox = (await page.locator(".todo-text").first().boundingBox())!;

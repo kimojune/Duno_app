@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AddCategoryResult, CategoryItem } from "../../lib/categories/types";
 import type { TodayRead } from "../../lib/today-types";
 import type { TodoDay, TodoItem, TodoResult } from "../../lib/todos/types";
+import { FakeHistory } from "./fake-history";
 
 /**
  * 방향 C(디자인 명세 12절) 적는 창·분야 칩 시험. 상태 C1~C26 가운데 「코드」로 확인하는 칸, D-125 개발 항목 넷,
@@ -331,22 +332,30 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
   }
 
   it("C-D2 열 때 pushState 한 칸, 「닫기」·Esc로 닫으면 history.back()으로 거두고, 뒤로 가기로 닫으면 back을 부르지 않는다", () => {
+    // back()이 실제로 한 칸 돌아가 popstate를 보내는 가짜 history(칸마다 state, fake-history.ts)
+    vi.restoreAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    setOnline(true);
+    const history = new FakeHistory().install();
     renderScreen();
     open();
-    expect(pushState).toHaveBeenCalledTimes(1);
-    expect((window.history.state as Record<string, unknown>).dunoTodoSheet).toBe(true);
+    expect(history.pushState).toHaveBeenCalledTimes(1);
+    expect(typeof (history.state as Record<string, unknown>).dunoTodoSheet).toBe("string"); // 열기마다 고유한 표시
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
-    expect(back).toHaveBeenCalledTimes(1);
-    window.history.replaceState(null, ""); // back()이 한 칸 돌아간 모습
+    expect(history.back).toHaveBeenCalledTimes(1);
+    history.flush(); // back()이 한 칸 돌아간다
+    expect(history.index).toBe(0);
     open();
     fireEvent.keyDown(todoInput(), { key: "Escape" });
-    expect(pushState).toHaveBeenCalledTimes(2);
-    expect(back).toHaveBeenCalledTimes(2);
-    window.history.replaceState(null, "");
+    expect(history.pushState).toHaveBeenCalledTimes(2);
+    expect(history.back).toHaveBeenCalledTimes(2);
+    history.flush();
     open();
-    browserBack();
-    expect(back).toHaveBeenCalledTimes(2); // 뒤로 가기는 이미 칸을 떠났다
+    history.userBack();
+    expect(history.back).toHaveBeenCalledTimes(2); // 뒤로 가기는 이미 칸을 떠났다
     expect(screen.queryByRole("form", { name: "할 일 적기" })).toBeNull();
+    expect(history.index).toBe(0);
+    expect(history.leftApp).toBe(false);
   });
 
   it("C-D2 창을 연 채 다시 불러오기·새벽 4시가 와도 history가 두 칸 쌓이지 않는다", async () => {
@@ -867,11 +876,23 @@ describe("악용 시나리오(화면 쪽)", () => {
 
   it("3: 「할 일 적기」·「적기」·「더하기」 연타 — 창 하나·history 한 칸, 적기 한 번, 더하기 요청 하나", () => {
     renderScreen();
+    // 같은 렌더의 단추를 두 번 누른다. 첫 누름이 flushSync로 단추를 바로 떼어 내므로, 같은 DOM 노드에 click을 두 번 보내면
+    // 둘째는 React 뿌리까지 올라가지 못해 시험이 비게 된다. 그래서 그 렌더의 onClick(React가 노드에 둔 props)을 한 act 안에서 두 번 부른다.
     const button = openButton();
-    fireEvent.click(button);
-    fireEvent.click(button); // 이미 사라진 단추를 또 누름
+    const reactProps = Object.entries(button).find(([k]) => k.startsWith("__reactProps$"))?.[1] as { onClick: () => void };
+    expect(typeof reactProps?.onClick).toBe("function");
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    let firstMark: unknown;
+    act(() => {
+      reactProps.onClick();
+      firstMark = (window.history.state as Record<string, unknown>).dunoTodoSheet;
+      reactProps.onClick();
+    });
     expect(screen.getAllByRole("form", { name: "할 일 적기" })).toHaveLength(1);
+    // 창 열기 가드(sheetOpenRef)가 둘째 누름을 무시한다: 칸을 더 쌓지도, 연 칸의 표시를 바꿔 쓰지도 않는다
     expect(pushState).toHaveBeenCalledTimes(1);
+    expect(replaceState).not.toHaveBeenCalled();
+    expect((window.history.state as Record<string, unknown>).dunoTodoSheet).toBe(firstMark);
     addTodo.mockReturnValue(new Promise(() => {}));
     typeTodo("연타 글");
     pressWrite();
@@ -935,6 +956,56 @@ describe("악용 시나리오(화면 쪽)", () => {
       window.dispatchEvent(new PopStateEvent("popstate", { state: { dunoTodoSheet: true } }));
     });
     expect(screen.queryByRole("form", { name: "할 일 적기" })).toBeNull();
+  });
+});
+
+describe("낭독 영역(2-6·4.1.3): role=status는 안내 전부터 있고, 같은 요소의 글만 바뀐다", () => {
+  it("칩 줄 아래 한 줄 안내(C17·C18): 창을 열 때부터 빈 role=status가 있고, 안내가 나오면 그 요소의 글이 바뀐다", () => {
+    renderScreen();
+    open();
+    const region = document.querySelector(".cat-notice") as HTMLElement;
+    expect(region).not.toBeNull();
+    expect(region.getAttribute("role")).toBe("status");
+    expect(region.textContent).toBe("");
+    fireEvent.click(addCategoryChip());
+    typeCategory("운동");
+    pressAdd(); // C17(화면이 먼저 아는 같은 이름)
+    expect(document.querySelector(".cat-notice")).toBe(region); // 같은 요소
+    expect(region.textContent).toBe("이미 있는 분야라서 골랐어요: 운동");
+    fireEvent.click(addCategoryChip());
+    typeCategory("기타");
+    pressAdd(); // C18
+    expect(document.querySelector(".cat-notice")).toBe(region);
+    expect(region.textContent).toBe("기타는 더하지 않아도 돼요. 분야를 고르지 않으면 기타로 들어가요.");
+  });
+
+  it("새 분야 칸 도움말(C19·C21): 새 분야 줄을 열 때부터 빈 role=status가 있고, 실패·오프라인 안내는 그 요소의 글만 바뀐다. 셈은 낭독 영역 밖", async () => {
+    renderScreen();
+    open();
+    fireEvent.click(addCategoryChip());
+    const region = document.querySelector("#newcat-help [role=status]") as HTMLElement;
+    expect(region).not.toBeNull();
+    expect(region.textContent).toBe("");
+    typeCategory("가".repeat(15));
+    expect(document.getElementById("newcat-help")!.textContent).toBe("15/20");
+    expect(region.textContent).toBe(""); // 글자 셈은 낭독 영역에 넣지 않는다
+    addCategory.mockResolvedValueOnce({ ok: false, error: "unavailable" });
+    typeCategory("자격증");
+    pressAdd();
+    await waitFor(() => expect(region.textContent).toBe("분야를 더하지 못했어요. 다시 눌러 주세요."));
+    expect(document.querySelector("#newcat-help [role=status]")).toBe(region); // C19: 같은 요소
+    setOnline(false);
+    typeCategory("자격증 시험");
+    expect(region.textContent).toBe("");
+    pressAdd();
+    expect(document.querySelector("#newcat-help [role=status]")).toBe(region); // C21: 같은 요소
+    expect(region.textContent).toBe("인터넷에 연결되면 분야를 더할 수 있어요. 적은 이름은 그대로 있어요.");
+  });
+
+  it("빈 안내 자리를 display:none으로 숨기지 않는다(접근성 트리에서 빠지지 않게, 정적 확인)", () => {
+    const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
+    expect(css).toContain(".cat-notice");
+    expect(css).not.toMatch(/.cat-notice:emptys*{[^}]*displays*:s*none/);
   });
 });
 
