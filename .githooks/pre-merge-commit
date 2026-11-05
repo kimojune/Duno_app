@@ -1,0 +1,7 @@
+#!/bin/sh
+# 비밀 검사 훅(머지 커밋용) — git merge가 머지 커밋을 만들기 직전에 pre-commit과 같은 검사를 한다.
+# git은 머지 커밋에 pre-commit을 부르지 않고 이 훅을 부른다. 설치·되돌리기·우회 금지는 .githooks/pre-commit 머리 주석과 같다.
+# 못 막는 것: fast-forward 머지(커밋을 만들지 않아 훅이 돌지 않는다), --no-verify.
+# 충돌이 나서 손으로 고친 뒤 git commit 으로 끝내는 머지는 pre-commit이 검사한다.
+# [AI 초안] 2026-11-04 22_개발 팀장 작업 지시로 새로 둠(견본에는 없음).
+exec sh "$(dirname "$0")/pre-commit" merge

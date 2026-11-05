@@ -1,0 +1,252 @@
+/* 디자인 명세 2-1 토큰을 값 그대로 옮김(임시 값 포함). 뜻이 바뀌면 명세를 먼저 고친다. */
+:root {
+  /* 색 (임시) */
+  --color-bg: #FAFAF7;
+  --color-surface: #FFFFFF;
+  --color-text: #1C1C1A;
+  --color-text-sub: #5C5B55;
+  --color-primary: #2F5D50;
+  --color-primary-pressed: #24493F;
+  --color-secondary-pressed: #E3E1D9; /* 명세 2-3 SecondaryButton 눌림. 2-1 표에 빠져 있어 더함 */
+  --color-on-primary: #FFFFFF;
+  --color-border-input: #7A7972;
+  --color-border-check: #5C5B55;
+  --color-divider: #E6E4DD;
+  --color-notice-bg: #EFEDE6;
+  --color-skeleton: #E6E4DD;
+
+  /* 글자 — 한 화면에 크기 셋 */
+  --font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif;
+  --font-name: 700 32px/40px var(--font-family);
+  --font-title: 700 24px/32px var(--font-family);
+  --font-body: 400 16px/24px var(--font-family);
+  --font-sub: 400 14px/20px var(--font-family);
+  --font-google: 500 14px/20px var(--font-family); /* Google 단추 글(명세 2-4) */
+
+  /* 간격 — 4의 배수 */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px; --space-12: 48px;
+
+  /* 모서리 */
+  --radius-control: 8px;
+  --radius-check: 4px;
+
+  /* 그림자는 쓰지 않는다. 입력 줄 경계만 선으로 */
+  --edge-bar-top: 0 -1px 0 var(--color-divider);
+  --edge-bar-bottom: 0 1px 0 var(--color-divider);
+
+  /* 포커스 */
+  --focus-ring: 2px solid var(--color-primary);
+  --focus-offset: 2px;
+
+  /* 크기 — 높이는 모두 「최소」. 고정 height를 쓰지 않는다 */
+  --tap-min: 48px;
+  --page-x: 16px;
+  --page-max: 480px;
+  --todo-max-chars: 200; /* (임시) 유니코드 문자 수 */
+}
+:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  word-break: keep-all; /* 한글을 낱말 가운데서 끊지 않는다. 너무 긴 낱말만 overflow-wrap으로 끊는다 */
+}
+h1, p { margin: 0; }
+button, input { font: inherit; color: inherit; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- 단추 ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font: var(--font-body);
+  background: transparent;
+  cursor: pointer;
+}
+.btn-primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.btn-primary:active { background: var(--color-primary-pressed); border-color: var(--color-primary-pressed); }
+.btn-secondary { border-color: var(--color-primary); color: var(--color-primary); }
+.btn-secondary:active { background: var(--color-secondary-pressed); }
+.btn-text { padding: 0 var(--space-3); color: var(--color-primary); }
+.btn-text:active { background: var(--color-notice-bg); }
+
+/* ---- 알림 상자: 무채색. 노랑·빨강 없음 ---- */
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-notice-bg);
+  font: var(--font-body);
+  overflow-wrap: anywhere;
+}
+.notice p + p { margin-top: 0; }
+.notice-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* ---- Google 단추 (명세 2-4, Light) ---- */
+.google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: var(--tap-min);
+  max-width: 100%;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #747775;
+  border-radius: var(--radius-control);
+  color: #1F1F1F;
+  font: var(--font-google);
+  cursor: pointer;
+}
+.google-btn:active { background: #F1F1F1; }
+.google-btn img { display: block; width: 20px; height: 20px; flex: none; }
+
+/* ---- 로그인 화면 (방향 A: 단추가 아래, B: 위에서부터) ---- */
+.login {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-x);
+}
+.login-head { margin-top: 30dvh; }
+.login-name { font: var(--font-name); }
+.login-sentence { margin-top: var(--space-2); font: var(--font-body); color: var(--color-text-sub); }
+.login-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+.login-actions .notice { align-self: stretch; }
+.login.dir-b .login-head { margin-top: var(--space-6); }
+.login.dir-b .login-actions { margin-top: var(--space-6); padding-bottom: var(--space-6); }
+
+/* ---- 할 일 화면 ---- */
+.todo-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: var(--page-max);
+  margin: 0 auto;
+}
+.today-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--page-x) var(--space-4);
+}
+.today-title { font: var(--font-title); }
+.today-date { margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--page-x) var(--space-4); }
+.todo-main { flex: 1; padding: 0 var(--page-x); }
+.todo-main > .notice { margin-bottom: var(--space-2); }
+.todo-list, .todo-skeleton { list-style: none; margin: 0; padding: 0; }
+.todo-empty { padding: var(--space-4) 0; color: var(--color-text); }
+
+.todo-row {
+  display: flex;
+  align-items: flex-start;
+  min-height: 56px;
+  padding: var(--space-1) 0;
+  scroll-margin-top: 160px;
+  scroll-margin-bottom: 176px; /* 아래 입력 줄에 가리지 않게 */
+}
+.check-hit {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--tap-min);
+  min-height: var(--tap-min);
+  align-self: flex-start;
+}
+.check-hit input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.check-box {
+  position: absolute;
+  top: 12px; left: 12px;
+  width: 24px; height: 24px;
+  border: 2px solid var(--color-border-check);
+  border-radius: var(--radius-check);
+  background: transparent;
+  pointer-events: none;
+}
+.check-hit input:checked + .check-box { background: var(--color-primary); border-color: var(--color-primary); }
+.check-hit input:checked + .check-box::after {
+  content: "";
+  position: absolute;
+  left: 6px; top: 1px;
+  width: 6px; height: 12px;
+  border: solid var(--color-on-primary);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.check-hit input:focus-visible + .check-box { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.todo-body { flex: 1; min-width: 0; margin-left: var(--space-1); padding-top: var(--space-3); }
+.todo-text { font: var(--font-body); overflow-wrap: anywhere; white-space: pre-wrap; }
+.todo-text.is-done { color: var(--color-text-sub); text-decoration: line-through; }
+.todo-sub { font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.row-actions { display: flex; flex-wrap: wrap; margin-left: calc(var(--space-3) * -1); }
+
+.skeleton-row { align-items: center; }
+.skeleton-box { flex: none; width: 24px; height: 24px; margin: 0 var(--space-3); background: var(--color-skeleton); border-radius: var(--radius-check); }
+.skeleton-bar { display: block; min-height: 16px; background: var(--color-skeleton); border-radius: var(--radius-check); }
+
+/* ---- 입력 줄 ---- */
+.input-bar {
+  background: var(--color-surface);
+  padding: var(--space-2) var(--page-x) var(--space-3);
+}
+.input-label { display: block; font: var(--font-sub); color: var(--color-text); margin-bottom: var(--space-1); }
+.input-row { display: flex; gap: var(--space-2); align-items: flex-start; }
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  font: var(--font-body);
+}
+.add-btn { min-width: 64px; padding: 0 var(--space-3); white-space: nowrap; }
+.input-help { min-height: 20px; margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+
+.dir-a .input-bar {
+  position: sticky;
+  bottom: 0;
+  box-shadow: var(--edge-bar-top);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+}
+.dir-b .sticky-top { position: sticky; top: 0; z-index: 2; background: var(--color-bg); }
+.dir-b .input-bar { box-shadow: var(--edge-bar-bottom); }
+.dir-b .today-header { padding-bottom: var(--space-2); }
