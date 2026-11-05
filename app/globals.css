@@ -49,6 +49,9 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* C-D11: 스크롤하는 요소(문서)의 아래 여백. 포커스 받은 체크 칸·「다시」·「빼기」가 단추·적는 창 밑에 들어가지 않게.
+   --bottom-clearance는 TodoView가 창 높이를 재어(ResizeObserver) 넣는다. 없을 때는 닫힌 값(단추 56 + 위아래 16씩). */
+html { scroll-padding-bottom: var(--bottom-clearance, calc(88px + env(safe-area-inset-bottom))); }
 body {
   font: var(--font-body);
   background: var(--color-bg);
@@ -161,7 +164,8 @@ button, input { font: inherit; color: inherit; }
 .today-title { font: var(--font-title); }
 .today-date { margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--page-x) var(--space-4); }
-.todo-main { flex: 1; padding: 0 var(--page-x); }
+/* 목록 끝 여백(12-2): 창이 닫혔으면 88px, 열렸으면 창 높이 + 16px. 둘 다 + 안전 영역. scroll-padding-bottom과 같은 값 */
+.todo-main { flex: 1; padding: 0 var(--page-x) var(--bottom-clearance, calc(88px + env(safe-area-inset-bottom))); }
 .todo-main > .notice { margin-bottom: var(--space-2); }
 .todo-list, .todo-skeleton { list-style: none; margin: 0; padding: 0; }
 .todo-empty { padding: var(--space-4) 0; color: var(--color-text); }
@@ -171,8 +175,6 @@ button, input { font: inherit; color: inherit; }
   align-items: flex-start;
   min-height: 56px;
   padding: var(--space-1) 0;
-  scroll-margin-top: 160px;
-  scroll-margin-bottom: 176px; /* 아래 입력 줄에 가리지 않게 */
 }
 .check-hit {
   position: relative;
@@ -221,11 +223,116 @@ button, input { font: inherit; color: inherit; }
 .skeleton-box { flex: none; width: 24px; height: 24px; margin: 0 var(--space-3); background: var(--color-skeleton); border-radius: var(--radius-check); }
 .skeleton-bar { display: block; min-height: 16px; background: var(--color-skeleton); border-radius: var(--radius-check); }
 
-/* ---- 입력 줄 ---- */
-.input-bar {
-  background: var(--color-surface);
-  padding: var(--space-2) var(--page-x) var(--space-3);
+/* ---- 분야 표시(CategoryTag, 12-3): 할 일 글 아래 4px. 긴 이름은 줄바꿈, 말줄임 없음 ---- */
+.category-tag-line { margin-top: var(--space-1); }
+.category-tag {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-check);
+  background: var(--color-notice-bg);
+  color: var(--color-text-sub);
+  font: var(--font-sub);
+  overflow-wrap: anywhere;
 }
+
+/* ---- 할 일 적기 단추(AddTodoButton, 12-3): 오른쪽 아래에 떠 있음. 본문 폭 480 안 ---- */
+.add-todo-btn {
+  position: fixed;
+  z-index: 3;
+  right: max(var(--space-4), calc((100vw - var(--page-max)) / 2 + var(--space-4)));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  min-height: 56px;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  white-space: nowrap;
+}
+.add-todo-btn .plus-icon { display: block; flex: none; } /* 24×24는 svg 속성으로(고정 height 규칙을 쓰지 않는다) */
+
+/* ---- 적는 창(TodoSheet, 12-3): 모달이 아니다. 화면 아래(키보드 위, C-D3 resizes-content), 본문 폭 480 안 ---- */
+.todo-sheet {
+  position: fixed;
+  z-index: 3;
+  bottom: 0;
+  left: max(0px, calc((100vw - var(--page-max)) / 2));
+  right: max(0px, calc((100vw - var(--page-max)) / 2));
+  max-height: 100dvh; /* 보이는 화면보다 높아지면 창 안이 스크롤된다(C26) */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-surface);
+  box-shadow: var(--edge-bar-top);
+  padding: var(--space-2) var(--page-x) calc(var(--space-3) + env(safe-area-inset-bottom));
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.sheet-label { display: block; font: var(--font-sub); color: var(--color-text); }
+.sheet-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  min-height: var(--tap-min);
+  font: var(--font-sub);
+  color: var(--color-text-sub);
+  overflow-wrap: anywhere;
+}
+.cat-notice { font: var(--font-sub); color: var(--color-text); overflow-wrap: anywhere; }
+.cat-notice:empty { display: none; }
+.sheet-todo-label { margin-top: var(--space-2); margin-bottom: var(--space-1); }
+
+/* 칩 줄(CategoryChipRow): 한 줄, 옆으로 민다. 안쪽 왼쪽 4·오른쪽 16(포커스 고리가 잘리지 않게, 「+ 분야」까지 닿게) */
+.chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4) 0 var(--space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+/* 칩(CategoryChip·AddCategoryChip): 누름 영역 48×48 이상(위아래 투명 8), 보이는 면은 높이 32 */
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  /* 칩 최대 폭 = 칩 줄 보이는 폭 − --chip-max-gap(임시 32px). 100%는 칩 줄 안쪽 폭(보이는 폭 − 안쪽 여백 20) */
+  max-width: calc(100% + 20px - var(--chip-max-gap, 32px));
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.chip-face {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: var(--font-sub);
+}
+.chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-check { display: block; flex: none; } /* 16×16은 svg 속성으로 */
+.chip:active .chip-face { background: var(--color-notice-bg); }
+.chip[aria-pressed="true"] .chip-face { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.chip[aria-pressed="true"]:active .chip-face { background: var(--color-primary-pressed); border-color: var(--color-primary-pressed); }
+.chip-add .chip-face { color: var(--color-primary); }
+.chip:focus-visible { outline: none; }
+.chip:focus-visible .chip-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* 새 분야 줄(NewCategoryRow): 칸 + 「더하기」「취소」. 좁으면 단추 둘이 칸 아래 줄로 */
+.newcat { padding-top: var(--space-1); }
+.newcat-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
+.newcat-field { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; }
+.newcat-actions { display: flex; flex: none; gap: var(--space-2); }
+
+/* ---- 적는 칸(창 안 ④, 2-3 TodoInputBar의 칸·단추·도움말과 같은 값) ---- */
 .input-label { display: block; font: var(--font-sub); color: var(--color-text); margin-bottom: var(--space-1); }
 .input-row { display: flex; gap: var(--space-2); align-items: flex-start; }
 .input {
@@ -240,13 +347,3 @@ button, input { font: inherit; color: inherit; }
 }
 .add-btn { min-width: 64px; padding: 0 var(--space-3); white-space: nowrap; }
 .input-help { min-height: 20px; margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
-
-.dir-a .input-bar {
-  position: sticky;
-  bottom: 0;
-  box-shadow: var(--edge-bar-top);
-  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
-}
-.dir-b .sticky-top { position: sticky; top: 0; z-index: 2; background: var(--color-bg); }
-.dir-b .input-bar { box-shadow: var(--edge-bar-bottom); }
-.dir-b .today-header { padding-bottom: var(--space-2); }

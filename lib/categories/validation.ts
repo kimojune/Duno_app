@@ -13,6 +13,12 @@ import { z } from "zod";
  */
 export const CATEGORY_NAME_MAX_LENGTH = 20;
 
+/**
+ * 사용자당 분야 수 상한. 임시, 결정 필요: 50(보관한 것 포함). DB 트리거(private.categories_enforce_limit)와 같은 값.
+ * 화면은 이 값으로 「+ 분야」를 누를 때 미리 알리고(C20), 서버 거절(category_limit)에도 같은 문구를 쓴다.
+ */
+export const CATEGORY_LIMIT = 50;
+
 /** 분야 번호가 비었을 때 화면이 보여 줄 이름이자, 분야 이름으로 쓸 수 없는 이름 */
 export const OTHER_CATEGORY_NAME = "기타";
 
@@ -30,6 +36,11 @@ export function normalizeCategoryName(name: string): string {
 /** 같은 이름 판정용 열쇠: 정규화한 뒤 로마자 대문자(A~Z)만 소문자로. 다른 글자의 대소문자는 건드리지 않는다. */
 export function categoryNameKey(name: string): string {
   return normalizeCategoryName(name).replace(/[A-Z]/g, (c) => c.toLowerCase());
+}
+
+/** 화면 표시용 글자 수: 정규화한 이름의 코드 포인트 수(C16) */
+export function countCategoryChars(name: string): number {
+  return [...normalizeCategoryName(name)].length;
 }
 
 /** 두 이름이 같은 분야 이름인가(12-7 판정) */
