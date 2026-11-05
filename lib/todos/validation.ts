@@ -38,5 +38,8 @@ export function checkTodoText(input: unknown): TodoTextCheck {
 /** 할 일 id: uuid 형식만(화면이 crypto.randomUUID()로 만든다) */
 export const todoIdSchema = z.uuid();
 
+/** 할 일의 분야 번호: 없거나 null이면 「기타」, 있으면 uuid 형식만. 내 분야인지는 DB 외래 키가 본다. */
+export const todoCategoryIdSchema = z.uuid().nullable().optional();
+
 /** 끝냄 값: 참·거짓만(뒤집기가 아니라 원하는 값) */
 export const todoDoneSchema = z.boolean();

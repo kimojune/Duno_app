@@ -1,9 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTodoForToday, listTodosForToday, setTodoDoneForUser } from "../../lib/todos/core";
-import { decryptTodoText, encryptTodoText, parseTodoKey, type TodoKey } from "../../lib/todos/crypto";
+import { decryptTodoText, encryptCategoryName, encryptTodoText, parseTodoKey, type TodoKey } from "../../lib/todos/crypto";
 import { todoDayFor } from "../../lib/todos/day";
-import { FakeDb, fakeClient, type FakeRow } from "./fake-supabase";
+import { FakeDb, fakeClient, type FakeCategoryRow, type FakeRow } from "./fake-supabase";
 
 // 시험 키는 무작위로 만든다(진짜 TODO_ENCRYPTION_KEY를 쓰지 않는다).
 const newKey = (): TodoKey => parseTodoKey(randomBytes(32).toString("base64"))!;
@@ -41,9 +41,22 @@ function seed(row: Partial<FakeRow> & { user_id: string; text?: string }): FakeR
     text_encrypted: row.text_encrypted ?? encryptTodoText(row.text ?? "seed", row.user_id, key),
     done: row.done ?? false,
     created_at: row.created_at ?? db.nextCreatedAt(),
+    category_id: row.category_id ?? null,
   };
   db.rows.push(full);
   return full;
+}
+
+function seedCategory(user_id: string, name = "취업"): FakeCategoryRow {
+  const row: FakeCategoryRow = {
+    id: randomUUID(),
+    user_id,
+    name_encrypted: encryptCategoryName(name, user_id, key),
+    archived_at: null,
+    created_at: db.nextCreatedAt(),
+  };
+  db.categories.push(row);
+  return row;
 }
 
 describe("로그인 안 됨·만료 (T13)", () => {
@@ -129,7 +142,7 @@ describe("적기", () => {
       ok: true,
       data: {
         day: { date: TODAY, year: 2026, month: 11, dayOfMonth: 5, weekday: 4 },
-        todo: { id, readable: true, text: "토익 단어 30개 외우기", done: false, createdAt: expect.any(String) },
+        todo: { id, readable: true, text: "토익 단어 30개 외우기", done: false, createdAt: expect.any(String), categoryId: null },
       },
     });
 
@@ -256,7 +269,7 @@ describe("오늘 목록", () => {
     expect(res.data.todos.map((x) => x.id)).toEqual([a1.id, a2.id, b.id]);
     expect(res.data.todos.map((x) => x.text)).toEqual(["첫째-1", "첫째-2", "둘째"]);
     for (const item of res.data.todos) {
-      expect(Object.keys(item).sort()).toEqual(["createdAt", "done", "id", "readable", "text"]);
+      expect(Object.keys(item).sort()).toEqual(["categoryId", "createdAt", "done", "id", "readable", "text"]);
     }
   });
 
@@ -278,7 +291,14 @@ describe("오늘 목록", () => {
     const byId = new Map(res.data.todos.map((x) => [x.id, x]));
     expect(byId.get(good.id)).toMatchObject({ readable: true, text: "멀쩡한 글" });
     for (const bad of [forged, wrongOwner, wrongKey]) {
-      expect(byId.get(bad.id)).toEqual({ id: bad.id, readable: false, text: null, done: false, createdAt: bad.created_at });
+      expect(byId.get(bad.id)).toEqual({
+        id: bad.id,
+        readable: false,
+        text: null,
+        done: false,
+        createdAt: bad.created_at,
+        categoryId: null,
+      });
     }
   });
 
@@ -287,5 +307,84 @@ describe("오늘 목록", () => {
     const res = await listTodosForToday({ supabase: signedIn(), key, now });
     expect(res).toEqual({ ok: false, error: "unavailable" });
     expect(JSON.stringify(res)).not.toContain("10.0.0.1");
+  });
+});
+
+describe("할 일의 분야 (D-135, 악용 3·6·11)", () => {
+  it("분야 번호가 없거나 null이면 기타: category_id를 보내지 않고 categoryId는 null", async () => {
+    const deps = { supabase: signedIn(), key, now };
+    for (const categoryId of [undefined, null]) {
+      const res = await createTodoForToday(deps, randomUUID(), "기타 할 일", categoryId);
+      expect(res).toMatchObject({ ok: true, data: { todo: { categoryId: null } } });
+    }
+    for (const insert of db.calls.filter((c) => c.op === "insert")) {
+      expect(insert.payload).not.toHaveProperty("category_id");
+    }
+    expect(db.rows.map((r) => r.category_id)).toEqual([null, null]);
+  });
+
+  it("정상: 내 분야 번호로 적으면 그 번호가 저장되고 목록 항목에 categoryId로 실린다", async () => {
+    const mine = seedCategory(me);
+    const deps = { supabase: signedIn(), key, now };
+    const id = randomUUID();
+    const res = await createTodoForToday(deps, id, "자소서 쓰기", mine.id);
+    expect(res).toMatchObject({ ok: true, data: { todo: { id, text: "자소서 쓰기", categoryId: mine.id } } });
+    const insert = db.calls.find((c) => c.op === "insert")!;
+    expect(insert.payload!.category_id).toBe(mine.id);
+    expect(Object.keys(insert.payload!).sort()).toEqual(["category_id", "day", "id", "text_encrypted", "user_id"]);
+
+    seed({ user_id: me, text: "기타 글" });
+    const list = await listTodosForToday(deps);
+    expect(list.ok).toBe(true);
+    if (!list.ok) return;
+    expect(list.data.todos.map((t) => t.categoryId)).toEqual([mine.id, null]);
+  });
+
+  it("악용 3: 남의 분야 번호로 적으면 DB 외래 키가 거절하고 invalid_category, 행이 생기지 않는다", async () => {
+    const theirs = seedCategory(other, "남의 분야");
+    const res = await createTodoForToday({ supabase: signedIn(), key, now }, randomUUID(), "글", theirs.id);
+    expect(res).toEqual({ ok: false, error: "invalid_category" });
+    expect(db.rows).toHaveLength(0);
+    expect(JSON.stringify(res)).not.toContain("todos_category_owner_fkey");
+  });
+
+  it("없는 분야 번호도 invalid_category", async () => {
+    const res = await createTodoForToday({ supabase: signedIn(), key, now }, randomUUID(), "글", randomUUID());
+    expect(res).toEqual({ ok: false, error: "invalid_category" });
+    expect(db.rows).toHaveLength(0);
+  });
+
+  it("악용 6: 분야 번호가 uuid가 아니면 invalid_input, DB를 부르지 않는다", async () => {
+    const deps = { supabase: signedIn(), key, now };
+    for (const categoryId of ["", "기타", "1", 7, true, {}, [randomUUID()], { id: randomUUID() }]) {
+      expect(await createTodoForToday(deps, randomUUID(), "글", categoryId)).toEqual({ ok: false, error: "invalid_input" });
+    }
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it("악용 1: 세션이 없으면 분야 번호가 있어도 unauthenticated, DB를 부르지 않는다", async () => {
+    const theirs = seedCategory(other);
+    expect(await createTodoForToday({ supabase: signedOut(), key, now }, randomUUID(), "글", theirs.id)).toEqual({
+      ok: false,
+      error: "unauthenticated",
+    });
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it("분야 번호 없이 23503이 오면(분야와 상관없는 외래 키) invalid_category가 아니라 unavailable", async () => {
+    db.insertError = { code: "23503", message: 'violates foreign key constraint "todos_user_id_fkey"' };
+    const res = await createTodoForToday({ supabase: signedIn(), key, now }, randomUUID(), "글");
+    expect(res).toEqual({ ok: false, error: "unavailable" });
+  });
+
+  it("같은 id 재시도는 분야 번호가 있어도 행 하나, 처음 행 그대로", async () => {
+    const mine = seedCategory(me);
+    const deps = { supabase: signedIn(), key, now };
+    const id = randomUUID();
+    const first = await createTodoForToday(deps, id, "처음", mine.id);
+    const second = await createTodoForToday(deps, id, "다시", mine.id);
+    expect(first.ok && second.ok).toBe(true);
+    expect(db.rows).toHaveLength(1);
+    if (first.ok && second.ok) expect(second.data.todo).toEqual(first.data.todo);
   });
 });

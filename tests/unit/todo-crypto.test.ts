@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CIPHERTEXT_MAX_LENGTH,
   DECRYPT_FAILED,
+  decryptCategoryName,
   decryptTodoText,
+  encryptCategoryName,
   encryptTodoText,
   parseTodoKey,
   type TodoKey,
@@ -158,5 +160,63 @@ describe("암호화·풀기", () => {
     const result = decryptTodoText(encryptTodoText("글", user, key), user, newKey());
     expect(result).toEqual({ ok: false });
     expect(Object.keys(result)).toEqual(["ok"]);
+  });
+});
+
+describe("용도별 AAD: 할 일 글과 분야 이름 (악용 9)", () => {
+  const user = randomUUID();
+
+  // base(c35cf7b, 용도 구분 전) 코드의 encryptTodoText로 만든 고정 값. 이미 DB에 있는 할 일 글이 이 꼴이다.
+  // 키는 0x2a 32바이트(시험용, 비밀 아님), 소유자 id와 평문은 아래와 같다. 이 시험이 깨지면 할 일 글 AAD가 바뀐 것이다.
+  const BASE_USER = "0b0e7a52-6f1c-4d8e-9a3b-2c4d5e6f7a8b";
+  const BASE_PLAIN = "기존 할 일 글 v1";
+  const BASE_VALUE = "v1:RyiG6Y1pUkzvnw-v:ReHw8O7rXDh7vkt0Z4YirmhGRuPB:z88r7YPWbcj49CabgfTfsw";
+  const baseKey = () => parseTodoKey(Buffer.alloc(32, 0x2a).toString("base64"))!;
+
+  it("base 코드로 암호화한 할 일 글이 바뀐 코드로도 풀린다(할 일 글 AAD 그대로)", () => {
+    expect(decryptTodoText(BASE_VALUE, BASE_USER, baseKey())).toEqual({ ok: true, text: BASE_PLAIN });
+    expect(decryptTodoText(BASE_VALUE, BASE_USER, baseKey(), "todo_text")).toEqual({ ok: true, text: BASE_PLAIN });
+  });
+
+  it("base 할 일 글 값을 분야 이름으로 풀면 실패", () => {
+    expect(decryptCategoryName(BASE_VALUE, BASE_USER, baseKey())).toBe(DECRYPT_FAILED);
+  });
+
+  it("분야 이름은 왕복하고, 같은 v1 형식(DB 형식 규칙)을 지킨다", () => {
+    const key = newKey();
+    const value = encryptCategoryName("취업 준비", user, key);
+    expect(value).toMatch(dbFormatRule());
+    expect(value.startsWith("v1:")).toBe(true);
+    expect(value).not.toContain("취업");
+    expect(decryptCategoryName(value, user, key)).toEqual({ ok: true, text: "취업 준비" });
+  });
+
+  it("할 일 글 암호문을 분야 이름 자리에 옮기면 풀리지 않는다", () => {
+    const key = newKey();
+    const todo = encryptTodoText("할 일 글", user, key);
+    expect(decryptTodoText(todo, user, key)).toEqual({ ok: true, text: "할 일 글" }); // 양성 대조
+    expect(decryptCategoryName(todo, user, key)).toBe(DECRYPT_FAILED);
+  });
+
+  it("분야 이름 암호문을 할 일 글 자리에 옮기면 풀리지 않는다", () => {
+    const key = newKey();
+    const name = encryptCategoryName("분야", user, key);
+    expect(decryptCategoryName(name, user, key)).toEqual({ ok: true, text: "분야" }); // 양성 대조
+    expect(decryptTodoText(name, user, key)).toBe(DECRYPT_FAILED);
+  });
+
+  it("분야 이름도 다른 사용자·다른 키로는 풀리지 않는다", () => {
+    const key = newKey();
+    const name = encryptCategoryName("분야", user, key);
+    expect(decryptCategoryName(name, randomUUID(), key)).toBe(DECRYPT_FAILED);
+    expect(decryptCategoryName(name, user, newKey())).toBe(DECRYPT_FAILED);
+  });
+
+  it("모르는 용도는 암호화에서 던지고, 풀기에서는 실패(할 일 글 AAD로 넘어가지 않는다)", () => {
+    const key = newKey();
+    const todo = encryptTodoText("글", user, key);
+    const bogus = "toString" as unknown as "todo_text";
+    expect(() => encryptTodoText("글", user, key, bogus)).toThrow(TypeError);
+    expect(decryptTodoText(todo, user, key, bogus)).toBe(DECRYPT_FAILED);
   });
 });

@@ -1,14 +1,14 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
+import { requireUserId } from "../session";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
 import { describeTodoDay, todoDayFor } from "./day";
 import type { AddedTodo, TodayTodos, TodoDoneState, TodoErrorCode, TodoItem, TodoResult } from "./types";
-import { checkTodoText, todoDoneSchema, todoIdSchema } from "./validation";
+import { checkTodoText, todoCategoryIdSchema, todoDoneSchema, todoIdSchema } from "./validation";
 
 /**
  * 할 일 데이터 접근의 핵심(서버 전용). Supabase 클라이언트·키·시계를 인자로 받아 시험할 수 있게 뗐다.
- * - 함수마다 자기 안에서 세션을 확인한다(getClaims, 서명 검증). getSession 값은 믿지 않는다.
+ * - 함수마다 자기 안에서 세션을 확인한다(lib/session의 getClaims, 서명 검증). getSession 값은 믿지 않는다.
  * - 사용자 id는 세션에서, 날짜는 서버가 요청을 받은 시각과 todoDayFor로 정한다. 호출자가 user_id·날짜를 넘길 길이 없다.
  * - 예상된 실패는 던지지 않고 짧은 오류 코드로 돌려준다. DB 오류 원문·평문·키를 로그나 반환값에 담지 않는다.
  */
@@ -21,20 +21,7 @@ export type TodoDeps = {
 };
 
 const fail = (error: TodoErrorCode) => ({ ok: false, error }) as const;
-const userIdSchema = z.guid();
 const serverNow = () => new Date();
-
-/** 세션에서 사용자 id를 얻는다. 없거나 만료·검증 실패면 unauthenticated. */
-async function requireUserId(supabase: SupabaseClient): Promise<TodoResult<string>> {
-  try {
-    const { data, error } = await supabase.auth.getClaims();
-    if (error || !data?.claims) return fail("unauthenticated");
-    const sub = userIdSchema.safeParse(data.claims.sub);
-    return sub.success ? { ok: true, data: sub.data } : fail("unauthenticated");
-  } catch {
-    return fail("unavailable");
-  }
-}
 
 type DbError = { code?: string | null; hint?: string | null } | null | undefined;
 
@@ -49,14 +36,22 @@ function mapDbError(error: DbError): TodoErrorCode {
   return "unavailable";
 }
 
-type TodoRow = { id: string; day: string; text_encrypted: string; done: boolean; created_at: string };
-const ROW_COLUMNS = "id, day, text_encrypted, done, created_at";
+type TodoRow = {
+  id: string;
+  day: string;
+  text_encrypted: string;
+  done: boolean;
+  created_at: string;
+  category_id: string | null;
+};
+const ROW_COLUMNS = "id, day, text_encrypted, done, created_at, category_id";
 
 function toItem(row: TodoRow, userId: string, key: TodoKey): TodoItem {
   const opened = decryptTodoText(row.text_encrypted, userId, key);
+  const categoryId = row.category_id ?? null;
   return opened.ok
-    ? { id: row.id, readable: true, text: opened.text, done: row.done, createdAt: row.created_at }
-    : { id: row.id, readable: false, text: null, done: row.done, createdAt: row.created_at };
+    ? { id: row.id, readable: true, text: opened.text, done: row.done, createdAt: row.created_at, categoryId }
+    : { id: row.id, readable: false, text: null, done: row.done, createdAt: row.created_at, categoryId };
 }
 
 /** 오늘(서울 새벽 4시 기준) 내 할 일 목록. created_at 오름차순, 같으면 id. 풀 수 없는 행은 그 행만 readable=false. */
@@ -85,16 +80,25 @@ export async function listTodosForToday(deps: TodoDeps): Promise<TodoResult<Toda
 }
 
 /**
- * 오늘 날짜로 할 일을 적는다. 받는 것은 화면이 만든 uuid와 글뿐이다(user_id·날짜는 받지 않는다).
+ * 오늘 날짜로 할 일을 적는다. 받는 것은 화면이 만든 uuid와 글, 분야 번호뿐이다(user_id·날짜는 받지 않는다).
+ * 분야 번호가 없거나 null이면 「기타」. uuid가 아니면 invalid_input, 없는 분야·남의 분야면 DB 외래 키가 거절해 invalid_category.
  * 같은 id로 다시 오면(재시도) 새 행을 만들지 않고, 그 id의 행이 내 것으로 보이면 그 행으로 성공한다.
  * 보이지 않으면(남의 행과 id가 겹침) conflict.
  */
-export async function createTodoForToday(deps: TodoDeps, id: unknown, text: unknown): Promise<TodoResult<AddedTodo>> {
+export async function createTodoForToday(
+  deps: TodoDeps,
+  id: unknown,
+  text: unknown,
+  categoryId?: unknown,
+): Promise<TodoResult<AddedTodo>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     const parsedId = todoIdSchema.safeParse(id);
     if (!parsedId.success) return fail("invalid_input");
+    const parsedCategory = todoCategoryIdSchema.safeParse(categoryId);
+    if (!parsedCategory.success) return fail("invalid_input");
+    const category = parsedCategory.data ?? null;
     const checked = checkTodoText(text);
     if (!checked.ok) return fail(checked.error);
     if (!deps.key) return fail("config");
@@ -104,10 +108,10 @@ export async function createTodoForToday(deps: TodoDeps, id: unknown, text: unkn
     const textEncrypted = encryptTodoText(checked.text, user.data, key);
     if (textEncrypted.length > CIPHERTEXT_MAX_LENGTH) return fail("too_long");
 
-    const { data, error } = await deps.supabase
-      .from("todos")
-      .insert({ id: parsedId.data, user_id: user.data, day, text_encrypted: textEncrypted })
-      .select(ROW_COLUMNS);
+    // 기타(null)는 열을 보내지 않는다(기본값 null). 분야가 있을 때만 category_id를 싣는다.
+    const values: Record<string, string> = { id: parsedId.data, user_id: user.data, day, text_encrypted: textEncrypted };
+    if (category !== null) values.category_id = category;
+    const { data, error } = await deps.supabase.from("todos").insert(values).select(ROW_COLUMNS);
 
     if (error) {
       // 같은 id(23505)거나, 이미 들어간 뒤 상한에 걸린 재시도(P0001)라면 내 행이 있는지 본다.
@@ -121,6 +125,8 @@ export async function createTodoForToday(deps: TodoDeps, id: unknown, text: unkn
         const row = ((existing.data ?? []) as TodoRow[])[0];
         if (row) return { ok: true, data: { day: describeTodoDay(row.day), todo: toItem(row, user.data, key) } };
       }
+      // 분야 외래 키(todos_category_owner_fkey) 위반: 없는 분야이거나 남의 분야
+      if (error.code === "23503" && category !== null) return fail("invalid_category");
       return fail(mapDbError(error));
     }
 
@@ -130,7 +136,14 @@ export async function createTodoForToday(deps: TodoDeps, id: unknown, text: unkn
       ok: true,
       data: {
         day: describeTodoDay(row.day),
-        todo: { id: row.id, readable: true, text: checked.text, done: row.done, createdAt: row.created_at },
+        todo: {
+          id: row.id,
+          readable: true,
+          text: checked.text,
+          done: row.done,
+          createdAt: row.created_at,
+          categoryId: row.category_id ?? null,
+        },
       },
     };
   } catch {
