@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { signOut } from "../app/actions";
 import { addTodo, setTodoDone } from "../app/todos/actions";
 import { fetchToday } from "../lib/read-client";
@@ -111,7 +111,9 @@ export function TodoScreen({
   const focusRequestRef = useRef<{ kind: "row"; id: string } | { kind: "input" } | null>(null);
   const confirmWasOpenRef = useRef(false);
 
-  useEffect(() => {
+  // 그린 줄과 ref를 화면이 그려지기 전에(layout) 맞춘다. 수동 effect로 두면 그린 직후 누른 체크·빼기가
+  // 아직 옛 rowsRef를 읽어 아무 일도 하지 않는 틈이 있다(빠른 손가락·시험에서 간헐적으로 드러났다).
+  useLayoutEffect(() => {
     rowsRef.current = rows;
     const target = scrollToRef.current;
     if (target) {
@@ -119,7 +121,7 @@ export function TodoScreen({
       document.getElementById(`row-${target}`)?.scrollIntoView({ block: "nearest" });
     }
   }, [rows]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     draftRef.current = draft;
   }, [draft]);
 
@@ -368,7 +370,8 @@ export function TodoScreen({
 
   // 포커스가 있던 요소가 사라져도 body로 떨어뜨리지 않는다.
   // 「빼기」 규칙(바로 아래 줄 체크 칸 → 위 줄 → 입력 칸)이 앞서고, 확인이 닫힐 때 포커스가 확인 안이나 body면 머리 「로그아웃」으로 보낸다.
-  useEffect(() => {
+  // 요소가 사라진 그 커밋 안에서(layout) 옮긴다: 그려진 뒤 잠깐이라도 포커스가 body에 있지 않게.
+  useLayoutEffect(() => {
     const request = focusRequestRef.current;
     focusRequestRef.current = null;
     if (request) {
