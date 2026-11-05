@@ -9,7 +9,8 @@ Node와 npm이 필요합니다(Node 24.18, npm 11.16에서 확인).
 ```bash
 npm ci
 cp .env.example .env.local   # 값을 채운다
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3000 (이 컴퓨터에서만 듣는다. 127.0.0.1이 아니라 localhost로 연다:
+                             #  Supabase 로그인 돌아오는 주소가 http://localhost:3000/... 이다)
 ```
 
 ## 비밀값
