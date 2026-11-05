@@ -6,6 +6,7 @@ import type { TodoDay, TodoItem, TodoResult } from "../../lib/todos/types";
 const fetchTodayTodos = vi.fn();
 const addTodo = vi.fn();
 const setTodoDone = vi.fn();
+const addCategory = vi.fn();
 const signOut = vi.fn();
 const refresh = vi.fn();
 // MO-17 ①: 목록 다시 읽기는 Server Action이 아니라 GET(lib/read-client)이다. 쓰기만 Action을 가짜로 바꾼다.
@@ -13,6 +14,7 @@ const refresh = vi.fn();
 vi.mock("../../app/todos/actions", () => ({
   addTodo: (...a: unknown[]) => addTodo(...a),
   setTodoDone: (...a: unknown[]) => setTodoDone(...a),
+  addCategory: (...a: unknown[]) => addCategory(...a),
 }));
 vi.mock("../../lib/read-client", () => ({
   fetchToday: async (...a: unknown[]) => ({
@@ -51,8 +53,14 @@ async function renderLoaded(todos: TodoItem[] = []) {
   await screen.findByText(/개 중 \d개 끝냄/);
 }
 
+/** 방향 C: 할 일 칸은 적는 창 안에 있다. 창이 닫혀 있으면 「할 일 적기」 단추로 연다(옛 A 화면의 입력 줄 자리) */
+function openSheet() {
+  const button = screen.queryByRole("button", { name: /^(할 일 적기|적던 글 이어 적기)$/ });
+  if (button) fireEvent.click(button);
+}
 function input() {
-  return screen.getByLabelText("할 일 적기") as HTMLInputElement;
+  openSheet();
+  return screen.getByRole("textbox", { name: "할 일 적기" }) as HTMLInputElement;
 }
 function write(text: string) {
   fireEvent.change(input(), { target: { value: text } });
@@ -62,7 +70,7 @@ function press() {
 }
 
 beforeEach(() => {
-  for (const m of [fetchTodayTodos, addTodo, setTodoDone, signOut, refresh]) m.mockReset();
+  for (const m of [fetchTodayTodos, addTodo, setTodoDone, addCategory, signOut, refresh]) m.mockReset();
   setOnline(true);
   signOut.mockResolvedValue(undefined);
   Element.prototype.scrollIntoView = vi.fn(); // jsdom에는 없다
@@ -90,7 +98,8 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
     await renderLoaded([]);
     expect(screen.getByText(/0개 중 0개 끝냄/)).toBeTruthy();
     expect(screen.getByText("오늘 적은 할 일이 없어요.")).toBeTruthy();
-    expect(screen.getByText("아래 칸에 적어 보세요.")).toBeTruthy();
+    // 방향 C(C3): 창이 닫혀 있으면 둘째 줄은 단추를 가리킨다(창이 열린 모습은 todo-sheet 시험)
+    expect(screen.getByText("아래 단추를 눌러 적어 보세요.")).toBeTruthy();
     expect(document.body.textContent).not.toContain("@");
   });
 
@@ -153,7 +162,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     addTodo.mockResolvedValueOnce(ok({ day: DAY, todo: item(id1 as string, "첫째 글") }));
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     await waitFor(() => expect(addTodo).toHaveBeenCalledTimes(3));
-    expect(addTodo.mock.calls[2]).toEqual([id1, "첫째 글"]);
+    expect(addTodo.mock.calls[2]).toEqual([id1, "첫째 글", null]); // 방향 C: 셋째 인자는 분야 번호(null = 기타)
     await waitFor(() => expect(screen.queryByText("저장하지 못했어요.")).toBeNull());
     expect(screen.getAllByText("첫째 글")).toHaveLength(1); // 줄은 하나
   });
@@ -644,7 +653,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     const id = addTodo.mock.calls[0][0] as string;
     addTodo.mockReturnValueOnce(new Promise(() => {}));
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
-    expect(addTodo.mock.calls[1]).toEqual([id, "느린 글"]); // 같은 id, 같은 글
+    expect(addTodo.mock.calls[1]).toEqual([id, "느린 글", null]); // 같은 id, 같은 글, 같은 분야 번호(기타)
 
     first.resolve(ok({ day: DAY, todo: item(id, "느린 글") })); // 늦게 온 성공
     await act(async () => {});
@@ -1022,7 +1031,7 @@ describe("MO-17 LOW 고침", () => {
     expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: "다시 보낼 글" }));
   });
 
-  it("사라지는 단추의 포커스: 「다시 불러오기」를 누르면 안내가 사라져도 포커스가 입력 칸에 있다", async () => {
+  it("사라지는 단추의 포커스: 「다시 불러오기」를 누르면 안내가 사라져도 포커스가 body가 아니라 「할 일 적기」 단추에 있다(창이 닫혀 있을 때)", async () => {
     fetchTodayTodos.mockResolvedValueOnce(fail("unavailable"));
     render(<TodoScreen />);
     const reloadButton = await screen.findByRole("button", { name: "다시 불러오기" });
@@ -1031,6 +1040,7 @@ describe("MO-17 LOW 고침", () => {
     fireEvent.click(reloadButton);
     expect(screen.queryByRole("button", { name: "다시 불러오기" })).toBeNull();
     expect(document.activeElement).not.toBe(document.body);
-    expect(document.activeElement).toBe(input());
+    // 방향 C: 할 일 칸은 창 안에 있어, 창이 닫혀 있으면 「할 일 적기」 단추로 간다(창이 열려 있으면 칸 — todo-sheet 시험)
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "할 일 적기" }));
   });
 });

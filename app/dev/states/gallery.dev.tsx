@@ -41,7 +41,7 @@ const BASIC: RowView[] = [
 
 const LONG_TEXT = "가".repeat(100) + "나".repeat(100); // 200자
 const LONG_URL = "https://example.com/" + "a-very-long-path-without-spaces/".repeat(6) + "end";
-const NAME_20 = "토익스피킹레벨칠목표반복연습하기매일"; // 한글 20자 이름(C23)
+const NAME_20 = "토익스피킹레벨칠목표반복연습하기매일아침"; // 한글 20자 이름(C23)
 const OVER_DRAFT = "다".repeat(230);
 const OVER_CATEGORY = "가나다라마바사아자차카타파하거너더러머버서"; // 23자(C16)
 const COUNT_CATEGORY = "가나다라마바사아자차카타파하거"; // 15자(C16 셈)

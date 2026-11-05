@@ -114,7 +114,7 @@ describe("Server Action 파일은 쓰기만 (MO-17 ①)", () => {
     const imported = /import\s*\{([^}]*)\}\s*from\s*"\.\.\/app\/todos\/actions"/.exec(src);
     expect(imported).not.toBeNull();
     const names = imported![1].split(",").map((s) => s.trim()).filter(Boolean).sort();
-    expect(names).toEqual(["addTodo", "setTodoDone"]);
+    expect(names).toEqual(["addCategory", "addTodo", "setTodoDone"]); // 방향 C: 분야 더하기도 쓰기 Action
     expect(src).toContain('from "../lib/read-client"');
   });
 });

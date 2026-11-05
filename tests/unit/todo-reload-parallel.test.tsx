@@ -70,7 +70,8 @@ describe("MO-17 ① 다시 불러오기는 적기·체크와 나란히 돈다", 
     render(<TodoScreen initial={ok([item(ID_A, "처음 글")])} />);
     let addResolved = false;
     addTodo.mockReturnValue(new Promise(() => {}).then(() => (addResolved = true))); // 끝나지 않는 적기
-    fireEvent.change(screen.getByLabelText("할 일 적기"), { target: { value: "느린 망에서 적은 글" } });
+    fireEvent.click(screen.getByRole("button", { name: "할 일 적기" })); // 방향 C: 적는 창을 연다
+    fireEvent.change(screen.getByRole("textbox", { name: "할 일 적기" }), { target: { value: "느린 망에서 적은 글" } });
     fireEvent.click(screen.getByRole("button", { name: "적기" }));
     expect(addTodo).toHaveBeenCalledTimes(1);
 
