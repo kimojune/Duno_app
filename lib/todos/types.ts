@@ -27,7 +27,7 @@ export type TodoItem =
   | { id: string; readable: true; text: string; done: boolean; createdAt: string; categoryId: string | null }
   | { id: string; readable: false; text: null; done: boolean; createdAt: string; categoryId: string | null };
 
-/** 두노 하루(서울 새벽 4시 경계)와 화면 날짜 글을 만들 재료. 예: 11월 5일 수요일 */
+/** 두노 하루(서울 새벽 4시 경계)와 화면 날짜 글을 만들 재료. 예: 11월 5일 목요일 */
 export type TodoDay = {
   date: string; // 'YYYY-MM-DD'
   year: number;
