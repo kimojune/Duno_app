@@ -328,13 +328,24 @@ button, input { font: inherit; color: inherit; }
 .chip:focus-visible .chip-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 /* 새 분야 줄(NewCategoryRow): 칸 + 「더하기」「취소」. 좁으면 단추 둘이 칸 아래 줄로 */
-.newcat { padding-top: var(--space-1); }
-.newcat-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
-/* 칸 묶음은 풀고(contents), 칸 · 단추는 윗줄, 도움말은 아랫줄 전체 폭(칸 폭 172px에 갇혀 접히지 않게) */
+.newcat { padding-top: var(--space-1); container-type: inline-size; }
+/* 넓으면: 칸 + 단추가 윗줄(간격 8), 도움말은 그 아래 줄 전체 폭(칸과 간격 4). 칸 묶음(.newcat-field)은 풀어(contents) 칸·도움말을 줄에 직접 놓는다 */
+.newcat-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  grid-template-areas: "field actions" "help help";
+  column-gap: var(--space-2);
+  align-items: start;
+}
 .newcat-field { display: contents; }
-.newcat-field .input { order: 0; flex: 1 1 160px; }
-.newcat-actions { order: 1; display: flex; flex: none; gap: var(--space-2); }
-.newcat-field .input-help { order: 2; flex: 0 0 100%; margin-top: 0; }
+.newcat-field .input { grid-area: field; min-width: 0; }
+.newcat-field .input-help { grid-area: help; margin-top: var(--space-1); }
+.newcat-actions { grid-area: actions; display: flex; gap: var(--space-2); }
+/* 좁으면(칸 160 + 간격 8 + 단추 둘 「더하는 중」 때 약 184 = 352px 미만): 칸 → 도움말 → 단추 */
+@container (max-width: 351px) {
+  .newcat-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "field" "help" "actions"; }
+  .newcat-actions { margin-top: var(--space-2); }
+}
 
 /* ---- 적는 칸(창 안 ④, 2-3 TodoInputBar의 칸·단추·도움말과 같은 값) ---- */
 .input-label { display: block; font: var(--font-sub); color: var(--color-text); margin-bottom: var(--space-1); }
