@@ -265,6 +265,9 @@ button, input { font: inherit; color: inherit; }
 }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .sheet-label { display: block; font: var(--font-sub); color: var(--color-text); }
+/* 창 안 TextButton의 글자 가장자리를 위 글 줄에 맞춘다: 안 여백 12 + 테두리 1 = 13만큼 단추 상자를 바깥으로 민다(누르는 면적은 그대로 → 줄지 않고 바깥으로 13 늘어남) */
+.todo-sheet .btn-flush-start { margin-inline-start: calc(-1 * (var(--space-3) + 1px)); }
+.todo-sheet .btn-flush-end { margin-inline-end: calc(-1 * (var(--space-3) + 1px)); }
 .sheet-line {
   display: flex;
   align-items: center;

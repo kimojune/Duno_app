@@ -382,7 +382,7 @@ export function CategoryChipRow(
     return (
       <div className="sheet-line">
         <span role="status">{props.online ? TODO_TEXT.categoriesFailed : TODO_TEXT.categoriesOffline}</span>
-        {props.online && <TextButton onClick={props.onReload}>{TODO_TEXT.reload}</TextButton>}
+        {props.online && <TextButton className="btn-flush-start" onClick={props.onReload}>{TODO_TEXT.reload}</TextButton>}
       </div>
     );
   }
@@ -498,7 +498,7 @@ export function TodoSheet({ sheetRef, inputRef, newCategoryInputRef, ...props }:
         <span id="category-label" className="sheet-label">
           {TODO_TEXT.categoryLabel}
         </span>
-        <TextButton id="sheet-close" aria-label={TODO_TEXT.sheetCloseName} onClick={() => props.onCloseSheet("button")}>
+        <TextButton id="sheet-close" className="btn-flush-end" aria-label={TODO_TEXT.sheetCloseName} onClick={() => props.onCloseSheet("button")}>
           {TODO_TEXT.sheetClose}
         </TextButton>
       </div>
