@@ -536,7 +536,11 @@ export function TodoScreen({
       setAddingCategory(false);
     };
     const timer = setTimeout(() => {
-      if (!current() || attempt.abandoned) return;
+      if (!current()) return;
+      if (attempt.abandoned) {
+        stopBusy(); // 창을 닫아 버린 시도여도 「더하는 중」은 남기지 않는다. 알림은 띄우지 않는다
+        return;
+      }
       attempt.timedOut = true;
       stopBusy();
       setNewCategoryHelp("failed"); // C19: 적은 이름은 지우지 않는다
