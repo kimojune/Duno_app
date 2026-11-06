@@ -651,6 +651,22 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     expect(catNotice()).toBe("");
   });
 
+  it("창을 닫고 응답이 오지 않아도 15초 뒤 「더하는 중」은 풀리고 알림은 띄우지 않는다", async () => {
+    await renderFake();
+    addCategory.mockReturnValueOnce(deferred<AddCategoryResult>().promise); // 끝내 답이 오지 않는다
+    typeCategory("자격증");
+    pressAdd();
+    expect(screen.getByRole("button", { name: "더하는 중" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CATEGORY_ADD_TIMEOUT_MS + 100);
+    });
+    open();
+    expect(screen.queryByRole("button", { name: "더하는 중" })).toBeNull();
+    expect(screen.getByRole("button", { name: "더하기" })).toBeTruthy();
+    expect(screen.queryByText("분야를 더하지 못했어요. 다시 눌러 주세요.")).toBeNull();
+  });
+
   it("창을 닫은 뒤 실패하면 아무것도 띄우지 않고, 창을 닫은 뒤 성공하면 조용히(알림 없이) 칩이 생긴다", async () => {
     await renderFake();
     const fail = deferred<AddCategoryResult>();
