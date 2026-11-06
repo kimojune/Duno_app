@@ -265,6 +265,9 @@ button, input { font: inherit; color: inherit; }
 }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .sheet-label { display: block; font: var(--font-sub); color: var(--color-text); }
+/* 창 안 TextButton의 글자 가장자리를 위 글 줄에 맞춘다: 안 여백 12만큼 단추 상자를 바깥으로 민다(테두리 1은 남겨 포커스 고리가 창 가장자리에서 잘리지 않게. 누르는 면적은 줄지 않고 바깥으로 12 늘어남) */
+.todo-sheet .btn-flush-start { margin-inline-start: calc(-1 * var(--space-3)); }
+.todo-sheet .btn-flush-end { margin-inline-end: calc(-1 * var(--space-3)); }
 .sheet-line {
   display: flex;
   align-items: center;
@@ -341,6 +344,8 @@ button, input { font: inherit; color: inherit; }
 .newcat-field .input { grid-area: field; min-width: 0; }
 .newcat-field .input-help { grid-area: help; margin-top: var(--space-1); }
 .newcat-actions { grid-area: actions; display: flex; gap: var(--space-2); }
+/* 「더하기」 폭을 「더하는 중」 글 폭에 맞춰 고정: 글 4자 + 띄어쓰기 약 0.4em = 4.4em, 안 여백 16×2, 테두리 1×2. 눌러도 폭이 안 바뀐다 */
+.newcat-actions .btn-secondary { min-width: calc(4.4em + 2 * var(--space-4) + 2px); white-space: nowrap; }
 /* 좁으면(칸 160 + 간격 8 + 단추 둘 「더하는 중」 때 약 184 = 352px 미만): 칸 → 도움말 → 단추 */
 @container (max-width: 351px) {
   .newcat-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "field" "help" "actions"; }
