@@ -86,3 +86,41 @@ self.addEventListener("fetch", (event) => {
   }
   // 그 밖(RSC 응답 등)은 가로채지 않는다.
 });
+
+// ---- 알림(PRD 7-8, ⑦) ----
+// 보내는 쪽은 본문 없이 신호만 보낸다(본문 암호화에는 새 패키지가 필요할 수 있어 이번 틀에서는 쓰지 않는다. docs/oneshot-v2/임시값.md ⑦).
+// 그래서 어느 알림인지는 이 서비스 워커가 지금 서울 시각으로 가른다: 오후 3시 전이면 아침 알림, 아니면 저녁 알림(임시).
+// 저녁 알림을 누르면 저녁 기록이 열린다(/?open=evening). 글은 어미 없는 이름표와 해요체 한 문장이고 재촉하지 않는다.
+const EVENING_FROM_HOUR = 15;
+
+function seoulHourNow() {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const part = parts.find((p) => p.type === "hour");
+  return Number(part ? part.value : "0");
+}
+
+self.addEventListener("push", (event) => {
+  const evening = seoulHourNow() >= EVENING_FROM_HOUR;
+  const title = evening ? "오늘 기록" : "오늘 먼저 할 일";
+  const options = {
+    body: evening ? "오늘 몇 시간 썼어요?" : "앱을 열어 오늘 할 일을 시작해 보세요",
+    tag: evening ? "duno-evening" : "duno-morning",
+    icon: "/icon-192.png",
+    data: { url: evening ? "/?open=evening" : "/" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data;
+  const url = data && typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if ("navigate" in client && "focus" in client) return client.navigate(url).then((c) => (c || client).focus());
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

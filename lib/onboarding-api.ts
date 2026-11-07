@@ -1,7 +1,8 @@
 import { addCategory } from "../app/todos/actions";
 import { saveRatios, saveSettings } from "../app/settings/actions";
 import type { AddCategoryResult } from "./categories/types";
-import { requestNotificationPermission, type PermissionState } from "./push/client";
+import { notificationPermission, type PermissionState } from "./push/client";
+import { defaultPushApi } from "./push/subscribe";
 import type { RecordResult } from "./records/common";
 import type { NotifySettings, RatioItem, SettingsData } from "./settings/types";
 
@@ -34,5 +35,11 @@ export const defaultSettingsApi: SettingsApi = {
   addCategory: (id, name) => safely(() => addCategory(id, name)) as Promise<AddCategoryResult>,
   saveRatios: (ratios) => safely(() => saveRatios(ratios)) as ReturnType<SettingsApi["saveRatios"]>,
   saveSettings: (patch) => safely(() => saveSettings(patch)) as ReturnType<SettingsApi["saveSettings"]>,
-  requestPermission: requestNotificationPermission,
+  // 알림 허락을 묻고 푸시를 구독한다(처음 설정 끝, D-102⑤). 구독이 안 돼도(보내는 쪽 설정이 아직 없음 등) 허락만 됐으면 허락으로 본다
+  requestPermission: async () => {
+    const result = await defaultPushApi.enable();
+    if (result === "ok") return "granted";
+    if (result === "denied") return "denied";
+    return notificationPermission();
+  },
 };

@@ -291,6 +291,12 @@ function fill(values: Row): (row: Row) => Row {
 /** 원샷 v2 마이그레이션의 규칙을 시험용으로 옮긴 것(표 이름은 마이그레이션과 같다) */
 export function v2Rules(): Record<string, TableRule> {
   return {
+    push_subscriptions: {
+      allowDelete: true,
+      insertColumns: ["id", "user_id", "endpoint", "p256dh", "auth"],
+      uniques: [["user_id", "endpoint"]],
+      limit: { count: 20, hint: "push_subscriptions_limit" },
+    },
     weekly_goals: {
       primaryKey: ["user_id", "week_start"],
       allowDelete: true,

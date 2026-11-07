@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { APP_CONFIG, isEvening } from "../lib/app-config";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
@@ -11,7 +11,9 @@ import { defaultManageApi } from "../lib/manage-api";
 import { defaultOffersApi, type OffersApi } from "../lib/offers-api";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
+import { defaultPushApi, type PushApi } from "../lib/push/subscribe";
 import { fetchToday } from "../lib/read-client";
+import type { SettingsData } from "../lib/settings/types";
 import type { TodayRead } from "../lib/today-types";
 import type { ViewEntry } from "../lib/views/core-types";
 import type { GoalSummary } from "../lib/goals/types";
@@ -19,6 +21,7 @@ import { CategoryPage } from "./category-page";
 import { EveningEntry, EveningRecord } from "./evening-record";
 import { GoalEditor, GoalLine } from "./goal";
 import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
+import { MeScreen } from "./me-screen";
 import { OfferCard } from "./offer-card";
 import { Onboarding, type OnboardingResult } from "./onboarding";
 import { TabBar, type TabId } from "./tab-bar";
@@ -46,21 +49,28 @@ export function withCategories(initial: TodayRead, added: Entry[]): TodayRead {
   return { ...initial, categories: { ok: true, data: { categories: [...initial.categories.data.categories, ...extra] } } };
 }
 
-const TABS: TabId[] = ["growth", "todo", "timer"];
+/** 읽을 수 있는 분야(보관 안 한 것) */
+function readableCategories(initial: TodayRead): Entry[] {
+  return initial.categories.ok ? initial.categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])) : [];
+}
+
+const TABS: TabId[] = ["growth", "todo", "timer", "me"];
 
 /** 이 앱이 서버를 부르는 길 모음. 시험은 가짜를 넣는다 */
-export type ShellApis = { offers: OffersApi; focus: FocusApi };
-const DEFAULT_APIS: ShellApis = { offers: defaultOffersApi, focus: defaultFocusApi };
+export type ShellApis = { offers: OffersApi; focus: FocusApi; push: PushApi };
+const DEFAULT_APIS: ShellApis = { offers: defaultOffersApi, focus: defaultFocusApi, push: defaultPushApi };
 
 export function AppShell({
   home,
   initialOpen = null,
-  apis = DEFAULT_APIS,
+  apis: apisProp,
 }: {
   home: HomeRead;
   initialOpen?: "evening" | null;
-  apis?: ShellApis;
+  apis?: Partial<ShellApis>;
 }) {
+  // 부르는 길 모음은 렌더마다 새로 만들지 않는다(자식의 읽기 효과가 다시 돌지 않게)
+  const apis = useMemo<ShellApis>(() => ({ ...DEFAULT_APIS, ...apisProp }), [apisProp]);
   const settings = home.settings.ok ? home.settings.data : null;
   const [done, setDone] = useState<OnboardingResult | null>(null);
   const needsOnboarding = settings !== null && !settings.onboardingDone && done === null;
@@ -81,10 +91,24 @@ export function AppShell({
     );
   }
   const initial = done ? withCategories(home.today, done.categories) : home.today;
-  return <MainShell initial={initial} initialOpen={initialOpen} apis={apis} />;
+  // 내 정보 탭이 쓰는 설정: 처음 설정을 방금 마쳤으면 그 결과, 아니면 서버가 읽은 값(못 읽었으면 null)
+  const mySettings: SettingsData | null = done
+    ? { goal: done.goal, goalReadable: true, onboardingDone: true, notify: done.notify, ratios: done.ratios }
+    : settings;
+  return <MainShell initial={initial} initialOpen={initialOpen} apis={apis} settings={mySettings} />;
 }
 
-function MainShell({ initial, initialOpen, apis }: { initial: TodayRead; initialOpen: "evening" | null; apis: ShellApis }) {
+function MainShell({
+  initial,
+  initialOpen,
+  apis,
+  settings,
+}: {
+  initial: TodayRead;
+  initialOpen: "evening" | null;
+  apis: ShellApis;
+  settings: SettingsData | null;
+}) {
   const [tab, setTab] = useState<TabId>("todo");
   const [eveningOpen, setEveningOpen] = useState(initialOpen === "evening");
   const [growthEntry, setGrowthEntry] = useState<ViewEntry>("self");
@@ -215,6 +239,9 @@ function MainShell({ initial, initialOpen, apis }: { initial: TodayRead; initial
           recommended={recommended}
           onActiveChange={() => {}}
         />
+      </div>
+      <div hidden={tab !== "me"}>
+        <MeScreen settings={settings} categories={readableCategories(initial)} api={defaultSettingsApi} push={apis.push} />
       </div>
       <TabBar tabs={TABS} current={tab} onSelect={(next) => openTab(next)} />
       {eveningOpen && (

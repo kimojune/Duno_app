@@ -349,10 +349,11 @@ describe("AppShell의 탭", () => {
     expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith("/growth"))).toBe(true);
     await waitFor(() => expect(recordViewAction).toHaveBeenCalledTimes(1));
     expect(recordViewAction.mock.calls[0][0]).toMatchObject({ screen: "growth", entry: "self" });
-    // 지금 탭(상태보기) 말고 할 일·타이머 탭이 숨겨져 있고, 할 일 탭은 지워지지 않고 살아 있다
+    // 지금 탭(상태보기)은 보이고, 나머지 탭은 숨겨져 있되 할 일 탭은 지워지지 않고 살아 있다(탭이 몇 개든 같다)
     const hidden = Array.from(container.querySelectorAll("div[hidden]"));
-    expect(hidden).toHaveLength(2);
+    expect(hidden.length).toBeGreaterThanOrEqual(2);
     expect(hidden.some((el) => el.querySelector(".todo-app") !== null)).toBe(true);
+    expect(hidden.every((el) => el.querySelector(".growth") === null)).toBe(true);
   });
 
   it("상태보기에서 분야를 누르면 분야 페이지가 열리고 닫을 수 있다", async () => {
