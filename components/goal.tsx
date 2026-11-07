@@ -53,19 +53,23 @@ export function GoalLine({
   onOpen: (summary: GoalSummary) => void;
 }) {
   const [data, setData] = useState<GoalSummary | null>(null);
+  // 첫 응답 전에는 자리를 비워 둔다(B16): 응답이 늦어도 아래 목록이 밀리지 않게
+  const [loaded, setLoaded] = useState(false);
 
   // 서버에서 읽는 일(바깥 시스템과 맞추기). 상태는 응답을 받은 뒤에만 바꾼다. 읽기 실패는 옛 값을 그대로 둔다.
   useEffect(() => {
     let alive = true;
     void api.fetchSummary().then((res) => {
-      if (alive && res.ok) setData(res.data);
+      if (!alive) return;
+      if (res.ok) setData(res.data);
+      setLoaded(true);
     });
     return () => {
       alive = false;
     };
   }, [api, refreshKey]);
 
-  if (!data) return null;
+  if (!data) return loaded ? null : <div className="slot-goal" aria-hidden="true" />;
   const goal = data.goal;
   const progress = goal ? goalProgress(goal, data.thisWeek) : null;
   return (

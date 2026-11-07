@@ -512,3 +512,13 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 
 /* ---- 원샷 v2 고침1 ---- */
 .notice-top { margin-bottom: var(--space-3); }
+/* 「자세히」: 줄 오른쪽의 작은 단추(B16). 글은 작은 크기, 누르는 면은 48×48 이상 */
+.row-detail { flex: none; margin-left: 0; align-self: flex-start; }
+.row-detail-btn { min-width: var(--tap-min); padding: 0 var(--space-2); font: var(--font-sub); }
+/* 위에 얹는 카드가 늦게 와도 목록이 밀리지 않게 자리를 먼저 비워 둔다(B16). 응답이 오면 자리는 카드로 바뀌고, 카드가 없으면 접힌다 */
+.slot-goal { min-height: calc(var(--tap-min) + var(--space-3)); }
+.slot-card { min-height: 148px; margin-bottom: var(--space-3); }
+.slot-carry { min-height: calc(var(--tap-min) + var(--space-4)); }
+
+/* ---- 로그아웃(내 정보 맨 아래, B18) ---- */
+.me-logout { margin-top: var(--space-8); display: flex; justify-content: flex-start; }

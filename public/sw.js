@@ -101,7 +101,7 @@ function seoulHourNow() {
 
 self.addEventListener("push", (event) => {
   const evening = seoulHourNow() >= EVENING_FROM_HOUR;
-  const title = evening ? "오늘 기록" : "오늘 먼저 할 일";
+  const title = evening ? "저녁 기록" : "오늘 먼저 할 일";
   const options = {
     body: evening ? "오늘 몇 시간 썼어요?" : "앱을 열어 오늘 할 일을 시작해 보세요",
     tag: evening ? "duno-evening" : "duno-morning",

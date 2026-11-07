@@ -718,7 +718,7 @@ describe("C21 오프라인·C22·C23 긴 글과 이름·C24 칩 줄", () => {
     expect(addCategory).not.toHaveBeenCalled();
     expect(screen.getByText("인터넷에 연결되면 분야를 더할 수 있어요. 적은 이름은 그대로 있어요.").getAttribute("role")).toBe("status");
     expect(newCategoryInput().value).toBe("자격증");
-    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 체크할 수 있어요.").closest("[role=status]")).toBeTruthy();
+    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
   });
 
   it("C22 분야 표시가 붙은 200자 할 일: 표시는 글 아래(DOM 순서), 줄바꿈 클래스", () => {

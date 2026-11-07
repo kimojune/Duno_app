@@ -252,7 +252,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     act(() => {
       window.dispatchEvent(new Event("offline"));
     });
-    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 체크할 수 있어요.").closest("[role=status]")).toBeTruthy();
+    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
     write("지하철에서 적은 글");
     press();
     expect(addTodo).not.toHaveBeenCalled();
@@ -268,7 +268,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
       window.dispatchEvent(new Event("online"));
     });
     await waitFor(() => expect(fetchTodayTodos).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText("인터넷 연결이 끊겼어요. 연결되면 적고 체크할 수 있어요.")).toBeNull();
+    expect(screen.queryByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.")).toBeNull();
     expect(input().value).toBe("지하철에서 적은 글"); // 입력 칸 글은 건드리지 않는다 (D10)
   });
 });
@@ -300,7 +300,7 @@ describe("체크 (T8, D5)", () => {
     const box = screen.getByRole("checkbox", { name: "실패할 체크" }) as HTMLInputElement;
     fireEvent.click(box);
     expect(box.checked).toBe(true); // 누른 즉시 바뀐다
-    await screen.findByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     expect(box.checked).toBe(false);
   });
 
@@ -547,7 +547,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     fireEvent.click(box);
     expect(box.checked).toBe(false);
     expect(setTodoDone).not.toHaveBeenCalled();
-    expect(screen.queryByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
 
     const id = addTodo.mock.calls[0][0] as string;
     addTodo.mockResolvedValueOnce(ok({ day: DAY, todo: item(id, "저장 못 한 글") }));
@@ -628,7 +628,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
-    expect(liveText()).toBe("체크를 바꾸지 못했어요. 다시 눌러 주세요.");
+    expect(liveText()).toBe("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
   });
 
   it("R6 15초 안에 답이 없으면 그 줄을 T7로 바꾸고, 「다시」는 같은 id이며, 늦은 성공이 오면 줄은 하나로 저장됨이 된다", async () => {
@@ -669,9 +669,9 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     fireEvent.click(box);
     fireEvent.click(box);
     resolvers[1](fail("unavailable"));
-    await screen.findByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     resolvers[0](ok({ id: ID_A, done: true }));
-    await waitFor(() => expect(screen.queryByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull());
     expect(box.checked).toBe(true);
   });
 
@@ -682,15 +682,15 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     fireEvent.click(box); // 1: 끔 요청
     fireEvent.click(box); // 2: 켬 요청
     resolvers[1](fail("unavailable")); // 2 실패 → 확인값(켬)으로 돌아감
-    await screen.findByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     expect(box.checked).toBe(true);
     fireEvent.click(box); // 3: 끔 요청(진행 중)
     expect(box.checked).toBe(false);
-    expect(screen.queryByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
     resolvers[0](ok({ id: ID_A, done: false })); // 낡은 첫 응답: 성공
     await act(async () => {});
     expect(box.checked).toBe(false); // 세 번째 값 그대로
-    expect(screen.queryByText("체크를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
     resolvers[2](ok({ id: ID_A, done: false }));
     await act(async () => {});
     expect(box.checked).toBe(false);

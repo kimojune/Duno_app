@@ -47,13 +47,13 @@ async function fire(handler: Handler, event: Record<string, unknown>) {
 afterEach(() => vi.useRealTimers());
 
 describe("sw.js 알림 (7-8, ⑦)", () => {
-  it("저녁(서울 오후 3시 이후)에 신호가 오면 「오늘 기록」을 보이고, 누르면 저녁 기록 주소를 연다", async () => {
+  it("저녁(서울 오후 3시 이후)에 신호가 오면 「저녁 기록」을 보이고, 누르면 저녁 기록 주소를 연다", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-07T10:30:00.000Z")); // 서울 19:30
     const sw = load();
     await fire(sw.handlers.push, {});
     expect(sw.shown).toHaveLength(1);
-    expect(sw.shown[0].title).toBe("오늘 기록");
+    expect(sw.shown[0].title).toBe("저녁 기록");
     expect(sw.shown[0].options).toMatchObject({ body: "오늘 몇 시간 썼어요?", tag: "duno-evening", data: { url: "/?open=evening" } });
   });
   it("아침(서울 오후 3시 전)에 신호가 오면 아침 알림을 보이고, 누르면 앱 처음 화면을 연다", async () => {

@@ -145,6 +145,7 @@ export function TodoScreen({
   topSlot,
   outbox,
   onBeforeSignOut,
+  logoutRequest = 0,
 }: {
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
   initial?: TodayRead;
@@ -156,6 +157,8 @@ export function TodoScreen({
   outbox?: Outbox;
   /** 원샷 v2(선택, A7): 로그아웃 직전에 부른다(이 기기의 푸시 구독을 거둔다). 3초 안에 끝나지 않아도 로그아웃은 진행한다 */
   onBeforeSignOut?: () => Promise<void>;
+  /** 원샷 v2(선택, B18): 1 이상으로 커질 때마다 머리 「로그아웃」을 누른 것과 같은 흐름을 시작한다(내 정보 맨 아래 단추가 건다) */
+  logoutRequest?: number;
 }) {
   const initialTodos = initial?.todos;
   const first = initialTodos?.ok ? initialTodos.data : null;
@@ -873,6 +876,17 @@ export function TodoScreen({
     if (anyUnsaved()) setLogoutConfirm(true);
     else doSignOut();
   }
+  // 다른 탭(내 정보)에서 건 로그아웃 요청: 값이 바뀔 때만 한 번 시작한다(처음 값은 건너뛴다)
+  const onLogoutRef = useRef(onLogout);
+  useLayoutEffect(() => {
+    onLogoutRef.current = onLogout;
+  });
+  const seenLogoutRequestRef = useRef(logoutRequest);
+  useEffect(() => {
+    if (logoutRequest === seenLogoutRequestRef.current) return;
+    seenLogoutRequestRef.current = logoutRequest;
+    if (logoutRequest > 0) onLogoutRef.current();
+  }, [logoutRequest]);
 
   async function copyUnsaved() {
     const lines = rowsRef.current.filter((r) => r.status !== "saved" && r.text).map((r) => r.text as string);

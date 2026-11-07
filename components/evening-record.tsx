@@ -41,7 +41,7 @@ export const EVENING_TEXT = {
   splitHint: "미리 채운 값을 확인하고 고쳐요. 나누지 않은 시간은 기타로 들어가요.",
   other: "기타",
   otherRemain: (m: number) => formatMinutes(m),
-  raised: (m: number) => `나눈 시간이 합계보다 많아서 합계를 ${formatMinutes(m)}로 맞춰 저장해요.`,
+  raised: (m: number) => `나눈 시간이 합계보다 많아서 합계를 ${formatMinutes(m)}으로 맞춰 저장해요.`,
   back: "이전",
   save: "저장",
   saving: "저장하는 중",
@@ -360,13 +360,16 @@ export function EveningRecord({
   );
 }
 
+/** 저녁 기록을 여는 단추 글(할 일 탭 입구·상태보기 빈 안내가 같은 글을 쓴다) */
+export const EVENING_ENTRY_LABEL = "저녁 기록 남기기";
+
 /** 할 일 화면 위에 얹는 저녁 기록 입구. 저녁(오후 6시~새벽 4시 전)에는 질문 글을 앞세운다 */
 export function EveningEntry({ evening, onOpen }: { evening: boolean; onOpen: () => void }) {
   return (
     <section className="entry-card" aria-label={EVENING_TEXT.title}>
       <p className="entry-title">{EVENING_TEXT.title}</p>
       {evening && <p className="todo-sub">{EVENING_TEXT.askToday}</p>}
-      <SecondaryButton onClick={onOpen}>{evening ? "오늘 기록하기" : "기록 남기기"}</SecondaryButton>
+      <SecondaryButton onClick={onOpen}>{EVENING_ENTRY_LABEL}</SecondaryButton>
     </section>
   );
 }

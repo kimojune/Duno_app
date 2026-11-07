@@ -34,6 +34,8 @@ export function CarryOver({
 }) {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [open, setOpen] = useState(false);
+  // 첫 응답 전에는 자리를 비워 둔다(B16)
+  const [loaded, setLoaded] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -42,14 +44,16 @@ export function CarryOver({
   useEffect(() => {
     let alive = true;
     void api.fetchYesterday().then((res) => {
-      if (alive && res.ok) setItems(res.data.todos);
+      if (!alive) return;
+      if (res.ok) setItems(res.data.todos);
+      setLoaded(true);
     });
     return () => {
       alive = false;
     };
   }, [api]);
 
-  if (items.length === 0) return null;
+  if (items.length === 0) return loaded ? null : <div className="slot-carry" aria-hidden="true" />;
 
   function toggle(id: string) {
     setFailed(false);

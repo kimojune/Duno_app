@@ -6,6 +6,7 @@ import type { GrowthData } from "../lib/growth/types";
 import type { GrowthApi } from "../lib/growth-api";
 import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import type { ViewEntry } from "../lib/views/core-types";
+import { EVENING_ENTRY_LABEL } from "./evening-record";
 import { Notice, SecondaryButton } from "./ui";
 
 /**
@@ -52,6 +53,7 @@ export function GrowthScreen({
   activation,
   entry,
   onOpenCategory,
+  onOpenEvening,
 }: {
   api: GrowthApi;
   /** 이 탭이 지금 보이는가 */
@@ -60,6 +62,8 @@ export function GrowthScreen({
   activation: number;
   entry: ViewEntry;
   onOpenCategory: (categoryId: string | null, name: string) => void;
+  /** 이번 주 기록이 없을 때 빈 안내 아래의 「저녁 기록 남기기」(B17). 없으면 단추를 그리지 않는다 */
+  onOpenEvening?: () => void;
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [mode, setMode] = useState<"week" | "compare">("week");
@@ -124,7 +128,7 @@ export function GrowthScreen({
               ))}
             </div>
             {mode === "week" ? (
-              <WeekView data={load.data} onOpenCategory={onOpenCategory} />
+              <WeekView data={load.data} onOpenCategory={onOpenCategory} onOpenEvening={onOpenEvening} />
             ) : (
               <CompareView data={load.data} onOpenCategory={onOpenCategory} />
             )}
@@ -144,7 +148,15 @@ function rowsFor(data: GrowthData): { id: string | null; name: string }[] {
   return [...data.categories.map((c) => ({ id: c.id as string | null, name: c.name })), { id: null, name: GROWTH_TEXT.other }];
 }
 
-function WeekView({ data, onOpenCategory }: { data: GrowthData; onOpenCategory: (id: string | null, name: string) => void }) {
+function WeekView({
+  data,
+  onOpenCategory,
+  onOpenEvening,
+}: {
+  data: GrowthData;
+  onOpenCategory: (id: string | null, name: string) => void;
+  onOpenEvening?: () => void;
+}) {
   const rows = rowsFor(data);
   const minutes = rows.map((r) => minutesOf(data.thisWeek, r.id));
   const bars = barPercents(minutes);
@@ -167,7 +179,16 @@ function WeekView({ data, onOpenCategory }: { data: GrowthData; onOpenCategory: 
           </li>
         ))}
       </ul>
-      {total === 0 && data.goal === null && <p className="todo-sub">{GROWTH_TEXT.empty}</p>}
+      {total === 0 && data.goal === null && (
+        <>
+          <p className="todo-sub">{GROWTH_TEXT.empty}</p>
+          {onOpenEvening && (
+            <div className="detail-actions">
+              <SecondaryButton onClick={onOpenEvening}>{EVENING_ENTRY_LABEL}</SecondaryButton>
+            </div>
+          )}
+        </>
+      )}
 
       <h2 className="growth-sub-title">{GROWTH_TEXT.shortfallHeading}</h2>
       <p className="todo-sub">{shortfall.basis === "goal" ? GROWTH_TEXT.basisGoal : GROWTH_TEXT.basisRatio}</p>

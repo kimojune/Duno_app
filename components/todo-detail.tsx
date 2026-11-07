@@ -38,7 +38,7 @@ export const DETAIL_TEXT = {
   notesLoading: "작업 기록을 불러오는 중",
   notesFailed: "작업 기록을 불러오지 못했어요.",
   noteLabel: "작업 기록 쓰기",
-  noteAdd: "기록 남기기",
+  noteAdd: "작업 기록 남기기",
   noteAdding: "남기는 중",
   noteAddFailed: "기록을 남기지 못했어요. 다시 눌러 주세요.",
   noteDelete: "지우기",

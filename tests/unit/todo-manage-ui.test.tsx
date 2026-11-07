@@ -183,7 +183,7 @@ describe("작업 기록 (0-1번)", () => {
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     expect(await screen.findByText("어제 경력을 적었다")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("작업 기록 쓰기"), { target: { value: "오늘은 학력 항목" } });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "기록 남기기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "작업 기록 남기기" })));
     expect(api.addNote).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f-]{36}$/), A, "오늘은 학력 항목");
     expect(screen.getByText("오늘은 학력 항목")).toBeTruthy();
     expect((screen.getByLabelText("작업 기록 쓰기") as HTMLTextAreaElement).value).toBe("");
@@ -200,10 +200,10 @@ describe("작업 기록 (0-1번)", () => {
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={fakeApi({ addNote })} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     fireEvent.change(await screen.findByLabelText("작업 기록 쓰기"), { target: { value: "다시 보낼 글" } });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "기록 남기기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "작업 기록 남기기" })));
     expect(screen.getByText("기록을 남기지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
     expect((screen.getByLabelText("작업 기록 쓰기") as HTMLTextAreaElement).value).toBe("다시 보낼 글");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "기록 남기기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "작업 기록 남기기" })));
     expect(addNote.mock.calls[0][0]).toBe(addNote.mock.calls[1][0]);
   });
 
@@ -213,7 +213,7 @@ describe("작업 기록 (0-1번)", () => {
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     await screen.findByText("지울 기록");
-    expect((screen.getByRole("button", { name: "기록 남기기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "작업 기록 남기기" }) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: /지우기: 2026-11-06 기록/ })));
     expect(api.deleteNote).toHaveBeenCalledWith("n1");
     expect(screen.queryByText("지울 기록")).toBeNull();

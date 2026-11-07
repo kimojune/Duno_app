@@ -135,7 +135,7 @@ describe("저녁 기록 (7-3, ②)", () => {
     setNumber("시간", 1);
     await press("분야마다 나누기");
     setNumber("어학", 90);
-    expect(screen.getByText("나눈 시간이 합계보다 많아서 합계를 1시간 30분로 맞춰 저장해요.")).toBeTruthy();
+    expect(screen.getByText("나눈 시간이 합계보다 많아서 합계를 1시간 30분으로 맞춰 저장해요.")).toBeTruthy();
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 90, items: [{ categoryId: C1, minutes: 90 }] }));
   });
@@ -279,10 +279,10 @@ describe("EveningEntry", () => {
     const onOpen = vi.fn();
     const { rerender } = render(<EveningEntry evening onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "오늘 기록하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "저녁 기록 남기기" }));
     expect(onOpen).toHaveBeenCalled();
     rerender(<EveningEntry evening={false} onOpen={onOpen} />);
     expect(screen.queryByText("오늘 몇 시간 썼어요?")).toBeNull();
-    expect(screen.getByRole("button", { name: "기록 남기기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "저녁 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글
   });
 });

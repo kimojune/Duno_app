@@ -39,10 +39,10 @@ export const TODO_TEXT = {
   liveQueued: "연결되면 저장할게요",
   retry: "다시",
   remove: "빼기",
-  checkFailed: "체크를 바꾸지 못했어요. 다시 눌러 주세요.",
+  checkFailed: "끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.",
   loadFailed: "할 일을 불러오지 못했어요.",
   reload: "다시 불러오기",
-  offline: "인터넷 연결이 끊겼어요. 연결되면 적고 체크할 수 있어요.",
+  offline: "인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.",
   offlineHelp: "인터넷에 연결되면 적을 수 있어요. 적은 글은 그대로 있어요.",
   sessionUnsaved:
     "로그인이 풀렸어요. 다시 로그인하면 이 화면을 떠나서, 아직 저장되지 않은 글은 사라져요. 필요하면 먼저 복사해 두세요.",
@@ -340,15 +340,15 @@ function Row({
             {TODO_TEXT.checkFailed}
           </p>
         )}
-        {/* 저장된 줄에만. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
-        {onOpenDetail && !notSaved && (
-          <div className="row-actions">
-            <TextButton aria-label={`자세히 보기: ${row.text ?? TODO_TEXT.unreadable}`} onClick={() => onOpenDetail(row.id)}>
-              자세히
-            </TextButton>
-          </div>
-        )}
       </div>
+      {/* 저장된 줄에만, 줄 오른쪽의 작은 단추로(B16). 보이는 글은 작아도 누르는 면은 48px 이상. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
+      {onOpenDetail && !notSaved && (
+        <div className="row-actions row-detail">
+          <TextButton className="row-detail-btn" aria-label={`자세히 보기: ${row.text ?? TODO_TEXT.unreadable}`} onClick={() => onOpenDetail(row.id)}>
+            자세히
+          </TextButton>
+        </div>
+      )}
     </li>
   );
 }

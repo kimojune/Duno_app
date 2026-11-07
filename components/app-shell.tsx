@@ -149,10 +149,14 @@ function MainShell({
   const [timerActivation, setTimerActivation] = useState(0);
   // 내 정보 탭의 분야 목록(A15): 앱을 열 때 읽은 값 그대로 두지 않고, 탭을 열 때마다 다시 읽는다(그사이 더한 분야가 보이게)
   const [meActivation, setMeActivation] = useState(0);
+  // 내 정보 맨 아래 「로그아웃」(B18)은 할 일 탭의 로그아웃 흐름(저장 안 된 글 확인)을 부른다
+  const [logoutRequest, setLogoutRequest] = useState(0);
   const [meCategories, setMeCategories] = useState<Entry[] | null>(null);
   const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
   // 오늘 먼저 할 일 카드(⑤): 앱을 열 때 한 번 건네받는다. 반응이 없는(new) 것만 보인다
   const [cardOffer, setCardOffer] = useState<Offer | null>(null);
+  // 카드 제시를 처음 받기 전에는 카드 자리를 비워 둔다(B16)
+  const [cardLoaded, setCardLoaded] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
   const [cardError, setCardError] = useState<"failed" | "offline" | null>(null);
   // 타이머가 돌고 있는가(B3). 타이머 탭이 알려 준다. 앱을 연 직후에는 모르다가 시작 단추를 눌렀을 때 서버가 「이미 진행 중」으로 알려 준다
@@ -186,7 +190,9 @@ function MainShell({
     let alive = true;
     function refresh() {
       void apis.offers.request("card").then((res) => {
-        if (!alive || !res.ok) return;
+        if (!alive) return;
+        setCardLoaded(true);
+        if (!res.ok) return;
         const offer = res.data.offer;
         setCardOffer(offer && offer.state === "new" && offer.day === todoDayFor(new Date()) ? offer : null);
       });
@@ -325,6 +331,7 @@ function MainShell({
           activation={growthActivation}
           entry={growthEntry}
           onOpenCategory={(id, name) => setCategory({ id, name })}
+          onOpenEvening={() => setEveningOpen(true)}
         />
       </div>
       <div hidden={tab !== "todo"}>
@@ -333,6 +340,7 @@ function MainShell({
           manage={defaultManageApi}
           outbox={outbox}
           onBeforeSignOut={() => apis.push.disable()}
+          logoutRequest={logoutRequest}
           topSlot={
             <>
               {startNotice && startNoticeOpen && (
@@ -347,6 +355,7 @@ function MainShell({
                 </Notice>
               )}
               <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
+              {!cardLoaded && !cardOffer && <div className="slot-card" aria-hidden="true" />}
               {cardOffer && (
                 <OfferCard
                   offer={cardOffer}
@@ -374,7 +383,12 @@ function MainShell({
         />
       </div>
       <div hidden={tab !== "me"}>
-        <MeScreen settings={settings} categories={meCategories ?? readableCategories(initial)} api={defaultSettingsApi} push={apis.push} />
+        <MeScreen settings={settings} categories={meCategories ?? readableCategories(initial)} api={defaultSettingsApi} push={apis.push}
+          onLogout={() => {
+            openTab("todo");
+            setLogoutRequest((n) => n + 1);
+          }}
+        />
       </div>
       <TabBar tabs={TABS} current={tab} onSelect={(next) => openTab(next)} />
       {eveningOpen && (

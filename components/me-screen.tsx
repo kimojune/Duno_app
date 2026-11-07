@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import type { SettingsApi } from "../lib/onboarding-api";
 import type { PushApi } from "../lib/push/subscribe";
@@ -9,19 +9,19 @@ import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/s
 import { useOnline } from "../lib/use-online";
 import { NotifyRow } from "./onboarding";
 import { RatioEditor, type RatioEntry } from "./ratio-editor";
-import { Notice, PrimaryButton, SecondaryButton } from "./ui";
+import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 내 정보 탭(PRD 부록 B): 처음 설정에서 정한 것을 고치는 곳과 알림 설정. 이번 틀의 내용은 임시다(임시값 목록).
  * - 목표 한 문장 고치기, 처음 정한 비율 고치기(처음 설정과 같은 −/+ 5% 단추. 「고칠 자리와 때」, PRD 7-1 열림), 알림 둘의 켜기·시각.
  * - 알림 켜기는 알림 허락 → 푸시 구독 저장이다. 푸시 서명 공개 키가 설정에 없으면 켜지 않고 안내한다(보내는 쪽 설정은 PM이 서버 설정에 둔다).
- * - 로그아웃은 할 일 탭 머리에 있다(적던 글이 있을 때 확인을 거치므로 여기에 따로 두지 않는다, 임시).
+ * - 로그아웃은 맨 아래에도 있다(B18). 적던 글이 있을 때 확인은 할 일 탭이 하므로, 누르면 할 일 탭으로 가서 같은 로그아웃 흐름을 시작한다.
  * 모든 글은 React 텍스트로만 그린다.
  */
 
 export const ME_TEXT = {
   title: "내 정보",
-  goalHeading: "목표",
+  goalHeading: "이루고 싶은 것", // 처음 설정의 첫 질문과 같은 이름
   goalLabel: "목표 한 문장",
   goalSave: "목표 저장",
   ratioHeading: "처음 정한 비율",
@@ -29,6 +29,7 @@ export const ME_TEXT = {
   ratioEmpty: "분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.",
   notifyHeading: "알림",
   notifySave: "알림 설정 저장",
+  logout: "로그아웃",
   saved: "저장했어요",
   saving: "저장하는 중",
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
@@ -57,6 +58,7 @@ export function MeScreen({
   api,
   push,
   onChanged,
+  onLogout,
 }: {
   /** 서버가 읽은 설정(못 읽었으면 null) */
   settings: SettingsData | null;
@@ -65,7 +67,16 @@ export function MeScreen({
   push: PushApi;
   /** 저장이 끝났을 때(다른 화면이 새 값을 쓰게) */
   onChanged?: (next: { goal?: string | null; ratios?: RatioItem[]; notify?: NotifySettings }) => void;
+  /** 맨 아래 「로그아웃」(B18). 없으면 단추를 그리지 않는다 */
+  onLogout?: () => void;
 }) {
+  const logout = onLogout ? (
+    <div className="me-logout">
+      <TextButton id="me-logout-button" onClick={onLogout}>
+        {ME_TEXT.logout}
+      </TextButton>
+    </div>
+  ) : null;
   if (!settings) {
     return (
       <section className="me" aria-labelledby="me-title">
@@ -76,11 +87,12 @@ export function MeScreen({
         </header>
         <div className="growth-body">
           <Notice role="alert">{ME_TEXT.loadFailed}</Notice>
+          {logout}
         </div>
       </section>
     );
   }
-  return <MeBody settings={settings} categories={categories} api={api} push={push} onChanged={onChanged} />;
+  return <MeBody settings={settings} categories={categories} api={api} push={push} onChanged={onChanged} logout={logout} />;
 }
 
 function MeBody({
@@ -89,12 +101,14 @@ function MeBody({
   api,
   push,
   onChanged,
+  logout,
 }: {
   settings: SettingsData;
   categories: Entry[];
   api: SettingsApi;
   push: PushApi;
   onChanged?: (next: { goal?: string | null; ratios?: RatioItem[]; notify?: NotifySettings }) => void;
+  logout: ReactNode;
 }) {
   const online = useOnline();
   // 목표
@@ -306,6 +320,7 @@ function MeBody({
             {notifyBusy ? ME_TEXT.saving : ME_TEXT.notifySave}
           </SecondaryButton>
         </section>
+        {logout}
       </div>
     </section>
   );
