@@ -276,9 +276,53 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
   return client as unknown as SupabaseClient;
 }
 
+/** 안 보낸 열을 기본값으로 채우는 defaults 함수(보낸 값은 그대로 둔다) */
+function fill(values: Row): (row: Row) => Row {
+  return (row) => {
+    const out: Row = {};
+    for (const [k, v] of Object.entries(values)) if (row[k] === undefined) out[k] = v;
+    return out;
+  };
+}
+
 /** 원샷 v2 마이그레이션의 규칙을 시험용으로 옮긴 것(표 이름은 마이그레이션과 같다) */
 export function v2Rules(): Record<string, TableRule> {
   return {
+    user_settings: {
+      primaryKey: ["user_id"],
+      insertColumns: [
+        "user_id",
+        "goal_encrypted",
+        "onboarding_done_at",
+        "notify_evening_enabled",
+        "notify_evening_minute",
+        "notify_morning_enabled",
+        "notify_morning_minute",
+      ],
+      updateColumns: [
+        "goal_encrypted",
+        "onboarding_done_at",
+        "notify_evening_enabled",
+        "notify_evening_minute",
+        "notify_morning_enabled",
+        "notify_morning_minute",
+      ],
+      defaults: fill({
+        goal_encrypted: null,
+        onboarding_done_at: null,
+        notify_evening_enabled: false,
+        notify_evening_minute: 1170,
+        notify_morning_enabled: false,
+        notify_morning_minute: 600,
+      }),
+    },
+    category_ratios: {
+      primaryKey: ["user_id", "category_id"],
+      allowDelete: true,
+      insertColumns: ["user_id", "category_id", "percent"],
+      updateColumns: ["percent"],
+      fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
+    },
     todos: {
       allowDelete: true,
       updateColumns: ["done", "text_encrypted", "category_id", "position"],
