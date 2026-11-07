@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import type { SettingsApi } from "../lib/onboarding-api";
 import type { PushApi } from "../lib/push/subscribe";
@@ -115,7 +115,17 @@ function MeBody({
   const [morningMinute, setMorningMinute] = useState(settings.notify.morningMinute);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifyBusy, setNotifyBusy] = useState(false);
+  // 「받아요」는 실제 구독이 있는지로 정한다(B4). 처음 그릴 때는 허락 상태로 짐작하고, 곧 실제 구독 유무로 바로잡는다
   const [pushOn, setPushOn] = useState(() => push.permission() === "granted" && (settings.notify.eveningEnabled || settings.notify.morningEnabled));
+  useEffect(() => {
+    let alive = true;
+    void push.subscribed().then((actual) => {
+      if (alive) setPushOn(actual);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [push]);
 
   const goalCheck = checkGoal(goal);
   const goalOver = !goalCheck.ok && goalCheck.error === "too_long";

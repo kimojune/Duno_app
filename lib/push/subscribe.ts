@@ -17,9 +17,31 @@ export type PushApi = {
   supported(): boolean;
   /** 서명 공개 키가 설정에 있는가 */
   hasKey(): boolean;
+  /** 이 기기에 실제 푸시 구독이 있는가(허락 상태와 다르다. 허락했어도 구독이 없을 수 있다, B4). 던지지 않는다 */
+  subscribed(): Promise<boolean>;
   enable(): Promise<PushEnableResult>;
   disable(): Promise<void>;
 };
+
+/** 서비스 워커 준비를 기다리는 시간 상한(A3). serviceWorker.ready는 등록이 없으면 영원히 끝나지 않는다 */
+export const PUSH_READY_TIMEOUT_MS = 5000;
+
+/** 서비스 워커가 준비되길 기다린다. 시간 안에 안 되면 던진다(호출하는 쪽이 failed로 바꾼다) */
+export function readyWithTimeout(ms: number = PUSH_READY_TIMEOUT_MS): Promise<ServiceWorkerRegistration> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("service worker not ready")), ms);
+    navigator.serviceWorker.ready.then(
+      (registration) => {
+        clearTimeout(timer);
+        resolve(registration);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 /** base64url 공개 키를 푸시 구독에 쓰는 바이트로 */
 export function urlBase64ToBytes(value: string): Uint8Array {
@@ -36,6 +58,16 @@ export const defaultPushApi: PushApi = {
   permission: notificationPermission,
   supported: pushSupported,
   hasKey: () => getVapidPublicKey() !== null,
+  subscribed: async () => {
+    if (!pushSupported()) return false;
+    try {
+      // getRegistration은 등록이 없어도 바로 끝난다(ready와 달리 멈추지 않는다)
+      const registration = await navigator.serviceWorker.getRegistration();
+      return registration ? (await registration.pushManager.getSubscription()) !== null : false;
+    } catch {
+      return false;
+    }
+  },
   enable: async () => {
     if (!pushSupported()) return "unsupported";
     const key = getVapidPublicKey();
@@ -43,7 +75,7 @@ export const defaultPushApi: PushApi = {
     try {
       const permission = await requestNotificationPermission();
       if (permission !== "granted") return permission === "unsupported" ? "unsupported" : "denied";
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await readyWithTimeout();
       const existing = await registration.pushManager.getSubscription();
       const subscription =
         existing ?? (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToBytes(key).buffer as ArrayBuffer }));
@@ -57,8 +89,8 @@ export const defaultPushApi: PushApi = {
   disable: async () => {
     if (!pushSupported()) return;
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
       if (!subscription) return;
       await deletePushSubscription(subscription.endpoint);
       await subscription.unsubscribe();

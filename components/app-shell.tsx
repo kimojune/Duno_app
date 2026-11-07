@@ -24,10 +24,11 @@ import { GoalEditor, GoalLine } from "./goal";
 import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
 import { MeScreen } from "./me-screen";
 import { OfferCard } from "./offer-card";
-import { Onboarding, type OnboardingResult } from "./onboarding";
+import { Onboarding, pushOutcomeText, type OnboardingResult } from "./onboarding";
 import { TabBar, type TabId } from "./tab-bar";
 import { TimerScreen } from "./timer-screen";
 import { TodoScreen } from "./todo-screen";
+import { Notice, TextButton } from "./ui";
 
 /**
  * 로그인한 뒤의 앱 전체 틀(클라이언트). 서버 컴포넌트(app/page.tsx)가 읽은 값(home)을 받아 화면들을 이어 붙인다.
@@ -107,7 +108,16 @@ export function AppShell({
   const mySettings: SettingsData | null = done
     ? { goal: done.goal, goalReadable: true, onboardingDone: true, notify: done.notify, ratios: done.ratios }
     : settings;
-  return <MainShell initial={initial} initialOpen={initialOpen} apis={apis} settings={mySettings} outbox={outbox} />;
+  return (
+    <MainShell
+      initial={initial}
+      initialOpen={initialOpen}
+      apis={apis}
+      settings={mySettings}
+      outbox={outbox}
+      startNotice={done ? pushOutcomeText(done.pushOutcome) : null}
+    />
+  );
 }
 
 function MainShell({
@@ -116,13 +126,17 @@ function MainShell({
   apis,
   settings,
   outbox,
+  startNotice,
 }: {
   initial: TodayRead;
   initialOpen: "evening" | null;
   apis: ShellApis;
   settings: SettingsData | null;
   outbox: Outbox | undefined;
+  /** 처음 설정 끝에서 알림을 켜지 못했을 때의 안내(B4). 첫 화면에 남겨 둔다 */
+  startNotice: string | null;
 }) {
+  const [startNoticeOpen, setStartNoticeOpen] = useState(startNotice !== null);
   const [tab, setTab] = useState<TabId>("todo");
   const [eveningOpen, setEveningOpen] = useState(initialOpen === "evening");
   const [growthEntry, setGrowthEntry] = useState<ViewEntry>("self");
@@ -238,6 +252,17 @@ function MainShell({
           outbox={outbox}
           topSlot={
             <>
+              {startNotice && startNoticeOpen && (
+                <Notice
+                  role="status"
+                  className="notice-top"
+                  actions={
+                    <TextButton onClick={() => setStartNoticeOpen(false)}>닫기</TextButton>
+                  }
+                >
+                  {startNotice}
+                </Notice>
+              )}
               <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
               {cardOffer && <OfferCard offer={cardOffer} busy={cardBusy} error={cardError} onStart={() => void startFromCard()} onDismiss={() => void dismissCard()} />}
               <EveningEntry evening={isEvening(new Date())} onOpen={() => setEveningOpen(true)} />

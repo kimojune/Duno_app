@@ -28,6 +28,7 @@ function fakePush(over: Partial<PushApi> = {}): PushApi {
     permission: vi.fn(() => "default" as const),
     supported: vi.fn(() => true),
     hasKey: vi.fn(() => true),
+    subscribed: vi.fn(async () => (over.permission ? over.permission() === "granted" : false)),
     enable: vi.fn(async () => "ok" as const),
     disable: vi.fn(async () => {}),
     ...over,
@@ -154,6 +155,24 @@ describe("내 정보 탭", () => {
     expect(push.disable).toHaveBeenCalledTimes(1);
     expect(push.enable).not.toHaveBeenCalled();
     expect(api.saveSettings).toHaveBeenCalledWith({ notify: { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } });
+  });
+
+  it("허락은 했어도 이 기기에 실제 구독이 없으면 「받지 않아요」로 보인다 (B4)", async () => {
+    const push = fakePush({ permission: vi.fn(() => "granted" as const), subscribed: vi.fn(async () => false) });
+    await act(async () => {
+      render(
+        <MeScreen
+          settings={settings({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } })}
+          categories={categories}
+          api={fakeApi()}
+          push={push}
+        />,
+      );
+    });
+    expect(screen.getByText("이 기기에서는 알림을 받지 않아요")).toBeTruthy();
+    // 저장하면 구독을 다시 시도한다
+    await press("알림 설정 저장");
+    expect(push.enable).toHaveBeenCalledTimes(1);
   });
 
   it("이미 구독한 기기에서 시각만 바꾸면 다시 허락을 묻지 않는다", async () => {

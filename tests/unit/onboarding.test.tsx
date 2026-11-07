@@ -208,6 +208,38 @@ describe("처음 설정 (7-1, ①)", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  it("알림 켜기 결과(키 없음·구독 실패)를 끝에 알리고, 알림은 꺼진 채 처음 설정은 저장·완료한다 (B4)", async () => {
+    for (const outcome of ["missing_key", "failed", "unsupported"] as const) {
+      cleanup();
+      const api = fakeApi({ requestPermission: vi.fn(async () => outcome) });
+      const onDone = mount(api);
+      click("다음");
+      click("다음");
+      click("다음");
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+      expect(api.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ notify: expect.objectContaining({ eveningEnabled: false, morningEnabled: false }), completeOnboarding: true }),
+      );
+      expect(onDone).toHaveBeenCalledTimes(1);
+      expect(onDone.mock.calls[0][0]).toMatchObject({ pushOutcome: outcome });
+    }
+  });
+
+  it("알림 켜기가 던져도 처음 설정은 저장하고 끝낸다 (A3)", async () => {
+    const api = fakeApi({
+      requestPermission: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    });
+    const onDone = mount(api);
+    click("다음");
+    click("다음");
+    click("다음");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ completeOnboarding: true }));
+    expect(onDone.mock.calls[0][0]).toMatchObject({ pushOutcome: "failed" });
+  });
+
   it("「나중에 하고 시작하기」는 허락을 묻지 않고 알림을 끈 채 시작한다", async () => {
     const api = fakeApi();
     const onDone = mount(api);
@@ -295,6 +327,21 @@ describe("AppShell의 처음 설정 관문", () => {
   it("설정을 못 읽었을 때는 처음 설정을 강요하지 않는다", () => {
     render(<AppShell home={{ today, settings: unavailable }} />);
     expect(screen.getByRole("button", { name: "할 일 적기" })).toBeTruthy();
+  });
+  it("처음 설정을 끝낼 때 알림이 안 켜졌으면 첫 화면에 안내 상자가 남고, 닫을 수 있다 (B4)", async () => {
+    const { saveRatios, saveSettings } = await import("../../app/settings/actions");
+    vi.mocked(saveRatios).mockResolvedValue({ ok: true, data: { ratios: [{ categoryId: C1, percent: 100 }] } });
+    vi.mocked(saveSettings).mockResolvedValue({ ok: true, data: { goal: null, goalReadable: true, onboardingDone: true, notify: NOTIFY } });
+    render(<AppShell home={{ today, settings: settings(false) }} />);
+    click("다음");
+    click("다음");
+    click("다음");
+    // jsdom에는 푸시 지원이 없어 「받을 수 없음」 결과가 나온다
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    expect(screen.getByRole("button", { name: "할 일 적기" })).toBeTruthy();
+    expect(screen.getByText("이 브라우저는 알림을 받을 수 없어요.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByText("이 브라우저는 알림을 받을 수 없어요.")).toBeNull();
   });
   it("withCategories: 처음 설정에서 더한 분야를 칩 목록 끝에 끼우고, 이미 있는 분야와 읽기 실패는 그대로 둔다", () => {
     const merged = withCategories(today, [{ id: C2, name: "새 분야" }, { id: C1, name: "어학" }]);

@@ -507,3 +507,6 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   color: var(--color-text); font: var(--font-body); text-align: left; cursor: pointer;
 }
 .goal-line:active { background: var(--color-notice-bg); }
+
+/* ---- 원샷 v2 고침1 ---- */
+.notice-top { margin-bottom: var(--space-3); }

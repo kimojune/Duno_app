@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { checkCategoryName, sameCategoryName } from "../lib/categories/validation";
-import type { SettingsApi } from "../lib/onboarding-api";
+import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
 import { formatClock } from "../lib/time-format";
@@ -52,6 +52,9 @@ export const ONBOARDING_TEXT = {
   saving: "저장하는 중",
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
   denied: "알림이 허락되지 않았어요. 브라우저 설정에서 바꿀 수 있어요.",
+  pushUnsupported: "이 브라우저는 알림을 받을 수 없어요.",
+  pushMissingKey: "알림을 보내는 설정이 아직 없어서 알림은 켜지 않았어요. 설정이 끝나면 내 정보에서 켤 수 있어요.",
+  pushFailed: "알림을 켜지 못했어요. 내 정보에서 다시 켤 수 있어요.",
   tooLong: (n: number) => `${GOAL_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${n}자예요.`,
 } as const;
 
@@ -64,7 +67,26 @@ export type OnboardingResult = {
   ratios: RatioItem[];
   categories: CategoryEntry[];
   notify: NotifySettings;
+  /** 「허락하고 시작하기」를 눌렀을 때 알림 켜기 결과. 누르지 않았으면 null(B4: 첫 화면이 이 결과를 알린다) */
+  pushOutcome?: EnableOutcome | null;
 };
+
+/** 알림 켜기가 granted가 아닐 때 사용자에게 보일 글(granted·null은 글이 없다) */
+export function pushOutcomeText(outcome: EnableOutcome | null | undefined): string | null {
+  switch (outcome) {
+    case "denied":
+    case "default":
+      return ONBOARDING_TEXT.denied;
+    case "unsupported":
+      return ONBOARDING_TEXT.pushUnsupported;
+    case "missing_key":
+      return ONBOARDING_TEXT.pushMissingKey;
+    case "failed":
+      return ONBOARDING_TEXT.pushFailed;
+    default:
+      return null;
+  }
+}
 
 function timeOptions(): number[] {
   return Array.from({ length: 48 }, (_, i) => i * 30);
@@ -211,10 +233,17 @@ export function Onboarding({
     setSaving(true);
     setMessage("");
     let notifyOn = false;
+    let pushOutcome: EnableOutcome | null = null;
     if (allow) {
-      const permission = await api.requestPermission();
-      notifyOn = permission === "granted";
-      if (!notifyOn) setMessage(ONBOARDING_TEXT.denied);
+      // 알림이 안 켜져도 처음 설정은 저장하고 끝낸다(A3). 결과는 첫 화면이 알린다(B4)
+      try {
+        pushOutcome = await api.requestPermission();
+      } catch {
+        pushOutcome = "failed";
+      }
+      notifyOn = pushOutcome === "granted";
+      const text = pushOutcomeText(pushOutcome);
+      if (text) setMessage(text);
     }
     const ratios: RatioItem[] = entries.map((e) => ({ categoryId: e.id, percent: e.percent }));
     const notify: NotifySettings = {
@@ -239,7 +268,7 @@ export function Onboarding({
       setMessage(ONBOARDING_TEXT.saveFailed);
       return;
     }
-    onDone({ goal: goalCheck.ok ? goalCheck.goal : null, ratios, categories: catalog, notify });
+    onDone({ goal: goalCheck.ok ? goalCheck.goal : null, ratios, categories: catalog, notify, pushOutcome });
   }
 
   function onGoalKeyDown(event: KeyboardEvent<HTMLInputElement>) {
