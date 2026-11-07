@@ -7,6 +7,7 @@ import { signOut } from "../app/actions";
 import { addCategory, addTodo, setTodoDone } from "../app/todos/actions";
 import type { AddCategoryResult, CategoryItem, CategoryList, CategoryResult } from "../lib/categories/types";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
+import type { LocalTodos } from "../lib/local/todos";
 import type { ManageApi } from "../lib/manage-api";
 import type { Outbox, OutboxItem } from "../lib/outbox";
 import { fetchToday } from "../lib/read-client";
@@ -44,6 +45,8 @@ import { TodoDetail } from "./todo-detail";
  * 클라이언트는 user_id·날짜를 보내지 않는다. 브라우저 Supabase 클라이언트로 표를 직접 읽고 쓰지 않는다.
  * 저장 전 글·분야 이름은 기기에 두지 않는다(D6): localStorage·sessionStorage·IndexedDB·서비스 워커 캐시 없음.
  */
+
+export type { LocalTodos };
 
 type LocalRow = {
   id: string;
@@ -147,7 +150,10 @@ export function TodoScreen({
   outbox,
   onBeforeSignOut,
   logoutRequest = 0,
+  local,
 }: {
+  /** 기기 먼저 저장(고침 3바퀴, 선택): 있으면 쓰기는 기기에 먼저 반영하고 읽기는 기기 거울에서 한다. 없으면 예전 방식 그대로 */
+  local?: LocalTodos;
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
   initial?: TodayRead;
   /** 원샷 v2(선택): 있으면 줄마다 「자세히」(고치기·지우기·순서·작업 기록)와 「어제 못 끝낸 할 일」 가져오기를 그린다. 없으면 기존 화면 그대로 */
@@ -175,6 +181,8 @@ export function TodoScreen({
   const [offlineHelp, setOfflineHelp] = useState(false);
   const [sessionLost, setSessionLost] = useState(() => initialTodos?.ok === false && initialTodos.error === "unauthenticated");
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  /** 기기 먼저 저장: 로그아웃 확인이 「보내지 못한 기록」 때문인가, 보내는 중인가 */
+  const [signingOut, setSigningOut] = useState(false);
   const [live, announce] = useAnnouncer(first ? loadedText(first.todos.length) : TODO_TEXT.liveLoading);
   const online = useOnline();
   const router = useRouter(); // 다시 로그인: 서버가 세션을 다시 보고 로그인 화면을 그린다
@@ -290,8 +298,30 @@ export function TodoScreen({
     setSelectedCategoryId((prev) => (prev && merged.some((c) => c.id === prev && c.name !== null) ? prev : null));
   }, []);
 
+  /** 기기 거울에서 읽은 값으로 화면을 맞춘다(기기 먼저 저장). 서버를 기다리지 않는다 */
+  const applyLocalRead = useCallback(() => {
+    if (!local) return;
+    const read = local.read();
+    applyCategories(read.categories);
+    if (!read.todos.ok) {
+      if (!loadedRef.current) setList("error");
+      return;
+    }
+    loadedRef.current = true;
+    setDay(read.todos.data.day);
+    setRows(read.todos.data.todos.map(fromItem));
+    setList("ready");
+  }, [local, applyCategories]);
+
   const load = useCallback(
     async (mode: "first" | "silent") => {
+      if (local) {
+        // 기기 먼저 저장: 기기 거울로 바로 그리고, 서버 것은 뒤에서 받아 맞춘다
+        applyLocalRead();
+        local.refresh();
+        if (mode !== "silent") announce(loadedText(rowsRef.current.length));
+        return;
+      }
       const seq = ++loadSeqRef.current;
       const read = await safely<TodayRead>(() => fetchToday(), { todos: UNAVAILABLE, categories: UNAVAILABLE });
       if (seq !== loadSeqRef.current) return; // 더 새 불러오기가 있다
@@ -329,8 +359,37 @@ export function TodoScreen({
       setList("ready");
       if (mode !== "silent") announce(loadedText(server.length));
     },
-    [announce, applyCategories],
+    [announce, applyCategories, applyLocalRead, local],
   );
+
+  // 기기 먼저 저장: 거울이 바뀔 때마다(내가 쓴 것·서버에서 받아 맞춘 것·거절돼 되돌린 것) 화면을 거울에 맞춘다
+  useEffect(() => {
+    if (!local) return;
+    // 처음 그릴 때와 이 효과가 켜지는 사이에 바뀐 것을 놓치지 않게 한 번 맞춘다(효과 안에서 바로 상태를 바꾸지 않고 한 박자 뒤에)
+    let alive = true;
+    void Promise.resolve().then(() => {
+      if (alive) applyLocalRead();
+    });
+    const stop = local.subscribe(applyLocalRead);
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, [local, applyLocalRead]);
+  // 로그인이 풀려 보내지 못하는 상태를 화면에 알린다(보낼 줄은 기기에 남아 다시 로그인하면 이어서 보낸다)
+  useEffect(() => {
+    if (!local) return;
+    const sync = () => setSessionLost(local.isAuthLost());
+    let alive = true;
+    void Promise.resolve().then(() => {
+      if (alive) sync();
+    });
+    const stop = local.subscribeState(sync);
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, [local]);
 
   // 처음 불러오기: 서버 컴포넌트가 처음 목록을 넘기지 않았을 때만
   useEffect(() => {
@@ -542,7 +601,7 @@ export function TodoScreen({
       selectAfterAdd(existing, name, categoryDuplicateText(existing.name));
       return;
     }
-    if (!navigator.onLine) {
+    if (!navigator.onLine && !local) {
       setNewCategoryHelp("offline"); // C21: 이름은 그대로
       newCategoryInputRef.current?.focus();
       return;
@@ -574,7 +633,7 @@ export function TodoScreen({
       stopBusy();
       setNewCategoryHelp("failed"); // C19: 적은 이름은 지우지 않는다
     }, CATEGORY_ADD_TIMEOUT_MS);
-    const res = await safely<AddCategoryResult>(() => addCategory(requestId, name), UNAVAILABLE);
+    const res = await safely<AddCategoryResult>(() => (local ? local.addCategory(requestId, name) : addCategory(requestId, name)), UNAVAILABLE);
     clearTimeout(timer);
     stopBusy();
 
@@ -678,6 +737,21 @@ export function TodoScreen({
       input?.focus();
       return;
     }
+    if (local) {
+      // 기기 먼저 저장: 서버 왕복을 기다리지 않는다. 기기 거울에 먼저 적히고(목록이 바로 바뀐다) 서버에는 보낼 줄이 뒤에서 보낸다
+      const categoryId =
+        selectedCategoryId && readableChips().some((c) => c.id === selectedCategoryId) ? selectedCategoryId : null;
+      const id = crypto.randomUUID(); // 새로 적는 글마다 새 id (D4)
+      scrollToRef.current = id;
+      local.addTodo({ id, text: checked.text, categoryId });
+      setDraft(""); // 첫 누름에 칸을 비운다: 연타하면 둘째부터 빈 칸
+      draftRef.current = "";
+      setSelectedCategoryId(null); // C7: 적은 뒤 고른 분야는 풀린다(PM 임시값, D-125)
+      setOfflineHelp(false);
+      announce(TODO_TEXT.liveSaved);
+      input?.focus(); // 창은 열린 채, 포커스는 할 일 칸(C-D1)
+      return;
+    }
     // 보관함이 있으면 오프라인에서도 적는다(기기에 두었다가 연결되면 저장, PRD 10절). 없으면 옛 방식: 글은 그대로 두고 안내만
     const queueOffline = !navigator.onLine && outbox !== undefined;
     if (!navigator.onLine && !queueOffline) {
@@ -734,6 +808,11 @@ export function TodoScreen({
   function toggle(id: string) {
     const row = rowsRef.current.find((r) => r.id === id);
     if (!row) return;
+    if (local) {
+      // 기기 먼저 저장: 서버에 올라가기 전의 줄도 바로 끝냄 표시를 할 수 있고, 연결이 없어도 된다(기기 거울에 먼저 반영, 서버에는 뒤에서)
+      local.setDone(id, !row.done);
+      return;
+    }
     if (row.status !== "saved") return; // 저장 중·저장 못 한 줄은 서버에 없다. 저장되면 누를 수 있다
     if (!navigator.onLine) {
       announce(TODO_TEXT.offline, { again: true });
@@ -844,6 +923,18 @@ export function TodoScreen({
 
   function doSignOut() {
     outbox?.clear(); // 로그아웃하면 기기에 둔 못 올린 글도 지운다(남의 글이 남지 않게)
+    // 기기 먼저 저장: 이 사용자의 기기 저장소(거울·보낼 줄)를 지운 뒤 로그아웃한다. 보낼 줄이 남았으면 onLogout이 먼저 사용자에게 물었다
+    if (!local) {
+      signOutAfterWipe();
+      return;
+    }
+    void local.discard().then(
+      () => signOutAfterWipe(),
+      () => signOutAfterWipe(),
+    );
+  }
+
+  function signOutAfterWipe() {
     const before = onBeforeSignOut;
     if (!before) {
       void signOut();
@@ -876,6 +967,24 @@ export function TodoScreen({
   }
 
   function onLogout() {
+    if (local) {
+      // 기기 먼저 저장: 먼저 보낼 줄을 서버에 보내 본다. 다 보냈으면 로그아웃, 못 보낸 것이 있으면 「보내지 못한 기록이 있어요」를 알리고 사용자가 고른다
+      if (signingOut) return;
+      setSigningOut(true);
+      announce(TODO_TEXT.signingOut);
+      void local.flushBeforeSignOut().then(
+        (left) => {
+          setSigningOut(false);
+          if (left > 0 || anyUnsaved()) setLogoutConfirm(true);
+          else doSignOut();
+        },
+        () => {
+          setSigningOut(false);
+          setLogoutConfirm(true);
+        },
+      );
+      return;
+    }
     if (anyUnsaved()) setLogoutConfirm(true);
     else doSignOut();
   }
@@ -993,8 +1102,8 @@ export function TodoScreen({
   // 로그인 풀림 안내의 복사: 할 일 칸 글은 늘, 새 분야 칸 이름은 C19a일 때만
   const copyable = unsavedRows || hasDraft || (categoryAuthLost && hasCategoryDraft);
   // 확인이 떠 있는 동안 저장되지 않은 글이 없어지면(빼기·저장 끝·칸 비움) 확인을 닫는다
-  const confirmOpen = logoutConfirm && hasUnsaved;
-  if (logoutConfirm && !hasUnsaved) setLogoutConfirm(false);
+  const confirmOpen = logoutConfirm && (hasUnsaved || local !== undefined);
+  if (logoutConfirm && !hasUnsaved && !local) setLogoutConfirm(false);
 
   // 포커스가 있던 요소가 사라져도 body로 떨어뜨리지 않는다.
   // 요청된 곳(「빼기」의 이웃 줄, 「다시」의 그 줄, 할 일 칸, 「+ 분야」 등)이 앞서고, 없으면 할 일 칸 → 단추.
@@ -1026,7 +1135,9 @@ export function TodoScreen({
       online={online}
       offlineHelp={offlineHelp && !online}
       sessionLost={sessionLost}
-      hasUnsaved={copyable}
+      hasUnsaved={local ? false : copyable}
+      offlineText={local ? TODO_TEXT.offlineLocal : undefined}
+      logoutConfirmText={local ? TODO_TEXT.logoutUnsent : undefined}
       logoutConfirm={confirmOpen}
       live={live}
       sheetOpen={sheetOpen}
@@ -1070,7 +1181,7 @@ export function TodoScreen({
               </Notice>
             )}
             {topSlot}
-            {manage && list === "ready" && <CarryOver api={manage} online={online} onCarried={onCarried} />}
+            {manage && list === "ready" && <CarryOver api={manage} online={online || manage.localFirst === true} onCarried={onCarried} />}
             {manage?.fetchDay && list === "ready" && <TextButton onClick={() => setPastOpen(true)}>{PAST_DAYS_TEXT.open}</TextButton>}
           </>
         ) : undefined
@@ -1090,7 +1201,7 @@ export function TodoScreen({
             }}
             chips={chips}
             api={manage}
-            online={online}
+            online={online || manage.localFirst === true}
             onClose={() => closeDetail()}
             onEdited={onEdited}
             onDeleted={onDeleted}

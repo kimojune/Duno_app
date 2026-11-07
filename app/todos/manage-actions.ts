@@ -43,21 +43,22 @@ export async function reorderTodos(ids: unknown): Promise<TodoResult<{ ids: stri
   }
 }
 
-export async function carryOverTodos(items: unknown): ReturnType<typeof carryOverTodosForUser> {
+export async function carryOverTodos(items: unknown, writtenAt?: unknown): ReturnType<typeof carryOverTodosForUser> {
   try {
     const deps = await getDeps();
     if (!deps) return { ok: false, error: "config" };
-    return await carryOverTodosForUser(deps, items);
+    // writtenAt(기기가 누른 때)은 기기 먼저 저장이 보낸다. 없으면 옛 호출 꼴 그대로 부른다
+    return writtenAt === undefined ? await carryOverTodosForUser(deps, items) : await carryOverTodosForUser(deps, items, writtenAt);
   } catch {
     return { ok: false, error: "unavailable" };
   }
 }
 
-export async function addNote(id: unknown, todoId: unknown, text: unknown): Promise<RecordResult<{ note: NoteItem }>> {
+export async function addNote(id: unknown, todoId: unknown, text: unknown, writtenAt?: unknown): Promise<RecordResult<{ note: NoteItem }>> {
   try {
     const deps = await getDeps();
     if (!deps) return { ok: false, error: "config" };
-    return await addNoteForUser(deps, id, todoId, text);
+    return writtenAt === undefined ? await addNoteForUser(deps, id, todoId, text) : await addNoteForUser(deps, id, todoId, text, writtenAt);
   } catch {
     return { ok: false, error: "unavailable" };
   }

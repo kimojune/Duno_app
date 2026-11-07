@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireUserId } from "../session";
 import { addDays } from "../week";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
-import { describeTodoDay, todoDayFor } from "./day";
+import { describeTodoDay, resolveWriteDay, todoDayFor } from "./day";
 import { sortByPosition } from "./order";
 import type { TodoErrorCode, TodoItem, TodoResult } from "./types";
 import { checkTodoText, todoCategoryIdSchema, todoIdSchema } from "./validation";
@@ -201,10 +201,12 @@ const carrySchema = z.array(z.object({ from: todoIdSchema, id: todoIdSchema }).s
 /**
  * 어제 못 끝낸 할 일을 오늘로 가져온다. 글(암호문)과 분야를 그대로 복사해 새 할 일을 만들고, 어제 것은 그대로 둔다(앱이 알아서 넘기지 않는다).
  * from은 어제의 내 할 일이어야 한다. id는 화면이 만든 uuid라 같은 요청을 다시 보내도 새로 만들지 않는다.
+ * writtenAt(기기가 누른 때, ISO)이 믿을 수 있는 범위면 그 때의 하루를 「오늘」로 본다(기기 먼저 저장, 고침 3바퀴). 아니면 서버 시계.
  */
 export async function carryOverTodosForUser(
   deps: ManageDeps,
   items: unknown,
+  writtenAt?: unknown,
 ): Promise<TodoResult<{ todos: TodoItem[]; day: ReturnType<typeof describeTodoDay> }>> {
   try {
     const user = await requireUserId(deps.supabase);
@@ -213,7 +215,7 @@ export async function carryOverTodosForUser(
     if (!parsed.success) return fail("invalid_input");
     if (!deps.key) return fail("config");
     const key = deps.key;
-    const today = todoDayFor((deps.now ?? serverNow)());
+    const today = resolveWriteDay((deps.now ?? serverNow)(), writtenAt);
     const yesterday = addDays(today, -1);
 
     const sources = await deps.supabase.from("todos").select(ROW_COLUMNS).eq("user_id", user.data).eq("day", yesterday);

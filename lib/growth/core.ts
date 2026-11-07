@@ -8,8 +8,8 @@ import { requireUserId } from "../session";
 import { readSettingsForUser } from "../settings/core";
 import type { TodoKey } from "../todos/crypto";
 import { todoDayFor } from "../todos/day";
-import { addDays, previousMonthRange, weekDates, weekStartFor } from "../week";
-import { countLoggedDays, sumRange } from "./logic";
+import { weekStartFor } from "../week";
+import { computeGrowth } from "./compute";
 import type { GrowthData } from "./types";
 
 /**
@@ -27,8 +27,6 @@ export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<
     if (!deps.key) return recordFail("config");
     const today = todoDayFor((deps.now ?? serverNow)());
     const weekStart = weekStartFor(today);
-    const lastWeekStart = addDays(weekStart, -7);
-    const lastMonthRange = previousMonthRange(today);
 
     const [logs, settings, categories, goal] = await Promise.all([
       listEveningLogs({ supabase: deps.supabase }),
@@ -41,25 +39,15 @@ export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<
     if (!settings.ok) return settings;
     if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
 
-    const weekEnd = weekDates(weekStart)[6];
-    const lastWeekEnd = weekDates(lastWeekStart)[6];
     return {
       ok: true,
-      data: {
+      data: computeGrowth({
         today,
-        weekStart,
-        lastWeekStart,
-        lastMonthRange,
+        logs: logs.data,
         categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
         ratios: settings.data.ratios,
-        thisWeek: sumRange(logs.data, weekStart, weekEnd),
-        lastWeek: sumRange(logs.data, lastWeekStart, lastWeekEnd),
-        lastMonth: sumRange(logs.data, lastMonthRange.from, lastMonthRange.to),
-        cumulative: sumRange(logs.data),
-        loggedDaysThisWeek: countLoggedDays(logs.data, weekStart, weekEnd),
-        loggedDaysTotal: countLoggedDays(logs.data),
-        goal: goal.data ? { weekStart, items: goal.data } : null,
-      },
+        goalItems: goal.data,
+      }),
     };
   } catch {
     return recordFail("unavailable");

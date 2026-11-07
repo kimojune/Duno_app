@@ -85,7 +85,8 @@ export function EveningRecord({
   renderAfterSave?: (saved: SavedEvening, state: EveningState) => ReactNode;
 }) {
   const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
-  const online = useOnline();
+  // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
+  const online = useOnline() || api.localFirst === true;
   const [offsetDays, setOffsetDays] = useState<0 | 1>(0);
   const [load, setLoad] = useState<{ status: "loading" } | { status: "error" } | { status: "ready"; state: EveningState }>({ status: "loading" });
   const [phase, setPhase] = useState<Phase>("time");

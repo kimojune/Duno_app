@@ -4,9 +4,9 @@ import { z } from "zod";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
 import { decryptTodoText, encryptTodoText, type TodoKey } from "../todos/crypto";
-import { todoDayFor } from "../todos/day";
+import { resolveWriteDay } from "../todos/day";
 import { todoIdSchema } from "../todos/validation";
-import { NOTE_MAX_LENGTH_PUBLIC } from "./public";
+import { checkNoteText, NOTE_MAX_LENGTH_PUBLIC } from "./public";
 import type { CategoryPageData, CategoryPageDay, NoteItem } from "./types";
 
 /**
@@ -23,19 +23,8 @@ export const NOTE_MAX_LENGTH = NOTE_MAX_LENGTH_PUBLIC;
 export const CATEGORY_PAGE_TODO_LIMIT = 500;
 
 const serverNow = () => new Date();
-const stringSchema = z.string();
-
-export type NoteTextCheck = { ok: true; text: string } | { ok: false; error: "invalid_input" | "empty" | "too_long" };
-
-/** 글 검사: 앞뒤 공백을 지운 뒤 0자면 empty, 2000자를 넘으면 too_long. 줄바꿈은 그대로 둔다 */
-export function checkNoteText(input: unknown): NoteTextCheck {
-  const parsed = stringSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "invalid_input" };
-  const text = parsed.data.trim();
-  if (text.length === 0) return { ok: false, error: "empty" };
-  if (text.length > NOTE_MAX_LENGTH * 2 || [...text].length > NOTE_MAX_LENGTH) return { ok: false, error: "too_long" };
-  return { ok: true, text };
-}
+export { checkNoteText };
+export type { NoteTextCheck } from "./public";
 
 type NoteRow = { id: string; todo_id: string; day: string; note_encrypted: string; created_at: string };
 const NOTE_COLUMNS = "id, todo_id, day, note_encrypted, created_at";
@@ -48,12 +37,16 @@ function toNote(row: NoteRow, userId: string, key: TodoKey): NoteItem {
 
 const noteIdSchema = z.uuid();
 
-/** 작업 기록 더하기. id는 화면이 만든 uuid(같은 id를 다시 보내도 새로 만들지 않는다). 없는 할 일·남의 할 일이면 not_found */
+/**
+ * 작업 기록 더하기. id는 화면이 만든 uuid(같은 id를 다시 보내도 새로 만들지 않는다). 없는 할 일·남의 할 일이면 not_found.
+ * writtenAt(기기가 적은 때, ISO)이 최근 72시간 안·미래 5분 이내면 그 때의 두노 하루로 넣는다(기기 먼저 저장, 고침 3바퀴). 아니면 서버 시계.
+ */
 export async function addNoteForUser(
   deps: NotesDeps,
   id: unknown,
   todoId: unknown,
   text: unknown,
+  writtenAt?: unknown,
 ): Promise<RecordResult<{ note: NoteItem }>> {
   try {
     const user = await requireUserId(deps.supabase);
@@ -66,7 +59,7 @@ export async function addNoteForUser(
     if (!deps.key) return recordFail("config");
     const key = deps.key;
 
-    const day = todoDayFor((deps.now ?? serverNow)());
+    const day = resolveWriteDay((deps.now ?? serverNow)(), writtenAt);
     const encrypted = encryptTodoText(checked.text, user.data, key, "todo_note");
     const { data, error } = await deps.supabase
       .from("todo_notes")

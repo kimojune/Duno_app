@@ -6,6 +6,8 @@ import type { RecordResult } from "./records/common";
 
 /** 이번 주 목표 화면이 서버를 부르는 길(브라우저 쪽). 시험은 가짜를 넣는다. 실패는 던지지 않고 unavailable로 바꾼다 */
 export type GoalsApi = {
+  /** 기기 먼저 저장 구현이면 true(고침 3바퀴): 쓰기가 기기에 먼저 반영되고 서버에는 뒤에서 가므로 끊겨 있어도 막지 않는다 */
+  localFirst?: boolean;
   /** 한 줄과 정하기 창이 읽는 것 */
   fetchSummary(): Promise<RecordResult<GoalSummary>>;
   save(items: { categoryId: string; minutes: number }[]): Promise<RecordResult<{ weekStart: string; items: CategoryMinutes[] }>>;

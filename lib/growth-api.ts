@@ -10,6 +10,8 @@ import type { ViewEntry, ViewScreen } from "./views/core-types";
  * 실패는 던지지 않고 unavailable로 바꾼다. 화면 본 것 기록(recordView)이 실패해도 화면은 그대로다.
  */
 export type GrowthApi = {
+  /** 기기 먼저 저장 구현이면 true(고침 3바퀴): 쓰기가 기기에 먼저 반영되고 서버에는 뒤에서 가므로 끊겨 있어도 막지 않는다 */
+  localFirst?: boolean;
   fetchGrowth(): Promise<RecordResult<GrowthData>>;
   fetchCategoryPage(categoryId: string | null): Promise<RecordResult<CategoryPageData>>;
   /** 화면이 그려진 뒤 한 번. id는 화면이 만든 uuid */

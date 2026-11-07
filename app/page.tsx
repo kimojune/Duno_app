@@ -1,5 +1,6 @@
 import { LoginButton, LoginLayout } from "../components/login-button";
 import { AppShell } from "../components/app-shell";
+import { LocalAppShell } from "../components/local-app-shell";
 import { getPublicEnv } from "../lib/env";
 import { noticeFromErrorParam } from "../lib/login-text";
 import { createClient } from "../lib/supabase/server";
@@ -23,16 +24,22 @@ export default async function Home({
   if (supabase) {
     const { data } = await supabase.auth.getClaims();
     if (data?.claims?.sub) {
-      // 처음 화면(할 일 + 분야 + 설정)은 여기서 DAL로 바로 읽어 넘긴다(Server Action·자기 Route Handler를 거치지 않는다. MO-17).
-      // 세션 확인은 core 함수들이 다시 한다. 결과는 짧은 코드만 담긴 평범한 객체다.
-      let home: HomeRead;
-      try {
-        home = await readHome();
-      } catch {
-        const unavailable = { ok: false, error: "unavailable" } as const;
-        home = { today: { todos: unavailable, categories: unavailable }, settings: unavailable };
+      // 기기 먼저 저장(고침 3바퀴, 기본): 서버는 사용자 번호만 넘기고 개인 데이터는 HTML에 싣지 않는다. 화면이 기기 저장소에서 바로 그리고,
+      // 서버 것은 브라우저가 GET /mirror로 뒤에서 받아 맞춘다(예전에는 여기서 DB를 읽어 첫 화면이 그만큼 늦었다).
+      // 끄는 법: 서버 설정에 DUNO_LOCAL_FIRST=off를 두면 예전 방식(서버가 읽어 넘기고 서버에 직접 쓴다)으로 돈다. 문제가 생겼을 때의 안전 장치이고,
+      // 고치기 전·후 반응 속도를 같은 빌드에서 견주는 데도 쓴다.
+      if (process.env.DUNO_LOCAL_FIRST?.trim().toLowerCase() === "off") {
+        // 처음 화면(할 일 + 분야 + 설정)은 여기서 DAL로 바로 읽어 넘긴다(Server Action·자기 Route Handler를 거치지 않는다. MO-17).
+        let home: HomeRead;
+        try {
+          home = await readHome();
+        } catch {
+          const unavailable = { ok: false, error: "unavailable" } as const;
+          home = { today: { todos: unavailable, categories: unavailable }, settings: unavailable };
+        }
+        return <AppShell home={home} initialOpen={initialOpen} userKey={data.claims.sub} />;
       }
-      return <AppShell home={home} initialOpen={initialOpen} userKey={data.claims.sub} />;
+      return <LocalAppShell userKey={data.claims.sub} initialOpen={initialOpen} />;
     }
   }
 

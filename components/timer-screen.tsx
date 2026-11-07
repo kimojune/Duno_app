@@ -78,7 +78,8 @@ export function TimerScreen({
   /** 앱의 추천(⑤): 있으면 목록 맨 앞에 놓고 처음에 골라 둔다 */
   recommended?: { offerId: string | null; todoId: string | null; categoryId: string | null; label: string } | null;
 }) {
-  const online = useOnline();
+  // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 시작·끝내기를 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
+  const online = useOnline() || api.localFirst === true;
   const [load, setLoad] = useState<"loading" | "error" | "ready">("loading");
   const [running, setRunning] = useState<ActiveTimer | null>(null);
   const [today, setToday] = useState<FocusSession[]>([]);

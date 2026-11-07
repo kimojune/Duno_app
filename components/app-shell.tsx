@@ -9,6 +9,10 @@ import { defaultGrowthApi } from "../lib/growth-api";
 import type { HomeRead } from "../lib/home-types";
 import { defaultManageApi } from "../lib/manage-api";
 import { defaultOffersApi, type OffersApi } from "../lib/offers-api";
+import { readableCategories as readableMirrorCategories } from "../lib/local/derive";
+import { readTodayFromMirror, type LocalApis } from "../lib/local/apis";
+import { createLocalTodos, type LocalTodos } from "../lib/local/todos";
+import type { Runtime } from "../lib/local/runtime";
 import { clearOtherOutboxes, createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
@@ -30,6 +34,7 @@ import { Onboarding, pushOutcomeText, type OnboardingResult } from "./onboarding
 import { TabBar, type TabId } from "./tab-bar";
 import { TimerScreen } from "./timer-screen";
 import { TodoScreen } from "./todo-screen";
+import { TODO_TEXT } from "./todo-view";
 import { Notice, TextButton } from "./ui";
 
 /**
@@ -60,6 +65,12 @@ function readableCategories(initial: TodayRead): Entry[] {
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
 
+/**
+ * 기기 먼저 저장(고침 3바퀴)의 묶음: 운영 장치(기기 거울·보낼 줄)와 그 위에서 화면이 쓰는 API들.
+ * 있으면 화면은 서버 왕복을 기다리지 않고 기기 거울을 읽고 쓴다. 없으면 예전 방식(서버에서 읽어 받은 home을 쓰고 서버에 직접 쓴다) 그대로다.
+ */
+export type LocalBundle = { runtime: Runtime; apis: LocalApis };
+
 /** 이 앱이 서버를 부르는 길 모음. 시험은 가짜를 넣는다 */
 export type ShellApis = { offers: OffersApi; focus: FocusApi; push: PushApi };
 const DEFAULT_APIS: ShellApis = { offers: defaultOffersApi, focus: defaultFocusApi, push: defaultPushApi };
@@ -70,7 +81,10 @@ export function AppShell({
   apis: apisProp,
   userKey,
   outbox: outboxProp,
+  local,
 }: {
+  /** 기기 먼저 저장(고침 3바퀴, 선택): 있으면 화면이 기기 거울을 읽고 쓴다 */
+  local?: LocalBundle;
   home: HomeRead;
   initialOpen?: "evening" | null;
   apis?: Partial<ShellApis>;
@@ -80,16 +94,20 @@ export function AppShell({
   outbox?: Outbox;
 }) {
   // 부르는 길 모음은 렌더마다 새로 만들지 않는다(자식의 읽기 효과가 다시 돌지 않게)
-  const apis = useMemo<ShellApis>(() => ({ ...DEFAULT_APIS, ...apisProp }), [apisProp]);
+  const apis = useMemo<ShellApis>(
+    () => ({ ...DEFAULT_APIS, ...(local ? { offers: local.apis.offers, focus: local.apis.focus } : {}), ...apisProp }),
+    [apisProp, local],
+  );
   // 오프라인으로 적은 할 일을 기기에 두는 보관함(PRD 10절). 서버 렌더에서는 저장소가 없어 아무것도 안 하는 보관함이다
+  // (기기 먼저 저장이 켜져 있으면 옛 보관함은 쓰지 않는다: 보낼 줄이 그 일을 한다)
   const outbox = useMemo<Outbox | undefined>(
-    () => outboxProp ?? (userKey ? createOutbox(safeLocalStorage(), userKey) : undefined),
-    [outboxProp, userKey],
+    () => (local ? undefined : (outboxProp ?? (userKey ? createOutbox(safeLocalStorage(), userKey) : undefined))),
+    [outboxProp, userKey, local],
   );
   // 로그인 직후: 이 기기에 남은 다른 사용자의 보관함은 지운다(A6). 시험이 보관함을 직접 넣을 때는 건드리지 않는다
   useEffect(() => {
-    if (userKey && !outboxProp) clearOtherOutboxes(safeLocalStorage(), userKey);
-  }, [userKey, outboxProp]);
+    if (userKey && !outboxProp && !local) clearOtherOutboxes(safeLocalStorage(), userKey);
+  }, [userKey, outboxProp, local]);
   const settings = home.settings.ok ? home.settings.data : null;
   const [done, setDone] = useState<OnboardingResult | null>(null);
   const needsOnboarding = settings !== null && !settings.onboardingDone && done === null;
@@ -100,7 +118,7 @@ export function AppShell({
       : [];
     return (
       <Onboarding
-        api={defaultSettingsApi}
+        api={local ? local.apis.settings : defaultSettingsApi}
         categories={readable}
         initialGoal={settings.goal}
         initialRatios={settings.ratios}
@@ -121,6 +139,7 @@ export function AppShell({
       apis={apis}
       settings={mySettings}
       outbox={outbox}
+      local={local}
       startNotice={done ? pushOutcomeText(done.pushOutcome) : null}
     />
   );
@@ -132,8 +151,10 @@ function MainShell({
   apis,
   settings,
   outbox,
+  local,
   startNotice,
 }: {
+  local: LocalBundle | undefined;
   initial: TodayRead;
   initialOpen: "evening" | null;
   apis: ShellApis;
@@ -143,6 +164,25 @@ function MainShell({
   startNotice: string | null;
 }) {
   const [startNoticeOpen, setStartNoticeOpen] = useState(startNotice !== null);
+  // 기기 먼저 저장: 서버가 받지 않아 되돌린 쓰기 수(알림을 보이고 닫을 때까지 쌓인다)
+  const [rejectedCount, setRejectedCount] = useState(0);
+  // 기기 거울이 바뀌면 이 화면도 다시 그린다(내 정보 탭의 분야 목록 등이 거울을 읽는다)
+  const [, setMirrorVersion] = useState(0);
+  useEffect(() => {
+    if (!local) return;
+    const runtime = local.runtime;
+    const stopMirror = runtime.subscribe(() => setMirrorVersion((n) => n + 1));
+    const stopRejections = runtime.subscribeRejections(() => {
+      const taken = runtime.takeRejections().length;
+      if (taken > 0) setRejectedCount((n) => n + taken);
+    });
+    return () => {
+      stopMirror();
+      stopRejections();
+    };
+  }, [local]);
+  // 기기 먼저 저장에서 할 일 화면이 쓰는 것
+  const localTodos = useMemo<LocalTodos | undefined>(() => (local ? createLocalTodos(local.runtime, local.apis) : undefined), [local]);
   const [tab, setTab] = useState<TabId>("todo");
   const [eveningOpen, setEveningOpen] = useState(initialOpen === "evening");
   const [growthEntry, setGrowthEntry] = useState<ViewEntry>("self");
@@ -205,6 +245,19 @@ function MainShell({
     };
   }, [apis]);
 
+  // 기기 먼저 저장: 제시는 서버만 정하지만 받은 것은 기기 거울에 있다. 거울이 바뀌면(서버가 다시 건넨 것·내가 시작하거나 넘긴 것) 카드와 추천이 따라간다
+  useEffect(() => {
+    if (!local) return;
+    const runtime = local.runtime;
+    return runtime.subscribe(() => {
+      const offers = runtime.getMirror().offers;
+      const card = offers.card;
+      setCardOffer(card && card.state === "new" && card.day === todoDayFor(new Date()) ? card : null);
+      const tab = offers.timer_tab;
+      setTimerOffer(tab && tab.state !== "started" && tab.state !== "dismissed" ? tab : null);
+    });
+  }, [local]);
+
   // 카드의 날짜가 오늘이 아니면(앱을 켜 둔 채 하루가 바뀐 경우 등) 거둔다. 렌더가 아니라 화면이 다시 보일 때 확인한다
   useEffect(() => {
     function onVisible() {
@@ -242,6 +295,8 @@ function MainShell({
   // 내 정보 탭을 열 때마다 분야 목록을 다시 읽는다. 못 읽었으면 지금 목록을 그대로 둔다
   useEffect(() => {
     if (meActivation === 0) return;
+    // 기기 먼저 저장이면 분야 목록은 늘 기기 거울에서 읽는다(아래 meCategoriesNow). 서버에 물을 것이 없다
+    if (local) return;
     let alive = true;
     void fetchToday().then(
       (read) => {
@@ -252,12 +307,12 @@ function MainShell({
     return () => {
       alive = false;
     };
-  }, [meActivation]);
+  }, [meActivation, local]);
 
   async function startFromCard() {
     const offer = cardOffer;
     if (!offer || cardBusy) return;
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
+    if (typeof navigator !== "undefined" && !navigator.onLine && !local) {
       setCardError("offline");
       return;
     }
@@ -296,6 +351,7 @@ function MainShell({
     await apis.offers.dismiss(offer.id);
   }
 
+  const meCategoriesNow = local ? readableMirrorCategories(local.runtime.getMirror()) : (meCategories ?? readableCategories(initial));
   const recommended = timerOffer
     ? {
         offerId: timerOffer.id,
@@ -309,7 +365,7 @@ function MainShell({
     <div ref={shellRef} className="app-shell" style={shellStyle}>
       <div hidden={tab !== "growth"}>
         <GrowthScreen
-          api={defaultGrowthApi}
+          api={local ? local.apis.growth : defaultGrowthApi}
           active={tab === "growth"}
           activation={growthActivation}
           entry={growthEntry}
@@ -320,12 +376,22 @@ function MainShell({
       <div hidden={tab !== "todo"}>
         <TodoScreen
           initial={initial}
-          manage={defaultManageApi}
+          manage={local ? local.apis.manage : defaultManageApi}
+          local={localTodos}
           outbox={outbox}
           onBeforeSignOut={() => apis.push.disable()}
           logoutRequest={logoutRequest}
           topSlot={
             <>
+              {rejectedCount > 0 && (
+                <Notice
+                  role="status"
+                  className="notice-top"
+                  actions={<TextButton onClick={() => setRejectedCount(0)}>닫기</TextButton>}
+                >
+                  {TODO_TEXT.rejected(rejectedCount)}
+                </Notice>
+              )}
               {startNotice && startNoticeOpen && (
                 <Notice
                   role="status"
@@ -337,7 +403,7 @@ function MainShell({
                   {startNotice}
                 </Notice>
               )}
-              <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
+              <GoalLine api={local ? local.apis.goals : defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
               {!cardLoaded && !cardOffer && <div className="slot-card" aria-hidden="true" />}
               {cardOffer && (
                 <OfferCard
@@ -358,7 +424,7 @@ function MainShell({
       <div hidden={tab !== "timer"}>
         <TimerScreen
           api={apis.focus}
-          fetchToday={fetchToday}
+          fetchToday={local ? () => Promise.resolve(readTodayFromMirror(local.runtime)) : fetchToday}
           active={tab === "timer"}
           activation={timerActivation}
           recommended={recommended}
@@ -366,7 +432,7 @@ function MainShell({
         />
       </div>
       <div hidden={tab !== "me"}>
-        <MeScreen settings={settings} categories={meCategories ?? readableCategories(initial)} api={defaultSettingsApi} push={apis.push}
+        <MeScreen settings={settings} categories={meCategoriesNow} api={local ? local.apis.settings : defaultSettingsApi} push={apis.push}
           onLogout={() => {
             openTab("todo");
             setLogoutRequest((n) => n + 1);
@@ -376,26 +442,26 @@ function MainShell({
       <TabBar tabs={TABS} current={tab} onSelect={(next) => openTab(next)} />
       {eveningOpen && (
         <EveningRecord
-          api={defaultEveningApi}
+          api={local ? local.apis.evening : defaultEveningApi}
           onClose={() => setEveningOpen(false)}
           onSaved={() => setGoalVersion((n) => n + 1)}
           onOpenGrowth={() => {
             setEveningOpen(false);
             openTab("growth", "after_save");
           }}
-          renderAfterSave={() => <AfterSaveShortfall api={defaultGrowthApi} />}
+          renderAfterSave={() => <AfterSaveShortfall api={local ? local.apis.growth : defaultGrowthApi} />}
         />
       )}
       {goalEditor && (
         <GoalEditor
-          api={defaultGoalsApi}
+          api={local ? local.apis.goals : defaultGoalsApi}
           categories={goalEditor.categories}
           goal={goalEditor.goal}
           onClose={() => setGoalEditor(null)}
           onSaved={() => setGoalVersion((n) => n + 1)}
         />
       )}
-      {category && <CategoryPage api={defaultGrowthApi} categoryId={category.id} name={category.name} onClose={() => setCategory(null)} />}
+      {category && <CategoryPage api={local ? local.apis.growth : defaultGrowthApi} categoryId={category.id} name={category.name} onClose={() => setCategory(null)} />}
     </div>
   );
 }

@@ -18,6 +18,8 @@ export type FocusStartInput = {
 };
 
 export type FocusApi = {
+  /** 기기 먼저 저장 구현이면 true(고침 3바퀴): 쓰기가 기기에 먼저 반영되고 서버에는 뒤에서 가므로 끊겨 있어도 막지 않는다 */
+  localFirst?: boolean;
   fetchState(): Promise<RecordResult<FocusState>>;
   start(input: FocusStartInput): Promise<RecordResult<StartedFocus>>;
   end(id: string): Promise<RecordResult<EndedFocus>>;

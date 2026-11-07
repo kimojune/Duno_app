@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
-import { todoDayFor } from "../todos/day";
+import { resolveWriteDay } from "../todos/day";
 import { VIEW_ENTRIES, VIEW_SCREENS } from "./core-types";
 
 /**
@@ -15,7 +15,7 @@ export type ViewDeps = { supabase: SupabaseClient; now?: () => Date };
 
 const serverNow = () => new Date();
 
-const viewSchema = z.object({ id: z.uuid(), screen: z.enum(VIEW_SCREENS), entry: z.enum(VIEW_ENTRIES) }).strict();
+const viewSchema = z.object({ id: z.uuid(), screen: z.enum(VIEW_SCREENS), entry: z.enum(VIEW_ENTRIES), clientAt: z.string().max(40).optional() }).strict();
 
 /** 같은 id를 다시 보내도(재시도) 한 번만 남는다(이미 있으면 성공) */
 export async function recordViewForUser(deps: ViewDeps, input: unknown): Promise<RecordResult<{ id: string }>> {
@@ -24,7 +24,8 @@ export async function recordViewForUser(deps: ViewDeps, input: unknown): Promise
     if (!user.ok) return user;
     const parsed = viewSchema.safeParse(input);
     if (!parsed.success) return recordFail("invalid_input");
-    const day = todoDayFor((deps.now ?? serverNow)());
+    // 본 날은 기기가 본 때(clientAt)가 믿을 수 있는 범위면 그 때의 하루, 아니면 서버 시계(기기 먼저 저장, 고침 3바퀴)
+    const day = resolveWriteDay((deps.now ?? serverNow)(), parsed.data.clientAt);
     const { error } = await deps.supabase
       .from("view_events")
       .insert({ id: parsed.data.id, user_id: user.data, screen: parsed.data.screen, entry: parsed.data.entry, day })

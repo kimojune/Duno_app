@@ -7,14 +7,14 @@ import { mapRecordDbError, recordFail, type RecordResult } from "../records/comm
 import { requireUserId } from "../session";
 import { readSettingsForUser } from "../settings/core";
 import type { TodoKey } from "../todos/crypto";
-import { todoDayFor } from "../todos/day";
+import { resolveWriteDay, todoDayFor, trustedClientTime } from "../todos/day";
 import { weekDates, weekStartFor } from "../week";
 import { readWeeklyGoalItems } from "../goals/core";
 import { APP_CONFIG } from "../app-config";
 import { elapsedSecondsSoFar, isActive } from "./logic";
 import { oppositeFlags } from "./opposite";
-import { COLUMNS, toSession, type FocusRow as Row } from "./map";
-import { FOCUS_SURFACES, type EndedFocus, type FocusState, type StartedFocus } from "./types";
+import { COLUMNS, effectiveStartedAt, toSession, type FocusRow as Row } from "./map";
+import { FOCUS_SURFACES, type EndedFocus, type FocusSession, type FocusState, type StartedFocus } from "./types";
 
 /**
  * 타이머와 먼저 한 기록(PRD 7-6, 8절). 서버 전용.
@@ -58,7 +58,8 @@ export async function startFocusForUser(deps: FocusDeps, input: unknown): Promis
     if (!deps.key) return recordFail("config");
     const v = parsed.data;
     const now = (deps.now ?? serverNow)();
-    const day = todoDayFor(now);
+    // 시작한 하루는 기기가 누른 때(clientStartedAt)가 믿을 수 있는 범위면 그 때의 하루, 아니면 서버 시계(기기 먼저 저장, 고침 3바퀴)
+    const day = resolveWriteDay(now, v.clientStartedAt);
     const categoryId = v.categoryId ?? null;
 
     // 시작하는 순간의 이번 주 기록으로 반대편 여부를 정한다
@@ -121,9 +122,15 @@ export async function startFocusForUser(deps: FocusDeps, input: unknown): Promis
 
 /**
  * 타이머 끝내기. 끝난 시각은 서버 시계, 진행한 시간은 시작부터 지금까지(정한 길이를 넘기지 않는다)로 서버가 정한다.
+ * 기기 먼저 저장(고침 3바퀴): 기기가 끝낸 때(clientEndedAt)가 믿을 수 있는 범위(최근 72시간·미래 5분)이고 시작 이후면 그 때를 끝난 시각으로 본다
+ * (끊긴 채 끝낸 타이머가 나중에 올라가도 진행한 시간이 맞게). 시작도 기기가 보낸 시각이 믿을 수 있으면 그 시각을 쓴다. 아니면 서버 시계.
  * 이미 끝난 세션이면 그대로 성공(여러 번 보내도 같다). 남의 것·없는 것은 not_found.
  */
-export async function endFocusForUser(deps: Pick<FocusDeps, "supabase" | "now">, id: unknown): Promise<RecordResult<EndedFocus>> {
+export async function endFocusForUser(
+  deps: Pick<FocusDeps, "supabase" | "now">,
+  id: unknown,
+  clientEndedAt?: unknown,
+): Promise<RecordResult<EndedFocus>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
@@ -136,11 +143,13 @@ export async function endFocusForUser(deps: Pick<FocusDeps, "supabase" | "now">,
     if (row.ended_at !== null) return { ok: true, data: { session: toSession(row) } };
 
     const now = (deps.now ?? serverNow)();
-    const startedMs = Date.parse(row.started_at);
-    const elapsed = Number.isFinite(startedMs) ? elapsedSecondsSoFar(startedMs, now.getTime(), row.planned_minutes) : 0;
+    const startedMs = Date.parse(effectiveStartedAt(row));
+    const clientEndMs = trustedClientTime(now, clientEndedAt);
+    const endMs = clientEndMs !== null && Number.isFinite(startedMs) && clientEndMs >= startedMs ? clientEndMs : now.getTime();
+    const elapsed = Number.isFinite(startedMs) ? elapsedSecondsSoFar(startedMs, endMs, row.planned_minutes) : 0;
     const { data, error } = await deps.supabase
       .from("focus_sessions")
-      .update({ ended_at: now.toISOString(), elapsed_seconds: elapsed })
+      .update({ ended_at: new Date(endMs).toISOString(), elapsed_seconds: elapsed })
       .eq("id", parsedId.data)
       .eq("user_id", user.data)
       .select(COLUMNS);
@@ -184,6 +193,38 @@ export async function readFocusState(deps: Pick<FocusDeps, "supabase" | "now">):
       if (candidate && isActive(candidate, now.getTime())) active = candidate;
     }
     return { ok: true, data: { serverNow: now.toISOString(), active, today } };
+  } catch {
+    return recordFail("unavailable");
+  }
+}
+
+/**
+ * 기기 먼저 저장(고침 3바퀴)이 기기에 두는 타이머 기록: fromDay 이후에 시작한 것과, 끝내지 않은 것 가운데 아직 진행 중으로 볼 수 있는 것.
+ * 시작 순서(오래된 것이 위).
+ */
+export async function listFocusSessionsSince(deps: Pick<FocusDeps, "supabase" | "now">, fromDay: string): Promise<RecordResult<FocusSession[]>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    const { data, error } = await deps.supabase
+      .from("focus_sessions")
+      .select(COLUMNS)
+      .eq("user_id", user.data)
+      .gte("day", fromDay)
+      .order("started_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(2000);
+    if (error) return recordFail(mapRecordDbError(error));
+    const sessions = ((data ?? []) as Row[]).map(toSession);
+    // 어제보다 앞에 시작해 새벽 4시를 넘긴 채 도는 세션도 진행 중으로 본다: 기간 밖에서 끝내지 않은 가장 최근 것을 하나 더 찾는다
+    const now = (deps.now ?? serverNow)();
+    if (!sessions.some((s) => isActive(s, now.getTime()))) {
+      const open = await deps.supabase.from("focus_sessions").select(COLUMNS).eq("user_id", user.data).is("ended_at", null).order("started_at", { ascending: false }).limit(1);
+      if (open.error) return recordFail(mapRecordDbError(open.error));
+      const candidate = ((open.data ?? []) as Row[]).map(toSession)[0];
+      if (candidate && isActive(candidate, now.getTime()) && !sessions.some((s) => s.id === candidate.id)) sessions.push(candidate);
+    }
+    return { ok: true, data: sessions };
   } catch {
     return recordFail("unavailable");
   }

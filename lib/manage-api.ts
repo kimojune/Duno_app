@@ -10,6 +10,8 @@ import type { TodayTodos, TodoDay, TodoItem, TodoResult } from "./todos/types";
  * 네트워크 실패·이상한 응답은 던지지 않고 unavailable로 바꾼다.
  */
 export type ManageApi = {
+  /** 기기 먼저 저장 구현이면 true(고침 3바퀴): 쓰기가 기기에 먼저 반영되고 서버에는 뒤에서 가므로 끊겨 있어도 막지 않는다 */
+  localFirst?: boolean;
   editTodo(id: string, patch: { text?: string; categoryId?: string | null }): Promise<TodoResult<{ todo: TodoItem }>>;
   deleteTodo(id: string): Promise<TodoResult<{ id: string }>>;
   reorderTodos(ids: string[]): Promise<TodoResult<{ ids: string[] }>>;

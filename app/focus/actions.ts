@@ -19,11 +19,12 @@ export async function startFocus(input: unknown): Promise<RecordResult<StartedFo
   }
 }
 
-export async function endFocus(id: unknown): Promise<RecordResult<EndedFocus>> {
+export async function endFocus(id: unknown, clientEndedAt?: unknown): Promise<RecordResult<EndedFocus>> {
   try {
     const deps = await getDeps();
     if (!deps) return { ok: false, error: "config" };
-    return await endFocusForUser(deps, id);
+    // clientEndedAt(기기가 끝낸 때)은 기기 먼저 저장이 보낸다. 없으면 옛 호출 꼴 그대로 부른다
+    return clientEndedAt === undefined ? await endFocusForUser(deps, id) : await endFocusForUser(deps, id, clientEndedAt);
   } catch {
     return { ok: false, error: "unavailable" };
   }

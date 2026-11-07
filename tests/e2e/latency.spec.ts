@@ -165,24 +165,21 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
       const all = await nodeA.from("todos").select("id, done");
       return (all.data ?? []).filter((r: { id: string; done: boolean }) => !beforeIds.has(r.id) && r.done).length >= expected;
     }
-    // 적은 직후 바로 체크: 옛 화면은 서버에 올라가기 전의 줄을 체크할 수 없다. 1초 뒤에도 체크가 남는지 본다
+    // 적은 직후 바로 체크: 줄이 화면에 보이자마자(서버 응답을 기다리지 않고) 끝냄 표시를 누른다. 옛 화면은 서버에 올라가기 전의 줄은 체크할 수 없다.
+    // 누른 뒤 1초 안에 체크가 켜졌고, 1초 뒤에도 남는지 본다
     {
       const text = `${marker} 바로 체크`;
       await input.fill(text);
-      const keptChecked = await page.evaluate(
-        ([t]) =>
-          new Promise<boolean>((resolve) => {
-            const btn = [...document.querySelectorAll("button")].find((x) => x.textContent && x.textContent.trim() === "적기") as HTMLButtonElement;
-            btn.click();
-            const find = () =>
-              [...document.querySelectorAll("li.todo-row input[type=checkbox]")].find((x) => x.closest("li") && (x.closest("li") as HTMLElement).textContent?.includes(t as string)) as HTMLInputElement | undefined;
-            const box = find();
-            box?.click();
-            setTimeout(() => resolve(!!find()?.checked), 1000);
-          }),
-        [text],
+      await clickUntil(
+        page,
+        `() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent && x.textContent.trim() === '적기'); b.click(); }`,
+        `() => [...document.querySelectorAll('li.todo-row')].some((li) => li.textContent && li.textContent.includes(${JSON.stringify(text)}))`,
       );
-      result.tickRightAfterAdd = { stillCheckedAfter1s: keptChecked };
+      const find = `[...document.querySelectorAll('li.todo-row input[type=checkbox]')].find((x) => x.closest('li') && x.closest('li').textContent.includes(${JSON.stringify(text)}))`;
+      const tickMs = await clickUntil(page, `() => { const cb = ${find}; if (cb) cb.click(); }`, `() => { const cb = ${find}; return !!cb && cb.checked; }`, 1000);
+      await page.waitForTimeout(1000);
+      const kept = await page.evaluate(`(() => { const cb = ${find}; return !!cb && cb.checked; })()`);
+      result.tickRightAfterAdd = { checkedWithin1s: tickMs >= 0, stillCheckedAfter1s: kept === true };
       await page.waitForFunction(() => !document.body.innerText.includes("저장하는 중"), undefined, { timeout: 30_000 });
     }
     result.addTodo = { screenMedian: median(addScreen), screenAll: addScreen, serverMedian: median(addServer), serverAll: addServer };

@@ -45,14 +45,20 @@ export function describeTodoDay(date: string): TodoDay {
 export const WRITTEN_AT_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 export const WRITTEN_AT_MAX_FUTURE_MS = 5 * 60 * 1000;
 
+/**
+ * 기기가 보낸 시각(ISO)이 믿을 수 있는 범위(최근 72시간, 미래 5분)면 그 시각(ms), 아니면 null.
+ * 기기 먼저 저장(고침 3바퀴)에서는 하루 경계(서울 새벽 4시)를 적은 때 기기에서 정해 함께 보내고, 서버는 이 범위만 검사한다.
+ */
+export function trustedClientTime(now: Date, value: unknown): number | null {
+  if (typeof value !== "string" || value.length > 40) return null;
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return null;
+  const delta = now.getTime() - ms;
+  return delta <= WRITTEN_AT_MAX_AGE_MS && delta >= -WRITTEN_AT_MAX_FUTURE_MS ? ms : null;
+}
+
 /** 할 일이 들어갈 하루: writtenAt이 믿을 수 있는 ISO 시각이면 그 시각의 하루, 아니면 now의 하루 */
 export function resolveWriteDay(now: Date, writtenAt: unknown): string {
-  if (typeof writtenAt === "string" && writtenAt.length <= 40) {
-    const ms = Date.parse(writtenAt);
-    if (Number.isFinite(ms)) {
-      const delta = now.getTime() - ms;
-      if (delta <= WRITTEN_AT_MAX_AGE_MS && delta >= -WRITTEN_AT_MAX_FUTURE_MS) return todoDayFor(new Date(ms));
-    }
-  }
-  return todoDayFor(now);
+  const ms = trustedClientTime(now, writtenAt);
+  return todoDayFor(ms === null ? now : new Date(ms));
 }

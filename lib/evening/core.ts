@@ -5,7 +5,7 @@ import { listCategoriesForUser } from "../categories/core";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
 import type { TodoKey } from "../todos/crypto";
-import { todoDayFor } from "../todos/day";
+import { resolveWriteDay, todoDayFor } from "../todos/day";
 import { addDays, isDayString } from "../week";
 import { listTimerMinutes } from "../focus/minutes";
 import { compactItems, diffItems, EVENING_BACK_DAYS, notSplitItems, SAVE_MODES, sumMinutes, type EveningItem } from "./logic";
@@ -133,7 +133,8 @@ export async function saveEveningLogForUser(deps: EveningDeps, input: unknown): 
     const parsed = saveSchema.safeParse(input);
     if (!parsed.success) return recordFail("invalid_input");
     const v = parsed.data;
-    const today = todoDayFor((deps.now ?? serverNow)());
+    // 「오늘」은 기기가 저장한 때(clientSavedAt)가 믿을 수 있는 범위면 그 때의 하루, 아니면 서버 시계(기기 먼저 저장, 고침 3바퀴)
+    const today = resolveWriteDay((deps.now ?? serverNow)(), v.clientSavedAt);
     if (!dayInReach(today, v.targetDay)) return recordFail("invalid_input");
     const ids = v.items.map((i) => i.categoryId);
     if (new Set(ids).size !== ids.length) return recordFail("invalid_input");

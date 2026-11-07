@@ -936,8 +936,12 @@ describe("악용 시나리오(화면 쪽)", () => {
     roots.forEach(walk);
     expect(files.length).toBeGreaterThan(10); // 양성 대조: 실제로 파일을 읽었다
     // 실제 API 접근(이름 뒤 . 또는 [)만 센다. 「기기에 두지 않는다」는 설명 주석의 낱말은 세지 않는다
-    const offenders = files.filter((f) => /\b(localStorage|sessionStorage|indexedDB|caches)\s*[.[]/.test(fs.readFileSync(f, "utf8")));
-    expect(offenders).toEqual([]);
+    // 고침 3바퀴(기기 먼저 저장, PM d-69 「클라이언트에서 저장」)가 이 규칙(D6)을 바꿨다: 기기 저장소(IndexedDB)는 한 모듈(lib/local/kv.ts)만 직접 만진다.
+    // 화면 코드·서버 코드·그 밖의 모든 파일은 여전히 기기 저장소에 닿지 못한다(허용 목록이 한 파일이라 규칙이 약해지지 않는다)
+    const offenders = files
+      .filter((f) => /\b(localStorage|sessionStorage|indexedDB|caches)\s*[.[]/.test(fs.readFileSync(f, "utf8")))
+      .map((f) => path.relative(path.resolve(__dirname, "../.."), f).split(path.sep).join("/"));
+    expect(offenders).toEqual(["lib/local/kv.ts"]);
   });
 
   it("4: 적고 분야를 더해도 Storage.setItem을 부르지 않는다", async () => {

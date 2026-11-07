@@ -3,12 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { listCategoriesForUser } from "../categories/core";
 import { listEveningLogs } from "../evening/core";
-import { sumRange, type CategoryMinutes } from "../growth/logic";
+import type { CategoryMinutes } from "../growth/logic";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
 import type { TodoKey } from "../todos/crypto";
-import { todoDayFor } from "../todos/day";
-import { weekDates, weekStartFor } from "../week";
+import { resolveWriteDay, todoDayFor } from "../todos/day";
+import { weekStartFor } from "../week";
+import { computeGoalSummary } from "../growth/compute";
 import type { GoalSummary } from "./types";
 import { checkGoalItems } from "./validation";
 
@@ -50,17 +51,19 @@ export async function readWeeklyGoalItems(args: { supabase: SupabaseClient; week
 /**
  * 이번 주 목표를 통째로 정한다(분야마다 1시간 단위, 합 168시간 이하). 이미 있으면 바꾼다.
  * 같은 요청을 여러 번 보내도 같다. 남의 분야·없는 분야면 not_found.
+ * clientAt(기기가 정한 때, ISO)이 믿을 수 있는 범위면 그 때의 하루가 속한 주의 월요일, 아니면 서버 시계의 주(기기 먼저 저장, 고침 3바퀴).
  */
 export async function saveWeeklyGoalForUser(
   deps: GoalDeps,
   input: unknown,
+  clientAt?: unknown,
 ): Promise<RecordResult<{ weekStart: string; items: CategoryMinutes[] }>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     const checked = checkGoalItems(input);
     if (!checked.ok) return recordFail("invalid_input");
-    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+    const weekStart = weekStartFor(resolveWriteDay((deps.now ?? serverNow)(), clientAt));
 
     // 분야는 내 것이어야 한다(jsonb라 DB 외래 키가 없어 여기서 본다)
     const ids = checked.items.map((i) => i.categoryId);
@@ -81,11 +84,11 @@ export async function saveWeeklyGoalForUser(
 }
 
 /** 이번 주 목표를 없앤다(목표가 없어도 앱은 그대로 쓴다). 없는 것을 없애도 성공 */
-export async function clearWeeklyGoalForUser(deps: GoalDeps): Promise<RecordResult<{ weekStart: string }>> {
+export async function clearWeeklyGoalForUser(deps: GoalDeps, clientAt?: unknown): Promise<RecordResult<{ weekStart: string }>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
-    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+    const weekStart = weekStartFor(resolveWriteDay((deps.now ?? serverNow)(), clientAt));
     const { error } = await deps.supabase.from("weekly_goals").delete().eq("user_id", user.data).eq("week_start", weekStart).select("week_start");
     if (error) return recordFail(mapRecordDbError(error));
     return { ok: true, data: { weekStart } };
@@ -103,7 +106,8 @@ export async function readGoalSummaryForUser(deps: { supabase: SupabaseClient; k
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     if (!deps.key) return recordFail("config");
-    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+    const today = todoDayFor((deps.now ?? serverNow)());
+    const weekStart = weekStartFor(today);
     const [logs, categories, goal] = await Promise.all([
       listEveningLogs({ supabase: deps.supabase }, weekStart),
       listCategoriesForUser({ supabase: deps.supabase, key: deps.key }),
@@ -114,12 +118,12 @@ export async function readGoalSummaryForUser(deps: { supabase: SupabaseClient; k
     if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
     return {
       ok: true,
-      data: {
-        weekStart,
-        goal: goal.data,
-        thisWeek: sumRange(logs.data, weekStart, weekDates(weekStart)[6]),
+      data: computeGoalSummary({
+        today,
+        logs: logs.data,
         categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
-      },
+        goalItems: goal.data,
+      }),
     };
   } catch {
     return recordFail("unavailable");

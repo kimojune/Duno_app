@@ -94,7 +94,8 @@ export function GoalEditor({
   onSaved: () => void;
 }) {
   const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
-  const online = useOnline();
+  // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
+  const online = useOnline() || api.localFirst === true;
   const [hours, setHours] = useState<Record<string, number>>(() =>
     Object.fromEntries((goal ?? []).flatMap((g) => (g.categoryId ? [[g.categoryId, Math.round(g.minutes / 60)]] : []))),
   );

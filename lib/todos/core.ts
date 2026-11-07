@@ -5,6 +5,7 @@ import { addDays, isDayString } from "../week";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
 import { describeTodoDay, resolveWriteDay, todoDayFor } from "./day";
 import { sortByPosition } from "./order";
+import type { MirrorTodo } from "../local/types";
 import type { AddedTodo, TodayTodos, TodoDoneState, TodoErrorCode, TodoItem, TodoResult } from "./types";
 import { checkTodoText, todoCategoryIdSchema, todoDoneSchema, todoIdSchema } from "./validation";
 
@@ -83,6 +84,49 @@ export async function listTodosForPastDay(deps: TodoDeps, dayParam: unknown): Pr
     if (dayParam >= today || dayParam < addDays(today, -3650)) return fail("invalid_input");
     if (!deps.key) return fail("config");
     return await readTodosOfDay(deps, user.data, deps.key, dayParam);
+  } catch {
+    return fail("unavailable");
+  }
+}
+
+/** 기기 거울이 받아 가는 기간의 할 일 상한(날마다 200개 × 8일 = 1600이 최대) */
+const MIRROR_TODO_LIMIT = 2000;
+
+/**
+ * 기기 먼저 저장(고침 3바퀴)이 기기에 두는 할 일: fromDay부터 toDay까지(둘 다 포함)의 내 할 일. 순서를 정한 값(position)도 함께 싣는다.
+ * 풀 수 없는 글은 text null로 싣는다(그 행만). 날짜 오름차순, 같은 날은 만든 순서.
+ */
+export async function listTodosWindow(deps: TodoDeps, fromDay: string, toDay: string): Promise<TodoResult<MirrorTodo[]>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    if (!deps.key) return fail("config");
+    if (!isDayString(fromDay) || !isDayString(toDay)) return fail("invalid_input");
+    const key = deps.key;
+    const { data, error } = await deps.supabase
+      .from("todos")
+      .select(ROW_COLUMNS)
+      .eq("user_id", user.data)
+      .gte("day", fromDay)
+      .lte("day", toDay)
+      .order("day", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(MIRROR_TODO_LIMIT);
+    if (error) return fail(mapDbError(error));
+    const todos = ((data ?? []) as TodoRow[]).map((row): MirrorTodo => {
+      const opened = decryptTodoText(row.text_encrypted, user.data, key);
+      return {
+        id: row.id,
+        day: row.day,
+        text: opened.ok ? opened.text : null,
+        done: row.done,
+        createdAt: row.created_at,
+        categoryId: row.category_id ?? null,
+        position: row.position ?? null,
+      };
+    });
+    return { ok: true, data: todos };
   } catch {
     return fail("unavailable");
   }

@@ -50,6 +50,11 @@ export const TODO_TEXT = {
   copy: "저장 안 된 글 복사",
   relogin: "다시 로그인",
   logoutConfirm: "아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.",
+  // ---- 기기 먼저 저장(고침 3바퀴) ----
+  offlineLocal: "인터넷 연결이 끊겼어요. 적고 끝낸 것은 이 기기에 두었다가 연결되면 보내요.",
+  logoutUnsent: "보내지 못한 기록이 있어요. 지금 로그아웃하면 이 기록은 사라져요.",
+  signingOut: "기록을 서버에 보내는 중이에요",
+  rejected: (n: number) => `서버가 받지 않은 기록 ${n}개를 되돌렸어요`,
   cancel: "취소",
   liveLoading: "할 일을 불러오는 중",
   liveSaving: "할 일을 저장하는 중",
@@ -180,6 +185,9 @@ export type TodoViewProps = {
   /** 로그인 풀림 안내에서 「저장 안 된 글 복사」를 보일지(복사할 글이 있는가, 12-5) */
   hasUnsaved: boolean;
   logoutConfirm: boolean;
+  /** 기기 먼저 저장(고침 3바퀴)이면 끊김·로그아웃 확인 글이 다르다. 없으면 기본 글 */
+  offlineText?: string;
+  logoutConfirmText?: string;
   live: string;
 
   // 적는 창
@@ -618,7 +626,7 @@ export function TodoView(props: TodoViewProps) {
   if (!online) {
     notices.push(
       <Notice key="offline" role="status">
-        {TODO_TEXT.offline}
+        {props.offlineText ?? TODO_TEXT.offline}
       </Notice>,
     );
   }
@@ -650,7 +658,7 @@ export function TodoView(props: TodoViewProps) {
           </>
         }
       >
-        {TODO_TEXT.logoutConfirm}
+        {props.logoutConfirmText ?? TODO_TEXT.logoutConfirm}
       </Notice>,
     );
   }
