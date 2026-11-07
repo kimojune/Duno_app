@@ -1,9 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUserId } from "../session";
+import { addDays, isDayString } from "../week";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
 import { describeTodoDay, resolveWriteDay, todoDayFor } from "./day";
-import { sortByPosition } from "./manage-core";
+import { sortByPosition } from "./order";
 import type { AddedTodo, TodayTodos, TodoDoneState, TodoErrorCode, TodoItem, TodoResult } from "./types";
 import { checkTodoText, todoCategoryIdSchema, todoDoneSchema, todoIdSchema } from "./validation";
 
@@ -63,20 +64,43 @@ export async function listTodosForToday(deps: TodoDeps): Promise<TodoResult<Toda
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     if (!deps.key) return fail("config");
-    const key = deps.key;
-    const day = todoDayFor((deps.now ?? serverNow)());
+    return await readTodosOfDay(deps, user.data, deps.key, todoDayFor((deps.now ?? serverNow)()));
+  } catch {
+    return fail("unavailable");
+  }
+}
 
+/**
+ * 지난 날의 내 할 일 목록(보기만, 고침 3바퀴 PM 답 d-69 ⑦). 오늘 이후 날짜는 앞날 적기가 없으므로 invalid_input.
+ * 읽는 모양은 오늘 목록과 같다(created_at 순, 순서를 정한 행이 앞).
+ */
+export async function listTodosForPastDay(deps: TodoDeps, dayParam: unknown): Promise<TodoResult<TodayTodos>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    if (!isDayString(dayParam)) return fail("invalid_input");
+    const today = todoDayFor((deps.now ?? serverNow)());
+    if (dayParam >= today || dayParam < addDays(today, -3650)) return fail("invalid_input");
+    if (!deps.key) return fail("config");
+    return await readTodosOfDay(deps, user.data, deps.key, dayParam);
+  } catch {
+    return fail("unavailable");
+  }
+}
+
+async function readTodosOfDay(deps: TodoDeps, userId: string, key: TodoKey, day: string): Promise<TodoResult<TodayTodos>> {
+  try {
     const { data, error } = await deps.supabase
       .from("todos")
       .select(ROW_COLUMNS)
-      .eq("user_id", user.data)
+      .eq("user_id", userId)
       .eq("day", day)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true });
     if (error) return fail(mapDbError(error));
 
     // 읽는 쿼리는 created_at·id 순 그대로 두고, 순서를 정한 행(position)만 앞으로 안정 정렬한다
-    const todos = sortByPosition((data ?? []) as TodoRow[]).map((row) => toItem(row, user.data, key));
+    const todos = sortByPosition((data ?? []) as TodoRow[]).map((row) => toItem(row, userId, key));
     return { ok: true, data: { day: describeTodoDay(day), todos } };
   } catch {
     return fail("unavailable");

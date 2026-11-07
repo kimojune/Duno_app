@@ -1,7 +1,7 @@
 import { addNote, carryOverTodos, deleteNote, deleteTodo, editTodo, reorderTodos } from "../app/todos/manage-actions";
 import type { NoteItem } from "./notes/types";
 import type { RecordResult } from "./records/common";
-import type { TodoDay, TodoItem, TodoResult } from "./todos/types";
+import type { TodayTodos, TodoDay, TodoItem, TodoResult } from "./todos/types";
 
 /**
  * 할 일 화면이 고치기·지우기·순서·작업 기록·어제 것 가져오기를 부르는 길(브라우저 쪽).
@@ -18,6 +18,8 @@ export type ManageApi = {
   fetchNotes(todoId: string): Promise<RecordResult<{ notes: NoteItem[] }>>;
   fetchYesterday(): Promise<TodoResult<{ todos: TodoItem[] }>>;
   carryOver(items: { from: string; id: string }[]): Promise<TodoResult<{ todos: TodoItem[]; day: TodoDay }>>;
+  /** 지난 날의 할 일 보기(보기만, 고침 3바퀴). 없으면 「지난 날 보기」를 그리지 않는다 */
+  fetchDay?(date: string): Promise<TodoResult<TodayTodos>>;
 };
 
 const UNAVAILABLE = { ok: false, error: "unavailable" } as const;
@@ -55,4 +57,5 @@ export const defaultManageApi: ManageApi = {
   fetchNotes: (todoId) => getJson(`/notes?todoId=${encodeURIComponent(todoId)}`),
   fetchYesterday: () => getJson("/todos/yesterday"),
   carryOver: (items) => safely(() => carryOverTodos(items)) as ReturnType<ManageApi["carryOver"]>,
+  fetchDay: (date) => getJson(`/todos/day?date=${encodeURIComponent(date)}`),
 };

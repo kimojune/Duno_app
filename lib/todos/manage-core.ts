@@ -5,6 +5,7 @@ import { requireUserId } from "../session";
 import { addDays } from "../week";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
 import { describeTodoDay, todoDayFor } from "./day";
+import { sortByPosition } from "./order";
 import type { TodoErrorCode, TodoItem, TodoResult } from "./types";
 import { checkTodoText, todoCategoryIdSchema, todoIdSchema } from "./validation";
 
@@ -45,18 +46,7 @@ type TodoRow = {
 };
 const ROW_COLUMNS = "id, day, text_encrypted, done, created_at, category_id, position";
 
-/** position 오름차순(null은 뒤), 같으면 들어온 순서 그대로(안정 정렬) */
-export function sortByPosition<T extends { position?: number | null }>(rows: T[]): T[] {
-  return rows
-    .map((row, index) => ({ row, index }))
-    .sort((a, b) => {
-      const pa = a.row.position ?? Number.POSITIVE_INFINITY;
-      const pb = b.row.position ?? Number.POSITIVE_INFINITY;
-      if (pa !== pb) return pa < pb ? -1 : 1;
-      return a.index - b.index;
-    })
-    .map((entry) => entry.row);
-}
+export { sortByPosition };
 
 function toItem(row: TodoRow, userId: string, key: TodoKey): TodoItem {
   const opened = decryptTodoText(row.text_encrypted, userId, key);

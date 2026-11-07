@@ -30,6 +30,7 @@ import {
   type RowView,
 } from "./todo-view";
 import { CarryOver } from "./carry-over";
+import { PAST_DAYS_TEXT, PastDays } from "./past-days";
 import { Notice, TextButton } from "./ui";
 import { TodoDetail } from "./todo-detail";
 
@@ -196,6 +197,8 @@ export function TodoScreen({
   const [categoryAuthLost, setCategoryAuthLost] = useState(false);
   /** 열려 있는 「할 일 자세히」의 할 일 번호(manage가 있을 때만 쓴다) */
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** 「지난 날 보기」 창이 열려 있다(보기만, 고침 3바퀴) */
+  const [pastOpen, setPastOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const newCategoryInputRef = useRef<HTMLInputElement | null>(null);
@@ -1068,11 +1071,14 @@ export function TodoScreen({
             )}
             {topSlot}
             {manage && list === "ready" && <CarryOver api={manage} online={online} onCarried={onCarried} />}
+            {manage?.fetchDay && list === "ready" && <TextButton onClick={() => setPastOpen(true)}>{PAST_DAYS_TEXT.open}</TextButton>}
           </>
         ) : undefined
       }
       overlay={
-        manage && detailRow ? (
+        manage && pastOpen && day ? (
+          <PastDays api={manage} today={day.date} onClose={() => setPastOpen(false)} />
+        ) : manage && detailRow ? (
           <TodoDetail
             key={detailRow.id}
             todo={{
