@@ -1,11 +1,15 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { CategoryMinutes } from "../growth/logic";
+import { listCategoriesForUser } from "../categories/core";
+import { listEveningLogs } from "../evening/core";
+import { sumRange, type CategoryMinutes } from "../growth/logic";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
+import type { TodoKey } from "../todos/crypto";
 import { todoDayFor } from "../todos/day";
-import { weekStartFor } from "../week";
+import { weekDates, weekStartFor } from "../week";
+import type { GoalSummary } from "./types";
 import { checkGoalItems } from "./validation";
 
 /**
@@ -85,6 +89,38 @@ export async function clearWeeklyGoalForUser(deps: GoalDeps): Promise<RecordResu
     const { error } = await deps.supabase.from("weekly_goals").delete().eq("user_id", user.data).eq("week_start", weekStart).select("week_start");
     if (error) return recordFail(mapRecordDbError(error));
     return { ok: true, data: { weekStart } };
+  } catch {
+    return recordFail("unavailable");
+  }
+}
+
+/**
+ * 할 일 탭의 이번 주 목표 한 줄과 목표 정하기 창이 읽는 것(A14). 상태보기 읽기 전체(지난주·지난달·누적·설정)를 만들지 않고
+ * 이번 주 목표·이번 주 저녁 기록(월요일부터)·분야 목록만 읽는다.
+ */
+export async function readGoalSummaryForUser(deps: { supabase: SupabaseClient; key: TodoKey | null; now?: () => Date }): Promise<RecordResult<GoalSummary>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    if (!deps.key) return recordFail("config");
+    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+    const [logs, categories, goal] = await Promise.all([
+      listEveningLogs({ supabase: deps.supabase }, weekStart),
+      listCategoriesForUser({ supabase: deps.supabase, key: deps.key }),
+      readWeeklyGoalItems({ supabase: deps.supabase, weekStart }),
+    ]);
+    if (!logs.ok) return logs;
+    if (!goal.ok) return goal;
+    if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
+    return {
+      ok: true,
+      data: {
+        weekStart,
+        goal: goal.data,
+        thisWeek: sumRange(logs.data, weekStart, weekDates(weekStart)[6]),
+        categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
+      },
+    };
   } catch {
     return recordFail("unavailable");
   }

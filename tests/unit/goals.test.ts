@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearWeeklyGoalForUser, readWeeklyGoalItems, saveWeeklyGoalForUser } from "../../lib/goals/core";
+import { clearWeeklyGoalForUser, readGoalSummaryForUser, readWeeklyGoalItems, saveWeeklyGoalForUser } from "../../lib/goals/core";
 import { checkGoalItems, goalProgress } from "../../lib/goals/validation";
 import { endFocusForUser, startFocusForUser } from "../../lib/focus/core";
 import { readGrowthForUser } from "../../lib/growth/core";
@@ -102,6 +102,37 @@ describe("clearWeeklyGoalForUser · readWeeklyGoalItems", () => {
     const store = setup();
     store.seed("weekly_goals", { user_id: ME, week_start: "2026-11-02", items: "깨짐" });
     expect(await readWeeklyGoalItems({ supabase: deps(store).supabase, weekStart: "2026-11-02" })).toEqual({ ok: true, data: null });
+  });
+});
+
+describe("readGoalSummaryForUser (A14)", () => {
+  it("할 일 탭의 한 줄이 쓰는 값(주·목표·이번 주 쓴 시간·분야)을 상태보기와 같게 주되, 할 일·설정 표를 읽지 않는다", async () => {
+    const store = setup();
+    await saveWeeklyGoalForUser(deps(store), [{ categoryId: C2, minutes: 120 }]);
+    store.seed("evening_logs", { id: "e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1", user_id: ME, target_day: "2026-11-05", total_minutes: 90, items: [{ categoryId: C2, minutes: 90 }], save_mode: "edited", saved_at: "2026-11-05T14:00:00.000Z" });
+    // 지난주 기록은 이번 주 합에 들지 않는다
+    store.seed("evening_logs", { id: "e2e2e2e2-e2e2-4e2e-8e2e-e2e2e2e2e2e2", user_id: ME, target_day: "2026-10-30", total_minutes: 60, items: [{ categoryId: C2, minutes: 60 }], save_mode: "edited", saved_at: "2026-10-30T14:00:00.000Z" });
+    store.calls.length = 0;
+    const summary = await readGoalSummaryForUser(deps(store));
+    const growth = await readGrowthForUser(deps(store));
+    expect(summary.ok && summary.data).toEqual({
+      weekStart: "2026-11-02",
+      goal: [{ categoryId: C2, minutes: 120 }],
+      thisWeek: [{ categoryId: C2, minutes: 90 }],
+      categories: [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }],
+    });
+    expect(growth.ok && summary.ok && { weekStart: growth.data.weekStart, goal: growth.data.goal?.items ?? null, thisWeek: growth.data.thisWeek, categories: growth.data.categories }).toEqual(summary.ok ? summary.data : null);
+  });
+  it("읽는 표는 저녁 기록·분야·이번 주 목표뿐이다. 로그인이 없으면 unauthenticated, 키가 없으면 config", async () => {
+    const store = setup();
+    store.calls.length = 0;
+    await readGoalSummaryForUser(deps(store));
+    const tables = new Set(store.calls.map((c) => c.table));
+    expect(tables.has("todos")).toBe(false);
+    expect(tables.has("user_settings")).toBe(false);
+    expect(tables.has("category_ratios")).toBe(false);
+    expect(await readGoalSummaryForUser(deps(store, null))).toEqual({ ok: false, error: "unauthenticated" });
+    expect(await readGoalSummaryForUser({ ...deps(store), key: null })).toEqual({ ok: false, error: "config" });
   });
 });
 

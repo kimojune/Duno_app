@@ -250,6 +250,28 @@ describe("listEveningLogs · latestPerDay", () => {
     expect(from.ok && from.data).toHaveLength(1);
     expect(await listEveningLogs(deps(store), "x")).toEqual({ ok: false, error: "invalid_input" });
   });
+  it("2000행을 넘게 쌓여도 가장 최근 기록이 빠지지 않는다(오래된 쪽이 빠진다) (A12)", async () => {
+    const store = setup();
+    const start = new Date("2020-01-01T00:00:00.000Z").getTime();
+    const dayOf = (i: number) => new Date(start + i * 86_400_000).toISOString().slice(0, 10);
+    const total = 2010;
+    for (let i = 0; i < total; i++) {
+      store.seed("evening_logs", {
+        id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+        user_id: ME,
+        target_day: dayOf(i),
+        total_minutes: 10,
+        items: [{ categoryId: null, minutes: 10 }],
+        save_mode: "edited",
+        saved_at: `${dayOf(i)}T12:00:00.000Z`,
+      });
+    }
+    const res = await listEveningLogs(deps(store));
+    expect(res.ok && res.data).toHaveLength(2000);
+    // 가장 최근 날이 들어 있고, 빠진 것은 가장 오래된 열 날이다. 결과는 날짜 오름차순
+    expect(res.ok && res.data[res.data.length - 1].targetDay).toBe(dayOf(total - 1));
+    expect(res.ok && res.data[0].targetDay).toBe(dayOf(total - 2000));
+  });
   it("toLog: 이상한 items는 빈 목록으로, 모르는 저장 방식은 edited로 읽는다", () => {
     const log = toLog({ id: L1, target_day: "2026-11-07", total_minutes: 5, items: "깨짐", save_mode: "zzz", saved_at: "x" });
     expect(log).toMatchObject({ items: [], saveMode: "edited" });

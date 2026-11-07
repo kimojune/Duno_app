@@ -188,7 +188,7 @@ export async function saveEveningLogForUser(deps: EveningDeps, input: unknown): 
 
 /**
  * 최근 날들의 저녁 기록(날마다 가장 늦게 저장한 것). 상태보기가 쓴다. from은 그 날부터(포함).
- * 임시: 전체를 읽는다(최대 2000행). 쌓이면 SQL 집계로 옮긴다.
+ * 임시: 최근 것부터 최대 2000행을 읽는다(넘으면 가장 오래된 기록이 빠진다). 쌓이면 SQL 집계로 옮긴다.
  */
 export async function listEveningLogs(deps: Pick<EveningDeps, "supabase">, fromDay?: string): Promise<RecordResult<EveningLog[]>> {
   try {
@@ -199,7 +199,9 @@ export async function listEveningLogs(deps: Pick<EveningDeps, "supabase">, fromD
       if (!isDayString(fromDay)) return recordFail("invalid_input");
       query = query.gte("target_day", fromDay);
     }
-    const { data, error } = await query.order("target_day", { ascending: true }).order("saved_at", { ascending: true }).limit(2000);
+    // 최근 것부터 2000행을 읽는다(A12). 오래된 것부터 읽으면 2000행을 넘긴 뒤의 새 기록이 조용히 빠져 누적이 멈춘다.
+    // 날짜 오름차순으로 돌려주는 것은 latestPerDay가 맡는다
+    const { data, error } = await query.order("target_day", { ascending: false }).order("saved_at", { ascending: false }).limit(2000);
     if (error) return recordFail(mapRecordDbError(error));
     return { ok: true, data: latestPerDay(((data ?? []) as LogRow[]).map(toLog)) };
   } catch {
