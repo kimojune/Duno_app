@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { isEvening } from "../lib/app-config";
+import { defaultEveningApi } from "../lib/evening-api";
 import type { HomeRead } from "../lib/home-types";
 import { defaultManageApi } from "../lib/manage-api";
 import { defaultSettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import type { TodayRead } from "../lib/today-types";
+import { EveningEntry, EveningRecord } from "./evening-record";
 import { Onboarding, type OnboardingResult } from "./onboarding";
 import { TodoScreen } from "./todo-screen";
 
@@ -13,6 +16,7 @@ import { TodoScreen } from "./todo-screen";
  * 로그인한 뒤의 앱 전체 틀(클라이언트). 서버 컴포넌트(app/page.tsx)가 읽은 값(home)을 받아 화면들을 이어 붙인다.
  * - 처음 설정을 안 마쳤으면 처음 설정(Onboarding)부터 보여 준다(PRD ①). 설정을 못 읽었을 때는 강요하지 않고 앱을 보여 준다(임시).
  * - 할 일 화면에는 고치기·지우기·순서·작업 기록·어제 것 가져오기를 단다(PRD 0·0-1번).
+ * - 저녁 기록(PRD ②)은 할 일 화면 위의 입구로 열고, 알림을 눌러 들어온 주소(/?open=evening)로도 열린다.
  */
 
 type Entry = { id: string; name: string };
@@ -28,9 +32,10 @@ export function withCategories(initial: TodayRead, added: Entry[]): TodayRead {
   return { ...initial, categories: { ok: true, data: { categories: [...initial.categories.data.categories, ...extra] } } };
 }
 
-export function AppShell({ home }: { home: HomeRead }) {
+export function AppShell({ home, initialOpen = null }: { home: HomeRead; initialOpen?: "evening" | null }) {
   const settings = home.settings.ok ? home.settings.data : null;
   const [done, setDone] = useState<OnboardingResult | null>(null);
+  const [eveningOpen, setEveningOpen] = useState(initialOpen === "evening");
   const needsOnboarding = settings !== null && !settings.onboardingDone && done === null;
 
   const readable: Entry[] = home.today.categories.ok
@@ -55,5 +60,14 @@ export function AppShell({ home }: { home: HomeRead }) {
   const notify: NotifySettings | null = done ? done.notify : (settings?.notify ?? null);
   void ratios;
   void notify;
-  return <TodoScreen initial={initial} manage={defaultManageApi} />;
+  return (
+    <>
+      <TodoScreen
+        initial={initial}
+        manage={defaultManageApi}
+        topSlot={<EveningEntry evening={isEvening(new Date())} onOpen={() => setEveningOpen(true)} />}
+      />
+      {eveningOpen && <EveningRecord api={defaultEveningApi} onClose={() => setEveningOpen(false)} />}
+    </>
+  );
 }

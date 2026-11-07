@@ -288,6 +288,11 @@ function fill(values: Row): (row: Row) => Row {
 /** 원샷 v2 마이그레이션의 규칙을 시험용으로 옮긴 것(표 이름은 마이그레이션과 같다) */
 export function v2Rules(): Record<string, TableRule> {
   return {
+    evening_logs: {
+      insertColumns: ["id", "user_id", "target_day", "total_minutes", "items", "save_mode", "client_saved_at"],
+      defaults: (_row, store) => ({ saved_at: store.nextTimestamp() }),
+      limit: { count: 20000, hint: "evening_logs_limit" },
+    },
     user_settings: {
       primaryKey: ["user_id"],
       insertColumns: [

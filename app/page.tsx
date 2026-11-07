@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; open?: string | string[] }>;
 }) {
-  const { error } = await searchParams;
+  const { error, open } = await searchParams;
+  // 알림을 눌러 들어온 길(예: /?open=evening): 저녁 알림은 저녁 기록을 연다(PRD 7-3·7-8, AI 판단·PM 확인 전)
+  const initialOpen = open === "evening" ? "evening" : null;
 
   // 사용자 판단은 getClaims()로만 한다. 이메일은 화면에 내지 않는다(명세 2-0).
   const supabase = await createClient();
@@ -30,7 +32,7 @@ export default async function Home({
         const unavailable = { ok: false, error: "unavailable" } as const;
         home = { today: { todos: unavailable, categories: unavailable }, settings: unavailable };
       }
-      return <AppShell home={home} />;
+      return <AppShell home={home} initialOpen={initialOpen} />;
     }
   }
 

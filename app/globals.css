@@ -416,3 +416,26 @@ button, input { font: inherit; color: inherit; }
 .notify-toggle input { flex: none; inline-size: 24px; block-size: 24px; margin: 0; }
 .notify-name { font: var(--font-body); font-weight: 700; }
 select.input { appearance: auto; }
+
+/* ---- 원샷 v2 ②: 저녁 기록·숫자 입력·입구 카드 ---- */
+.stepper { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--tap-min); width: 100%; }
+.stepper-label { font: var(--font-body); overflow-wrap: anywhere; min-width: 0; }
+.stepper-control { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.stepper-btn { min-width: var(--tap-min); padding: 0; }
+.stepper-input { flex: none; inline-size: 5.5em; text-align: center; padding: 0 var(--space-2); }
+.stepper-unit { font: var(--font-sub); color: var(--color-text-sub); min-width: 2em; }
+.evening-time { display: flex; flex-direction: column; gap: var(--space-2); }
+.after-save-line {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
+  width: 100%; min-height: var(--tap-min); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-input); border-radius: var(--radius-control);
+  background: var(--color-surface); color: var(--color-text); text-align: left; font: var(--font-body);
+}
+button.after-save-line { cursor: pointer; }
+button.after-save-line:active { background: var(--color-notice-bg); }
+.after-save-title { font: var(--font-sub); color: var(--color-text-sub); }
+.after-save-text { overflow-wrap: anywhere; }
+.after-save-go { font: var(--font-sub); color: var(--color-primary); }
+.entry-card { margin: 0 0 var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); background: var(--color-notice-bg); }
+.entry-title { margin: 0 0 var(--space-1); font: var(--font-body); font-weight: 700; }
+.entry-card .btn { margin-top: var(--space-2); }
