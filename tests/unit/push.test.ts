@@ -1,6 +1,7 @@
 import { createPublicKey, createVerify, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { getPushServerConfig, getTickConfig, getVapidPublicKey } from "../../lib/push/config";
+import { getPushServerConfig, getTickConfig } from "../../lib/push/config";
+import { getVapidPublicKey } from "../../lib/push/public-config";
 import { deleteSubscriptionForUser, saveSubscriptionForUser } from "../../lib/push/core";
 import { isDue, seoulMinuteOfDay } from "../../lib/push/due";
 import { PUSH_SEND_TIMEOUT_MS, sendPushSignal } from "../../lib/push/send";

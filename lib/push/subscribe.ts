@@ -1,5 +1,5 @@
 import { deletePushSubscription, savePushSubscription } from "../../app/push/actions";
-import { getVapidPublicKey } from "./config";
+import { getVapidPublicKey } from "./public-config";
 import { notificationPermission, requestNotificationPermission, type PermissionState } from "./client";
 
 /**

@@ -35,13 +35,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("/api/notify/tick (알림 예약 실행 주소)", () => {
-  it("설정(서버 키·예약 비밀·푸시 서명 키)이 없으면 아무것도 안 하고 503 not_configured", async () => {
+  it("예약 비밀이 서버 설정에 없으면 어떤 값을 보내도 401이다(다른 설정이 있는지 없는지 알리지 않고, 아무것도 안 한다) (A9)", async () => {
     setEnv({});
-    const res = await call(POST, "anything");
+    for (const secret of [undefined, "", "anything"]) {
+      const res = await call(POST, secret);
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ ok: false, error: "unauthorized" });
+    }
+    expect(createClient).not.toHaveBeenCalled();
+    expect(runNotifyTick).not.toHaveBeenCalled();
+  });
+  it("비밀이 맞고 서버 키·푸시 서명 키가 없으면 아무것도 안 하고 503 not_configured", async () => {
+    setEnv({ CRON_SECRET: FULL_ENV.CRON_SECRET });
+    const res = await call(POST, FULL_ENV.CRON_SECRET);
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ ok: false, error: "not_configured" });
     expect(createClient).not.toHaveBeenCalled();
     expect(runNotifyTick).not.toHaveBeenCalled();
+  });
+  it("비밀이 틀리면 다른 설정이 없어도 401이다(설정이 있는지 알리지 않는다) (A9)", async () => {
+    setEnv({ CRON_SECRET: FULL_ENV.CRON_SECRET });
+    expect((await call(POST, "wrong")).status).toBe(401);
   });
   it("푸시 서명 키 하나만 빠져도 not_configured", async () => {
     setEnv({ ...FULL_ENV, VAPID_PRIVATE_KEY: "" });

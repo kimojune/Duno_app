@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearAllOutboxes, createOutbox, OUTBOX_MAX_ITEMS, safeLocalStorage, type OutboxItem } from "../../lib/outbox";
+import { clearAllOutboxes, clearOtherOutboxes, createOutbox, OUTBOX_MAX_ITEMS, safeLocalStorage, type OutboxItem } from "../../lib/outbox";
 
 const U1 = "11111111-1111-4111-8111-111111111111";
 const U2 = "22222222-2222-4222-8222-222222222222";
@@ -89,5 +89,30 @@ describe("오프라인 보관함 (PRD 10절)", () => {
       throw new Error("blocked");
     });
     expect(safeLocalStorage()).toBeNull();
+  });
+});
+
+describe("clearOtherOutboxes (A6)", () => {
+  it("지금 사용자의 보관함은 두고, 다른 사용자의 보관함만 지운다. 다른 저장값은 그대로", () => {
+    const store = new Map<string, string>();
+    const storage = {
+      get length() {
+        return store.size;
+      },
+      key: (i: number) => [...store.keys()][i] ?? null,
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    } as Storage;
+    const item: OutboxItem = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", text: "글", categoryId: null, writtenAt: "2026-11-07T00:00:00.000Z" };
+    createOutbox(storage, "me").save([item]);
+    createOutbox(storage, "other").save([item]);
+    storage.setItem("theme", "dark");
+    clearOtherOutboxes(storage, "me");
+    expect(createOutbox(storage, "me").load()).toHaveLength(1);
+    expect(createOutbox(storage, "other").load()).toEqual([]);
+    expect(storage.getItem("theme")).toBe("dark");
+    expect(() => clearOtherOutboxes(null, "me")).not.toThrow();
   });
 });

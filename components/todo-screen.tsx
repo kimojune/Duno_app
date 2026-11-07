@@ -144,6 +144,7 @@ export function TodoScreen({
   manage,
   topSlot,
   outbox,
+  onBeforeSignOut,
 }: {
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
   initial?: TodayRead;
@@ -153,6 +154,8 @@ export function TodoScreen({
   topSlot?: ReactNode;
   /** 원샷 v2(선택, PRD 10절): 있으면 오프라인으로도 할 일을 적는다. 못 올린 글(연결 대기·저장 중·실패)을 기기에 두었다가 연결되면 같은 id로 다시 보낸다. 없으면 옛 방식 그대로(오프라인에서는 적을 수 없다) */
   outbox?: Outbox;
+  /** 원샷 v2(선택, A7): 로그아웃 직전에 부른다(이 기기의 푸시 구독을 거둔다). 3초 안에 끝나지 않아도 로그아웃은 진행한다 */
+  onBeforeSignOut?: () => Promise<void>;
 }) {
   const initialTodos = initial?.todos;
   const first = initialTodos?.ok ? initialTodos.data : null;
@@ -835,7 +838,26 @@ export function TodoScreen({
 
   function doSignOut() {
     outbox?.clear(); // 로그아웃하면 기기에 둔 못 올린 글도 지운다(남의 글이 남지 않게)
-    void signOut();
+    const before = onBeforeSignOut;
+    if (!before) {
+      void signOut();
+      return;
+    }
+    // 이 기기의 푸시 구독을 거둔 뒤 로그아웃한다(로그아웃한 기기로 알림이 가지 않게, A7). 세션이 살아 있어야 구독을 지울 수 있어 먼저 한다
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const limit = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, 3000);
+    });
+    let work: Promise<void>;
+    try {
+      work = before().catch(() => {});
+    } catch {
+      work = Promise.resolve();
+    }
+    void Promise.race([work, limit]).then(() => {
+      clearTimeout(timer);
+      void signOut();
+    });
   }
 
   /** 로그아웃 확인이 세는 「아직 저장되지 않은 글」(C-D9): 저장 중·실패 줄, 할 일 칸 글, 새 분야 칸 글(창이 닫혀 있어도) */

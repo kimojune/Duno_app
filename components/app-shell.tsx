@@ -9,7 +9,7 @@ import { defaultGrowthApi } from "../lib/growth-api";
 import type { HomeRead } from "../lib/home-types";
 import { defaultManageApi } from "../lib/manage-api";
 import { defaultOffersApi, type OffersApi } from "../lib/offers-api";
-import { createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
+import { clearOtherOutboxes, createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
 import { msUntilNextDayStart, todoDayFor } from "../lib/todos/day";
@@ -85,6 +85,10 @@ export function AppShell({
     () => outboxProp ?? (userKey ? createOutbox(safeLocalStorage(), userKey) : undefined),
     [outboxProp, userKey],
   );
+  // 로그인 직후: 이 기기에 남은 다른 사용자의 보관함은 지운다(A6). 시험이 보관함을 직접 넣을 때는 건드리지 않는다
+  useEffect(() => {
+    if (userKey && !outboxProp) clearOtherOutboxes(safeLocalStorage(), userKey);
+  }, [userKey, outboxProp]);
   const settings = home.settings.ok ? home.settings.data : null;
   const [done, setDone] = useState<OnboardingResult | null>(null);
   const needsOnboarding = settings !== null && !settings.onboardingDone && done === null;
@@ -328,6 +332,7 @@ function MainShell({
           initial={initial}
           manage={defaultManageApi}
           outbox={outbox}
+          onBeforeSignOut={() => apis.push.disable()}
           topSlot={
             <>
               {startNotice && startNoticeOpen && (

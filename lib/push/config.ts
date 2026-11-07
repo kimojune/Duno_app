@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * 알림(웹 푸시) 설정 이름과 읽는 곳(PRD 7-8, ⑦). 비밀값은 코드에 쓰지 않고 환경 변수로만 읽는다(기획서 9절).
  *
@@ -9,13 +11,8 @@
  *  - CRON_SECRET                  : 예약 실행 주소(/api/notify/tick)를 부르는 쪽이 보내는 비밀(서버 전용)
  *
  * 이 값들이 없으면 알림은 켜지지 않고 앱은 그대로 돈다(AI 없이도 돌고, 알림 없이도 돈다).
+ * 서버 전용(server-only): 비밀을 읽는 코드가 브라우저 번들에 들어가지 못하게 한다. 화면이 읽는 공개 키는 lib/push/public-config.ts에 따로 있다.
  */
-
-/** 화면용 공개 키. 반드시 process.env.이름 꼴의 정적 참조로만 읽는다(브라우저 번들에서 치환된다). 없으면 null */
-export function getVapidPublicKey(): string | null {
-  const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
-  return key ? key : null;
-}
 
 /** 환경 변수 모음(process.env나 시험용 평범한 객체) */
 export type EnvLike = Record<string, string | undefined>;

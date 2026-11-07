@@ -106,3 +106,22 @@ export function clearAllOutboxes(storage: Storage | null): void {
     // 조용히 둔다
   }
 }
+
+/**
+ * 이 기기에 남은 다른 사용자의 보관함을 지운다(로그인 직후, A6). 로그아웃 없이 계정이 바뀌었거나(세션 만료 뒤 다른 계정으로 로그인 등)
+ * 로그아웃 때 지우지 못했을 때, 지금 사용자의 것은 두고 나머지만 지워 남의 글이 보이거나 올라가지 않게 한다.
+ */
+export function clearOtherOutboxes(storage: Storage | null, userKey: string): void {
+  if (!storage) return;
+  try {
+    const keep = KEY_PREFIX + userKey;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k && k.startsWith(KEY_PREFIX) && k !== keep) keys.push(k);
+    }
+    for (const k of keys) storage.removeItem(k);
+  } catch {
+    // 조용히 둔다
+  }
+}
