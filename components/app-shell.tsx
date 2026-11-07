@@ -143,6 +143,9 @@ function MainShell({
   const [growthEntry, setGrowthEntry] = useState<ViewEntry>("self");
   const [growthActivation, setGrowthActivation] = useState(0);
   const [timerActivation, setTimerActivation] = useState(0);
+  // 내 정보 탭의 분야 목록(A15): 앱을 열 때 읽은 값 그대로 두지 않고, 탭을 열 때마다 다시 읽는다(그사이 더한 분야가 보이게)
+  const [meActivation, setMeActivation] = useState(0);
+  const [meCategories, setMeCategories] = useState<Entry[] | null>(null);
   const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
   // 오늘 먼저 할 일 카드(⑤): 앱을 열 때 한 번 건네받는다. 반응이 없는(new) 것만 보인다
   const [cardOffer, setCardOffer] = useState<Offer | null>(null);
@@ -235,8 +238,24 @@ function MainShell({
       setGrowthActivation((n) => n + 1);
     }
     if (next === "timer") setTimerActivation((n) => n + 1);
+    if (next === "me") setMeActivation((n) => n + 1);
     setTab(next);
   }
+
+  // 내 정보 탭을 열 때마다 분야 목록을 다시 읽는다. 못 읽었으면 지금 목록을 그대로 둔다
+  useEffect(() => {
+    if (meActivation === 0) return;
+    let alive = true;
+    void fetchToday().then(
+      (read) => {
+        if (alive && read.categories.ok) setMeCategories(readableCategories(read));
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [meActivation]);
 
   async function startFromCard() {
     const offer = cardOffer;
@@ -350,7 +369,7 @@ function MainShell({
         />
       </div>
       <div hidden={tab !== "me"}>
-        <MeScreen settings={settings} categories={readableCategories(initial)} api={defaultSettingsApi} push={apis.push} />
+        <MeScreen settings={settings} categories={meCategories ?? readableCategories(initial)} api={defaultSettingsApi} push={apis.push} />
       </div>
       <TabBar tabs={TABS} current={tab} onSelect={(next) => openTab(next)} />
       {eveningOpen && (
