@@ -1,0 +1,64 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { listCategoriesForUser } from "../categories/core";
+import { listEveningLogs } from "../evening/core";
+import { recordFail, type RecordResult } from "../records/common";
+import { requireUserId } from "../session";
+import { readSettingsForUser } from "../settings/core";
+import type { TodoKey } from "../todos/crypto";
+import { todoDayFor } from "../todos/day";
+import { addDays, previousMonthRange, weekDates, weekStartFor } from "../week";
+import { countLoggedDays, sumRange } from "./logic";
+import type { GrowthData } from "./types";
+
+/**
+ * 상태보기 읽기(PRD 7-4). 서버 전용. 저녁 기록(날마다 가장 늦은 것)을 이번 주·지난주·지난달·누적으로 모아 준다.
+ * 세션 확인은 각 core 함수가 자기 안에서 한다. 예외는 던지지 않고 짧은 코드로 돌려준다.
+ */
+export type GrowthDeps = { supabase: SupabaseClient; key: TodoKey | null; now?: () => Date };
+
+const serverNow = () => new Date();
+
+export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<GrowthData>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    if (!deps.key) return recordFail("config");
+    const today = todoDayFor((deps.now ?? serverNow)());
+    const weekStart = weekStartFor(today);
+    const lastWeekStart = addDays(weekStart, -7);
+    const lastMonthRange = previousMonthRange(today);
+
+    const [logs, settings, categories] = await Promise.all([
+      listEveningLogs({ supabase: deps.supabase }),
+      readSettingsForUser({ supabase: deps.supabase, key: deps.key }),
+      listCategoriesForUser({ supabase: deps.supabase, key: deps.key }),
+    ]);
+    if (!logs.ok) return logs;
+    if (!settings.ok) return settings;
+    if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
+
+    const weekEnd = weekDates(weekStart)[6];
+    const lastWeekEnd = weekDates(lastWeekStart)[6];
+    return {
+      ok: true,
+      data: {
+        today,
+        weekStart,
+        lastWeekStart,
+        lastMonthRange,
+        categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
+        ratios: settings.data.ratios,
+        thisWeek: sumRange(logs.data, weekStart, weekEnd),
+        lastWeek: sumRange(logs.data, lastWeekStart, lastWeekEnd),
+        lastMonth: sumRange(logs.data, lastMonthRange.from, lastMonthRange.to),
+        cumulative: sumRange(logs.data),
+        loggedDaysThisWeek: countLoggedDays(logs.data, weekStart, weekEnd),
+        loggedDaysTotal: countLoggedDays(logs.data),
+        goal: null, // 이번 주 목표(⑥)가 생기면 여기서 읽는다
+      },
+    };
+  } catch {
+    return recordFail("unavailable");
+  }
+}
