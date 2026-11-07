@@ -86,6 +86,7 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
       let upsertOptions: { onConflict?: string; ignoreDuplicates?: boolean } = {};
       const orders: [string, boolean][] = [];
       let limitCount: number | null = null;
+      let rangeFrom = 0;
 
       const pk = rule.primaryKey ?? ["id"];
       const sameKey = (a: Row, b: Row, cols: string[]) => cols.every((c) => a[c] === b[c] && a[c] !== undefined && a[c] !== null);
@@ -209,7 +210,7 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
             return 0;
           });
         }
-        if (limitCount !== null) sorted = sorted.slice(0, limitCount);
+        if (limitCount !== null || rangeFrom > 0) sorted = sorted.slice(rangeFrom, limitCount === null ? undefined : rangeFrom + limitCount);
         return { data: sorted.map((r) => ({ ...r })), error: null };
       };
 
@@ -267,6 +268,12 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
         },
         limit(n: number) {
           limitCount = n;
+          return builder;
+        },
+        /** 쪽 읽기: from~to(둘 다 포함) */
+        range(from: number, to: number) {
+          rangeFrom = from;
+          limitCount = to - from + 1;
           return builder;
         },
         then<T>(resolve: (v: { data: unknown; error: FakeError | null }) => T, reject?: (e: unknown) => T) {

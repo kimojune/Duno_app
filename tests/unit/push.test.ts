@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { getPushServerConfig, getTickConfig, getVapidPublicKey } from "../../lib/push/config";
 import { deleteSubscriptionForUser, saveSubscriptionForUser } from "../../lib/push/core";
 import { isDue, seoulMinuteOfDay } from "../../lib/push/due";
-import { sendPushSignal } from "../../lib/push/send";
-import { runNotifyTick } from "../../lib/push/tick";
+import { PUSH_SEND_TIMEOUT_MS, sendPushSignal } from "../../lib/push/send";
+import { PUSH_SEND_CONCURRENCY, runNotifyTick, SETTINGS_PAGE_SIZE } from "../../lib/push/tick";
 import { createVapidJwt, vapidAuthorization } from "../../lib/push/vapid";
 import { FakeStore, fakeTablesClient, v2Rules, type TableRule } from "./fake-tables";
 
@@ -75,6 +75,20 @@ describe("sendPushSignal", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization.startsWith("vapid t=")).toBe(true);
     expect(headers.TTL).toBe("3600");
+  });
+  it("푸시 서비스에 보내는 요청에는 5초 시간 제한(AbortSignal)이 붙는다 (A5)", async () => {
+    const f = fetchWith(201);
+    await sendPushSignal({ endpoint: ENDPOINT, config, fetchFn: f });
+    const [, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(PUSH_SEND_TIMEOUT_MS).toBe(5000);
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.signal?.aborted).toBe(false);
+  });
+  it("시간 제한에 걸려 요청이 끊기면 던지지 않고 network (A5)", async () => {
+    const aborted = vi.fn(async () => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    }) as unknown as typeof fetch;
+    expect(await sendPushSignal({ endpoint: ENDPOINT, config, fetchFn: aborted })).toEqual({ ok: false, error: "network" });
   });
   it("404·410은 구독이 사라진 것(gone), 그 밖은 rejected, 네트워크 오류는 network", async () => {
     expect(await sendPushSignal({ endpoint: ENDPOINT, config, fetchFn: fetchWith(410) })).toEqual({ ok: false, error: "gone" });
@@ -196,6 +210,53 @@ describe("runNotifyTick (예약 실행)", () => {
     const res = await runNotifyTick({ admin: fakeTablesClient(store, { sub: null }), now: NOW, send });
     expect(res.ok && res.data).toEqual({ dueUsers: 1, sent: 0, gone: 1, failed: 1 });
     expect(store.table("push_subscriptions").map((r) => r.endpoint)).toEqual(["https://bad.example/1"]);
+  });
+  it("동시에 보내는 수는 10을 넘지 않고 모두 보낸다 (A5)", async () => {
+    const store = adminStore();
+    for (let i = 0; i < 25; i++) {
+      const user = `u${String(i).padStart(2, "0")}`;
+      settings(store, user);
+      sub(store, user, `https://p.example/${i}`);
+    }
+    let running = 0;
+    let peak = 0;
+    const send = vi.fn(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 5));
+      running -= 1;
+      return { ok: true as const };
+    });
+    const res = await runNotifyTick({ admin: fakeTablesClient(store, { sub: null }), now: NOW, send });
+    expect(res.ok && res.data).toEqual({ dueUsers: 25, sent: 25, gone: 0, failed: 0 });
+    expect(send).toHaveBeenCalledTimes(25);
+    expect(peak).toBeLessThanOrEqual(PUSH_SEND_CONCURRENCY);
+    expect(peak).toBeGreaterThan(1);
+  });
+  it("보내다 던져도 그 구독만 실패로 세고 나머지는 보낸다 (A5)", async () => {
+    const store = adminStore();
+    settings(store, ME);
+    sub(store, ME, "https://a.example/1");
+    sub(store, ME, "https://a.example/2");
+    const send = vi.fn(async (endpoint: string) => {
+      if (endpoint.endsWith("/1")) throw new Error("boom");
+      return { ok: true as const };
+    });
+    const res = await runNotifyTick({ admin: fakeTablesClient(store, { sub: null }), now: NOW, send });
+    expect(res.ok && res.data).toEqual({ dueUsers: 1, sent: 1, gone: 0, failed: 1 });
+  });
+  it("설정은 쪽으로 읽고, 한 쪽을 넘는 사용자도 놓치지 않는다 (A5)", async () => {
+    const store = adminStore();
+    const total = SETTINGS_PAGE_SIZE + 5;
+    for (let i = 0; i < total; i++) {
+      const user = `u${String(i).padStart(5, "0")}`;
+      settings(store, user, i >= SETTINGS_PAGE_SIZE ? {} : { notify_evening_minute: 0 });
+      if (i >= SETTINGS_PAGE_SIZE) sub(store, user, `https://p.example/${i}`);
+    }
+    const send = vi.fn(async () => ({ ok: true as const }));
+    const res = await runNotifyTick({ admin: fakeTablesClient(store, { sub: null }), now: NOW, send });
+    expect(res.ok && res.data).toMatchObject({ dueUsers: 5, sent: 5 });
+    expect(store.calls.filter((c) => c.table === "user_settings")).toHaveLength(2);
   });
   it("보낼 사람이 없으면 구독을 읽지도 않는다. DB 오류는 unavailable", async () => {
     const store = adminStore();
