@@ -11,6 +11,11 @@ vi.mock("../../app/views/actions", () => ({ recordView: (...a: unknown[]) => rec
 const saveEveningAction = vi.fn();
 vi.mock("../../app/evening/actions", () => ({ saveEveningLog: (...a: unknown[]) => saveEveningAction(...a) }));
 vi.mock("../../app/settings/actions", () => ({ saveRatios: vi.fn(), saveSettings: vi.fn() }));
+vi.mock("../../app/offers/actions", () => ({
+  requestOffer: vi.fn(async () => ({ ok: true, data: { offer: null, reason: "no_target" } })),
+  dismissOffer: vi.fn(),
+}));
+vi.mock("../../app/focus/actions", () => ({ startFocus: vi.fn(), endFocus: vi.fn() }));
 vi.mock("../../app/todos/actions", () => ({ addTodo: vi.fn(), setTodoDone: vi.fn(), addCategory: vi.fn() }));
 vi.mock("../../app/todos/manage-actions", () => ({
   editTodo: vi.fn(),

@@ -16,6 +16,11 @@ vi.mock("../../app/todos/manage-actions", () => ({
   deleteNote: vi.fn(),
 }));
 vi.mock("../../app/settings/actions", () => ({ saveRatios: vi.fn(), saveSettings: vi.fn() }));
+vi.mock("../../app/offers/actions", () => ({
+  requestOffer: vi.fn(async () => ({ ok: true, data: { offer: null, reason: "no_target" } })),
+  dismissOffer: vi.fn(),
+}));
+vi.mock("../../app/focus/actions", () => ({ startFocus: vi.fn(), endFocus: vi.fn() }));
 vi.mock("../../lib/read-client", () => ({
   fetchToday: vi.fn(async () => ({ todos: { ok: false, error: "unavailable" }, categories: { ok: false, error: "unavailable" } })),
 }));

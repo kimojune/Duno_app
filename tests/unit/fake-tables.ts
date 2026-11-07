@@ -291,6 +291,14 @@ function fill(values: Row): (row: Row) => Row {
 /** 원샷 v2 마이그레이션의 규칙을 시험용으로 옮긴 것(표 이름은 마이그레이션과 같다) */
 export function v2Rules(): Record<string, TableRule> {
   return {
+    todo_offers: {
+      insertColumns: ["id", "user_id", "day", "surface", "category_id", "todo_id", "offer_key"],
+      updateColumns: ["dismissed_at"],
+      uniques: [["user_id", "day", "offer_key"]],
+      defaults: (row, store) => ({ offered_at: store.nextTimestamp(), dismissed_at: null, ...(row.category_id === undefined ? { category_id: null } : {}), ...(row.todo_id === undefined ? { todo_id: null } : {}) }),
+      fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
+      limit: { count: 50000, hint: "todo_offers_limit" },
+    },
     focus_sessions: {
       insertColumns: [
         "id",

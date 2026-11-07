@@ -86,7 +86,8 @@ export function TimerScreen({
   const [todosFailed, setTodosFailed] = useState(false);
   // 사용자가 고른 것(null이면 아직 안 골랐다: 처음 고름을 따른다)
   const [choice, setChoice] = useState<Choice | null>(null);
-  const [noneCategory, setNoneCategory] = useState<string | null>(null);
+  // 할 일 없이 시작할 때 고른 분야(undefined면 아직 안 골랐다: 앱의 추천 분야, 없으면 기타)
+  const [pickedCategory, setPickedCategory] = useState<string | null | undefined>(undefined);
   const [busy, setBusy] = useState<"start" | "end" | null>(null);
   const [message, setMessage] = useState("");
   const [tick, setTick] = useState(0);
@@ -140,11 +141,15 @@ export function TimerScreen({
   // 처음 고름: 추천이 있으면 그 할 일, 없으면 첫 할 일. 사용자가 고른 뒤에는 건드리지 않는다
   const defaultChoice: Choice = (() => {
     if (recommended?.todoId && todos.some((t) => t.id === recommended.todoId)) return { kind: "todo", id: recommended.todoId };
+    // 분야만 추천했으면 「할 일 없이 시작」과 그 분야가 처음에 골라져 있다
+    if (recommended && recommended.todoId === null) return { kind: "none" };
     if (todos.length > 0) return { kind: "todo", id: todos[0].id };
     return { kind: "none" };
   })();
   const effectiveChoice: Choice = choice && (choice.kind === "none" || todos.some((t) => t.id === choice.id)) ? choice : defaultChoice;
 
+  const noneCategory: string | null = pickedCategory !== undefined ? pickedCategory : (recommended && recommended.todoId === null ? recommended.categoryId : null);
+  const setNoneCategory = (id: string | null) => setPickedCategory(id);
   const nameOf = (id: string | null) => (id === null ? TIMER_TEXT.other : (categories.find((c) => c.id === id)?.name ?? TIMER_TEXT.other));
 
   function pick(next: Choice) {
@@ -160,7 +165,10 @@ export function TimerScreen({
     }
     const todo = effectiveChoice.kind === "todo" ? todos.find((t) => t.id === effectiveChoice.id) : undefined;
     const categoryId = todo ? todo.categoryId : noneCategory;
-    const fromRecommendation = recommended !== null && recommended !== undefined && todo !== undefined && recommended.todoId === todo.id;
+    // 앱의 추천 그대로 켠 것인가: 추천한 할 일을 골랐거나, 할 일 없이 추천한 분야로 켰다
+    const fromRecommendation =
+      !!recommended &&
+      (todo !== undefined ? recommended.todoId === todo.id : recommended.todoId === null && categoryId === recommended.categoryId);
     const surface: FocusSurface = fromRecommendation ? "timer_tab" : "manual";
     const offerId = fromRecommendation ? (recommended?.offerId ?? null) : null;
     // 같은 고름으로 다시 누르면 같은 id(서버가 한 번만 만든다)
