@@ -1,14 +1,91 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type { CategoryMinutes } from "../growth/logic";
-import type { RecordResult } from "../records/common";
+import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
+import { requireUserId } from "../session";
+import { todoDayFor } from "../todos/day";
+import { weekStartFor } from "../week";
+import { checkGoalItems } from "./validation";
 
 /**
- * 이번 주 목표 읽기(⑥에서 표와 함께 채운다). 지금은 이번 주 목표가 없는 것으로 본다.
- * 먼저 한 기록의 반대편 계산이 이 함수를 부른다(목표 기준 반대편, D-110).
- * 돌려주는 값: 목표에 든 분야와 목표 분(없는 주는 null).
+ * 이번 주 목표(PRD 7-7, ⑥). 서버 전용.
+ * 같은 규칙: 함수마다 자기 안에서 세션 확인(getClaims), user_id는 세션에서만, 주는 서버 시계(두노 하루 기준 월요일), 예상된 실패는 짧은 코드.
+ * 목표가 없어도 앱을 쓰는 데 막히지 않는다: 행이 없으면 목표가 없는 주(null)다.
+ */
+export type GoalDeps = { supabase: SupabaseClient; now?: () => Date };
+
+const serverNow = () => new Date();
+
+const rowItemsSchema = z.array(z.object({ categoryId: z.uuid(), minutes: z.number().int().min(0) }));
+
+function parseItems(value: unknown): CategoryMinutes[] | null {
+  const parsed = rowItemsSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const items = parsed.data.filter((i) => i.minutes > 0).map((i) => ({ categoryId: i.categoryId as string | null, minutes: i.minutes }));
+  return items.length > 0 ? items : null;
+}
+
+/**
+ * 그 주(월요일 weekStart)의 목표 분야·분. 목표가 없으면 null. 다른 core 함수(상태보기·먼저 할 일·먼저 한 기록)가 쓴다.
+ * 세션은 여기서도 다시 확인하고(getClaims), 자기 행만 읽는다.
  */
 export async function readWeeklyGoalItems(args: { supabase: SupabaseClient; weekStart: string }): Promise<RecordResult<CategoryMinutes[] | null>> {
-  void args;
-  return { ok: true, data: null };
+  try {
+    const user = await requireUserId(args.supabase);
+    if (!user.ok) return user;
+    const { data, error } = await args.supabase.from("weekly_goals").select("items").eq("user_id", user.data).eq("week_start", args.weekStart);
+    if (error) return recordFail(mapRecordDbError(error));
+    const row = ((data ?? []) as { items: unknown }[])[0];
+    return { ok: true, data: row ? parseItems(row.items) : null };
+  } catch {
+    return recordFail("unavailable");
+  }
+}
+
+/**
+ * 이번 주 목표를 통째로 정한다(분야마다 1시간 단위, 합 168시간 이하). 이미 있으면 바꾼다.
+ * 같은 요청을 여러 번 보내도 같다. 남의 분야·없는 분야면 not_found.
+ */
+export async function saveWeeklyGoalForUser(
+  deps: GoalDeps,
+  input: unknown,
+): Promise<RecordResult<{ weekStart: string; items: CategoryMinutes[] }>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    const checked = checkGoalItems(input);
+    if (!checked.ok) return recordFail("invalid_input");
+    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+
+    // 분야는 내 것이어야 한다(jsonb라 DB 외래 키가 없어 여기서 본다)
+    const ids = checked.items.map((i) => i.categoryId);
+    const mine = await deps.supabase.from("categories").select("id").eq("user_id", user.data).in("id", ids);
+    if (mine.error) return recordFail(mapRecordDbError(mine.error));
+    if (((mine.data ?? []) as { id: string }[]).length !== ids.length) return recordFail("not_found");
+
+    const { data, error } = await deps.supabase
+      .from("weekly_goals")
+      .upsert({ user_id: user.data, week_start: weekStart, items: checked.items }, { onConflict: "user_id,week_start" })
+      .select("items");
+    if (error) return recordFail(mapRecordDbError(error));
+    const items = parseItems(((data ?? []) as { items: unknown }[])[0]?.items) ?? [];
+    return { ok: true, data: { weekStart, items } };
+  } catch {
+    return recordFail("unavailable");
+  }
+}
+
+/** 이번 주 목표를 없앤다(목표가 없어도 앱은 그대로 쓴다). 없는 것을 없애도 성공 */
+export async function clearWeeklyGoalForUser(deps: GoalDeps): Promise<RecordResult<{ weekStart: string }>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    const weekStart = weekStartFor(todoDayFor((deps.now ?? serverNow)()));
+    const { error } = await deps.supabase.from("weekly_goals").delete().eq("user_id", user.data).eq("week_start", weekStart).select("week_start");
+    if (error) return recordFail(mapRecordDbError(error));
+    return { ok: true, data: { weekStart } };
+  } catch {
+    return recordFail("unavailable");
+  }
 }

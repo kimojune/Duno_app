@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { listCategoriesForUser } from "../categories/core";
 import { listEveningLogs } from "../evening/core";
+import { readWeeklyGoalItems } from "../goals/core";
 import { recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
 import { readSettingsForUser } from "../settings/core";
@@ -29,12 +30,14 @@ export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<
     const lastWeekStart = addDays(weekStart, -7);
     const lastMonthRange = previousMonthRange(today);
 
-    const [logs, settings, categories] = await Promise.all([
+    const [logs, settings, categories, goal] = await Promise.all([
       listEveningLogs({ supabase: deps.supabase }),
       readSettingsForUser({ supabase: deps.supabase, key: deps.key }),
       listCategoriesForUser({ supabase: deps.supabase, key: deps.key }),
+      readWeeklyGoalItems({ supabase: deps.supabase, weekStart }),
     ]);
     if (!logs.ok) return logs;
+    if (!goal.ok) return goal;
     if (!settings.ok) return settings;
     if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
 
@@ -55,7 +58,7 @@ export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<
         cumulative: sumRange(logs.data),
         loggedDaysThisWeek: countLoggedDays(logs.data, weekStart, weekEnd),
         loggedDaysTotal: countLoggedDays(logs.data),
-        goal: null, // 이번 주 목표(⑥)가 생기면 여기서 읽는다
+        goal: goal.data ? { weekStart, items: goal.data } : null,
       },
     };
   } catch {

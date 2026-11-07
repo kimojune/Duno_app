@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { APP_CONFIG, isEvening } from "../lib/app-config";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
+import { defaultGoalsApi } from "../lib/goals-api";
 import { defaultGrowthApi } from "../lib/growth-api";
 import type { HomeRead } from "../lib/home-types";
 import { defaultManageApi } from "../lib/manage-api";
@@ -13,8 +14,10 @@ import { defaultSettingsApi } from "../lib/onboarding-api";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
 import type { ViewEntry } from "../lib/views/core-types";
+import type { GoalSummary } from "../lib/goals/types";
 import { CategoryPage } from "./category-page";
 import { EveningEntry, EveningRecord } from "./evening-record";
+import { GoalEditor, GoalLine } from "./goal";
 import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
 import { OfferCard } from "./offer-card";
 import { Onboarding, type OnboardingResult } from "./onboarding";
@@ -94,6 +97,9 @@ function MainShell({ initial, initialOpen, apis }: { initial: TodayRead; initial
   const [cardError, setCardError] = useState<"failed" | "offline" | null>(null);
   // 타이머 탭의 추천(⑤): 탭을 열 때마다 건네받는다(같은 제시는 서버가 한 번만 센다)
   const [timerOffer, setTimerOffer] = useState<Offer | null>(null);
+  // 이번 주 목표(⑥): 한 줄은 저녁 기록·목표를 저장한 뒤 다시 읽는다
+  const [goalVersion, setGoalVersion] = useState(0);
+  const [goalEditor, setGoalEditor] = useState<GoalSummary | null>(null);
   const cardStartRef = useRef<string | null>(null);
 
   // 처음 열 때 카드 제시를 받는다(서버에서 가져오는 일). 상태는 응답을 받은 뒤에만 바꾼다.
@@ -193,6 +199,7 @@ function MainShell({ initial, initialOpen, apis }: { initial: TodayRead; initial
           manage={defaultManageApi}
           topSlot={
             <>
+              <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
               {cardOffer && <OfferCard offer={cardOffer} busy={cardBusy} error={cardError} onStart={() => void startFromCard()} onDismiss={() => void dismissCard()} />}
               <EveningEntry evening={isEvening(new Date())} onOpen={() => setEveningOpen(true)} />
             </>
@@ -214,11 +221,21 @@ function MainShell({ initial, initialOpen, apis }: { initial: TodayRead; initial
         <EveningRecord
           api={defaultEveningApi}
           onClose={() => setEveningOpen(false)}
+          onSaved={() => setGoalVersion((n) => n + 1)}
           onOpenGrowth={() => {
             setEveningOpen(false);
             openTab("growth", "after_save");
           }}
           renderAfterSave={() => <AfterSaveShortfall api={defaultGrowthApi} />}
+        />
+      )}
+      {goalEditor && (
+        <GoalEditor
+          api={defaultGoalsApi}
+          categories={goalEditor.categories}
+          goal={goalEditor.goal}
+          onClose={() => setGoalEditor(null)}
+          onSaved={() => setGoalVersion((n) => n + 1)}
         />
       )}
       {category && <CategoryPage api={defaultGrowthApi} categoryId={category.id} name={category.name} onClose={() => setCategory(null)} />}
