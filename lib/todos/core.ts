@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUserId } from "../session";
 import { CIPHERTEXT_MAX_LENGTH, decryptTodoText, encryptTodoText, type TodoKey } from "./crypto";
-import { describeTodoDay, todoDayFor } from "./day";
+import { describeTodoDay, resolveWriteDay, todoDayFor } from "./day";
+import { sortByPosition } from "./manage-core";
 import type { AddedTodo, TodayTodos, TodoDoneState, TodoErrorCode, TodoItem, TodoResult } from "./types";
 import { checkTodoText, todoCategoryIdSchema, todoDoneSchema, todoIdSchema } from "./validation";
 
@@ -43,8 +44,10 @@ type TodoRow = {
   done: boolean;
   created_at: string;
   category_id: string | null;
+  /** 순서(0부터, null은 뒤). 고치는 길은 lib/todos/manage-core.ts. 화면에는 내보내지 않고 정렬에만 쓴다 */
+  position?: number | null;
 };
-const ROW_COLUMNS = "id, day, text_encrypted, done, created_at, category_id";
+const ROW_COLUMNS = "id, day, text_encrypted, done, created_at, category_id, position";
 
 function toItem(row: TodoRow, userId: string, key: TodoKey): TodoItem {
   const opened = decryptTodoText(row.text_encrypted, userId, key);
@@ -72,7 +75,8 @@ export async function listTodosForToday(deps: TodoDeps): Promise<TodoResult<Toda
       .order("id", { ascending: true });
     if (error) return fail(mapDbError(error));
 
-    const todos = ((data ?? []) as TodoRow[]).map((row) => toItem(row, user.data, key));
+    // 읽는 쿼리는 created_at·id 순 그대로 두고, 순서를 정한 행(position)만 앞으로 안정 정렬한다
+    const todos = sortByPosition((data ?? []) as TodoRow[]).map((row) => toItem(row, user.data, key));
     return { ok: true, data: { day: describeTodoDay(day), todos } };
   } catch {
     return fail("unavailable");
@@ -90,6 +94,7 @@ export async function createTodoForToday(
   id: unknown,
   text: unknown,
   categoryId?: unknown,
+  writtenAt?: unknown,
 ): Promise<TodoResult<AddedTodo>> {
   try {
     const user = await requireUserId(deps.supabase);
@@ -104,7 +109,8 @@ export async function createTodoForToday(
     if (!deps.key) return fail("config");
     const key = deps.key;
 
-    const day = todoDayFor((deps.now ?? serverNow)());
+    // 오프라인으로 적은 글은 적은 때(writtenAt)의 하루로 들어간다. 믿는 범위(최근 72시간, 미래 5분)만 따르고 아니면 서버 시계(PRD 10절)
+    const day = resolveWriteDay((deps.now ?? serverNow)(), writtenAt);
     const textEncrypted = encryptTodoText(checked.text, user.data, key);
     if (textEncrypted.length > CIPHERTEXT_MAX_LENGTH) return fail("too_long");
 

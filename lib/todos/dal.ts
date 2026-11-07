@@ -13,10 +13,15 @@ import type { AddedTodo, TodoDoneState, TodoResult } from "./types";
  * 쓰기: app/todos/actions.ts의 Server Action.
  */
 
-export async function createTodayTodo(id: unknown, text: unknown, categoryId?: unknown): Promise<TodoResult<AddedTodo>> {
+export async function createTodayTodo(
+  id: unknown,
+  text: unknown,
+  categoryId?: unknown,
+  writtenAt?: unknown,
+): Promise<TodoResult<AddedTodo>> {
   const supabase = await createClient();
   if (!supabase) return { ok: false, error: "config" };
-  return createTodoForToday({ supabase, key: getTodoKeyFromEnv() }, id, text, categoryId);
+  return createTodoForToday({ supabase, key: getTodoKeyFromEnv() }, id, text, categoryId, writtenAt);
 }
 
 export async function updateTodoDone(id: unknown, done: unknown): Promise<TodoResult<TodoDoneState>> {

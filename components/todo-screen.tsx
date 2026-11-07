@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { signOut } from "../app/actions";
 import { addCategory, addTodo, setTodoDone } from "../app/todos/actions";
 import type { AddCategoryResult, CategoryItem, CategoryList, CategoryResult } from "../lib/categories/types";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
+import type { ManageApi } from "../lib/manage-api";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
 import { describeTodoDay, todoDayFor } from "../lib/todos/day";
@@ -26,6 +27,8 @@ import {
   type NewCategoryHelp,
   type RowView,
 } from "./todo-view";
+import { CarryOver } from "./carry-over";
+import { TodoDetail } from "./todo-detail";
 
 /**
  * 할 일 화면의 진짜 동작(디자인 명세 12절 방향 C).
@@ -125,6 +128,7 @@ function initialListState(initial: TodoResult<TodayTodos> | undefined): ListStat
 
 type FocusRequest =
   | { kind: "row"; id: string }
+  | { kind: "detailButton"; id: string }
   | { kind: "input" }
   | { kind: "addButton" }
   | { kind: "addCategoryChip" }
@@ -142,9 +146,15 @@ type CategoryAttempt = {
 
 export function TodoScreen({
   initial,
+  manage,
+  topSlot,
 }: {
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
   initial?: TodayRead;
+  /** 원샷 v2(선택): 있으면 줄마다 「자세히」(고치기·지우기·순서·작업 기록)와 「어제 못 끝낸 할 일」 가져오기를 그린다. 없으면 기존 화면 그대로 */
+  manage?: ManageApi;
+  /** 원샷 v2(선택): 목록 위에 얹는 것(먼저 할 일 카드·이번 주 목표 줄·저녁 기록 입구 등) */
+  topSlot?: ReactNode;
 }) {
   const initialTodos = initial?.todos;
   const first = initialTodos?.ok ? initialTodos.data : null;
@@ -177,6 +187,8 @@ export function TodoScreen({
   const [newCategoryHelp, setNewCategoryHelp] = useState<NewCategoryHelp>(null);
   /** 분야 더하기가 401로 돌아왔다(C19a): 그때만 새 분야 칸 이름도 「저장 안 된 글」 복사에 넣는다 */
   const [categoryAuthLost, setCategoryAuthLost] = useState(false);
+  /** 열려 있는 「할 일 자세히」의 할 일 번호(manage가 있을 때만 쓴다) */
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const newCategoryInputRef = useRef<HTMLInputElement | null>(null);
@@ -767,6 +779,65 @@ export function TodoScreen({
     }
   }
 
+  // ---- 원샷 v2 0번: 고치기·지우기·순서·어제 것 가져오기(manage가 있을 때만) ----
+
+  function closeDetail(restoreFocusTo?: FocusRequest) {
+    focusRequestRef.current = restoreFocusTo ?? (detailId ? { kind: "detailButton", id: detailId } : null);
+    setDetailId(null);
+  }
+
+  function onEdited(todo: TodoItem) {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === todo.id ? { ...r, text: todo.readable ? todo.text : r.text, categoryId: todo.categoryId ?? null } : r,
+      ),
+    );
+  }
+
+  function onDeleted(id: string) {
+    const all = rowsRef.current;
+    const index = all.findIndex((r) => r.id === id);
+    const neighbor = all[index + 1] ?? all[index - 1];
+    pendingTextRef.current.delete(id);
+    pendingCategoryRef.current.delete(id);
+    confirmedRef.current.delete(id);
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    closeDetail(neighbor ? { kind: "row", id: neighbor.id } : { kind: "addButton" });
+  }
+
+  /** 저장된 줄 가운데 위(-1)·아래(1)로 한 칸. 서버가 순서를 받으면 화면도 바꾼다 */
+  async function moveRow(id: string, direction: -1 | 1): Promise<boolean> {
+    if (!manage) return false;
+    const saved = rowsRef.current.filter((r) => r.status === "saved");
+    const from = saved.findIndex((r) => r.id === id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= saved.length) return false;
+    const next = [...saved];
+    [next[from], next[to]] = [next[to], next[from]];
+    const res = await safely(() => manage.reorderTodos(next.map((r) => r.id)), UNAVAILABLE);
+    if (!res.ok) {
+      if (res.error === "unauthenticated") setSessionLost(true);
+      return false;
+    }
+    setRows((prev) => {
+      const byId = new Map(prev.map((r) => [r.id, r]));
+      const ordered = next.map((r) => byId.get(r.id)).filter((r): r is LocalRow => r !== undefined);
+      return [...ordered, ...prev.filter((r) => r.status !== "saved")];
+    });
+    return true;
+  }
+
+  function onCarried(todos: TodoItem[]) {
+    const added = todos.map(fromItem);
+    for (const r of added) confirmedRef.current.set(r.id, r.done);
+    setRows((prev) => [...prev, ...added.filter((r) => !prev.some((p) => p.id === r.id))]);
+    announce(`할 일 ${added.length}개를 가져왔어요`);
+  }
+
+  const savedRows = rows.filter((r) => r.status === "saved");
+  const detailRow = detailId ? rows.find((r) => r.id === detailId && r.status === "saved") : undefined;
+  const detailIndex = detailRow ? savedRows.findIndex((r) => r.id === detailRow.id) : -1;
+
   const byCategory = new Map(categories.map((c) => [c.id, c]));
   function categoryText(categoryId: string | null): string | null {
     if (!categoryId) return null;
@@ -807,6 +878,7 @@ export function TodoScreen({
       const fallback = () => inputRef.current ?? document.getElementById("add-todo-button");
       let target: HTMLElement | null = null;
       if (request.kind === "row") target = document.querySelector<HTMLElement>(`#row-${request.id} input[type=checkbox]`);
+      else if (request.kind === "detailButton") target = document.querySelector<HTMLElement>(`#row-${request.id} .row-actions button`);
       else if (request.kind === "addButton") target = document.getElementById("add-todo-button");
       else if (request.kind === "addCategoryChip") target = document.getElementById("add-category-chip");
       else if (request.kind === "newCategoryInput") target = newCategoryInputRef.current;
@@ -860,6 +932,36 @@ export function TodoScreen({
       onLogoutCancel={() => setLogoutConfirm(false)}
       onCopy={() => void copyUnsaved()}
       onRelogin={() => router.refresh()}
+      onOpenDetail={manage ? (id) => setDetailId(id) : undefined}
+      topSlot={
+        manage || topSlot ? (
+          <>
+            {topSlot}
+            {manage && list === "ready" && <CarryOver api={manage} online={online} onCarried={onCarried} />}
+          </>
+        ) : undefined
+      }
+      overlay={
+        manage && detailRow ? (
+          <TodoDetail
+            key={detailRow.id}
+            todo={{
+              id: detailRow.id,
+              text: detailRow.text,
+              categoryId: detailRow.categoryId,
+              canMoveUp: detailIndex > 0,
+              canMoveDown: detailIndex >= 0 && detailIndex < savedRows.length - 1,
+            }}
+            chips={chips}
+            api={manage}
+            online={online}
+            onClose={() => closeDetail()}
+            onEdited={onEdited}
+            onDeleted={onDeleted}
+            onMove={moveRow}
+          />
+        ) : undefined
+      }
     />
   );
 }

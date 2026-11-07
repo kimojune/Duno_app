@@ -32,3 +32,19 @@ export function describeTodoDay(date: string): TodoDay {
   const weekday = new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay();
   return { date, year, month, dayOfMonth, weekday };
 }
+
+/** 오프라인으로 적은 글이 쓰는 「적은 때」를 믿는 범위: 최근 72시간, 미래는 5분까지(기기 시계 오차). 이 밖은 서버 시계를 따른다(임시) */
+export const WRITTEN_AT_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+export const WRITTEN_AT_MAX_FUTURE_MS = 5 * 60 * 1000;
+
+/** 할 일이 들어갈 하루: writtenAt이 믿을 수 있는 ISO 시각이면 그 시각의 하루, 아니면 now의 하루 */
+export function resolveWriteDay(now: Date, writtenAt: unknown): string {
+  if (typeof writtenAt === "string" && writtenAt.length <= 40) {
+    const ms = Date.parse(writtenAt);
+    if (Number.isFinite(ms)) {
+      const delta = now.getTime() - ms;
+      if (delta <= WRITTEN_AT_MAX_AGE_MS && delta >= -WRITTEN_AT_MAX_FUTURE_MS) return todoDayFor(new Date(ms));
+    }
+  }
+  return todoDayFor(now);
+}

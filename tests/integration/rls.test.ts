@@ -185,14 +185,50 @@ describe("A가 B의 행에 닿지 못한다", () => {
     expect(await readById(b, aRow.id)).toHaveLength(0);
   });
 
-  it("update: done 말고 다른 열(day·text_encrypted)은 바꾸지 못한다", async () => {
+  // 원샷 v2 0번(마이그레이션 20261107100000_todo_manage.sql)이 update 권한 열을 done에서
+  // done·text_encrypted·category_id·position으로 넓혔다. day·user_id·id·created_at은 여전히 못 바꾼다.
+  // (옛 시험 「done 말고 다른 열(day·text_encrypted)은 바꾸지 못한다」는 새 계약에 맞춰 둘로 나눴다. 이 시험은 DB가 필요해 아직 돌리지 못했다.)
+  it("update: day·user_id·id는 바꾸지 못한다(권한 거절)", async () => {
     const day = await a.from("todos").update({ day: "2000-01-02" }).eq("id", aRow.id).select("id");
     expect(day.error).not.toBeNull();
-    const text = await a.from("todos").update({ text_encrypted: fakeCiphertext() }).eq("id", aRow.id).select("id");
-    expect(text.error).not.toBeNull();
+    const owner = await a.from("todos").update({ user_id: bId }).eq("id", aRow.id).select("id");
+    expect(owner.error !== null || (owner.data ?? []).length === 0).toBe(true);
+    const id = await a.from("todos").update({ id: "00000000-0000-4000-8000-000000000000" }).eq("id", aRow.id).select("id");
+    expect(id.error).not.toBeNull();
     const rows = await readById(a, aRow.id);
     expect(rows[0].day).toBe(aRow.day);
-    expect(rows[0].text_encrypted).toBe(aRow.text_encrypted);
+    expect(rows[0].user_id).toBe(aId);
+  });
+
+  it("update: 자기 행의 text_encrypted는 바꿀 수 있고(고치기), 형식이 틀린 값은 거절된다", async () => {
+    const next = fakeCiphertext();
+    const ok = await a.from("todos").update({ text_encrypted: next }).eq("id", aRow.id).select("id, text_encrypted");
+    expect(ok.error).toBeNull();
+    expect(ok.data).toEqual([{ id: aRow.id, text_encrypted: next }]);
+    const bad = await a.from("todos").update({ text_encrypted: "평문 글" }).eq("id", aRow.id).select("id");
+    expect(bad.error).not.toBeNull(); // todos_text_encrypted_format check
+    const back = await a.from("todos").update({ text_encrypted: aRow.text_encrypted }).eq("id", aRow.id).select("id");
+    expect(back.error).toBeNull();
+    expect((await readById(a, aRow.id))[0].text_encrypted).toBe(aRow.text_encrypted);
+  });
+
+  it("update: B의 행의 text_encrypted·position은 바꾸지 못한다(바뀐 행 0), B로 다시 읽으면 그대로", async () => {
+    const text = await a.from("todos").update({ text_encrypted: fakeCiphertext() }).eq("id", bRow.id).select("id");
+    expect(text.error !== null || (text.data ?? []).length === 0).toBe(true);
+    const position = await a.from("todos").update({ position: 7 }).eq("id", bRow.id).select("id");
+    expect(position.error !== null || (position.data ?? []).length === 0).toBe(true);
+    const rows = await readById(b, bRow.id);
+    expect(rows[0].text_encrypted).toBe(bRow.text_encrypted);
+  });
+
+  it("update: 자기 행의 position(순서)은 바꿀 수 있고, 범위를 벗어난 값은 거절된다", async () => {
+    const ok = await a.from("todos").update({ position: 3 }).eq("id", aRow.id).select("id, position");
+    expect(ok.error).toBeNull();
+    expect(ok.data).toEqual([{ id: aRow.id, position: 3 }]);
+    const bad = await a.from("todos").update({ position: -1 }).eq("id", aRow.id).select("id");
+    expect(bad.error).not.toBeNull(); // todos_position_range check
+    const reset = await a.from("todos").update({ position: null }).eq("id", aRow.id).select("id");
+    expect(reset.error).toBeNull();
   });
 });
 

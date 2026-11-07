@@ -31,6 +31,9 @@ const TAG_BYTES = 16;
 const AAD_PREFIX = {
   todo_text: "duno.todos.text|v1|user:",
   category_name: "duno.categories.name|v1|user:",
+  // 원샷 v2: 작업 기록 글(todo_notes.note_encrypted)과 처음 설정의 목표 글(user_settings.goal_encrypted)
+  todo_note: "duno.todo_notes.note|v1|user:",
+  goal_text: "duno.user_settings.goal|v1|user:",
 } as const;
 
 export type CipherPurpose = keyof typeof AAD_PREFIX;

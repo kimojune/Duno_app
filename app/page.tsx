@@ -1,5 +1,5 @@
 import { LoginButton, LoginLayout } from "../components/login-button";
-import { TodoScreen } from "../components/todo-screen";
+import { AppShell } from "../components/app-shell";
 import { getPublicEnv } from "../lib/env";
 import { noticeFromErrorParam } from "../lib/login-text";
 import { createClient } from "../lib/supabase/server";
@@ -29,7 +29,7 @@ export default async function Home({
       } catch {
         initial = { todos: { ok: false, error: "unavailable" }, categories: { ok: false, error: "unavailable" } };
       }
-      return <TodoScreen initial={initial} />;
+      return <AppShell initial={initial} />;
     }
   }
 

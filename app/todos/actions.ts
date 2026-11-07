@@ -19,9 +19,18 @@ import type { AddedTodo, TodoDoneState, TodoResult } from "../../lib/todos/types
  * 할 일 적기. id는 화면이 crypto.randomUUID()로 만들고, 재시도 때 같은 id를 다시 보낸다.
  * categoryId는 분야 번호(없거나 null이면 「기타」). 남의 분야·없는 분야면 invalid_category.
  */
-export async function addTodo(id: unknown, text: unknown, categoryId?: unknown): Promise<TodoResult<AddedTodo>> {
+export async function addTodo(
+  id: unknown,
+  text: unknown,
+  categoryId?: unknown,
+  writtenAt?: unknown,
+): Promise<TodoResult<AddedTodo>> {
   try {
-    return await createTodayTodo(id, text, categoryId);
+    // writtenAt(오프라인으로 적은 때, ISO 시각)은 최근 72시간 안이면 그 시각의 하루로 들어가고 아니면 서버 시계(PRD 10절).
+    // 없으면 옛 호출 꼴 그대로 부른다(인자 수가 늘지 않게).
+    return writtenAt === undefined
+      ? await createTodayTodo(id, text, categoryId)
+      : await createTodayTodo(id, text, categoryId, writtenAt);
   } catch {
     return { ok: false, error: "unavailable" };
   }

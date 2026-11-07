@@ -207,6 +207,14 @@ export type TodoViewProps = {
   onLogoutCancel: () => void;
   onCopy: () => void;
   onRelogin: () => void;
+
+  // ---- 원샷 v2: 선택 입력. 없으면 아무것도 더 그리지 않는다(기존 화면 그대로) ----
+  /** 줄마다 「자세히」 단추를 둔다(고치기·지우기·순서·작업 기록, PRD 0번) */
+  onOpenDetail?: (id: string) => void;
+  /** 목록 위에 얹는 것(어제 것 가져오기·먼저 할 일 카드·이번 주 목표 줄·저녁 기록 입구) */
+  topSlot?: ReactNode;
+  /** 화면을 덮는 자세히 창 */
+  overlay?: ReactNode;
 };
 
 /** 한글 조합 중의 엔터는 「적기」·「더하기」로 치지 않는다(12-6). 안드로이드 크롬은 조합 중 keyCode 229를 보낸다 */
@@ -262,7 +270,8 @@ function Row({
   onToggle,
   onRetry,
   onRemove,
-}: { row: RowView } & Pick<TodoViewProps, "onToggle" | "onRetry" | "onRemove">) {
+  onOpenDetail,
+}: { row: RowView } & Pick<TodoViewProps, "onToggle" | "onRetry" | "onRemove" | "onOpenDetail">) {
   const textId = `todo-text-${row.id}`;
   const statusId = `todo-status-${row.id}`;
   const tagId = `todo-tag-${row.id}`;
@@ -309,6 +318,14 @@ function Row({
           <p role="status" className="todo-sub">
             {TODO_TEXT.checkFailed}
           </p>
+        )}
+        {/* 저장된 줄에만. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
+        {onOpenDetail && !notSaved && (
+          <div className="row-actions">
+            <TextButton aria-label={`자세히 보기: ${row.text ?? TODO_TEXT.unreadable}`} onClick={() => onOpenDetail(row.id)}>
+              자세히
+            </TextButton>
+          </div>
         )}
       </div>
     </li>
@@ -622,6 +639,7 @@ export function TodoView(props: TodoViewProps) {
       {header}
       {notices.length > 0 && <div className="notices">{notices}</div>}
       <main className="todo-main" aria-busy={list === "loading"}>
+        {props.topSlot}
         {list === "loading" && <Skeleton />}
         {list === "error" && (
           <Notice role="alert" actions={<SecondaryButton onClick={props.onReload}>{TODO_TEXT.reload}</SecondaryButton>}>
@@ -637,13 +655,21 @@ export function TodoView(props: TodoViewProps) {
         {rows.length > 0 && (
           <ul className="todo-list">
             {rows.map((row) => (
-              <Row key={row.id} row={row} onToggle={props.onToggle} onRetry={props.onRetry} onRemove={props.onRemove} />
+              <Row
+                key={row.id}
+                row={row}
+                onToggle={props.onToggle}
+                onRetry={props.onRetry}
+                onRemove={props.onRemove}
+                onOpenDetail={props.onOpenDetail}
+              />
             ))}
           </ul>
         )}
       </main>
       {sheetOpen ? <TodoSheet {...props} sheetRef={sheetRef} /> : <AddTodoButton resume={props.resume} onOpen={props.onOpenSheet} />}
       <LiveRegion message={props.live} />
+      {props.overlay}
     </div>
   );
 }

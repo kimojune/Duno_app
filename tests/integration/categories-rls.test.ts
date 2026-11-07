@@ -262,18 +262,29 @@ describe("악용 8: 분야 지우기·이름 바꾸기, 할 일 분야 바꾸기
     expect(await readCategory(b, bCat.id)).toEqual([bCat]);
   });
 
-  it("할 일의 category_id update는 거절(update는 done만), 다시 읽으면 그대로", async () => {
+  // 원샷 v2 0번(20261107100000_todo_manage.sql)이 todos.category_id update 권한을 열었다. 옛 시험
+  // 「할 일의 category_id update는 거절(update는 done만)」은 새 계약에 맞춰 바꿨다: 내 분야로는 되고, 남의 분야로는
+  // 복합 외래 키(todos_category_owner_fkey)가 막는다. 이 시험은 DB가 필요해 아직 돌리지 못했다.
+  it("할 일의 category_id update: 내 분야로는 바뀌고 기타(null)로 돌릴 수 있으며, 남의 분야로는 거절", async () => {
     const made = await insertTodo(a, { day: TEST_DAY, text_encrypted: fakeCiphertext() });
     expect(made.error).toBeNull();
     const todoId = (made.data as { id: string }[])[0].id;
-    const { error } = await a.from("todos").update({ category_id: aCat.id }).eq("id", todoId).select("id");
-    expect(error).not.toBeNull();
-    expect(error?.code).toBe("42501");
+    const own = await a.from("todos").update({ category_id: aCat.id }).eq("id", todoId).select("id, category_id");
+    expect(own.error).toBeNull();
+    expect(own.data).toEqual([{ id: todoId, category_id: aCat.id }]);
+    const foreign = await a.from("todos").update({ category_id: bCat.id }).eq("id", todoId).select("id");
+    expect(foreign.error).not.toBeNull();
+    expect(foreign.error?.code).toBe("23503"); // 외래 키: (category_id, user_id)가 남의 분야를 가리킬 수 없다
     const again = await a.from("todos").select("category_id").eq("id", todoId);
-    expect(again.data).toEqual([{ category_id: null }]);
-    // 정상 대조: done은 여전히 바꿀 수 있다
+    expect(again.data).toEqual([{ category_id: aCat.id }]);
+    const unset = await a.from("todos").update({ category_id: null }).eq("id", todoId).select("id, category_id");
+    expect(unset.error).toBeNull();
+    expect(unset.data).toEqual([{ id: todoId, category_id: null }]);
+    // 정상 대조: done은 여전히 바꿀 수 있고, day는 여전히 못 바꾼다
     const done = await a.from("todos").update({ done: true }).eq("id", todoId).select("id, done");
     expect(done.error).toBeNull();
     expect(done.data).toEqual([{ id: todoId, done: true }]);
+    const day = await a.from("todos").update({ day: "2000-01-02" }).eq("id", todoId).select("id");
+    expect(day.error?.code).toBe("42501");
   });
 });
