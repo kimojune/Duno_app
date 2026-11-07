@@ -8,6 +8,7 @@ import { goalProgress } from "../lib/goals/validation";
 import type { CategoryMinutes } from "../lib/growth/logic";
 import { formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
+import { useOverlayWindow } from "../lib/use-overlay-window";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, TextButton } from "./ui";
 
@@ -88,6 +89,7 @@ export function GoalEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const online = useOnline();
   const [hours, setHours] = useState<Record<string, number>>(() =>
     Object.fromEntries((goal ?? []).flatMap((g) => (g.categoryId ? [[g.categoryId, Math.round(g.minutes / 60)]] : []))),
@@ -141,7 +143,7 @@ export function GoalEditor({
   }
 
   return (
-    <div className="detail" role="dialog" aria-modal="true" aria-labelledby="goal-title" onKeyDown={onKeyDown}>
+    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="goal-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
         <div className="detail-head">
           <h2 id="goal-title" className="detail-title" tabIndex={-1} ref={titleRef}>

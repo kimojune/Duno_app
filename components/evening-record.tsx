@@ -8,6 +8,7 @@ import type { EveningApi } from "../lib/evening-api";
 import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { addDays } from "../lib/week";
+import { useOverlayWindow } from "../lib/use-overlay-window";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -83,6 +84,7 @@ export function EveningRecord({
   /** 저장 직후 한 줄 아래에 얹는 것(상태보기의 「채울」 한 줄 등) */
   renderAfterSave?: (saved: SavedEvening, state: EveningState) => ReactNode;
 }) {
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const online = useOnline();
   const [offsetDays, setOffsetDays] = useState<0 | 1>(0);
   const [load, setLoad] = useState<{ status: "loading" } | { status: "error" } | { status: "ready"; state: EveningState }>({ status: "loading" });
@@ -225,7 +227,7 @@ export function EveningRecord({
     : "";
 
   return (
-    <div className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" onKeyDown={onKeyDown}>
+    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
         <div className="detail-head">
           <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>

@@ -6,6 +6,7 @@ import { NOTE_MAX_LENGTH_PUBLIC, countNoteChars } from "../lib/notes/public";
 import type { NoteItem } from "../lib/notes/types";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
+import { useOverlayWindow } from "../lib/use-overlay-window";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -75,6 +76,7 @@ function composing(event: KeyboardEvent): boolean {
 }
 
 export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDeleted, onMove }: TodoDetailProps) {
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const [text, setText] = useState(todo.text ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(todo.categoryId);
   const [busy, setBusy] = useState<"save" | "remove" | "move" | null>(null);
@@ -201,6 +203,7 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
 
   return (
     <div
+      ref={rootRef}
       className="detail"
       role="dialog"
       aria-modal="true"

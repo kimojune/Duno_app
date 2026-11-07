@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { GrowthApi } from "../lib/growth-api";
 import type { CategoryPageData } from "../lib/notes/types";
 import { describeTodoDay } from "../lib/todos/day";
+import { useOverlayWindow } from "../lib/use-overlay-window";
 import { Notice, SecondaryButton, TextButton } from "./ui";
 import { dayText } from "./todo-view";
 
@@ -43,6 +44,7 @@ export function CategoryPage({
   name: string;
   onClose: () => void;
 }) {
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const recordedRef = useRef(false);
@@ -82,7 +84,7 @@ export function CategoryPage({
   }
 
   return (
-    <div className="detail" role="dialog" aria-modal="true" aria-labelledby="category-page-title" onKeyDown={onKeyDown}>
+    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="category-page-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
         <div className="detail-head">
           <h2 id="category-page-title" className="detail-title" tabIndex={-1} ref={titleRef}>
