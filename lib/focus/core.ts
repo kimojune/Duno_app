@@ -45,6 +45,7 @@ function cleanClientTime(value: string | null | undefined): string | null {
 /**
  * 타이머 시작. 받는 것은 화면이 만든 id와 할 일·분야·제시 번호·어디서 켰나뿐이다(user_id·서버 시각·반대편 여부는 받지 않는다: 서버가 정한다).
  * - 같은 id로 다시 오면(재시도) 새 행을 만들지 않고 그 행으로 성공한다.
+ * - 이미 진행 중인 다른 타이머(끝내지 않았고 3시간 안)가 있으면 already_running(B3). 화면은 카드를 거두고 타이머 탭을 안내한다.
  * - 남의 분야·없는 분야면 not_found(DB 복합 외래 키가 거절).
  * - 반대편 여부 둘(이번 주 목표 기준·처음 정한 비율 기준)을 시작하는 순간의 이번 주 기록으로 계산해 함께 남긴다(D-110).
  */
@@ -76,6 +77,18 @@ export async function startFocusForUser(deps: FocusDeps, input: unknown): Promis
       goalItems: goal.data,
       totals: sumRange(logs.data, weekStart, weekDates(weekStart)[6]),
     });
+
+    // 이미 진행 중인 다른 타이머가 있으면 새로 켜지 않는다(B3). 같은 id의 재시도는 아래에서 그 행으로 성공한다.
+    const open = await deps.supabase
+      .from("focus_sessions")
+      .select(COLUMNS)
+      .eq("user_id", user.data)
+      .is("ended_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1);
+    if (open.error) return recordFail(mapRecordDbError(open.error));
+    const running = ((open.data ?? []) as Row[]).map(toSession)[0];
+    if (running && running.id !== v.id && isActive(running, now.getTime())) return recordFail("already_running");
 
     const { error } = await deps.supabase
       .from("focus_sessions")

@@ -11,7 +11,7 @@ import type { ManageApi } from "../lib/manage-api";
 import type { Outbox, OutboxItem } from "../lib/outbox";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
-import { describeTodoDay, todoDayFor } from "../lib/todos/day";
+import { describeTodoDay, msUntilNextDayStart, todoDayFor } from "../lib/todos/day";
 import type { AddedTodo, TodayTodos, TodoDay, TodoItem, TodoResult } from "../lib/todos/types";
 import { checkTodoText, countTodoChars } from "../lib/todos/validation";
 import { useAnnouncer } from "../lib/use-announcer";
@@ -73,14 +73,6 @@ function fromItem(item: TodoItem): LocalRow {
 
 function toEntry(item: CategoryItem): CategoryEntry {
   return { id: item.id, name: item.readable ? item.name : null };
-}
-
-/** 지금 시각 다음에 오는 서울 새벽 4시(= UTC 19:00)까지 남은 밀리초 */
-function msUntilNextDayStart(now: number): number {
-  const next = new Date(now);
-  next.setUTCHours(19, 0, 0, 0);
-  if (next.getTime() <= now) next.setUTCDate(next.getUTCDate() + 1);
-  return next.getTime() - now;
 }
 
 /** 임시, 결정 필요: 저장 요청이 이 시간 안에 답이 없으면 그 줄을 「저장하지 못했어요」로 바꾼다 */

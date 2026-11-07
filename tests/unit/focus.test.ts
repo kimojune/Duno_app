@@ -117,9 +117,31 @@ describe("startFocusForUser", () => {
     const store = setup();
     store.seed("evening_logs", { id: "e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1", user_id: ME, target_day: "2026-11-05", total_minutes: 100, items: [{ categoryId: C1, minutes: 100 }], save_mode: "edited", saved_at: "2026-11-05T14:00:00.000Z" });
     const a = await startFocusForUser(deps(store), { id: S1, categoryId: C1, surface: "manual" });
+    await endFocusForUser(deps(store), S1); // 진행 중인 타이머가 있으면 새로 켜지 않는다(B3): 앞의 것을 끝내고 켠다
     const b = await startFocusForUser(deps(store), { id: S2, categoryId: C2, surface: "manual" });
     expect(a.ok && a.data.session.oppositeByRatio).toBe(false);
     expect(b.ok && b.data.session.oppositeByRatio).toBe(true);
+  });
+  it("이미 진행 중인 타이머가 있으면 새로 켜지 않고 already_running(B3). 같은 id의 재시도는 그 행으로 성공, 끝낸 뒤나 3시간이 지나면 켤 수 있다", async () => {
+    const store = setup();
+    expect((await startFocusForUser(deps(store), { id: S1, categoryId: C1, surface: "manual" })).ok).toBe(true);
+    expect(await startFocusForUser(deps(store), { id: S2, categoryId: C2, surface: "card" })).toEqual({ ok: false, error: "already_running" });
+    expect(store.table("focus_sessions")).toHaveLength(1);
+    // 같은 id를 다시 보내는 것(재시도)은 막지 않는다
+    const retry = await startFocusForUser(deps(store), { id: S1, categoryId: C1, surface: "manual" });
+    expect(retry.ok && retry.data.session.id).toBe(S1);
+    // 3시간 넘게 끝내지 않은 것은 진행 중으로 보지 않는다
+    const later = await startFocusForUser(deps(store, ME, new Date(NOW.getTime() + 4 * 3600_000)), { id: S2, surface: "manual" });
+    expect(later.ok).toBe(true);
+    // 끝낸 뒤에는 켤 수 있다
+    await endFocusForUser(deps(store, ME, new Date(NOW.getTime() + 4 * 3600_000 + 60_000)), S2);
+    const S3 = "53535353-5353-4353-8353-535353535353";
+    expect((await startFocusForUser(deps(store, ME, new Date(NOW.getTime() + 4 * 3600_000 + 120_000)), { id: S3, surface: "manual" })).ok).toBe(true);
+  });
+  it("남의 진행 중 타이머는 내 시작을 막지 않는다(B3)", async () => {
+    const store = setup();
+    store.seed("focus_sessions", { id: S2, user_id: OTHER, started_at: NOW.toISOString(), day: "2026-11-07", planned_minutes: 30, surface: "manual", ended_at: null, elapsed_seconds: null });
+    expect((await startFocusForUser(deps(store), { id: S1, surface: "manual" })).ok).toBe(true);
   });
   it("분야 없이(기타) 켜도 남는다. 반대편은 아니다", async () => {
     const store = setup();

@@ -24,6 +24,14 @@ export function todoDayFor(now: Date): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/** 지금 시각 다음에 오는 서울 새벽 4시(= UTC 19:00)까지 남은 밀리초 */
+export function msUntilNextDayStart(now: number): number {
+  const next = new Date(now);
+  next.setUTCHours(19, 0, 0, 0);
+  if (next.getTime() <= now) next.setUTCDate(next.getUTCDate() + 1);
+  return next.getTime() - now;
+}
+
 /** 'YYYY-MM-DD'를 화면 날짜 글의 재료로 나눈다. 요일은 시간대와 상관없이 달력 날짜로 센다. */
 export function describeTodoDay(date: string): TodoDay {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);

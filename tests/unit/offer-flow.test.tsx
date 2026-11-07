@@ -71,12 +71,16 @@ async function mount(apis: { offers: OffersApi; focus: FocusApi }) {
 const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
 
 beforeEach(() => {
+  // 카드의 날짜가 오늘인지 보므로(A13) 시계는 시험의 하루(서울 2026-11-07 12:00)로 고정한다. 타이머(setTimeout)는 건드리지 않는다
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-07T03:00:00.000Z"));
   vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(true);
   Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
@@ -158,6 +162,75 @@ describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
     await mount({ offers: offersApi(), focus: focusApi() });
     const card = screen.getByRole("region", { name: "오늘 먼저 할 일" });
     expect(card.textContent).not.toMatch(/밀렸|부족|꼭|빨리|지금 바로|해야/);
+  });
+});
+
+describe("카드 다시 받기·타이머가 돌 때 (A13·B3)", () => {
+  const visible = () => act(async () => void document.dispatchEvent(new Event("visibilitychange")));
+
+  it("화면이 다시 보일 때 카드 제시를 다시 받고, 이미 넘긴 것으로 바뀌었으면 카드를 거둔다", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, data: { offer: offer() } })
+      .mockResolvedValue({ ok: true, data: { offer: offer({ state: "dismissed" }) } });
+    await mount({ offers: { request, dismiss: vi.fn() } as unknown as OffersApi, focus: focusApi() });
+    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" })).toBeTruthy();
+    await visible();
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
+  });
+
+  it("다시 받은 제시의 날짜가 오늘이 아니면 카드가 나오지 않는다. 새벽 4시를 넘기면 새 하루의 카드를 받는다", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date("2026-11-07T18:59:00.000Z")); // 서울 11-08 03:59 → 두노 하루는 11-07
+    const request = vi.fn(async () => ({ ok: true as const, data: { offer: offer() } }));
+    await mount({ offers: { request, dismiss: vi.fn() } as unknown as OffersApi, focus: focusApi() });
+    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" })).toBeTruthy();
+    // 4시를 넘기면(1분 + 1초) 다시 받는다. 서버가 새 하루(11-08)의 제시를 주면 그것으로 바뀐다
+    request.mockResolvedValue({ ok: true, data: { offer: offer({ day: "2026-11-08", categoryName: "포트폴리오" }) } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" }).textContent).toContain("포트폴리오");
+    // 날짜가 오늘이 아닌 제시(옛 하루)는 보이지 않는다
+    request.mockResolvedValue({ ok: true, data: { offer: offer({ day: "2026-11-07" }) } });
+    await visible();
+    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
+  });
+
+  it("서버가 이미 진행 중이라고 답하면 「시작하지 못했어요」 대신 타이머 탭 안내가 보이고 시작 단추가 없다", async () => {
+    const start = vi.fn(async () => ({ ok: false as const, error: "already_running" as const }));
+    await mount({ offers: offersApi(), focus: focusApi({ start }) });
+    await press("30분 시작");
+    const card = screen.getByRole("region", { name: "오늘 먼저 할 일" });
+    expect(within(card).getByText("타이머가 돌고 있어요. 타이머 탭에서 볼 수 있어요.")).toBeTruthy();
+    expect(screen.queryByText("시작하지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "30분 시작" })).toBeNull();
+    await press("타이머 탭 열기");
+    expect(screen.getByRole("button", { name: "타이머" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("타이머 탭이 도는 타이머를 알려 주면 카드는 안내로 바뀌고, 끝내면 시작 단추가 돌아온다", async () => {
+    const running = session({ startedAt: new Date().toISOString() });
+    let active: FocusSession | null = running;
+    const focus = focusApi({
+      fetchState: vi.fn(async () => ({ ok: true as const, data: { serverNow: new Date().toISOString(), active, today: active ? [active] : [] } })),
+      end: vi.fn(async () => {
+        active = null;
+        return { ok: true as const, data: { session: { ...running, endedAt: new Date().toISOString(), elapsedSeconds: 10 } } };
+      }),
+    });
+    await mount({ offers: offersApi(), focus });
+    await press("타이머");
+    await press("할 일");
+    expect(within(screen.getByRole("region", { name: "오늘 먼저 할 일" })).getByText("타이머가 돌고 있어요. 타이머 탭에서 볼 수 있어요.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "30분 시작" })).toBeNull();
+    await press("타이머");
+    await press("끝내기");
+    await press("할 일");
+    expect(screen.getByRole("button", { name: "30분 시작" })).toBeTruthy();
   });
 });
 

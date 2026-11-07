@@ -12,6 +12,7 @@ import { defaultOffersApi, type OffersApi } from "../lib/offers-api";
 import { createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
+import { msUntilNextDayStart, todoDayFor } from "../lib/todos/day";
 import { defaultPushApi, type PushApi } from "../lib/push/subscribe";
 import { fetchToday } from "../lib/read-client";
 import type { SettingsData } from "../lib/settings/types";
@@ -147,6 +148,8 @@ function MainShell({
   const [cardOffer, setCardOffer] = useState<Offer | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
   const [cardError, setCardError] = useState<"failed" | "offline" | null>(null);
+  // 타이머가 돌고 있는가(B3). 타이머 탭이 알려 준다. 앱을 연 직후에는 모르다가 시작 단추를 눌렀을 때 서버가 「이미 진행 중」으로 알려 준다
+  const [timerRunning, setTimerRunning] = useState(false);
   // 타이머 탭의 추천(⑤): 탭을 열 때마다 건네받는다(같은 제시는 서버가 한 번만 센다)
   const [timerOffer, setTimerOffer] = useState<Offer | null>(null);
   // 이번 주 목표(⑥): 한 줄은 저녁 기록·목표를 저장한 뒤 다시 읽는다
@@ -154,16 +157,47 @@ function MainShell({
   const [goalEditor, setGoalEditor] = useState<GoalSummary | null>(null);
   const cardStartRef = useRef<string | null>(null);
 
-  // 처음 열 때 카드 제시를 받는다(서버에서 가져오는 일). 상태는 응답을 받은 뒤에만 바꾼다.
+  // 카드 제시를 받는다(서버에서 가져오는 일). 앱을 열 때, 화면이 다시 보일 때, 새벽 4시를 넘길 때마다 다시 받는다(A13).
+  // 같은 제시는 서버가 한 번만 센다. 받은 제시가 반응 없는(new) 오늘 것이 아니면 카드를 거둔다. 못 받았으면 지금 카드를 그대로 둔다.
   useEffect(() => {
     let alive = true;
-    void apis.offers.request("card").then((res) => {
-      if (alive && res.ok && res.data.offer && res.data.offer.state === "new") setCardOffer(res.data.offer);
-    });
+    function refresh() {
+      void apis.offers.request("card").then((res) => {
+        if (!alive || !res.ok) return;
+        const offer = res.data.offer;
+        setCardOffer(offer && offer.state === "new" && offer.day === todoDayFor(new Date()) ? offer : null);
+      });
+    }
+    refresh();
+    function onVisible() {
+      if (document.visibilityState === "visible") refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    // 켜 둔 채 새벽 4시를 넘기면 새 하루의 카드를 받는다(다음 새벽 4시마다 다시 걸어 둔다)
+    let timer: ReturnType<typeof setTimeout>;
+    function arm() {
+      timer = setTimeout(() => {
+        refresh();
+        arm();
+      }, msUntilNextDayStart(Date.now()) + 1000);
+    }
+    arm();
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
+      clearTimeout(timer);
     };
   }, [apis]);
+
+  // 카드의 날짜가 오늘이 아니면(앱을 켜 둔 채 하루가 바뀐 경우 등) 거둔다. 렌더가 아니라 화면이 다시 보일 때 확인한다
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      setCardOffer((prev) => (prev && prev.day !== todoDayFor(new Date()) ? null : prev));
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   // 타이머 탭을 열 때마다 앱의 추천을 받는다
   useEffect(() => {
@@ -212,7 +246,12 @@ function MainShell({
     if (res.ok) {
       cardStartRef.current = null;
       setCardOffer(null);
+      setTimerRunning(true);
       openTab("timer");
+    } else if (res.error === "already_running") {
+      // 이미 돌고 있는 타이머가 있다: 「시작하지 못했어요」를 반복하지 않고 타이머 탭을 안내한다
+      cardStartRef.current = null;
+      setTimerRunning(true);
     } else {
       setCardError("failed");
     }
@@ -264,7 +303,17 @@ function MainShell({
                 </Notice>
               )}
               <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
-              {cardOffer && <OfferCard offer={cardOffer} busy={cardBusy} error={cardError} onStart={() => void startFromCard()} onDismiss={() => void dismissCard()} />}
+              {cardOffer && (
+                <OfferCard
+                  offer={cardOffer}
+                  busy={cardBusy}
+                  error={cardError}
+                  running={timerRunning}
+                  onOpenTimer={() => openTab("timer")}
+                  onStart={() => void startFromCard()}
+                  onDismiss={() => void dismissCard()}
+                />
+              )}
               <EveningEntry evening={isEvening(new Date())} onOpen={() => setEveningOpen(true)} />
             </>
           }
@@ -277,7 +326,7 @@ function MainShell({
           active={tab === "timer"}
           activation={timerActivation}
           recommended={recommended}
-          onActiveChange={() => {}}
+          onActiveChange={(session) => setTimerRunning(session !== null)}
         />
       </div>
       <div hidden={tab !== "me"}>

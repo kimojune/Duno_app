@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clearWeeklyGoalForUser, readWeeklyGoalItems, saveWeeklyGoalForUser } from "../../lib/goals/core";
 import { checkGoalItems, goalProgress } from "../../lib/goals/validation";
-import { startFocusForUser } from "../../lib/focus/core";
+import { endFocusForUser, startFocusForUser } from "../../lib/focus/core";
 import { readGrowthForUser } from "../../lib/growth/core";
 import { requestOfferForUser } from "../../lib/offers/core";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
@@ -124,9 +124,11 @@ describe("이번 주 목표가 다른 기능에 닿는다", () => {
     const S2 = "52525252-5252-4252-8252-525252525252";
     const none = await startFocusForUser(deps(store), { id: S1, categoryId: C2, surface: "manual" });
     expect(none.ok && none.data.session.oppositeByGoal).toBeNull();
+    await endFocusForUser(deps(store), S1); // 진행 중인 타이머가 있으면 새로 켜지 않는다(B3): 앞의 것을 끝내고 켠다
     await saveWeeklyGoalForUser(deps(store), [{ categoryId: C2, minutes: 120 }]);
     const inGoal = await startFocusForUser(deps(store), { id: S2, categoryId: C2, surface: "manual" });
     expect(inGoal.ok && inGoal.data.session).toMatchObject({ oppositeByGoal: true, oppositeByRatio: true });
+    await endFocusForUser(deps(store), S2);
     const outside = await startFocusForUser(deps(store), { id: "53535353-5353-4353-8353-535353535353", categoryId: C1, surface: "manual" });
     expect(outside.ok && outside.data.session).toMatchObject({ oppositeByGoal: false, oppositeByRatio: true });
   });

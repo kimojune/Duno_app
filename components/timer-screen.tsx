@@ -35,6 +35,7 @@ export const TIMER_TEXT = {
   started: (m: number) => `${m}분 타이머를 시작했어요`,
   over: (m: number) => `${m}분이 지났어요`,
   startFailed: "시작하지 못했어요. 다시 눌러 주세요.",
+  alreadyRunning: "이미 타이머가 돌고 있어요.",
   endFailed: "끝내지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 시작할 수 있어요.",
   todosFailed: "오늘 할 일을 불러오지 못했어요. 할 일 없이 시작할 수 있어요.",
@@ -186,6 +187,11 @@ export function TimerScreen({
       setMessage(TIMER_TEXT.started(current.session.plannedMinutes));
       onActiveChange?.(current.session);
       startKeyRef.current = null;
+    } else if (res.error === "already_running") {
+      // 다른 화면에서 이미 켠 타이머가 있다(B3): 시작을 반복하게 두지 않고 도는 타이머를 불러와 보여 준다
+      startKeyRef.current = null;
+      setMessage(TIMER_TEXT.alreadyRunning);
+      reload();
     } else {
       setMessage(TIMER_TEXT.startFailed);
     }

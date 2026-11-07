@@ -18,6 +18,8 @@ export const OFFER_TEXT = {
   skip: "넘기기",
   failed: "시작하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 시작할 수 있어요.",
+  running: "타이머가 돌고 있어요. 타이머 탭에서 볼 수 있어요.",
+  openTimer: "타이머 탭 열기",
 } as const;
 
 export function OfferCard({
@@ -26,14 +28,33 @@ export function OfferCard({
   error,
   onStart,
   onDismiss,
+  running = false,
+  onOpenTimer,
 }: {
   offer: Offer;
   busy: boolean;
   error: "failed" | "offline" | null;
   onStart: () => void;
   onDismiss: () => void;
+  /** 타이머가 이미 돌고 있다(B3): 시작 단추 대신 안내와 타이머 탭 열기를 둔다 */
+  running?: boolean;
+  onOpenTimer?: () => void;
 }) {
   const minutes = APP_CONFIG.timerMinutes;
+  if (running) {
+    return (
+      <section className="entry-card" aria-label="오늘 먼저 할 일">
+        <p className="entry-title">{OFFER_TEXT.title(offer.categoryName)}</p>
+        <p className="offer-text">{offer.todoText ?? `${offer.categoryName} ${minutes}분`}</p>
+        <p className="todo-sub" role="status">
+          {OFFER_TEXT.running}
+        </p>
+        <div className="detail-actions">
+          <PrimaryButton onClick={onOpenTimer}>{OFFER_TEXT.openTimer}</PrimaryButton>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="entry-card" aria-label="오늘 먼저 할 일">
       <p className="entry-title">{OFFER_TEXT.title(offer.categoryName)}</p>

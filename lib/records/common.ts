@@ -11,6 +11,7 @@ export type RecordErrorCode =
   | "not_found" // 대상이 없거나 내 것이 아님
   | "conflict" // 같은 id가 남의 행과 겹침
   | "limit" // 개수 상한(DB 트리거)
+  | "already_running" // 타이머: 이미 진행 중인 타이머가 있어 새로 시작하지 않음(B3)
   | "config" // 서버 설정 오류(암호화 키 없음, Supabase 주소·키 없음)
   | "unavailable"; // 일시 오류
 
