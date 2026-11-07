@@ -5,8 +5,7 @@ import fs from "node:fs";
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
  * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「저녁 기록 남기기」(B17), 새 전체 화면 창 넷(B6·B7).
  * 파일 이름: v2-<상태>-<크기>.png. 글자 200%는 screens.spec.ts와 같은 방법으로 흉내 낸다(토큰의 px를 두 배로).
- * 이 파일은 작성만 했다: 이번 바퀴에서는 Playwright를 돌리지 않았다(창구가 다음에 돌린다). 처음 돌릴 때 단언이 실제와 어긋나면
- * 사진을 먼저 보고 단언이 틀린 것인지 화면이 틀린 것인지 가린다.
+ * 고침 1바퀴에서는 작성만 했고, 고침 2바퀴에서 돌려 실패를 가렸다(docs/oneshot-v2/보고.md 「고침 2바퀴」).
  */
 
 const OUT = "test-results/screens";
@@ -97,9 +96,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
 }
 
 // ---- 새 전체 화면 창 넷 (B6·B7) ----
-const WINDOWS: { id: string; title: string }[] = [
+// title = 창 맨 위 제목(h2, 창의 이름). 저녁 기록 창의 h2는 질문이고 「저녁 기록」은 그 밑 작은 글이다(eyebrow).
+const WINDOWS: { id: string; title: string; eyebrow?: string }[] = [
   { id: "goal", title: "이번 주 목표" },
-  { id: "evening", title: "저녁 기록" },
+  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "저녁 기록" },
   { id: "category", title: "어학" },
   { id: "detail", title: "할 일 자세히" },
 ];
@@ -114,6 +114,8 @@ for (const w of WINDOWS) {
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
       await expect(page.getByRole("heading", { name: w.title, level: 2 }).first()).toBeVisible();
+      await expect(page.getByRole("dialog", { name: w.title })).toBeVisible();
+      if (w.eyebrow) await expect(dialog.getByText(w.eyebrow, { exact: true })).toBeVisible();
       await shot(page, `${w.id}-window-${size}`);
 
       // B7: 창 밖(본문·탭 줄)은 inert
