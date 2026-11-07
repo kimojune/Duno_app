@@ -460,7 +460,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 }
 .tabbar-btn[aria-current="page"] { color: var(--color-primary); border-top-color: var(--color-primary); font-weight: 700; }
 .tabbar-btn:active { background: var(--color-notice-bg); }
-.growth { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
+.growth, .me { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
 .growth-body { padding: 0 var(--page-x); }
 .growth-sub-title { margin: var(--space-6) 0 var(--space-1); font: var(--font-body); font-weight: 700; }
 .growth-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
