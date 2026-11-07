@@ -229,9 +229,11 @@ describe("서버와 맞추기: 되돌림·받기", () => {
 describe("로그아웃·로그인 풀림", () => {
   it("보낼 줄이 없으면 먼저 보내 보고 기기 저장소를 지운 뒤 바로 로그아웃한다", async () => {
     await mount();
+    document.cookie = "duno-device=" + USER + "; path=/";
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(await kvRef.keys("base/")).toEqual([]);
+    expect(document.cookie).not.toContain("duno-device"); // 이 기기에 거울이 없어졌다는 표시도 지운다
   });
   it("못 보낸 쓰기가 있으면 「보내지 못한 기록이 있어요」를 알리고, 취소하면 그대로, 로그아웃을 고르면 기기 저장소를 지우고 로그아웃한다", async () => {
     await mount();

@@ -258,3 +258,19 @@ describe("분야 페이지", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2); // 뒤에서 새로 받아 둔다
   });
 });
+
+describe("먼저 할 일 카드: 저녁에는 낮에 받은 제시를 먼저 보이지 않는다", () => {
+  it("서울 저녁(오후 6시~새벽 4시 전)에는 기기에 둔 카드를 건너뛰고 서버 답(건네지 않음)을 기다린다", async () => {
+    const evening = Date.parse("2026-11-07T10:00:00.000Z"); // 서울 19:00
+    const mirror: Mirror = { ...emptyMirror(), synced: true };
+    const kv = createMemoryKv();
+    await kv.set(kvKeys.base(USER), mirror);
+    const runtime = createRuntime({ userKey: USER, kv, send: async () => ({ ok: true }), fetchSnapshot: async () => ({ ok: false, error: "unavailable" }), now: () => evening, online: () => false });
+    await runtime.boot();
+    runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: { id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: null, todoText: null, state: "new" } } }));
+    requestOffer.mockResolvedValue({ ok: true, data: { offer: null, reason: "evening" } });
+    const res = await createLocalApis(runtime).offers.request("card");
+    expect(res).toEqual({ ok: true, data: { offer: null, reason: "evening" } });
+    expect(runtime.getMirror().offers.card).toBeNull();
+  });
+});

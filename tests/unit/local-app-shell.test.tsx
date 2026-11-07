@@ -145,3 +145,31 @@ describe("LocalAppShell", () => {
     await waitFor(() => expect(kvHolder.sent).toEqual([{ key: expect.any(String), attempts: 0, op: { kind: "todo.add", id: "22222222-2222-4222-8222-222222222222", text: "옛 보관함 글", categoryId: null }, clientAt: "2026-11-07T05:00:00.000Z" }]));
   });
 });
+
+describe("LocalAppShell: 이 기기에서 처음 여는 사용자에게 서버가 실어 보낸 사본 (고침 3바퀴)", () => {
+  const snapshot = () => ({ serverNow: "2026-11-07T06:00:00.000Z", todos: [todo(T1, "서버가 실어 보낸 글")], categories: mirror().categories, settings: mirror().settings, logs: [], goal: null, sessions: [] });
+  const clearCookie = () => {
+    document.cookie = "duno-device=; path=/; max-age=0";
+  };
+  beforeEach(clearCookie);
+  afterEach(clearCookie);
+
+  it("서버 사본이 실려 오면 서버에 다시 받으러 가지 않고 바로 그리며, 이 기기에 거울이 있다고 표시한다", async () => {
+    pullGate.reply = () => new Promise(() => {}); // GET /mirror가 응답하지 않아도
+    // 이 시험의 저장소는 기기 저장소가 아니라 메모리라 표시를 하지 않는다 → 저장소가 남는 경우를 따로 본다(아래)
+    render(<LocalAppShell userKey={USER} initialSnapshot={snapshot()} />);
+    expect(await screen.findByText("서버가 실어 보낸 글")).toBeTruthy();
+  });
+  it("기기 저장소가 남는 환경이면 표시 쿠키(사용자 번호)를 둔다. 서버 사본이 없던 사용자는 받은 뒤에 둔다", async () => {
+    kvHolder.kv = { ...createMemoryKv(), persistent: true }; // 기기에 남는 저장소인 척한다(메모리 저장소의 메서드는 자기 안에 상태를 가져 복사해도 된다)
+    render(<LocalAppShell userKey={USER} initialSnapshot={snapshot()} />);
+    await screen.findByText("서버가 실어 보낸 글");
+    expect(document.cookie).toContain(`duno-device=${USER}`);
+  });
+  it("기기에 이미 거울이 있으면 실려 온 사본으로 덮지 않는다(기기 것이 더 새것일 수 있다)", async () => {
+    await kvHolder.kv!.set(kvKeys.base(USER), mirror({ todos: [todo(T1, "기기에 있던 글")] }));
+    render(<LocalAppShell userKey={USER} initialSnapshot={snapshot()} />);
+    expect(await screen.findByText("기기에 있던 글")).toBeTruthy();
+    expect(screen.queryByText("서버가 실어 보낸 글")).toBeNull();
+  });
+});

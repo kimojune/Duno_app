@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { HomeRead } from "../lib/home-types";
 import { readTodayFromMirror, createLocalApis } from "../lib/local/apis";
 import { createBrowserRuntime, migrateLegacyOutbox, startBrowserSync } from "../lib/local/browser";
+import { markDeviceHint } from "../lib/local/device-hint";
+import type { MirrorSnapshot } from "../lib/local/types";
 import { AppShell, type LocalBundle } from "./app-shell";
 
 /**
@@ -24,7 +26,16 @@ function homeFromMirror(bundle: LocalBundle): HomeRead {
   };
 }
 
-export function LocalAppShell({ userKey, initialOpen = null }: { userKey: string; initialOpen?: "evening" | null }) {
+export function LocalAppShell({
+  userKey,
+  initialOpen = null,
+  initialSnapshot = null,
+}: {
+  userKey: string;
+  initialOpen?: "evening" | null;
+  /** 이 기기에서 처음 여는 사용자에게만 서버가 첫 화면과 함께 싣는 서버 사본(그 밖에는 null: HTML에 개인 데이터가 없다) */
+  initialSnapshot?: MirrorSnapshot | null;
+}) {
   const [bundle, setBundle] = useState<LocalBundle | null>(null);
   const [, setVersion] = useState(0);
 
@@ -35,9 +46,12 @@ export function LocalAppShell({ userKey, initialOpen = null }: { userKey: string
     const apis = createLocalApis(runtime);
     void (async () => {
       await runtime.boot();
-      await runtime.wipeOthers();
       migrateLegacyOutbox(runtime, userKey);
       if (!alive) return;
+      // 다른 사용자의 기기 저장소 지우기는 첫 화면을 기다리게 하지 않는다(우리는 내 열쇠만 읽는다)
+      void runtime.wipeOthers();
+      // 이 기기에서 처음이고 서버가 사본을 실어 보냈으면 그것으로 시작한다(JS를 받은 뒤 서버에 다시 사본을 받으러 가는 왕복이 없다)
+      if (!runtime.getMirror().synced && initialSnapshot) runtime.applySnapshot(initialSnapshot);
       stopSync = startBrowserSync(runtime);
       if (!runtime.getMirror().synced && runtime.isOnline()) {
         // 이 기기에서 처음: 서버 사본이 오기 전에는 비어 있는 것인지 아직 모르는 것인지 알 수 없다
@@ -45,6 +59,8 @@ export function LocalAppShell({ userKey, initialOpen = null }: { userKey: string
         await Promise.race([runtime.pull(), new Promise((resolve) => (timer = setTimeout(resolve, FIRST_PULL_WAIT_MS)))]);
         clearTimeout(timer);
       }
+      // 이 기기에 거울이 생겼다고 표시한다(다음에 열 때 서버는 개인 데이터를 HTML에 싣지 않는다). 저장소를 못 쓰면(메모리) 표시하지 않는다
+      if (runtime.getMirror().synced && runtime.isPersistent()) markDeviceHint(userKey);
       if (alive) setBundle({ runtime, apis });
     })();
     return () => {
@@ -53,6 +69,7 @@ export function LocalAppShell({ userKey, initialOpen = null }: { userKey: string
       void runtime.persistNow();
       runtime.stop();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userKey]);
 
   // 서버에서 받아 맞춘 것(다른 기기에서 처음 설정을 마친 경우 등)이 입구 판단에도 닿게 거울이 바뀔 때 다시 그린다

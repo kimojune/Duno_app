@@ -1,6 +1,7 @@
 import type { AddCategoryResult } from "../categories/types";
 import type { TodayRead } from "../today-types";
 import { readTodayFromMirror, type LocalApis } from "./apis";
+import { clearDeviceHint } from "./device-hint";
 import type { Runtime } from "./runtime";
 
 /**
@@ -54,6 +55,9 @@ export function createLocalTodos(runtime: Runtime, apis: LocalApis): LocalTodos 
       clearTimeout(timer);
       return runtime.pendingCount();
     },
-    discard: () => runtime.wipe(),
+    discard: () => {
+      clearDeviceHint(); // 이 기기에 거울이 없어졌다: 다음에 열 때 서버가 사본을 한 번 실어 보낸다
+      return runtime.wipe();
+    },
   };
 }

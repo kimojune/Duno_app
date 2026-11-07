@@ -1,10 +1,14 @@
+import { cookies } from "next/headers";
 import { LoginButton, LoginLayout } from "../components/login-button";
 import { AppShell } from "../components/app-shell";
 import { LocalAppShell } from "../components/local-app-shell";
 import { getPublicEnv } from "../lib/env";
 import { noticeFromErrorParam } from "../lib/login-text";
 import { createClient } from "../lib/supabase/server";
+import { getDeps } from "../lib/deps";
 import { readHome } from "../lib/home-dal";
+import { DEVICE_HINT_COOKIE } from "../lib/local/device-hint";
+import { readMirrorForUser } from "../lib/mirror/core";
 import type { HomeRead } from "../lib/home-types";
 
 // 로그인 상태를 보여 주므로 정적 캐시하지 않고 요청 때마다 그린다.
@@ -39,7 +43,21 @@ export default async function Home({
         }
         return <AppShell home={home} initialOpen={initialOpen} userKey={data.claims.sub} />;
       }
-      return <LocalAppShell userKey={data.claims.sub} initialOpen={initialOpen} />;
+      // 단, 이 기기에서 처음 여는 사용자(로그인 직후 포함: 기기 표시 쿠키가 없다)에게는 서버 사본을 첫 화면과 함께 실어 보낸다. 그래야
+      // JS를 받은 뒤 서버에 사본을 다시 받으러 가는 왕복 없이 목록이 보인다. 다시 여는 기기에는 싣지 않는다(기기 저장소에서 바로 그린다).
+      const sub = data.claims.sub;
+      const knownDevice = (await cookies()).get(DEVICE_HINT_COOKIE)?.value === sub;
+      let initialSnapshot = null;
+      if (!knownDevice) {
+        try {
+          const deps = await getDeps();
+          const mirror = deps ? await readMirrorForUser(deps) : null;
+          if (mirror?.ok) initialSnapshot = mirror.data;
+        } catch {
+          // 사본을 못 읽어도 화면이 GET /mirror로 받는다
+        }
+      }
+      return <LocalAppShell userKey={sub} initialOpen={initialOpen} initialSnapshot={initialSnapshot} />;
     }
   }
 

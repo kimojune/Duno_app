@@ -525,3 +525,33 @@ describe("runtime: 사용자별 저장소와 로그아웃", () => {
     expect(result.sent).toBe(1); // 적지 못한 줄은 다른 탭이 보낸 것으로 오해하지 않고 보낸다
   });
 });
+
+describe("runtime: 로그아웃 뒤에는 기기 저장소에 다시 적지 않는다", () => {
+  it("wipe 뒤에 닫히며 거울을 적으려 해도(persistNow) 지운 것이 되살아나지 않는다", async () => {
+    const h = harness();
+    await h.runtime.boot();
+    h.runtime.enqueue({ kind: "todo.add", id: T1, text: "a" });
+    await h.runtime.wipe();
+    await h.runtime.persistNow();
+    h.runtime.enqueue({ kind: "todo.add", id: T2, text: "지운 뒤" });
+    await settle();
+    expect(await h.kv.keys("base/")).toEqual([]);
+    expect(await h.kv.keys("op/")).toEqual([]);
+  });
+});
+
+describe("runtime: 서버가 첫 화면과 함께 실어 보낸 사본(applySnapshot)", () => {
+  it("네트워크 없이 서버 사본을 거울에 합치고, 보낼 줄의 쓰기는 다시 입힌다", async () => {
+    const h = harness({ fetchSnapshot: async () => ({ ok: false, error: "unavailable" }) }, emptyMirror());
+    await h.runtime.boot();
+    h.setOnline(false);
+    h.runtime.enqueue({ kind: "todo.add", id: T2, text: "기기에서 적음" });
+    h.runtime.applySnapshot(snapshot({ todos: [todo(T1, "서버 글")], categories: [{ id: C1, readable: true, name: "어학", createdAt: "x" }] }));
+    expect(h.runtime.getMirror().synced).toBe(true);
+    expect(h.runtime.getMirror().todos.map((t) => t.id).sort()).toEqual([T1, T2]);
+    expect(h.runtime.getMirror().categories).toHaveLength(1);
+    await h.runtime.persistNow();
+    const saved = await h.kv.get<Mirror>(kvKeys.base(USER));
+    expect(saved?.synced).toBe(true);
+  });
+});

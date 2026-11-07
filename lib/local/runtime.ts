@@ -77,6 +77,8 @@ export function createRuntime(deps: RuntimeDeps) {
   let retryCount = 0;
   let persistHandle: unknown = null;
   let stopped = false;
+  /** wipe로 이 사용자의 기기 저장소를 지웠다: 그 뒤로는 아무것도 다시 적지 않는다(닫히며 거울을 적는 것이 지운 것을 되살리지 않게) */
+  let wiped = false;
   let authLost = false;
   /** 마지막으로 서버가 거절해 되돌린 것들(화면이 알림을 보이고 닫을 때까지 쌓인다) */
   let rejections: Rejection[] = [];
@@ -93,7 +95,7 @@ export function createRuntime(deps: RuntimeDeps) {
     }
   }
   function persistBaseSoon() {
-    if (persistHandle !== null) return;
+    if (wiped || persistHandle !== null) return;
     persistHandle = setTimer(() => {
       persistHandle = null;
       void persistBaseNow();
@@ -104,6 +106,7 @@ export function createRuntime(deps: RuntimeDeps) {
       clearTimer(persistHandle);
       persistHandle = null;
     }
+    if (wiped) return;
     await safe(() => kv.set(kvKeys.base(userKey), base));
   }
 
@@ -129,12 +132,12 @@ export function createRuntime(deps: RuntimeDeps) {
   /** 기기 저장소에서 서버 거울(base)과 보낼 줄을 읽어 화면이 볼 값을 만든다. 네트워크를 쓰지 않는다 */
   async function boot(): Promise<void> {
     if (booted) return;
-    const saved = await safe(() => kv.get<Mirror>(kvKeys.base(userKey)));
+    // 거울과 보낼 줄 열쇠를 함께 읽는다(첫 화면이 기기 저장소를 몇 번 거치느냐가 곧 첫 화면이 그려지는 때다)
+    const [saved, savedKeys] = await Promise.all([safe(() => kv.get<Mirror>(kvKeys.base(userKey))), safe(() => kv.keys(kvKeys.opPrefix(userKey)))]);
     if (saved && typeof saved === "object" && Array.isArray((saved as Mirror).todos)) base = { ...emptyMirror(), ...saved };
-    const keys = (await safe(() => kv.keys(kvKeys.opPrefix(userKey)))) ?? [];
+    const keys = savedKeys ?? [];
     const loaded: QueuedOp[] = [];
-    for (const k of keys) {
-      const q = await safe(() => kv.get<QueuedOp>(k));
+    for (const q of await Promise.all(keys.map((k) => safe(() => kv.get<QueuedOp>(k))))) {
       if (q && typeof q === "object" && typeof q.key === "string" && q.op) loaded.push(q);
     }
     loaded.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
@@ -169,6 +172,7 @@ export function createRuntime(deps: RuntimeDeps) {
   /** 줄의 한 칸을 기기 저장소에 적는다. 적기가 끝났고 성공했는지는 보내기 전에 확인한다 */
   const opWrites = new Map<string, Promise<boolean>>();
   function persistOp(q: QueuedOp) {
+    if (wiped) return;
     opWrites.set(
       q.key,
       kv.set(kvKeys.op(userKey, q.key), q).then(
@@ -328,6 +332,18 @@ export function createRuntime(deps: RuntimeDeps) {
     return pulling;
   }
 
+  /**
+   * 서버가 첫 화면과 함께 실어 보낸 사본을 받는다(이 기기에서 처음 열 때, 고침 3바퀴). 네트워크를 쓰지 않는다. 받아 맞추기(pull)와 같은 규칙이다.
+   * 이미 서버 사본을 받은 기기에서는 부르지 않는다(기기에 있는 것이 더 새것일 수 있다).
+   */
+  function applySnapshot(snapshot: MirrorSnapshot): void {
+    base = mergeSnapshot(base, snapshot);
+    rebuildView();
+    persistBaseSoon();
+    emit();
+    emitState();
+  }
+
   // ---- 화면이 쓰는 것 ----
   function subscribe(listener: Listener): () => void {
     listeners.add(listener);
@@ -358,6 +374,7 @@ export function createRuntime(deps: RuntimeDeps) {
 
   async function wipe(): Promise<void> {
     stopped = true;
+    wiped = true;
     if (retryHandle !== null) clearTimer(retryHandle);
     if (persistHandle !== null) clearTimer(persistHandle);
     queue = [];
@@ -370,6 +387,7 @@ export function createRuntime(deps: RuntimeDeps) {
 
   return {
     boot,
+    applySnapshot,
     enqueue,
     /** 이미 쓰기를 거절당해 쌓인 알림을 비우지 않고 보기만 한다 */
     peekRejections: (): Rejection[] => rejections,
