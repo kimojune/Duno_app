@@ -301,7 +301,7 @@ export function v2Rules(): Record<string, TableRule> {
       primaryKey: ["user_id", "week_start"],
       allowDelete: true,
       insertColumns: ["user_id", "week_start", "items"],
-      updateColumns: ["items"],
+      updateColumns: ["user_id", "week_start", "items"],
     },
     todo_offers: {
       insertColumns: ["id", "user_id", "day", "surface", "category_id", "todo_id", "offer_key"],
@@ -347,6 +347,7 @@ export function v2Rules(): Record<string, TableRule> {
         "notify_morning_minute",
       ],
       updateColumns: [
+        "user_id",
         "goal_encrypted",
         "onboarding_done_at",
         "notify_evening_enabled",
@@ -367,7 +368,7 @@ export function v2Rules(): Record<string, TableRule> {
       primaryKey: ["user_id", "category_id"],
       allowDelete: true,
       insertColumns: ["user_id", "category_id", "percent"],
-      updateColumns: ["percent"],
+      updateColumns: ["user_id", "category_id", "percent"],
       fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
     },
     todos: {

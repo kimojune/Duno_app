@@ -28,8 +28,9 @@ revoke all on table public.weekly_goals from authenticated;
 
 grant select, delete on table public.weekly_goals to authenticated;
 grant insert (user_id, week_start, items) on table public.weekly_goals to authenticated;
--- 고칠 수 있는 것은 분야별 시간뿐이다(주는 못 바꾼다)
-grant update (items) on table public.weekly_goals to authenticated;
+-- 키 열(user_id, week_start)도 update 권한에 넣는다: 앱의 upsert가 보낸 열을 모두 DO UPDATE SET에 싣는데 권한 없는 열이 있으면 42501로 막히기 때문이다.
+-- user_id는 update 정책 with check((select auth.uid()) = user_id)가 자기 것으로 고정하고, week_start는 월요일 check(weekly_goals_monday)가 지킨다.
+grant update (user_id, week_start, items) on table public.weekly_goals to authenticated;
 
 alter table public.weekly_goals enable row level security;
 

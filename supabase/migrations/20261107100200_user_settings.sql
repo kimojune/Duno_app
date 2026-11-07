@@ -59,12 +59,17 @@ revoke all on table public.category_ratios from authenticated;
 grant select on table public.user_settings to authenticated;
 grant insert (user_id, goal_encrypted, onboarding_done_at, notify_evening_enabled, notify_evening_minute, notify_morning_enabled, notify_morning_minute)
   on table public.user_settings to authenticated;
-grant update (goal_encrypted, onboarding_done_at, notify_evening_enabled, notify_evening_minute, notify_morning_enabled, notify_morning_minute)
+-- 키 열(user_id)도 update 권한에 넣는다: 앱의 upsert(insert … on conflict do update)가 보낸 열을 모두 DO UPDATE SET에 싣는데,
+-- 열 단위 권한이 없는 열이 하나라도 있으면 42501로 막히기 때문이다. user_id를 남의 것으로 바꾸는 길은 update 정책의 with check
+-- ((select auth.uid()) = user_id)가 막는다(아래 user_settings_update_own).
+grant update (user_id, goal_encrypted, onboarding_done_at, notify_evening_enabled, notify_evening_minute, notify_morning_enabled, notify_morning_minute)
   on table public.user_settings to authenticated;
 
 grant select, delete on table public.category_ratios to authenticated;
 grant insert (user_id, category_id, percent) on table public.category_ratios to authenticated;
-grant update (percent) on table public.category_ratios to authenticated;
+-- 키 열(user_id, category_id)도 update 권한에 넣는다(upsert의 DO UPDATE SET, 위 user_settings와 같은 까닭).
+-- user_id는 update 정책 with check가 자기 것으로 고정하고, category_id는 (category_id, user_id) 복합 외래 키가 내 분야만 가리키게 한다.
+grant update (user_id, category_id, percent) on table public.category_ratios to authenticated;
 
 alter table public.user_settings enable row level security;
 alter table public.category_ratios enable row level security;

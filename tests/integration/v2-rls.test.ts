@@ -229,7 +229,9 @@ describe("weekly_goals (이번 주 목표)", () => {
     expect((await a.from("weekly_goals").update({ items: [{ categoryId: aCat, minutes: 600 }] }).eq("week_start", TEST_DAY).select("week_start")).error).toBeNull();
     expect((await a.from("weekly_goals").insert({ user_id: aId, week_start: "2000-01-04", items }).select("week_start")).error).not.toBeNull(); // 화요일
     expect((await a.from("weekly_goals").insert({ user_id: aId, week_start: "2000-01-10", items: [] }).select("week_start")).error).not.toBeNull();
-    expect((await a.from("weekly_goals").update({ week_start: "2000-01-10" }).eq("week_start", TEST_DAY).select("week_start")).error?.code).toBe("42501");
+    // 키 열 update 권한을 주었으므로(upsert의 DO UPDATE SET) 월요일로 옮기기는 되고, 월요일이 아닌 날로 옮기기와 남의 것으로 바꾸기는 막힌다
+    expect((await a.from("weekly_goals").update({ week_start: "2000-01-04" }).eq("week_start", TEST_DAY).select("week_start")).error).not.toBeNull();
+    expect(denied(await a.from("weekly_goals").update({ user_id: bId }).eq("week_start", TEST_DAY).select("week_start"))).toBe(true);
     expect(denied(await b.from("weekly_goals").delete().eq("user_id", aId).select("week_start"))).toBe(true);
     const del = await a.from("weekly_goals").delete().eq("week_start", TEST_DAY).select("week_start");
     expect(del.error).toBeNull();
