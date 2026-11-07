@@ -463,6 +463,8 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .tabbar-btn[aria-current="page"] { color: var(--color-primary); border-top-color: var(--color-primary); font-weight: 700; }
 .tabbar-btn:active { background: var(--color-notice-bg); }
 .growth, .me { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
+/* 내 정보의 글 칸·고르기 칸은 flex 밖이라 기본 폭(글자 수 기준)을 가진다. 글자 200%에서 화면보다 넓어지지 않게 자리 폭에 맞춘다 */
+.me .input:not(.stepper-input) { width: 100%; }
 .growth-body { padding: 0 var(--page-x); }
 .growth-sub-title { margin: var(--space-6) 0 var(--space-1); font: var(--font-body); font-weight: 700; }
 .growth-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }

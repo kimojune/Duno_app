@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
 import { GoalEditor } from "../../../components/goal";
@@ -15,6 +15,7 @@ import type { GrowthData } from "../../../lib/growth/types";
 import type { ManageApi } from "../../../lib/manage-api";
 import type { SettingsApi } from "../../../lib/onboarding-api";
 import type { PushApi } from "../../../lib/push/subscribe";
+import { useTabbarHeight } from "../../../lib/use-tabbar-height";
 import type { SettingsData } from "../../../lib/settings/types";
 
 /**
@@ -132,13 +133,22 @@ const EMPTY_GROWTH: GrowthData = {
 };
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
-const shellStyle = { "--tabbar-h": "calc(56px + env(safe-area-inset-bottom))" } as CSSProperties;
+
+/** 실제 앱(AppShell)과 같은 탭 줄 높이 측정을 쓴다: 글자 200%에서 탭 줄이 두 줄이 돼도 여백이 따라 늘어난다 */
+function Shell({ children }: { children: ReactNode }) {
+  const { shellRef, shellStyle } = useTabbarHeight();
+  return (
+    <div ref={shellRef} className="app-shell" style={shellStyle}>
+      {children}
+    </div>
+  );
+}
 
 /** 창 밖의 본문·탭 줄(창이 열린 동안 inert가 되는지 본다) */
 function Behind({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<TabId>("todo");
   return (
-    <div className="app-shell" style={shellStyle}>
+    <Shell>
       <main id="dev-behind">
         <p className="todo-sub">창 뒤의 본문</p>
         <button type="button" className="btn btn-secondary" id="dev-opener" onClick={noop}>
@@ -147,7 +157,7 @@ function Behind({ children }: { children: ReactNode }) {
       </main>
       <TabBar tabs={TABS} current={tab} onSelect={setTab} />
       {children}
-    </div>
+    </Shell>
   );
 }
 
@@ -166,18 +176,18 @@ function Opener({ render }: { render: (close: () => void) => ReactNode }) {
 export function V2Gallery({ id }: { id: string }) {
   if (id === "tabbar") {
     return (
-      <div className="app-shell" style={shellStyle}>
+      <Shell>
         <MeScreen settings={SETTINGS} categories={CATEGORIES} api={settingsApi} push={pushApi} onLogout={noop} />
         <TabBar tabs={TABS} current="me" onSelect={noop} />
-      </div>
+      </Shell>
     );
   }
   if (id === "growth-empty") {
     return (
-      <div className="app-shell" style={shellStyle}>
+      <Shell>
         <GrowthScreen api={growthApi(EMPTY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} />
         <TabBar tabs={TABS} current="growth" onSelect={noop} />
-      </div>
+      </Shell>
     );
   }
   if (id === "goal") {

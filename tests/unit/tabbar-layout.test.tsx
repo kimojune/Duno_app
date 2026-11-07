@@ -81,4 +81,8 @@ describe("아래 탭 줄 높이 (B8·B9)", () => {
   it("CSS: 내 정보 탭도 상태보기와 같은 폭·아래 여백을 가진다(B1)", () => {
     expect(css).toMatch(/\.growth,\s*\.me\s*\{[^}]*max-width:[^}]*padding-bottom:\s*calc\(var\(--tabbar-h/);
   });
+
+  it("CSS: 내 정보의 글 칸은 글자 200%에서도 자리 폭을 넘지 않는다(기본 폭 대신 100%, 스테퍼 칸은 그대로)", () => {
+    expect(css).toMatch(/\.me \.input:not\(\.stepper-input\)\s*\{\s*width:\s*100%/);
+  });
 });
