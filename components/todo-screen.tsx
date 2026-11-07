@@ -8,6 +8,7 @@ import { addCategory, addTodo, setTodoDone } from "../app/todos/actions";
 import type { AddCategoryResult, CategoryItem, CategoryList, CategoryResult } from "../lib/categories/types";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
 import type { ManageApi } from "../lib/manage-api";
+import type { Outbox, OutboxItem } from "../lib/outbox";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
 import { describeTodoDay, todoDayFor } from "../lib/todos/day";
@@ -45,7 +46,7 @@ type LocalRow = {
   id: string;
   text: string | null;
   done: boolean;
-  status: "saved" | "saving" | "failed";
+  status: "saved" | "saving" | "failed" | "queued";
   /** 저장이 오래 걸리는 중(SAVING_HINT_DELAY_MS 지남) */
   slow?: boolean;
   checkFailed: boolean;
@@ -148,6 +149,7 @@ export function TodoScreen({
   initial,
   manage,
   topSlot,
+  outbox,
 }: {
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
   initial?: TodayRead;
@@ -155,6 +157,8 @@ export function TodoScreen({
   manage?: ManageApi;
   /** 원샷 v2(선택): 목록 위에 얹는 것(먼저 할 일 카드·이번 주 목표 줄·저녁 기록 입구 등) */
   topSlot?: ReactNode;
+  /** 원샷 v2(선택, PRD 10절): 있으면 오프라인으로도 할 일을 적는다. 못 올린 글(연결 대기·저장 중·실패)을 기기에 두었다가 연결되면 같은 id로 다시 보낸다. 없으면 옛 방식 그대로(오프라인에서는 적을 수 없다) */
+  outbox?: Outbox;
 }) {
   const initialTodos = initial?.todos;
   const first = initialTodos?.ok ? initialTodos.data : null;
@@ -227,6 +231,10 @@ export function TodoScreen({
   const pendingTextRef = useRef(new Map<string, string>());
   /** 저장 전 줄의 분야 번호: 「다시」는 처음과 같은 분야 번호로 보낸다(C-D6) */
   const pendingCategoryRef = useRef(new Map<string, string | null>());
+  /** 오프라인 보관함(outbox)에 둔 줄의 적은 때(기기 시계). 서버가 최근 72시간 안이면 이 때의 하루로 넣는다 */
+  const writtenAtRef = useRef(new Map<string, string>());
+  /** 보관함을 처음 읽어 화면에 올린 뒤에만 보관함을 다시 쓴다(읽기 전에 빈 값으로 덮어쓰지 않게) */
+  const outboxReadyRef = useRef(false);
   const scrollToRef = useRef<string | null>(null);
   const focusRequestRef = useRef<FocusRequest | null>(null);
   const confirmWasOpenRef = useRef(false);
@@ -599,7 +607,7 @@ export function TodoScreen({
   // ---- 할 일 ----
 
   const send = useCallback(
-    async (id: string, text: string, categoryId: string | null) => {
+    async (id: string, text: string, categoryId: string | null, writtenAt?: string) => {
       let failureShown = false;
       const markFailed = () => {
         // 이 시도의 실패는 한 번만 띄운다: 15초 한도로 띄운 뒤 늦게 온 실패 응답이 안내를 다시 읽히지 않고,
@@ -616,12 +624,17 @@ export function TodoScreen({
       const hintTimer = setTimeout(() => {
         setRows((prev) => prev.map((r) => (r.id === id && r.status === "saving" ? { ...r, slow: true } : r)));
       }, SAVING_HINT_DELAY_MS);
-      const res = await safely<TodoResult<{ todo: TodoItem }>>(() => addTodo(id, text, categoryId), UNAVAILABLE);
+      // writtenAt(오프라인으로 적은 때)은 보관함을 쓰는 줄에만 싣는다. 없으면 옛 호출 꼴 그대로(인자 수가 늘지 않게)
+      const res = await safely<TodoResult<{ todo: TodoItem }>>(
+        () => (writtenAt === undefined ? addTodo(id, text, categoryId) : addTodo(id, text, categoryId, writtenAt)),
+        UNAVAILABLE,
+      );
       clearTimeout(timer);
       clearTimeout(hintTimer);
       if (res.ok) {
         pendingTextRef.current.delete(id);
         pendingCategoryRef.current.delete(id);
+        writtenAtRef.current.delete(id);
         confirmedRef.current.set(id, res.data.todo.done);
         const saved = fromItem(res.data.todo);
         setRows((prev) => prev.map((r) => (r.id === id ? { ...saved, text: saved.text ?? r.text } : r)));
@@ -646,7 +659,9 @@ export function TodoScreen({
       input?.focus();
       return;
     }
-    if (!navigator.onLine) {
+    // 보관함이 있으면 오프라인에서도 적는다(기기에 두었다가 연결되면 저장, PRD 10절). 없으면 옛 방식: 글은 그대로 두고 안내만
+    const queueOffline = !navigator.onLine && outbox !== undefined;
+    if (!navigator.onLine && !queueOffline) {
       setOfflineHelp(true); // 글·고름은 그대로 둔다(C21)
       announce(TODO_TEXT.offlineHelp, { again: true });
       input?.focus();
@@ -659,14 +674,15 @@ export function TodoScreen({
     pendingTextRef.current.set(id, checked.text);
     pendingCategoryRef.current.set(id, categoryId);
     scrollToRef.current = id;
-    setRows((prev) => [...prev, { id, text: checked.text, done: false, status: "saving", checkFailed: false, categoryId }]);
+    if (queueOffline) writtenAtRef.current.set(id, new Date().toISOString());
+    setRows((prev) => [...prev, { id, text: checked.text, done: false, status: queueOffline ? "queued" : "saving", checkFailed: false, categoryId }]);
     setDraft(""); // 첫 누름에 칸을 비운다: 연타하면 둘째부터 빈 칸
     draftRef.current = "";
     setSelectedCategoryId(null); // C7: 적은 뒤 고른 분야는 풀린다(PM 임시값, D-125)
     setOfflineHelp(false);
-    announce(TODO_TEXT.liveSaving);
+    announce(queueOffline ? TODO_TEXT.liveQueued : TODO_TEXT.liveSaving);
     input?.focus(); // 창은 열린 채, 포커스는 할 일 칸(C-D1)
-    void send(id, checked.text, categoryId);
+    if (!queueOffline) void send(id, checked.text, categoryId);
   }
 
   function changeDraft(value: string) {
@@ -681,7 +697,7 @@ export function TodoScreen({
     focusRequestRef.current = { kind: "row", id };
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "saving", slow: false } : r)));
     announce(TODO_TEXT.liveSaving);
-    void send(id, text, pendingCategoryRef.current.get(id) ?? null); // 같은 id, 같은 글, 같은 분야 번호
+    void send(id, text, pendingCategoryRef.current.get(id) ?? null, writtenAtRef.current.get(id)); // 같은 id, 같은 글, 같은 분야 번호
   }
 
   function remove(id: string) {
@@ -692,6 +708,7 @@ export function TodoScreen({
     focusRequestRef.current = neighbor ? { kind: "row", id: neighbor.id } : { kind: "input" };
     pendingTextRef.current.delete(id);
     pendingCategoryRef.current.delete(id);
+    writtenAtRef.current.delete(id);
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
 
@@ -734,6 +751,66 @@ export function TodoScreen({
     })();
   }
 
+  // ---- 오프라인 보관함(PRD 10절, outbox가 있을 때만) ----
+
+  // 처음 열 때 기기에 남은 못 올린 글을 줄로 올린다(연결 대기). 기기 저장소 읽기라 서버 렌더와 다르지 않게 마운트 뒤에 올린다.
+  useEffect(() => {
+    if (!outbox) return;
+    let alive = true;
+    void Promise.resolve().then(() => {
+      if (!alive) return;
+      const items: OutboxItem[] = outbox.load();
+      const known = new Set(rowsRef.current.map((r) => r.id));
+      const fresh = items.filter((i) => !known.has(i.id));
+      for (const i of fresh) {
+        pendingTextRef.current.set(i.id, i.text);
+        pendingCategoryRef.current.set(i.id, i.categoryId);
+        writtenAtRef.current.set(i.id, i.writtenAt);
+      }
+      if (fresh.length > 0) {
+        setRows((prev) => [
+          ...prev,
+          ...fresh.map((i): LocalRow => ({ id: i.id, text: i.text, done: false, status: "queued", checkFailed: false, categoryId: i.categoryId })),
+        ]);
+      }
+      outboxReadyRef.current = true;
+    });
+    return () => {
+      alive = false;
+    };
+  }, [outbox]);
+
+  // 올라가지 못한 줄(연결 대기·저장 중·실패)이 바뀔 때마다 기기에 다시 적는다. 올라가거나 뺀 줄은 빠진다.
+  useEffect(() => {
+    if (!outbox || !outboxReadyRef.current) return;
+    const items: OutboxItem[] = [];
+    for (const r of rows) {
+      if (r.status === "saved" || r.text === null) continue;
+      const writtenAt = writtenAtRef.current.get(r.id) ?? new Date().toISOString();
+      writtenAtRef.current.set(r.id, writtenAt);
+      items.push({ id: r.id, text: r.text, categoryId: r.categoryId, writtenAt });
+    }
+    outbox.save(items);
+  }, [rows, outbox]);
+
+  // 연결이 있고 연결 대기 줄이 있으면 같은 id로 보낸다(서버가 같은 id는 한 번만 만든다). 하나씩 저장 중으로 바뀐다.
+  const queuedCount = rows.filter((r) => r.status === "queued").length;
+  useEffect(() => {
+    if (!outbox || !online || queuedCount === 0) return;
+    let alive = true;
+    void Promise.resolve().then(() => {
+      if (!alive) return;
+      const queued = rowsRef.current.filter((r) => r.status === "queued" && r.text !== null);
+      if (queued.length === 0) return;
+      setRows((prev) => prev.map((r) => (r.status === "queued" ? { ...r, status: "saving", slow: false } : r)));
+      announce(TODO_TEXT.liveSaving);
+      for (const r of queued) void send(r.id, r.text as string, r.categoryId, writtenAtRef.current.get(r.id));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [outbox, online, queuedCount, send, announce]);
+
   function reload() {
     // T9·C10 「다시 불러오기」(할 일과 분야를 함께). 단추가 사라지니 포커스를 body로 떨어뜨리지 않고
     // 할 일 칸(창이 닫혔으면 단추)에 둔다.
@@ -747,6 +824,7 @@ export function TodoScreen({
   }
 
   function doSignOut() {
+    outbox?.clear(); // 로그아웃하면 기기에 둔 못 올린 글도 지운다(남의 글이 남지 않게)
     void signOut();
   }
 
@@ -854,6 +932,7 @@ export function TodoScreen({
     saving: r.status === "saving",
     savingSlow: r.slow === true,
     failed: r.status === "failed",
+    queued: r.status === "queued",
     checkFailed: r.checkFailed,
     category: categoryText(r.categoryId),
   }));

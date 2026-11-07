@@ -34,6 +34,8 @@ export const TODO_TEXT = {
   emptyOpen: "아래 칸에 적어 보세요.", // C3 창 열림
   saving: "저장하는 중",
   saveFailed: "저장하지 못했어요.",
+  queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절)
+  liveQueued: "연결되면 저장할게요",
   retry: "다시",
   remove: "빼기",
   checkFailed: "체크를 바꾸지 못했어요. 다시 눌러 주세요.",
@@ -147,6 +149,8 @@ export type RowView = {
   /** 저장이 SAVING_HINT_DELAY_MS를 넘겨 걸리는 중: 이때부터 「저장하는 중」 글을 눈에 보이게 한다 */
   savingSlow?: boolean;
   failed: boolean;
+  /** 오프라인으로 적어 기기에 둔 줄: 연결되면 저장한다(PRD 10절) */
+  queued?: boolean;
   checkFailed: boolean;
   /** 분야 표시 글(CategoryTag). null이면 기타라 붙이지 않는다. 풀 수 없는 분야는 TODO_TEXT.unreadableCategory */
   category?: string | null;
@@ -276,7 +280,7 @@ function Row({
   const statusId = `todo-status-${row.id}`;
   const tagId = `todo-tag-${row.id}`;
   // 저장 중·저장 못 한 줄은 서버에 아직 없다: 체크 칸은 보이되 눌러도 바뀌지 않고, 그 줄의 안내에 잇는다
-  const notSaved = row.saving || row.failed;
+  const notSaved = row.saving || row.failed || row.queued === true;
   const describedBy = [row.category ? tagId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
   return (
     <li className="todo-row" id={`row-${row.id}`}>
@@ -302,6 +306,16 @@ function Row({
           <p id={statusId} className={row.savingSlow ? "todo-sub" : "todo-sub sr-only"}>
             {TODO_TEXT.saving}
           </p>
+        )}
+        {row.queued && (
+          <>
+            <p id={statusId} className="todo-sub">
+              {TODO_TEXT.queued}
+            </p>
+            <div className="row-actions">
+              <TextButton onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
+            </div>
+          </>
         )}
         {row.failed && (
           <>

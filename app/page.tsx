@@ -32,7 +32,7 @@ export default async function Home({
         const unavailable = { ok: false, error: "unavailable" } as const;
         home = { today: { todos: unavailable, categories: unavailable }, settings: unavailable };
       }
-      return <AppShell home={home} initialOpen={initialOpen} />;
+      return <AppShell home={home} initialOpen={initialOpen} userKey={data.claims.sub} />;
     }
   }
 

@@ -9,6 +9,7 @@ import { defaultGrowthApi } from "../lib/growth-api";
 import type { HomeRead } from "../lib/home-types";
 import { defaultManageApi } from "../lib/manage-api";
 import { defaultOffersApi, type OffersApi } from "../lib/offers-api";
+import { createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
 import { defaultPushApi, type PushApi } from "../lib/push/subscribe";
@@ -64,13 +65,24 @@ export function AppShell({
   home,
   initialOpen = null,
   apis: apisProp,
+  userKey,
+  outbox: outboxProp,
 }: {
   home: HomeRead;
   initialOpen?: "evening" | null;
   apis?: Partial<ShellApis>;
+  /** 사용자 번호(기기에 둘 오프라인 보관함의 열쇠. 화면에 내지 않는다). 없으면 보관함을 쓰지 않는다 */
+  userKey?: string;
+  /** 시험에서 가짜 보관함을 넣는다 */
+  outbox?: Outbox;
 }) {
   // 부르는 길 모음은 렌더마다 새로 만들지 않는다(자식의 읽기 효과가 다시 돌지 않게)
   const apis = useMemo<ShellApis>(() => ({ ...DEFAULT_APIS, ...apisProp }), [apisProp]);
+  // 오프라인으로 적은 할 일을 기기에 두는 보관함(PRD 10절). 서버 렌더에서는 저장소가 없어 아무것도 안 하는 보관함이다
+  const outbox = useMemo<Outbox | undefined>(
+    () => outboxProp ?? (userKey ? createOutbox(safeLocalStorage(), userKey) : undefined),
+    [outboxProp, userKey],
+  );
   const settings = home.settings.ok ? home.settings.data : null;
   const [done, setDone] = useState<OnboardingResult | null>(null);
   const needsOnboarding = settings !== null && !settings.onboardingDone && done === null;
@@ -95,7 +107,7 @@ export function AppShell({
   const mySettings: SettingsData | null = done
     ? { goal: done.goal, goalReadable: true, onboardingDone: true, notify: done.notify, ratios: done.ratios }
     : settings;
-  return <MainShell initial={initial} initialOpen={initialOpen} apis={apis} settings={mySettings} />;
+  return <MainShell initial={initial} initialOpen={initialOpen} apis={apis} settings={mySettings} outbox={outbox} />;
 }
 
 function MainShell({
@@ -103,11 +115,13 @@ function MainShell({
   initialOpen,
   apis,
   settings,
+  outbox,
 }: {
   initial: TodayRead;
   initialOpen: "evening" | null;
   apis: ShellApis;
   settings: SettingsData | null;
+  outbox: Outbox | undefined;
 }) {
   const [tab, setTab] = useState<TabId>("todo");
   const [eveningOpen, setEveningOpen] = useState(initialOpen === "evening");
@@ -221,6 +235,7 @@ function MainShell({
         <TodoScreen
           initial={initial}
           manage={defaultManageApi}
+          outbox={outbox}
           topSlot={
             <>
               <GoalLine api={defaultGoalsApi} refreshKey={goalVersion} onOpen={setGoalEditor} />
