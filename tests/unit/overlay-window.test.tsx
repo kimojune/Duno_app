@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState, type ReactNode } from "react";
+import { StrictMode, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeHistory } from "./fake-history";
 
@@ -142,6 +142,24 @@ describe.each(WINDOWS)("%s 창", (_name, renderWindow) => {
     opener.focus();
     openWindow();
     expect(document.activeElement).not.toBe(opener); // 포커스는 창 안(제목)으로 갔다
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(opener);
+  });
+});
+
+describe.each(WINDOWS)("%s 창 — 개발 모드(StrictMode)", (_name, renderWindow) => {
+  // StrictMode는 효과를 지웠다 다시 켠다. 첫 켜짐에서 포커스가 창 제목으로 옮겨진 뒤 다시 켜지므로, 연 단추를 그때의 포커스로
+  // 잡으면 제목(곧 사라질 요소)을 연 단추로 잘못 기억한다(/dev/v2 화면 사진 시험에서 드러남).
+  it("닫으면 연 단추로 포커스가 돌아온다", () => {
+    render(
+      <StrictMode>
+        <Harness renderWindow={renderWindow} />
+      </StrictMode>,
+    );
+    const opener = screen.getByRole("button", { name: "창 열기" });
+    opener.focus();
+    fireEvent.click(opener);
+    expect(document.activeElement).not.toBe(opener);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(document.activeElement).toBe(opener);
   });

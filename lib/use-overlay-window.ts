@@ -74,12 +74,19 @@ function inertOutside(root: HTMLElement): HTMLElement[] {
 export function useOverlayWindow<T extends HTMLElement = HTMLDivElement>(onClose: () => void): RefObject<T | null> {
   const rootRef = useRef<T | null>(null);
   const closeRef = useRef(onClose);
+  // 연 단추. 개발 모드(StrictMode)는 효과를 지웠다 다시 켜는데, 다시 켤 때는 첫 켜짐에서 창 제목으로 옮겨진 포커스가 이미 창 안에 있다.
+  // 그때 포커스를 연 단추로 잡으면 곧 사라질 제목을 기억하게 되므로, 창 안에 있는 포커스는 연 단추로 잡지 않고 앞서 기억한 것을 둔다.
+  const openerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     closeRef.current = onClose;
   });
 
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && !rootRef.current?.contains(active)) {
+      openerRef.current = active;
+    }
+    const opener = openerRef.current;
     const mark = crypto.randomUUID();
     let pushed = false;
     let closedByPop = false;
