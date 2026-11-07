@@ -68,6 +68,22 @@ async function nodeClient(env: IntegrationEnv, account: Account): Promise<Supaba
   return client;
 }
 
+/**
+ * 시험 계정의 처음 설정을 마친 것으로 만든다(B10). 원샷 v2부터 설정 행이 없거나 처음 설정을 안 마친 사용자는 처음 설정 화면부터 보게 되어,
+ * 이 시험이 기대하는 할 일 화면(「오늘」 머리·목록)이 뜨지 않는다. 사용자 세션으로 자기 행만 upsert한다(RLS).
+ * user_settings는 지우는 권한이 없어 시험이 지우지 않는다: 한 번 마친 계정은 그대로 두고, 다시 돌려도 같은 값(마친 시각만 새로 적힌다).
+ * 마이그레이션(20261107100200_user_settings.sql)이 개발 DB에 적용된 뒤에만 된다.
+ */
+async function markOnboardingDone(client: SupabaseClient, label: string): Promise<void> {
+  const { data } = await client.auth.getUser();
+  const userId = data.user?.id;
+  if (!userId) throw new Error(`${label} 사용자 번호를 읽지 못했다`);
+  const { error } = await client
+    .from("user_settings")
+    .upsert({ user_id: userId, onboarding_done_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw new Error(`${label} 처음 설정 마침 표시 실패 (code=${error.code ?? "?"}) — 새 마이그레이션이 적용됐는지 본다`);
+}
+
 test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B에게는 보이지 않으며, 시험 데이터를 정리한다", async ({ browser }) => {
   test.setTimeout(120_000);
   const env = loadIntegrationEnv();
@@ -75,6 +91,8 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
   const B: Account = { label: "B", email: env.DUNO_TEST_B_EMAIL, password: env.DUNO_TEST_B_PASSWORD };
 
   const nodeA = await nodeClient(env, A);
+  await markOnboardingDone(nodeA, "A");
+  await markOnboardingDone(await nodeClient(env, B), "B");
   const before = await nodeA.from("todos").select("id");
   const beforeIds = new Set((before.data ?? []).map((r: { id: string }) => r.id));
 
@@ -132,7 +150,8 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
       await expect(todoInput).toHaveValue(""); // 첫 누름에 칸이 빈다
       await expect(page.getByText(text, { exact: true })).toBeVisible();
       if (text === short) {
-        // P1: 새 줄 높이가 적은 직후와 저장 뒤 모두 56px(「저장하는 중」이 1초 안에는 자리를 차지하지 않는다)
+        // P1: 새 줄 높이가 적은 직후와 저장 뒤 모두 56px(「저장하는 중」이 1초 안에는 자리를 차지하지 않는다).
+        // 원샷 v2의 「자세히」는 줄 오른쪽의 작은 단추(누르는 면 48px, 줄 위아래 4px씩)라 저장 뒤에도 줄 높이가 늘지 않는다(B16)
         const rowBox = page.locator("li.todo-row", { has: page.getByText(text, { exact: true }) });
         const heightNow = (await rowBox.boundingBox())!.height;
         await expect(page.getByText("저장하는 중")).toHaveCount(0, { timeout: 20_000 });
