@@ -7,8 +7,8 @@ export type Offer = {
   id: string;
   surface: OfferSurface;
   day: string;
-  /** 건넨 분야 */
-  categoryId: string;
+  /** 건넨 분야. null은 기타(처음 정한 비율에 기타를 넣었을 때) */
+  categoryId: string | null;
   categoryName: string;
   /** 건넨 할 일(없으면 분야만 건넨 것) */
   todoId: string | null;

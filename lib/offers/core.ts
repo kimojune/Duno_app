@@ -12,7 +12,7 @@ import { readSettingsForUser } from "../settings/core";
 import { decryptTodoText, type TodoKey } from "../todos/crypto";
 import { todoDayFor } from "../todos/day";
 import { addDays, weekDates, weekStartFor } from "../week";
-import { offerKey, pickOfferCategory, pickOfferTodo } from "./logic";
+import { OFFER_OTHER, offerKey, pickOfferCategory, pickOfferTodo } from "./logic";
 import { OFFER_SURFACES, type DismissedOffer, type OfferRequestResult } from "./types";
 
 /**
@@ -56,20 +56,20 @@ export async function requestOfferForUser(deps: OfferDeps, input: unknown): Prom
     if (!goal.ok) return goal;
     if (!categories.ok) return recordFail(categories.error === "unauthenticated" ? "unauthenticated" : categories.error === "config" ? "config" : "unavailable");
 
-    const categoryId = pickOfferCategory({
+    const target = pickOfferCategory({
       ratios: settings.data.ratios,
       goalItems: goal.data,
       totals: sumRange(logs.data, weekStart, weekDates(weekStart)[6]),
     });
-    const category = categoryId ? categories.data.categories.find((c) => c.id === categoryId) : undefined;
-    if (!categoryId || !category || !category.readable) return { ok: true, data: { offer: null, reason: "no_target" } };
+    // 기타(분야 없음)도 건넬 수 있다: 분야 번호는 null, 이름은 「기타」
+    const categoryId = target === OFFER_OTHER ? null : target;
+    const category = target === null ? undefined : categoryId === null ? { readable: true as const, name: "기타" } : categories.data.categories.find((c) => c.id === categoryId);
+    if (target === null || !category || !category.readable) return { ok: true, data: { offer: null, reason: "no_target" } };
 
-    // 건넬 할 일: 그 분야의 최근 7일 안 끝내지 않은 할 일
-    const todosRes = await deps.supabase
-      .from("todos")
-      .select("id, day, text_encrypted, created_at")
-      .eq("user_id", user.data)
-      .eq("category_id", categoryId)
+    // 건넬 할 일: 그 분야(기타는 분야 없는 것)의 최근 7일 안 끝내지 않은 할 일
+    let todosQuery = deps.supabase.from("todos").select("id, day, text_encrypted, created_at").eq("user_id", user.data);
+    todosQuery = categoryId === null ? todosQuery.is("category_id", null) : todosQuery.eq("category_id", categoryId);
+    const todosRes = await todosQuery
       .eq("done", false)
       .gte("day", addDays(day, -7))
       .lte("day", day)

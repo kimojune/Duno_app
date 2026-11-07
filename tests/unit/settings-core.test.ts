@@ -157,3 +157,84 @@ describe("saveRatiosForUser", () => {
     expect(store.table("category_ratios").filter((r) => r.user_id === OTHER)).toHaveLength(1);
   });
 });
+
+describe("기타를 처음 정한 비율에 넣기 (고침 3바퀴, PM 답 d-69)", () => {
+  it("검증: categoryId null(기타)도 비율이 될 수 있고, 기타만 있어도 합이 0보다 크면 된다. 기타 중복은 거절", () => {
+    expect(checkRatios([{ categoryId: C1, percent: 60 }, { categoryId: null, percent: 40 }]).ok).toBe(true);
+    expect(checkRatios([{ categoryId: null, percent: 10 }]).ok).toBe(true);
+    expect(checkRatios([{ categoryId: null, percent: 0 }]).ok).toBe(false);
+    expect(checkRatios([{ categoryId: null, percent: 10 }, { categoryId: null, percent: 20 }]).ok).toBe(false);
+  });
+  it("합으로 나눠 읽을 때 기타도 한 몫이고, 고르게 나누기는 기타 몫도 나눈다", () => {
+    expect(normalizedShares([{ categoryId: C1, percent: 30 }, { categoryId: null, percent: 10 }])).toEqual([
+      { categoryId: C1, share: 0.75 },
+      { categoryId: null, share: 0.25 },
+    ]);
+    expect(evenRatios([C1, null]).map((r) => r.percent)).toEqual([50, 50]);
+  });
+  it("저장하면 기타 몫은 user_settings.ratio_other_percent에, 분야 몫은 category_ratios에 가고, 읽으면 기타가 맨 끝에 붙는다", async () => {
+    const store = setup();
+    const ratios = [{ categoryId: C1, percent: 50 }, { categoryId: C2, percent: 30 }, { categoryId: null, percent: 20 }];
+    expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
+    expect(store.table("category_ratios").map((r) => [r.category_id, r.percent])).toEqual([[C1, 50], [C2, 30]]);
+    expect(store.table("user_settings")[0]).toMatchObject({ user_id: ME, ratio_other_percent: 20 });
+    const read = await readSettingsForUser(deps(store));
+    expect(read.ok && read.data.ratios).toEqual(ratios);
+  });
+  it("기타만 있는 비율도 저장된다(분야 몫 행은 모두 지워진다)", async () => {
+    const store = setup();
+    await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 100 }]);
+    await saveRatiosForUser(deps(store), [{ categoryId: null, percent: 100 }]);
+    expect(store.table("category_ratios")).toHaveLength(0);
+    const read = await readSettingsForUser(deps(store));
+    expect(read.ok && read.data.ratios).toEqual([{ categoryId: null, percent: 100 }]);
+  });
+  it("기타 몫을 빼고 다시 저장하면 그 열이 비워진다", async () => {
+    const store = setup();
+    await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 80 }, { categoryId: null, percent: 20 }]);
+    await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 80 }, { categoryId: null, percent: 0 }]);
+    expect(store.table("user_settings")[0]).toMatchObject({ ratio_other_percent: null });
+    const read = await readSettingsForUser(deps(store));
+    expect(read.ok && read.data.ratios).toEqual([{ categoryId: C1, percent: 80 }]);
+  });
+  it("기타를 안 쓰면 user_settings를 건드리지 않는다(마이그레이션 전 DB에서도 저장이 된다)", async () => {
+    const store = setup();
+    await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }]);
+    const writes = store.calls.filter((c) => c.table === "user_settings" && c.op !== "select");
+    expect(writes).toEqual([]);
+  });
+  it("기타 몫 열을 읽지 못하면(적용 전) 기타 없음으로 읽고 나머지는 그대로 읽힌다", async () => {
+    const store = setup();
+    store.seed("category_ratios", { user_id: ME, category_id: C1, percent: 100 });
+    const real = fakeTablesClient(store, { sub: ME });
+    const supabase = new Proxy(real, {
+      get(target, prop, receiver) {
+        if (prop !== "from") return Reflect.get(target, prop, receiver);
+        return (table: string) => {
+          const builder = target.from(table);
+          if (table !== "user_settings") return builder;
+          return new Proxy(builder, {
+            get(b, p, r) {
+              if (p === "select") {
+                return (columns?: string) =>
+                  columns === "ratio_other_percent"
+                    ? Promise.resolve({ data: null, error: { code: "42703", message: "column does not exist" } })
+                    : (b.select as (c?: string) => unknown)(columns);
+              }
+              return Reflect.get(b, p, r);
+            },
+          });
+        };
+      },
+    });
+    const read = await readSettingsForUser({ supabase: supabase as never, key: KEY, now: () => NOW });
+    expect(read.ok && read.data.ratios).toEqual([{ categoryId: C1, percent: 100 }]);
+  });
+  it("열이 없는 DB에서 기타를 저장하려 하면 거절된다(짧은 코드, 앱은 되돌린다)", async () => {
+    const store = setup();
+    store.rules.user_settings.insertColumns = store.rules.user_settings.insertColumns!.filter((c) => c !== "ratio_other_percent");
+    store.rules.user_settings.updateColumns = store.rules.user_settings.updateColumns!.filter((c) => c !== "ratio_other_percent");
+    const res = await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 50 }, { categoryId: null, percent: 50 }]);
+    expect(res.ok).toBe(false);
+  });
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import type { RatioItem } from "../lib/settings/types";
 import { evenRatios, RATIO_STEP } from "../lib/settings/validation";
 import { SecondaryButton } from "./ui";
 
@@ -10,6 +11,30 @@ import { SecondaryButton } from "./ui";
  */
 
 export type RatioEntry = { id: string; name: string; percent: number };
+
+/**
+ * 기타(분야 없음)도 비율 한 줄이다(고침 3바퀴, PM 답 d-69). 줄을 가리키는 표시는 uuid가 아니라 이 값이고, 저장할 때 categoryId null로 바꾼다.
+ * 기타가 0%면 저장 목록에 넣지 않는다(기타를 안 쓰는 사용자의 저장은 그대로).
+ */
+export const OTHER_RATIO_ID = "other";
+export const OTHER_RATIO_NAME = "기타";
+
+/** 저장된 비율 한 칸을 화면 줄 표시로 */
+export function ratioKey(categoryId: string | null): string {
+  return categoryId === null ? OTHER_RATIO_ID : categoryId;
+}
+
+/** 분야 줄들과 기타 줄(맨 끝)로 화면 줄 목록을 만든다 */
+export function withOtherEntry(entries: RatioEntry[], percents: Record<string, number>): RatioEntry[] {
+  return [...entries, { id: OTHER_RATIO_ID, name: OTHER_RATIO_NAME, percent: percents[OTHER_RATIO_ID] ?? 0 }];
+}
+
+/** 화면 줄들을 저장할 비율로(기타는 0보다 클 때만) */
+export function entriesToRatios(entries: RatioEntry[]): RatioItem[] {
+  return entries.flatMap((e): RatioItem[] =>
+    e.id === OTHER_RATIO_ID ? (e.percent > 0 ? [{ categoryId: null, percent: e.percent }] : []) : [{ categoryId: e.id, percent: e.percent }],
+  );
+}
 
 export const RATIO_TEXT = {
   total: (n: number) => `합계 ${n}%`,
@@ -25,9 +50,10 @@ export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onCh
   function set(id: string, percent: number) {
     onChange(entries.map((e) => (e.id === id ? { ...e, percent: Math.min(100, Math.max(0, percent)) } : e)));
   }
+  // 「고르게 나누기」는 분야끼리 나눈다(기타 줄은 0%로 돌아간다: 기타를 비율에 넣는 것은 사용자가 고른 때만)
   function even() {
-    const split = evenRatios(entries.map((e) => e.id));
-    onChange(entries.map((e) => ({ ...e, percent: split.find((s) => s.categoryId === e.id)?.percent ?? 0 })));
+    const split = evenRatios(entries.filter((e) => e.id !== OTHER_RATIO_ID).map((e) => e.id));
+    onChange(entries.map((e) => ({ ...e, percent: e.id === OTHER_RATIO_ID ? 0 : (split.find((s) => s.categoryId === e.id)?.percent ?? 0) })));
   }
 
   return (

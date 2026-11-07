@@ -27,13 +27,13 @@ export function countGoalChars(text: string): number {
 }
 
 const ratioSchema = z
-  .array(z.object({ categoryId: z.uuid(), percent: z.number().int().min(0).max(100) }).strict())
+  .array(z.object({ categoryId: z.uuid().nullable(), percent: z.number().int().min(0).max(100) }).strict())
   .min(1)
   .max(RATIO_ITEMS_MAX);
 
 export type RatioCheck = { ok: true; ratios: RatioItem[] } | { ok: false; error: "invalid_input" };
 
-/** 비율 검사: 분야 번호 uuid·중복 없음·0~100 정수·합이 0보다 큼 */
+/** 비율 검사: 분야 번호 uuid(null은 기타)·중복 없음·0~100 정수·합이 0보다 큼 */
 export function checkRatios(input: unknown): RatioCheck {
   const parsed = ratioSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_input" };
@@ -44,7 +44,7 @@ export function checkRatios(input: unknown): RatioCheck {
 }
 
 /** 분야 n개를 5% 단위로 고르게 나눈다. 나머지는 앞 분야부터 5%씩 더한다. 예: 3개 → 35·35·30 */
-export function evenRatios(categoryIds: string[]): RatioItem[] {
+export function evenRatios(categoryIds: (string | null)[]): RatioItem[] {
   const n = categoryIds.length;
   if (n === 0) return [];
   const units = 100 / RATIO_STEP; // 20칸
@@ -58,7 +58,7 @@ export function evenRatios(categoryIds: string[]): RatioItem[] {
 }
 
 /** 합으로 나눈 몫(합이 100이 아니어도 비율로 읽는다). 합이 0이면 빈 목록 */
-export function normalizedShares(ratios: RatioItem[]): { categoryId: string; share: number }[] {
+export function normalizedShares(ratios: RatioItem[]): { categoryId: string | null; share: number }[] {
   const sum = ratios.reduce((s, r) => s + r.percent, 0);
   if (sum <= 0) return [];
   return ratios.map((r) => ({ categoryId: r.categoryId, share: r.percent / sum }));

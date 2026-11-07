@@ -349,3 +349,50 @@ describe("AppShell의 처음 설정 관문", () => {
     expect(withCategories({ ...today, categories: unavailable }, [{ id: C2, name: "x" }]).categories).toEqual(unavailable);
   });
 });
+
+describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
+  it("분야 예시 칩은 마감 없는 이름이다: 「글쓰기」가 있고 「포트폴리오」는 없다", () => {
+    mount(fakeApi(), []);
+    click("다음");
+    expect(screen.getByRole("button", { name: "+ 글쓰기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "+ 포트폴리오" })).toBeNull();
+  });
+  it("비율 단계에는 고른 분야 줄 뒤에 기타 줄이 있고 처음에는 0%다. 합계에 기타가 들지 않는다", () => {
+    mount(fakeApi());
+    click("다음");
+    click("다음");
+    expect(screen.getByRole("button", { name: "기타 5% 늘리기" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "기타 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expect(screen.getAllByText("0%")).toHaveLength(1); // 기타만 0%
+  });
+  it("기타를 올리면 합계에 들고, 저장 목록에 categoryId null로 실린다. 「고르게 나누기」는 기타를 0%로 돌린다", async () => {
+    const api = fakeApi();
+    mount(api);
+    click("다음");
+    click("다음");
+    click("기타 5% 늘리기");
+    click("기타 5% 늘리기");
+    expect(screen.getByText("합계 110%")).toBeTruthy();
+    click("고르게 나누기");
+    expect(screen.getByText("합계 100%")).toBeTruthy();
+    click("기타 5% 늘리기");
+    click("다음");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    expect(api.saveRatios).toHaveBeenCalledWith([
+      { categoryId: C1, percent: 50 },
+      { categoryId: C2, percent: 50 },
+      { categoryId: null, percent: 5 },
+    ]);
+  });
+  it("기타를 올리지 않으면 저장 목록에 기타가 없다(기타를 안 쓰는 사용자의 저장은 예전 그대로)", async () => {
+    const api = fakeApi();
+    mount(api);
+    click("다음");
+    click("다음");
+    click("다음");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    const saved = (api.saveRatios as ReturnType<typeof vi.fn>).mock.calls[0][0] as { categoryId: string | null }[];
+    expect(saved.some((r) => r.categoryId === null)).toBe(false);
+  });
+});

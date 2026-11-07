@@ -33,7 +33,7 @@ export const totalOf = (list: CategoryMinutes[]) => list.reduce((s, t) => s + t.
  * 처음 정한 비율보다 덜 한 분야(부족의 기본 기준, G4-1 「일단은 가」). 임시 계산:
  * 이번 주 쓴 시간 전체(기타 포함)에 처음 정한 비율(합으로 나눈 몫)을 곱한 만큼을 「이만큼은 썼어야」로 보고,
  * 실제로 쓴 시간이 그보다 5분 이상 모자란 분야를 모자란 만큼과 함께 큰 순서로 돌려준다.
- * 기타는 비율에 들지 않고 부족한 분야로도 잡지 않는다. 쓴 시간이 없으면 빈 목록.
+ * 기타는 처음 정한 비율에 넣었을 때만 비율에 들고 부족한 분야로도 잡힌다(고침 3바퀴, PM 답 d-69). 넣지 않았으면 비율에도 부족에도 안 든다. 쓴 시간이 없으면 빈 목록.
  */
 export function shortfallByRatio(ratios: RatioItem[], totals: CategoryMinutes[]): CategoryMinutes[] {
   const total = totalOf(totals);
@@ -80,7 +80,7 @@ export function barPercents(values: number[]): number[] {
 /**
  * 「덜 한 분야」(반대편) 목록: 먼저 할 일을 고르고 먼저 한 기록에 반대편 여부를 남길 때 쓴다(D-105, D-108, D-110).
  * 처음 정한 비율 기준: 이번 주 쓴 시간이 아직 없으면(주 초) 비율이 0보다 큰 모든 분야가 덜 한 분야이고(큰 비율 순),
- * 쓴 시간이 있으면 shortfallByRatio와 같다. 기타는 들지 않는다. (임시)
+ * 쓴 시간이 있으면 shortfallByRatio와 같다. 기타는 처음 정한 비율에 넣었을 때만 든다. (임시)
  */
 export function lessDoneByRatio(ratios: RatioItem[], totals: CategoryMinutes[]): CategoryMinutes[] {
   if (totalOf(totals) > 0) return shortfallByRatio(ratios, totals);

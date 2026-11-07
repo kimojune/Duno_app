@@ -352,6 +352,7 @@ export function v2Rules(): Record<string, TableRule> {
         "notify_evening_minute",
         "notify_morning_enabled",
         "notify_morning_minute",
+        "ratio_other_percent", // 마이그레이션 20261107110000_ratio_other.sql
       ],
       updateColumns: [
         "user_id",
@@ -361,8 +362,10 @@ export function v2Rules(): Record<string, TableRule> {
         "notify_evening_minute",
         "notify_morning_enabled",
         "notify_morning_minute",
+        "ratio_other_percent",
       ],
       defaults: fill({
+        ratio_other_percent: null,
         goal_encrypted: null,
         onboarding_done_at: null,
         notify_evening_enabled: false,

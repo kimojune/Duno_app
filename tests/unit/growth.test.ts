@@ -183,3 +183,19 @@ describe("recordViewForUser (화면 본 것)", () => {
     expect(await recordViewForUser(viewsDeps(store, null), { id: ID, screen: "growth", entry: "self" })).toEqual({ ok: false, error: "unauthenticated" });
   });
 });
+
+describe("기타를 비율에 넣은 경우 (고침 3바퀴, PM 답 d-69)", () => {
+  const ratios = [{ categoryId: C1, percent: 50 }, { categoryId: null, percent: 50 }];
+  it("기타도 비율보다 덜 쓴 만큼 부족으로 잡힌다", () => {
+    expect(shortfallByRatio(ratios, [{ categoryId: C1, minutes: 100 }])).toEqual([{ categoryId: null, minutes: 50 }]);
+    expect(shortfallByRatio(ratios, [{ categoryId: C1, minutes: 20 }, { categoryId: null, minutes: 80 }])).toEqual([{ categoryId: C1, minutes: 30 }]);
+  });
+  it("비율에 기타가 없으면 기타는 부족으로 잡히지 않는다(예전 그대로)", () => {
+    expect(shortfallByRatio([{ categoryId: C1, percent: 100 }], [{ categoryId: C1, minutes: 20 }, { categoryId: null, minutes: 80 }])).toEqual([{ categoryId: C1, minutes: 80 }]);
+  });
+  it("주 초에는 비율이 있는 분야가 모두 덜 한 분야이고, 기타도 비율이 있으면 든다", async () => {
+    const { lessDoneByRatio } = await import("../../lib/growth/logic");
+    expect(lessDoneByRatio(ratios, []).map((c) => c.categoryId)).toEqual([C1, null]);
+    expect(lessDoneByRatio([{ categoryId: C1, percent: 100 }], []).map((c) => c.categoryId)).toEqual([C1]);
+  });
+});

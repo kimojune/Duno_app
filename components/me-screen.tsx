@@ -8,7 +8,7 @@ import type { NotifySettings, RatioItem, SettingsData } from "../lib/settings/ty
 import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
 import { useOnline } from "../lib/use-online";
 import { NotifyRow } from "./onboarding";
-import { RatioEditor, type RatioEntry } from "./ratio-editor";
+import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -117,7 +117,7 @@ function MeBody({
   const [goalBusy, setGoalBusy] = useState(false);
   // 비율
   const [percents, setPercents] = useState<Record<string, number>>(() => {
-    if (settings.ratios.length > 0) return Object.fromEntries(settings.ratios.map((r) => [r.categoryId, r.percent]));
+    if (settings.ratios.length > 0) return Object.fromEntries(settings.ratios.map((r) => [ratioKey(r.categoryId), r.percent]));
     return Object.fromEntries(evenRatios(categories.map((c) => c.id)).map((r) => [r.categoryId, r.percent]));
   });
   const [ratioMessage, setRatioMessage] = useState("");
@@ -158,7 +158,11 @@ function MeBody({
     }
   }
 
-  const entries: RatioEntry[] = categories.map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 }));
+  // 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다)
+  const entries: RatioEntry[] = withOtherEntry(
+    categories.map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 })),
+    percents,
+  );
   const ratioTotal = entries.reduce((s, e) => s + e.percent, 0);
 
   async function saveRatios() {
@@ -169,7 +173,7 @@ function MeBody({
     }
     setRatioBusy(true);
     setRatioMessage("");
-    const ratios: RatioItem[] = entries.map((e) => ({ categoryId: e.id, percent: e.percent }));
+    const ratios: RatioItem[] = entriesToRatios(entries);
     const res = await api.saveRatios(ratios);
     setRatioBusy(false);
     if (res.ok) {

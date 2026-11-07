@@ -228,3 +228,12 @@ describe("타이머 시간이 저녁 기록에 미리 채워진다", () => {
     expect(state.ok && state.data.timerByCategory).toEqual([{ categoryId: C1, minutes: 25 }]);
   });
 });
+
+describe("기타를 비율에 넣은 경우의 반대편 여부 (고침 3바퀴, PM 답 d-69)", () => {
+  const ratios = [{ categoryId: C1, percent: 50 }, { categoryId: null, percent: 50 }];
+  it("비율에 기타가 있으면 기타로 켠 것도 비율 기준 반대편일 수 있다. 목표 기준은 기타가 반대편이 아니다", () => {
+    expect(oppositeFlags({ categoryId: null, ratios, goalItems: null, totals: [] })).toEqual({ byGoal: null, byRatio: true });
+    expect(oppositeFlags({ categoryId: null, ratios, goalItems: null, totals: [{ categoryId: null, minutes: 100 }] }).byRatio).toBe(false);
+    expect(oppositeFlags({ categoryId: null, ratios, goalItems: [{ categoryId: C1, minutes: 60 }], totals: [] })).toEqual({ byGoal: false, byRatio: true });
+  });
+});

@@ -8,8 +8,11 @@ export type NotifySettings = {
   morningMinute: number;
 };
 
-/** 분야마다 처음 정한 비율(%). 기타는 두지 않는다(임시) */
-export type RatioItem = { categoryId: string; percent: number };
+/**
+ * 분야마다 처음 정한 비율(%). categoryId가 null이면 「기타」다(고침 3바퀴, PM 답 d-69 「기타 분야 넣어」).
+ * 기타는 처음 정한 비율에 넣을 수 있고, 부족한 분야 계산·건넬 분야에도 든다. 목표(이번 주)에는 기타를 넣지 않는다(임시).
+ */
+export type RatioItem = { categoryId: string | null; percent: number };
 
 export type SettingsData = {
   /** 목표 한 문장. 없으면 null. 풀 수 없는 글도 null(goalReadable=false) */

@@ -7,7 +7,7 @@ import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
 import { formatClock } from "../lib/time-format";
-import { RatioEditor, type RatioEntry } from "./ratio-editor";
+import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -112,11 +112,11 @@ export function Onboarding({
   const [goal, setGoal] = useState(initialGoal ?? "");
   const [catalog, setCatalog] = useState<CategoryEntry[]>(categories);
   const [selected, setSelected] = useState<string[]>(() => {
-    const withRatio = initialRatios.filter((r) => categories.some((c) => c.id === r.categoryId)).map((r) => r.categoryId);
+    const withRatio = initialRatios.flatMap((r) => (r.categoryId !== null && categories.some((c) => c.id === r.categoryId) ? [r.categoryId] : []));
     return withRatio.length > 0 ? withRatio : categories.map((c) => c.id);
   });
   const [percents, setPercents] = useState<Record<string, number>>(() =>
-    Object.fromEntries(initialRatios.map((r) => [r.categoryId, r.percent])),
+    Object.fromEntries(initialRatios.map((r) => [ratioKey(r.categoryId), r.percent])),
   );
   const [newName, setNewName] = useState("");
   const [addingName, setAddingName] = useState<string | null>(null);
@@ -138,10 +138,14 @@ export function Onboarding({
   const goalCheck = checkGoal(goal);
   const goalOver = !goalCheck.ok && goalCheck.error === "too_long";
 
-  const entries: RatioEntry[] = selected
-    .map((id) => catalog.find((c) => c.id === id))
-    .filter((c): c is CategoryEntry => c !== undefined)
-    .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 }));
+  // 고른 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다, 처음에는 0%)
+  const entries: RatioEntry[] = withOtherEntry(
+    selected
+      .map((id) => catalog.find((c) => c.id === id))
+      .filter((c): c is CategoryEntry => c !== undefined)
+      .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 })),
+    percents,
+  );
   const total = entries.reduce((s, e) => s + e.percent, 0);
 
   function toggleCategory(id: string) {
@@ -245,7 +249,7 @@ export function Onboarding({
       const text = pushOutcomeText(pushOutcome);
       if (text) setMessage(text);
     }
-    const ratios: RatioItem[] = entries.map((e) => ({ categoryId: e.id, percent: e.percent }));
+    const ratios: RatioItem[] = entriesToRatios(entries);
     const notify: NotifySettings = {
       eveningEnabled: notifyOn && eveningOn,
       eveningMinute,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { startFocusForUser } from "../../lib/focus/core";
 import { dismissOfferForUser, requestOfferForUser } from "../../lib/offers/core";
-import { offerKey, pickOfferCategory, pickOfferTodo } from "../../lib/offers/logic";
+import { OFFER_OTHER, offerKey, pickOfferCategory, pickOfferTodo } from "../../lib/offers/logic";
 import { encryptCategoryName, encryptTodoText, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
 
@@ -200,5 +200,44 @@ describe("dismissOfferForUser", () => {
     expect(await dismissOfferForUser(deps(store), "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f")).toEqual({ ok: false, error: "not_found" });
     expect(await dismissOfferForUser(deps(store), "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0fffff")).toEqual({ ok: false, error: "not_found" });
     expect(await dismissOfferForUser(deps(store), "x")).toEqual({ ok: false, error: "invalid_input" });
+  });
+});
+
+describe("기타도 건넨다 (고침 3바퀴, PM 답 d-69)", () => {
+  const ratios = [{ categoryId: C1, percent: 30 }, { categoryId: null, percent: 70 }];
+  const settingsRow = { user_id: ME, ratio_other_percent: 100, onboarding_done_at: null, goal_encrypted: null, notify_evening_enabled: false, notify_evening_minute: 1170, notify_morning_enabled: false, notify_morning_minute: 600 };
+  it("처음 정한 비율에 기타가 있고 주 초면 가장 큰 비율인 기타를 건넨다", () => {
+    expect(pickOfferCategory({ ratios, goalItems: null, totals: [] })).toBe(OFFER_OTHER);
+  });
+  it("쓴 시간이 있으면 비율보다 가장 덜 한 쪽(기타 포함)", () => {
+    expect(pickOfferCategory({ ratios, goalItems: null, totals: [{ categoryId: null, minutes: 200 }, { categoryId: C1, minutes: 0 }] })).toBe(C1);
+    expect(pickOfferCategory({ ratios, goalItems: null, totals: [{ categoryId: C1, minutes: 200 }] })).toBe(OFFER_OTHER);
+  });
+  it("비율에 기타가 없으면 기타는 건네지 않는다(예전 그대로)", () => {
+    expect(pickOfferCategory({ ratios: [{ categoryId: C1, percent: 100 }], goalItems: null, totals: [{ categoryId: null, minutes: 60 }] })).toBe(C1);
+    expect(pickOfferCategory({ ratios: [{ categoryId: C1, percent: 100 }], goalItems: null, totals: [{ categoryId: C1, minutes: 60 }] })).toBeNull();
+  });
+  it("이번 주 목표가 있으면 목표 안에서만 건넨다(목표에는 기타가 없다)", () => {
+    const goalItems = [{ categoryId: C1, minutes: 120 }];
+    expect(pickOfferCategory({ ratios, goalItems, totals: [] })).toBe(C1);
+  });
+  it("서버: 기타를 건네면 분야 없는 오늘 끝내지 않은 할 일을 담고 제시는 분야 null로 기록된다", async () => {
+    const { store, todo } = setup();
+    store.table("category_ratios").length = 0;
+    store.seed("user_settings", settingsRow);
+    todo(T1, "분야 없는 할 일", null);
+    todo(T2, "어학 할 일", C1);
+    const res = await requestOfferForUser(deps(store), { surface: "card" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.offer).toMatchObject({ categoryId: null, categoryName: "기타", todoId: T1, todoText: "분야 없는 할 일", state: "new" });
+    expect(store.table("todo_offers")[0]).toMatchObject({ category_id: null, todo_id: T1, offer_key: offerKey("card", null, T1) });
+  });
+  it("서버: 기타를 건네는데 할 일이 없으면 분야만(기타 30분) 건넨다", async () => {
+    const { store } = setup();
+    store.table("category_ratios").length = 0;
+    store.seed("user_settings", settingsRow);
+    const res = await requestOfferForUser(deps(store), { surface: "timer_tab" });
+    expect(res.ok && res.data.offer).toMatchObject({ categoryId: null, categoryName: "기타", todoId: null, todoText: null });
   });
 });

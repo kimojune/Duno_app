@@ -209,3 +209,32 @@ describe("내 정보 탭", () => {
     expect(document.querySelector("img[src='x']")).toBeNull();
   });
 });
+
+describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
+  it("분야 줄 뒤에 기타 줄이 있고, 저장된 기타 몫이 있으면 그 값으로 열린다. 저장하면 categoryId null로 간다", async () => {
+    const api = fakeApi();
+    render(
+      <MeScreen
+        settings={settings({ ratios: [{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 30 }, { categoryId: null, percent: 10 }] })}
+        categories={categories}
+        api={api}
+        push={fakePush()}
+      />,
+    );
+    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "기타 5% 줄이기" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" }));
+    await press("비율 저장");
+    expect(api.saveRatios).toHaveBeenCalledWith([
+      { categoryId: C1, percent: 60 },
+      { categoryId: C2, percent: 30 },
+      { categoryId: null, percent: 15 },
+    ]);
+  });
+  it("기타를 0%로 두면 저장 목록에 기타가 없다", async () => {
+    const api = fakeApi();
+    render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
+    await press("비율 저장");
+    expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }]);
+  });
+});

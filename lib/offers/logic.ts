@@ -12,17 +12,23 @@ import type { RatioItem } from "../settings/types";
  *   목표를 다 채웠으면(임시) 목표에 든 분야 안에서 처음 정한 비율이 가장 큰 분야(비율이 없으면 목표의 첫 분야).
  * - 목표가 없으면 처음 정한 비율보다 덜 한 분야(모자란 시간이 가장 큰 것, 주 초에는 비율이 가장 큰 것).
  * - 건넬 분야가 없으면 null(비율도 목표도 없다).
+ * 돌려주는 값은 분야 번호(uuid), 기타를 건네면 OFFER_OTHER, 건넬 것이 없으면 null이다.
+ * 처음 정한 비율에 기타를 넣었으면 기타도 건넬 수 있다(고침 3바퀴, PM 답 d-69). 목표에는 기타가 없어 목표 안에서는 건네지 않는다.
  */
+export const OFFER_OTHER = "other";
+
 export function pickOfferCategory(args: { ratios: RatioItem[]; goalItems: CategoryMinutes[] | null; totals: CategoryMinutes[] }): string | null {
   const { ratios, goalItems, totals } = args;
   if (goalItems !== null && goalItems.length > 0) {
     const goalCategories = goalItems.flatMap((g) => (g.categoryId === null ? [] : [g.categoryId]));
     const less = lessDoneByGoal(goalItems, totals).find((c) => c.categoryId !== null);
     if (less) return less.categoryId;
-    const byRatio = [...ratios].filter((r) => goalCategories.includes(r.categoryId)).sort((a, b) => b.percent - a.percent)[0];
+    const byRatio = [...ratios].filter((r) => r.categoryId !== null && goalCategories.includes(r.categoryId)).sort((a, b) => b.percent - a.percent)[0];
     return byRatio?.categoryId ?? goalCategories[0] ?? null;
   }
-  return lessDoneByRatio(ratios, totals).find((c) => c.categoryId !== null)?.categoryId ?? null;
+  const less = lessDoneByRatio(ratios, totals)[0];
+  if (!less) return null;
+  return less.categoryId === null ? OFFER_OTHER : less.categoryId;
 }
 
 export type OfferTodoCandidate = { id: string; day: string; createdAt: string };
