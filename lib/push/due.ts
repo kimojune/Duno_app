@@ -15,3 +15,14 @@ export function isDue(targetMinute: number, nowMinute: number, windowMinutes: nu
   const elapsed = (nowMinute - targetMinute + 1440) % 1440; // 정한 시각 뒤로 몇 분 지났나
   return elapsed >= 0 && elapsed < windowMinutes;
 }
+
+/** 예약 실행 간격(분) 설정값을 읽는다. 1~120 사이 정수가 아니면 기본값 */
+export function parseWindowMinutes(value: string | number | undefined | null): number {
+  const minutes = Number(value);
+  return Number.isInteger(minutes) && minutes >= 1 && minutes <= 120 ? minutes : NOTIFY_WINDOW_MINUTES_DEFAULT;
+}
+
+/** 정한 시각이 지난 지 몇 분인가(0~1439). 아직 오지 않은 시각은 하루에서 남은 만큼 큰 수가 된다 */
+export function minutesSince(targetMinute: number, nowMinute: number): number {
+  return (nowMinute - targetMinute + 1440) % 1440;
+}

@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 import { getPushServerConfig, getTickConfig } from "../../../../lib/push/config";
-import { NOTIFY_WINDOW_MINUTES_DEFAULT } from "../../../../lib/push/due";
+import { parseWindowMinutes } from "../../../../lib/push/due";
 import { sendPushSignal } from "../../../../lib/push/send";
 import { runNotifyTick } from "../../../../lib/push/tick";
 
@@ -29,12 +29,11 @@ async function handle(request: Request): Promise<Response> {
     const push = getPushServerConfig();
     if (!tick || !push) return Response.json({ ok: false, error: "not_configured" }, { status: 503 });
     const admin = createClient(tick.supabaseUrl, tick.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const minutes = Number(process.env.NOTIFY_TICK_MINUTES);
     const result = await runNotifyTick({
       admin,
       now: new Date(),
       send: (endpoint) => sendPushSignal({ endpoint, config: push }),
-      windowMinutes: Number.isInteger(minutes) && minutes >= 1 && minutes <= 120 ? minutes : NOTIFY_WINDOW_MINUTES_DEFAULT,
+      windowMinutes: parseWindowMinutes(process.env.NOTIFY_TICK_MINUTES),
     });
     return result.ok
       ? Response.json({ ok: true, data: result.data }, { headers: { "Cache-Control": "no-store" } })

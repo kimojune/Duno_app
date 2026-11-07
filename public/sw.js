@@ -88,33 +88,57 @@ self.addEventListener("fetch", (event) => {
 });
 
 // ---- 알림(PRD 7-8, ⑦) ----
-// 보내는 쪽은 본문 없이 신호만 보낸다(본문 암호화에는 새 패키지가 필요할 수 있어 이번 틀에서는 쓰지 않는다. docs/oneshot-v2/임시값.md ⑦).
-// 그래서 어느 알림인지는 이 서비스 워커가 지금 서울 시각으로 가른다: 오후 3시 전이면 아침 알림, 아니면 저녁 알림(임시).
-// 저녁 알림을 누르면 저녁 기록이 열린다(/?open=evening). 글은 어미 없는 이름표와 해요체 한 문장이고 재촉하지 않는다.
-const EVENING_FROM_HOUR = 15;
+// 보내는 쪽은 본문 없이 신호만 보낸다(본문 암호화에는 새 패키지가 필요할 수 있어 쓰지 않는다. docs/oneshot-v2/임시값.md ⑦).
+// 신호를 받으면 이 서비스 워커가 서버(GET /api/notify/next)에 「지금 보낼 알림이 무엇인가」를 물어 종류·글·여는 주소를 받는다(로그인 쿠키로 자기 것만).
+// 그래서 아침·저녁 알림 시각은 어디에 두어도 된다. 서버가 아침·저녁 알림을 서로 다른 알림으로 가른다(고침 3바퀴, PM 답 d-69).
+// 서버에 닿지 못하거나(끊김·로그인 풀림) 보낼 알림이 없다고 하면 시각을 짐작하지 않고 중립 알림 하나를 보인다(알림을 안 보이면 브라우저가 대신 보인다).
+// 알림을 누르면 알림 글이 정한 주소가 열린다(저녁 기록은 /?open=evening). 글은 재촉하지 않는다.
+const NEXT_URL = "/api/notify/next";
+const NEXT_TIMEOUT_MS = 8000;
+const NEUTRAL = { title: "두노", body: "앱을 열어 오늘을 확인해 보세요", tag: "duno-neutral", url: "/" };
 
-function seoulHourNow() {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
-  const part = parts.find((p) => p.type === "hour");
-  return Number(part ? part.value : "0");
+function cleanItem(item) {
+  if (!item || typeof item !== "object") return null;
+  const text = (value) => (typeof value === "string" && value.length > 0 && value.length <= 200 ? value : null);
+  const title = text(item.title);
+  const body = text(item.body);
+  const tag = text(item.tag);
+  const url = typeof item.url === "string" && item.url.startsWith("/") && !item.url.startsWith("//") ? item.url : "/";
+  return title && body && tag ? { title, body, tag, url } : null;
+}
+
+function loadNotifications() {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), NEXT_TIMEOUT_MS) : null;
+  return fetch(NEXT_URL, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }, signal: controller ? controller.signal : undefined })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((body) => {
+      const items = body && body.ok === true && body.data && Array.isArray(body.data.items) ? body.data.items.map(cleanItem).filter(Boolean).slice(0, 2) : [];
+      return items.length > 0 ? items : [NEUTRAL];
+    })
+    .catch(() => [NEUTRAL])
+    .then((items) => {
+      if (timer) clearTimeout(timer);
+      return items;
+    });
 }
 
 self.addEventListener("push", (event) => {
-  const evening = seoulHourNow() >= EVENING_FROM_HOUR;
-  const title = evening ? "저녁 기록" : "오늘 먼저 할 일";
-  const options = {
-    body: evening ? "오늘 몇 시간 썼어요?" : "앱을 열어 오늘 할 일을 시작해 보세요",
-    tag: evening ? "duno-evening" : "duno-morning",
-    icon: "/icon-192.png",
-    data: { url: evening ? "/?open=evening" : "/" },
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    loadNotifications().then((items) =>
+      Promise.all(
+        items.map((item) =>
+          self.registration.showNotification(item.title, { body: item.body, tag: item.tag, icon: "/icon-192.png", data: { url: item.url } }),
+        ),
+      ),
+    ),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data;
-  const url = data && typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
+  const url = data && typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url : "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       for (const client of windows) {
