@@ -76,3 +76,21 @@ export function barPercents(values: number[]): number[] {
   const max = Math.max(0, ...values);
   return values.map((v) => (max <= 0 ? 0 : Math.round((v / max) * 100)));
 }
+
+/**
+ * 「덜 한 분야」(반대편) 목록: 먼저 할 일을 고르고 먼저 한 기록에 반대편 여부를 남길 때 쓴다(D-105, D-108, D-110).
+ * 처음 정한 비율 기준: 이번 주 쓴 시간이 아직 없으면(주 초) 비율이 0보다 큰 모든 분야가 덜 한 분야이고(큰 비율 순),
+ * 쓴 시간이 있으면 shortfallByRatio와 같다. 기타는 들지 않는다. (임시)
+ */
+export function lessDoneByRatio(ratios: RatioItem[], totals: CategoryMinutes[]): CategoryMinutes[] {
+  if (totalOf(totals) > 0) return shortfallByRatio(ratios, totals);
+  return ratios
+    .filter((r) => r.percent > 0)
+    .sort((a, b) => b.percent - a.percent)
+    .map((r) => ({ categoryId: r.categoryId, minutes: 0 }));
+}
+
+/** 이번 주 목표 기준 덜 한 분야: 목표에 든 분야 가운데 목표보다 덜 한 것(남은 시간 큰 순) */
+export function lessDoneByGoal(goalItems: CategoryMinutes[], totals: CategoryMinutes[]): CategoryMinutes[] {
+  return shortfallByGoal(goalItems, totals);
+}

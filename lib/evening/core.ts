@@ -76,7 +76,7 @@ export async function readEveningState(deps: EveningDeps, dayParam?: unknown): P
       deps.supabase.from("evening_logs").select(LOG_COLUMNS).eq("user_id", user.data).eq("target_day", day).order("saved_at", { ascending: true }).order("id", { ascending: true }),
       deps.supabase.from("todos").select("category_id").eq("user_id", user.data).eq("day", day).eq("done", true),
       listCategoriesForUser({ supabase: deps.supabase, key: deps.key }),
-      listTimerMinutes({ supabase: deps.supabase, userId: user.data, day }),
+      listTimerMinutes({ supabase: deps.supabase, userId: user.data, day, now: deps.now }),
     ]);
     if (logs.error) return recordFail(mapRecordDbError(logs.error));
     if (done.error) return recordFail(mapRecordDbError(done.error));

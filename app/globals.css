@@ -483,3 +483,15 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .done-tag { margin-left: var(--space-2); }
 .note-sublist { list-style: none; margin: var(--space-1) 0 0; padding: 0 0 0 var(--space-3); border-left: 2px solid var(--color-divider); }
 .note-sublist > li { margin: 0 0 var(--space-1); }
+
+/* ---- 원샷 v2 ④: 타이머 탭 ---- */
+.timer { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
+.timer-title:focus, #timer-title:focus { outline: none; }
+.timer-running { margin: var(--space-4) 0; text-align: center; }
+.timer-label { margin: 0; font: var(--font-body); overflow-wrap: anywhere; }
+.timer-clock { margin: var(--space-2) 0; font: var(--font-name); font-variant-numeric: tabular-nums; }
+.timer-running .detail-actions { justify-content: center; }
+.timer-fieldset { margin: 0; padding: 0; border: 0; }
+.timer-option { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap-min); padding: var(--space-1) 0; overflow-wrap: anywhere; }
+.timer-option input { flex: none; inline-size: 24px; block-size: 24px; margin: 0; }
+.timer-option-text { min-width: 0; }

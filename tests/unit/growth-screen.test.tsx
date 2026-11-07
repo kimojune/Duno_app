@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HomeRead } from "../../lib/home-types";
 import type { GrowthData } from "../../lib/growth/types";
@@ -152,7 +152,7 @@ describe("상태보기 (7-4, ③)", () => {
   it("그려진 뒤에 본 것을 입구와 함께 한 번 남긴다", async () => {
     const api = fakeApi();
     await mount(api, { entry: "after_save" });
-    expect(api.recordView).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(api.recordView).toHaveBeenCalledTimes(1));
     expect(api.recordView).toHaveBeenCalledWith({ id: expect.stringMatching(/^[0-9a-f-]{36}$/), screen: "growth", entry: "after_save" });
   });
 
@@ -249,7 +249,7 @@ describe("분야 페이지 (G13-a)", () => {
     const a = api();
     render(<CategoryPage api={a} categoryId={C1} name="어학" onClose={vi.fn()} />);
     await screen.findByText("단어 50개 외웠다");
-    expect(a.recordView).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(a.recordView).toHaveBeenCalledTimes(1));
     expect(a.recordView).toHaveBeenCalledWith({ id: expect.any(String), screen: "category", entry: "self" });
   });
 
@@ -342,11 +342,12 @@ describe("AppShell의 탭", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
     await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
     expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith("/growth"))).toBe(true);
-    expect(recordViewAction).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(recordViewAction).toHaveBeenCalledTimes(1));
     expect(recordViewAction.mock.calls[0][0]).toMatchObject({ screen: "growth", entry: "self" });
+    // 지금 탭(상태보기) 말고 할 일·타이머 탭이 숨겨져 있고, 할 일 탭은 지워지지 않고 살아 있다
     const hidden = Array.from(container.querySelectorAll("div[hidden]"));
-    expect(hidden).toHaveLength(1);
-    expect(hidden[0].querySelector(".todo-app")).not.toBeNull(); // 숨겨졌을 뿐 살아 있다
+    expect(hidden).toHaveLength(2);
+    expect(hidden.some((el) => el.querySelector(".todo-app") !== null)).toBe(true);
   });
 
   it("상태보기에서 분야를 누르면 분야 페이지가 열리고 닫을 수 있다", async () => {

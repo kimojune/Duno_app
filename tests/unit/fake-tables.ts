@@ -44,7 +44,10 @@ export class FakeStore {
   table(name: string): Row[] {
     return (this.tables[name] ??= []);
   }
+  /** 정하면 모든 DB 기본값 시각(now())이 이 시각이 된다(서버 시계와 앱 시계를 맞추는 시험용) */
+  fixedNow: Date | null = null;
   nextTimestamp(): string {
+    if (this.fixedNow) return this.fixedNow.toISOString();
     this.clock += 1000;
     return new Date(this.clock).toISOString();
   }
@@ -288,6 +291,25 @@ function fill(values: Row): (row: Row) => Row {
 /** 원샷 v2 마이그레이션의 규칙을 시험용으로 옮긴 것(표 이름은 마이그레이션과 같다) */
 export function v2Rules(): Record<string, TableRule> {
   return {
+    focus_sessions: {
+      insertColumns: [
+        "id",
+        "user_id",
+        "client_started_at",
+        "day",
+        "planned_minutes",
+        "todo_id",
+        "category_id",
+        "offer_id",
+        "surface",
+        "opposite_by_goal",
+        "opposite_by_ratio",
+      ],
+      updateColumns: ["ended_at", "elapsed_seconds"],
+      defaults: (row, store) => ({ started_at: store.nextTimestamp(), ended_at: null, elapsed_seconds: null, ...(row.todo_id === undefined ? { todo_id: null } : {}), ...(row.category_id === undefined ? { category_id: null } : {}), ...(row.offer_id === undefined ? { offer_id: null } : {}) }),
+      fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
+      limit: { count: 50000, hint: "focus_sessions_limit" },
+    },
     evening_logs: {
       insertColumns: ["id", "user_id", "target_day", "total_minutes", "items", "save_mode", "client_saved_at"],
       defaults: (_row, store) => ({ saved_at: store.nextTimestamp() }),
