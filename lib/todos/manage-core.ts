@@ -181,7 +181,8 @@ export async function listCarryOverCandidates(deps: ManageDeps): Promise<TodoRes
     if (!user.ok) return user;
     if (!deps.key) return fail("config");
     const key = deps.key;
-    const yesterday = addDays(todoDayFor((deps.now ?? serverNow)()), -1);
+    const today = todoDayFor((deps.now ?? serverNow)());
+    const yesterday = addDays(today, -1);
     const { data, error } = await deps.supabase
       .from("todos")
       .select(ROW_COLUMNS)
@@ -191,7 +192,14 @@ export async function listCarryOverCandidates(deps: ManageDeps): Promise<TodoRes
       .order("created_at", { ascending: true })
       .order("id", { ascending: true });
     if (error) return fail(mapDbError(error));
-    const todos = sortByPosition((data ?? []) as TodoRow[]).map((row) => toItem(row, user.data, key));
+    // 이미 가져온 것은 후보에서 뺀다. 가져오기는 암호문을 그대로 복사하므로(IV까지 같다), 오늘 할 일(끝낸 것 포함)과
+    // text_encrypted가 같은 어제 것은 이미 가져온 것이다. 마이그레이션 없이 알아본다(A2).
+    // 가져온 뒤 오늘 쪽 글을 고치면 암호문이 달라져 다시 후보에 나올 수 있다(알려진 한계, 보고에 적음).
+    const todayRows = await deps.supabase.from("todos").select("text_encrypted").eq("user_id", user.data).eq("day", today);
+    if (todayRows.error) return fail(mapDbError(todayRows.error));
+    const taken = new Set(((todayRows.data ?? []) as { text_encrypted: string }[]).map((r) => r.text_encrypted));
+    const rows = ((data ?? []) as TodoRow[]).filter((row) => !taken.has(row.text_encrypted));
+    const todos = sortByPosition(rows).map((row) => toItem(row, user.data, key));
     return { ok: true, data: { todos } };
   } catch {
     return fail("unavailable");

@@ -223,6 +223,21 @@ describe("어제 못 끝낸 할 일 가져오기", () => {
     expect(again.ok).toBe(true);
     expect(store.table("todos").filter((r) => r.day === "2026-11-07")).toHaveLength(2);
   });
+  it("이미 가져온 것은 다시 열어도 후보에 나오지 않는다(오늘 것을 끝냈어도)", async () => {
+    const store = setup();
+    todoRow(store, T1, "못 끝냄", { day: "2026-11-06" });
+    todoRow(store, T2, "아직 안 가져옴", { day: "2026-11-06" });
+    const client = fakeTablesClient(store, { sub: ME });
+    const deps = { supabase: client, key: KEY, now: () => NOW };
+    const NEW1 = "44444444-4444-4444-8444-444444444444";
+    expect((await carryOverTodosForUser(deps, [{ from: T1, id: NEW1 }])).ok).toBe(true);
+    const list = await listCarryOverCandidates(deps);
+    expect(list.ok && list.data.todos.map((t) => t.id)).toEqual([T2]);
+    // 가져온 것을 오늘 끝내도 다시 나오지 않는다
+    store.table("todos").find((r) => r.id === NEW1)!.done = true;
+    const after = await listCarryOverCandidates(deps);
+    expect(after.ok && after.data.todos.map((t) => t.id)).toEqual([T2]);
+  });
   it("어제 것이 아니거나 남의 것이면 not_found, 형식이 틀리면 invalid_input", async () => {
     const store = setup();
     todoRow(store, T1, "오늘 것"); // 오늘
