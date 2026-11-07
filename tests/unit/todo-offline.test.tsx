@@ -106,6 +106,33 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     expect(box.stored()).toEqual([]);
   });
 
+  it("새벽 4시 전에 끊긴 채 적고 4시 뒤에 올리면, 서버가 어제 날짜로 넣은 글은 오늘 목록에서 빠지고 「어제 날짜로 저장했어요」가 보인다 (A4)", async () => {
+    const box = memoryOutbox();
+    await mount(box);
+    setOnline(false);
+    await write("자정 넘어 적은 글");
+    expect(screen.getByText("자정 넘어 적은 글")).toBeTruthy();
+    const yesterday: TodoDay = { date: "2026-11-06", year: 2026, month: 11, dayOfMonth: 6, weekday: 5 };
+    addTodo.mockImplementation(async (id: string, text: string) => ({ ok: true, data: { day: yesterday, todo: item(id, text) } }));
+    await goOnline();
+    expect(addTodo).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("자정 넘어 적은 글")).toBeNull(); // 오늘 목록에 「저장됨」으로 남지 않는다
+    expect(screen.getByText("어제 날짜로 저장했어요")).toBeTruthy();
+    expect(box.stored()).toEqual([]); // 올라갔으니 기기에서는 지운다
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByText("어제 날짜로 저장했어요")).toBeNull();
+  });
+
+  it("오늘 날짜로 저장된 글은 그대로 오늘 목록에 남는다 (A4)", async () => {
+    await mount(memoryOutbox());
+    setOnline(false);
+    await write("오늘 글");
+    addTodo.mockImplementation(async (id: string, text: string) => ({ ok: true, data: { day: DAY, todo: item(id, text) } }));
+    await goOnline();
+    expect(screen.getByText("오늘 글")).toBeTruthy();
+    expect(screen.queryByText(/날짜로 저장했어요/)).toBeNull();
+  });
+
   it("앱을 닫았다 열어도(보관함에 남은 글) 연결 대기 줄로 올라오고 연결이 있으면 바로 보낸다", async () => {
     const box = memoryOutbox([{ id: ID_OLD, text: "어제 적어 둔 글", categoryId: null, writtenAt: "2026-11-06T10:00:00.000Z" }]);
     addTodo.mockImplementation(async (id: string, text: string) => ok(item(id, text)));

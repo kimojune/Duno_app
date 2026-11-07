@@ -11,6 +11,7 @@ import {
 } from "react";
 import { CATEGORY_LIMIT, CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
 import type { TodoDay } from "../lib/todos/types";
+import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { LiveRegion, Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -108,6 +109,12 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 export function dayText(day: TodoDay): string {
   return `${day.month}월 ${day.dayOfMonth}일 ${WEEKDAYS[day.weekday]}요일`;
+}
+
+/** 오프라인으로 적어 두었다가 새벽 4시 뒤에 올라가 서버가 다른 날짜로 넣었을 때(A4). 어제면 「어제 날짜」, 더 전이면 날짜를 말한다 */
+export function savedOtherDayText(saved: TodoDay, today: TodoDay): string {
+  const yesterday = addDays(today.date, -1);
+  return saved.date === yesterday ? "어제 날짜로 저장했어요" : `${saved.month}월 ${saved.dayOfMonth}일 날짜로 저장했어요`;
 }
 
 export function loadedText(count: number): string {

@@ -12,7 +12,7 @@ import type { Outbox, OutboxItem } from "../lib/outbox";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
 import { describeTodoDay, todoDayFor } from "../lib/todos/day";
-import type { TodayTodos, TodoDay, TodoItem, TodoResult } from "../lib/todos/types";
+import type { AddedTodo, TodayTodos, TodoDay, TodoItem, TodoResult } from "../lib/todos/types";
 import { checkTodoText, countTodoChars } from "../lib/todos/validation";
 import { useAnnouncer } from "../lib/use-announcer";
 import { useOnline } from "../lib/use-online";
@@ -22,6 +22,7 @@ import {
   categoryOverLimitText,
   loadedText,
   overLimitText,
+  savedOtherDayText,
   TODO_TEXT,
   TodoView,
   type ChipView,
@@ -29,6 +30,7 @@ import {
   type RowView,
 } from "./todo-view";
 import { CarryOver } from "./carry-over";
+import { Notice, TextButton } from "./ui";
 import { TodoDetail } from "./todo-detail";
 
 /**
@@ -167,6 +169,9 @@ export function TodoScreen({
   const [list, setList] = useState<ListState>(() => initialListState(initialTodos));
   // 머리 날짜는 목록을 받기 전에도 보인다. 화면과 서버가 같은 순수 함수(todoDayFor)를 쓴다.
   const [day, setDay] = useState<TodoDay | null>(() => (first ? first.day : describeTodoDay(todoDayFor(new Date()))));
+  /** 방금 올라간 글이 오늘이 아닌 날짜로 저장됐을 때의 안내(A4). 닫을 수 있다 */
+  const [otherDayNotice, setOtherDayNotice] = useState<string | null>(null);
+  const dayRef = useRef<TodoDay | null>(day);
   const [draft, setDraft] = useState("");
   const [offlineHelp, setOfflineHelp] = useState(false);
   const [sessionLost, setSessionLost] = useState(() => initialTodos?.ok === false && initialTodos.error === "unauthenticated");
@@ -249,6 +254,9 @@ export function TodoScreen({
       document.getElementById(`row-${target}`)?.scrollIntoView?.({ block: "nearest" });
     }
   }, [rows]);
+  useLayoutEffect(() => {
+    dayRef.current = day;
+  }, [day]);
   useLayoutEffect(() => {
     draftRef.current = draft;
   }, [draft]);
@@ -625,7 +633,7 @@ export function TodoScreen({
         setRows((prev) => prev.map((r) => (r.id === id && r.status === "saving" ? { ...r, slow: true } : r)));
       }, SAVING_HINT_DELAY_MS);
       // writtenAt(오프라인으로 적은 때)은 보관함을 쓰는 줄에만 싣는다. 없으면 옛 호출 꼴 그대로(인자 수가 늘지 않게)
-      const res = await safely<TodoResult<{ todo: TodoItem }>>(
+      const res = await safely<TodoResult<AddedTodo>>(
         () => (writtenAt === undefined ? addTodo(id, text, categoryId) : addTodo(id, text, categoryId, writtenAt)),
         UNAVAILABLE,
       );
@@ -637,8 +645,18 @@ export function TodoScreen({
         writtenAtRef.current.delete(id);
         confirmedRef.current.set(id, res.data.todo.done);
         const saved = fromItem(res.data.todo);
-        setRows((prev) => prev.map((r) => (r.id === id ? { ...saved, text: saved.text ?? r.text } : r)));
-        announce(TODO_TEXT.liveSaved);
+        const today = dayRef.current;
+        if (today && res.data.day && res.data.day.date !== today.date) {
+          // 오프라인으로 새벽 4시 전에 적고 4시 뒤에 올린 글: 서버는 적은 때의 하루로 넣었다. 오늘 목록에 「저장됨」으로 두면
+          // 사실과 다르니 목록에서 빼고 어느 날짜로 저장됐는지 알린다(날짜 규칙 자체는 PM 물음, 바꾸지 않는다)
+          setRows((prev) => prev.filter((r) => r.id !== id));
+          const text = savedOtherDayText(res.data.day, today);
+          setOtherDayNotice(text);
+          announce(text, { again: true });
+        } else {
+          setRows((prev) => prev.map((r) => (r.id === id ? { ...saved, text: saved.text ?? r.text } : r)));
+          announce(TODO_TEXT.liveSaved);
+        }
       } else {
         // 남의 분야·없는 분야(invalid_category)도 일반 저장 실패(T7)와 같다
         if (res.error === "unauthenticated") setSessionLost(true);
@@ -1013,8 +1031,13 @@ export function TodoScreen({
       onRelogin={() => router.refresh()}
       onOpenDetail={manage ? (id) => setDetailId(id) : undefined}
       topSlot={
-        manage || topSlot ? (
+        manage || topSlot || otherDayNotice ? (
           <>
+            {otherDayNotice && (
+              <Notice role="status" className="notice-top" actions={<TextButton onClick={() => setOtherDayNotice(null)}>닫기</TextButton>}>
+                {otherDayNotice}
+              </Notice>
+            )}
             {topSlot}
             {manage && list === "ready" && <CarryOver api={manage} online={online} onCarried={onCarried} />}
           </>
