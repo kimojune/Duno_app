@@ -156,6 +156,22 @@ function MainShell({
   const [goalVersion, setGoalVersion] = useState(0);
   const [goalEditor, setGoalEditor] = useState<GoalSummary | null>(null);
   const cardStartRef = useRef<string | null>(null);
+  // 탭 줄의 실제 높이(B9): 글자가 커져 두 줄이 되면 본문 아래 여백도 따라 늘린다. 재기 전에는 한 줄 기준 값을 쓴다
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [tabbarH, setTabbarH] = useState<number | null>(null);
+  useEffect(() => {
+    const bar = shellRef.current?.querySelector<HTMLElement>(".tabbar");
+    if (!bar) return;
+    const measure = () => {
+      const height = Math.ceil(bar.getBoundingClientRect().height);
+      if (height > 0) setTabbarH(height); // 아직 그려지지 않았으면(0) 한 줄 기준 값을 둔다
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
   // 카드 제시를 받는다(서버에서 가져오는 일). 앱을 열 때, 화면이 다시 보일 때, 새벽 4시를 넘길 때마다 다시 받는다(A13).
   // 같은 제시는 서버가 한 번만 센다. 받은 제시가 반응 없는(new) 오늘 것이 아니면 카드를 거둔다. 못 받았으면 지금 카드를 그대로 둔다.
@@ -274,7 +290,11 @@ function MainShell({
     : null;
 
   return (
-    <div className="app-shell" style={{ "--tabbar-h": "calc(56px + env(safe-area-inset-bottom))" } as React.CSSProperties}>
+    <div
+      ref={shellRef}
+      className="app-shell"
+      style={{ "--tabbar-h": tabbarH === null ? "calc(56px + env(safe-area-inset-bottom))" : `${tabbarH}px` } as React.CSSProperties}
+    >
       <div hidden={tab !== "growth"}>
         <GrowthScreen
           api={defaultGrowthApi}

@@ -51,7 +51,7 @@
 html, body { margin: 0; padding: 0; }
 /* C-D11: 스크롤하는 요소(문서)의 아래 여백. 포커스 받은 체크 칸·「다시」·「빼기」가 단추·적는 창 밑에 들어가지 않게.
    --bottom-clearance는 TodoView가 창 높이를 재어(ResizeObserver) 넣는다. 없을 때는 닫힌 값(단추 56 + 위아래 16씩). */
-html { scroll-padding-bottom: var(--bottom-clearance, calc(88px + env(safe-area-inset-bottom))); }
+html { scroll-padding-bottom: var(--bottom-clearance, calc(88px + var(--tabbar-h, env(safe-area-inset-bottom)))); }
 body {
   font: var(--font-body);
   background: var(--color-bg);
@@ -165,7 +165,7 @@ button, input { font: inherit; color: inherit; }
 .today-date { margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--page-x) var(--space-4); }
 /* 목록 끝 여백(12-2): 창이 닫혔으면 88px, 열렸으면 창 높이 + 16px. 둘 다 + 안전 영역. scroll-padding-bottom과 같은 값 */
-.todo-main { flex: 1; padding: 0 var(--page-x) var(--bottom-clearance, calc(88px + env(safe-area-inset-bottom))); }
+.todo-main { flex: 1; padding: 0 var(--page-x) var(--bottom-clearance, calc(88px + var(--tabbar-h, env(safe-area-inset-bottom)))); }
 .todo-main > .notice { margin-bottom: var(--space-2); }
 .todo-list, .todo-skeleton { list-style: none; margin: 0; padding: 0; }
 .todo-empty { padding: var(--space-4) 0; color: var(--color-text); }
@@ -452,11 +452,13 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabbar-list { list-style: none; margin: 0 auto; padding: 0; max-width: var(--page-max); display: flex; }
-.tabbar-item { flex: 1; }
+.tabbar-item { flex: 1; min-width: 0; }
 .tabbar-btn {
   display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px;
   border: 0; border-top: 3px solid transparent; background: transparent; cursor: pointer;
   font: var(--font-sub); color: var(--color-text-sub);
+  /* 글자가 커져 한 줄에 안 들어가면 두 줄로 내려간다(B9). 칸이 글에 밀려 넘치지 않게 .tabbar-item에 min-width: 0 */
+  padding: var(--space-1) var(--space-1); text-align: center; overflow-wrap: anywhere;
 }
 .tabbar-btn[aria-current="page"] { color: var(--color-primary); border-top-color: var(--color-primary); font-weight: 700; }
 .tabbar-btn:active { background: var(--color-notice-bg); }

@@ -100,8 +100,8 @@ export const CHIP_MAX_GAP_PX = 32;
  */
 export const SHEET_REVIEW_MAX_RATIO = 2 / 3;
 
-/** 창이 닫혔을 때 목록 끝·scroll-padding-bottom 값(12-2, C-D11): 단추 56 + 위아래 16씩 */
-const CLOSED_CLEARANCE = "calc(88px + env(safe-area-inset-bottom))";
+/** 창이 닫혔을 때 목록 끝·scroll-padding-bottom 값(12-2, C-D11): 단추 56 + 위아래 16씩 + 아래 탭 줄 높이(탭 줄이 없으면 안전 영역만, B8) */
+const CLOSED_CLEARANCE = "calc(88px + var(--tabbar-h, env(safe-area-inset-bottom)))";
 /** 창이 열렸을 때: 창의 실제 높이 + 16px + 안전 영역 */
 const openClearance = (sheetHeight: number) => `calc(${Math.ceil(sheetHeight) + 16}px + env(safe-area-inset-bottom))`;
 

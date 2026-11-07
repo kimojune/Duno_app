@@ -1078,7 +1078,7 @@ describe("C-D11 scroll-padding-bottom을 창 높이에 맞춰 다시 잰다(Todo
   };
   const clearance = () => document.documentElement.style.getPropertyValue("--bottom-clearance");
 
-  it("닫힘은 88px + 안전 영역, 열림은 창 높이 + 16px, 창 높이가 바뀌면(ResizeObserver) 다시 잰다", () => {
+  it("닫힘은 88px + 탭 줄 높이(없으면 안전 영역), 열림은 창 높이 + 16px, 창 높이가 바뀌면(ResizeObserver) 다시 잰다", () => {
     let height = 213;
     vi.spyOn(HTMLFormElement.prototype, "getBoundingClientRect").mockImplementation(() => ({ height }) as DOMRect);
     const callbacks: (() => void)[] = [];
@@ -1092,14 +1092,14 @@ describe("C-D11 scroll-padding-bottom을 창 높이에 맞춰 다시 잰다(Todo
     }
     vi.stubGlobal("ResizeObserver", FakeObserver);
     const { rerender, unmount } = render(<TodoView {...base} />);
-    expect(clearance()).toBe("calc(88px + env(safe-area-inset-bottom))");
+    expect(clearance()).toBe("calc(88px + var(--tabbar-h, env(safe-area-inset-bottom)))");
     rerender(<TodoView {...base} sheetOpen />);
     expect(clearance()).toBe("calc(229px + env(safe-area-inset-bottom))");
     height = 301; // 새 분야 줄이 열려 창이 높아짐
     act(() => callbacks.forEach((cb) => cb()));
     expect(clearance()).toBe("calc(317px + env(safe-area-inset-bottom))");
     rerender(<TodoView {...base} />);
-    expect(clearance()).toBe("calc(88px + env(safe-area-inset-bottom))");
+    expect(clearance()).toBe("calc(88px + var(--tabbar-h, env(safe-area-inset-bottom)))");
     unmount();
     expect(clearance()).toBe("");
     vi.unstubAllGlobals();
