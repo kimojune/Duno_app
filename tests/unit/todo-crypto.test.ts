@@ -110,6 +110,17 @@ describe("암호화·풀기", () => {
     }
   });
 
+  it("풀기 길이 상한은 용도별이다(작업 기록은 DB 상한 16000자까지, 분야 이름은 512자까지)", () => {
+    const key = newKey();
+    const note = encryptTodoText("가".repeat(2000), user, key, "todo_note");
+    expect(note.length).toBeGreaterThan(CIPHERTEXT_MAX_LENGTH);
+    expect(decryptTodoText(note, user, key, "todo_note")).toEqual({ ok: true, text: "가".repeat(2000) });
+    // 같은 길이의 암호문이라도 할 일 글 자리에서는 상한 4096자를 넘어 풀지 않는다
+    expect(decryptTodoText(note, user, key)).toBe(DECRYPT_FAILED);
+    const cat = encryptCategoryName("어학", user, key);
+    expect(decryptTodoText(cat + "A".repeat(600), user, key, "category_name")).toBe(DECRYPT_FAILED);
+  });
+
   it("다른 키로 풀면 실패", () => {
     const value = encryptTodoText("글", user, newKey());
     expect(decryptTodoText(value, user, newKey())).toBe(DECRYPT_FAILED);

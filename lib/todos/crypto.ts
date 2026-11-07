@@ -10,7 +10,7 @@ import { getServerConfig } from "../server-config";
  *  - 추가 인증 데이터(AAD)에 그 행 소유자의 user id를 넣어, 다른 사용자 id로는 풀리지 않게 묶는다.
  *  - AAD에는 용도(purpose)도 들어간다. 할 일 글과 분야 이름은 같은 함수·같은 키·같은 형식이지만 AAD가 달라,
  *    한쪽 암호문을 다른 쪽 열에 옮겨 넣어도 풀리지 않는다.
- *  - DB check 제약(마이그레이션 todos_text_encrypted_format, 4096자)과 같은 규칙이다.
+ *  - DB check 제약(마이그레이션 todos_text_encrypted_format 등)과 같은 규칙이다. 길이 상한은 용도별(CIPHERTEXT_MAX_BY_PURPOSE).
  *
  * 키 교체 이음매: 판 번호. 지금은 v1 하나만 쓴다. 키를 바꿀 때는 새 판(v2)과 키를 더하고
  * 풀기에서 판 번호로 키를 고르게 바꾼다(방법은 결정 필요).
@@ -39,6 +39,17 @@ const AAD_PREFIX = {
 export type CipherPurpose = keyof typeof AAD_PREFIX;
 
 export const CIPHERTEXT_MAX_LENGTH = 4096;
+/**
+ * 풀기가 받는 암호문 길이 상한을 용도별로 둔다. 각 값은 그 열의 DB check 상한과 같다.
+ * (한 값 4096으로 모든 용도를 막으면, DB가 16000자까지 받는 작업 기록이 한글 약 1,014자부터 저장은 되고 읽을 때 풀리지 않는다.)
+ * 새 용도를 더할 때는 그 열의 DB 상한을 여기에 함께 적는다.
+ */
+export const CIPHERTEXT_MAX_BY_PURPOSE = {
+  todo_text: 4096, // todos_text_encrypted_length
+  category_name: 512, // categories_name_encrypted_length
+  todo_note: 16000, // todo_notes_note_encrypted_length
+  goal_text: 1024, // user_settings_goal_length
+} as const satisfies Record<CipherPurpose, number>;
 const CIPHERTEXT_FORMAT = /^v([1-9][0-9]{0,2}):([A-Za-z0-9_-]{16}):([A-Za-z0-9_-]+):([A-Za-z0-9_-]{22})$/;
 // 32바이트를 표준 base64로 쓰면 43자 + '=' 하나
 const KEY_BASE64 = /^[A-Za-z0-9+/]{43}=$/;
@@ -98,7 +109,8 @@ export function decryptTodoText(
   purpose: CipherPurpose = "todo_text",
 ): DecryptResult {
   try {
-    if (typeof value !== "string" || value.length > CIPHERTEXT_MAX_LENGTH) return DECRYPT_FAILED;
+    if (!Object.hasOwn(CIPHERTEXT_MAX_BY_PURPOSE, purpose)) return DECRYPT_FAILED;
+    if (typeof value !== "string" || value.length > CIPHERTEXT_MAX_BY_PURPOSE[purpose]) return DECRYPT_FAILED;
     const match = CIPHERTEXT_FORMAT.exec(value);
     if (!match) return DECRYPT_FAILED;
     const [, version, ivPart, bodyPart, tagPart] = match;

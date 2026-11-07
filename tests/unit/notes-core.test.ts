@@ -33,6 +33,35 @@ describe("checkNoteText", () => {
   });
 });
 
+describe("작업 기록 상한 글 왕복(A1)", () => {
+  it("「가」×2000(상한)을 저장하고 다시 읽으면 읽을 수 있는 글로 돌아온다", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "이력서", "2026-11-07", CAT);
+    const client = fakeTablesClient(store, { sub: ME });
+    const deps = { supabase: client, key: KEY, now: () => NOW };
+    const big = "가".repeat(NOTE_MAX_LENGTH);
+    const added = await addNoteForUser(deps, N1, T1, big);
+    expect(added.ok && added.data.note.readable).toBe(true);
+    // 저장된 암호문은 예전 풀기 상한(4096자)을 넘지만, DB 상한(16000자) 안이다
+    const stored = String(store.table("todo_notes")[0].note_encrypted);
+    expect(stored.length).toBeGreaterThan(4096);
+    expect(stored.length).toBeLessThanOrEqual(16000);
+    const listed = await listNotesForTodo(deps, T1);
+    expect(listed.ok && listed.data.notes[0]).toMatchObject({ readable: true, text: big });
+  });
+  it("😀×2000(가장 긴 바이트)도 DB 상한 16000자 안이고 읽힌다", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "이력서", "2026-11-07", CAT);
+    const client = fakeTablesClient(store, { sub: ME });
+    const deps = { supabase: client, key: KEY, now: () => NOW };
+    const big = "😀".repeat(NOTE_MAX_LENGTH);
+    await addNoteForUser(deps, N1, T1, big);
+    expect(String(store.table("todo_notes")[0].note_encrypted).length).toBeLessThanOrEqual(16000);
+    const listed = await listNotesForTodo(deps, T1);
+    expect(listed.ok && listed.data.notes[0]).toMatchObject({ readable: true, text: big });
+  });
+});
+
 describe("addNoteForUser", () => {
   it("암호화해 저장하고, 서버 하루를 붙이고, 평문을 DB에 보내지 않는다", async () => {
     const { store, seedTodo } = setup();
