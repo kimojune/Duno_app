@@ -129,15 +129,21 @@ describe("저녁 기록 (7-3, ②)", () => {
     );
   });
 
-  it("나눈 시간이 합계보다 많으면 합계를 늘려 저장한다고 알린다", async () => {
+  it("나눈 합은 쓴 시간을 넘지 못한다: 쓴 시간보다 큰 값을 넣어도 기타에 남은 만큼까지만 들어가고, 저장 총시간은 쓴 시간 그대로(PM 확정 11-08)", async () => {
     const api = fakeApi();
     await mount(api);
     setNumber("시간", 1);
     await press("분야마다 나누기");
     setNumber("어학", 90);
-    expect(screen.getByText("나눈 시간이 합계보다 많아서 합계를 1시간 30분으로 맞춰 저장해요.")).toBeTruthy();
+    expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("60");
+    expect((screen.getByRole("button", { name: "어학 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true); // 기타가 0분이라 다른 분야도 못 늘린다
+    setNumber("포트폴리오", 30);
+    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
+    expect(screen.queryByText(/나눈 시간이 합계보다 많아서/)).toBeNull();
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
     await press("저장");
-    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 90, items: [{ categoryId: C1, minutes: 90 }] }));
+    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 60, items: [{ categoryId: C1, minutes: 60 }] }));
   });
 
   it("저장 직후 한 줄을 누르면 상태보기로 간다(onOpenGrowth)", async () => {
