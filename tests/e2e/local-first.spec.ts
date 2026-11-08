@@ -18,6 +18,18 @@ async function ids(client: SupabaseClient, table: "todos" | "evening_logs"): Pro
 }
 const fresh = (now: Set<string>, before: Set<string>) => [...now].filter((id) => !before.has(id));
 
+/**
+ * 이번 시험이 만든 저녁 기록만(고침 4바퀴): 시작 때 없던 행 가운데 기기 저장 시각(client_saved_at)이 이 시험 시작 뒤인 것.
+ * 저녁 기록 표는 지울 수 없어(쌓기만 함) 앞 시험(latency 등)이 남긴 행이 늦게 도착해도 세지 않게 한다.
+ */
+async function freshLogs(client: SupabaseClient, before: Set<string>, sinceMs: number): Promise<string[]> {
+  const res = await client.from("evening_logs").select("id, client_saved_at");
+  if (res.error) throw new Error(`저녁 기록을 읽지 못했다: ${res.error.code ?? "unknown"}`);
+  return ((res.data ?? []) as { id: string; client_saved_at: string | null }[])
+    .filter((r) => !before.has(r.id) && r.client_saved_at !== null && Date.parse(r.client_saved_at) >= sinceMs)
+    .map((r) => r.id);
+}
+
 async function openApp(ctx: BrowserContext): Promise<Page> {
   const page = await ctx.newPage();
   await page.goto("/");
@@ -43,6 +55,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
   const ctx = await contextFor(browser, await sessionCookies(env, A));
   const marker = `off-${Date.now().toString(36)}`;
   const hours = 2 + (Date.now() % 20); // 2~21시간
+  const startedMs = Date.now() - 1000; // 기기·서버 시계 차이를 조금 둔다
   try {
     const page = await openApp(ctx);
 
@@ -78,18 +91,18 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     // 끊긴 동안 서버에는 아무것도 없다
     await page.waitForTimeout(1500);
     expect(fresh(await ids(nodeA, "todos"), beforeTodos)).toEqual([]);
-    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toEqual([]);
+    expect(await freshLogs(nodeA, beforeLogs, startedMs), "끊긴 동안 이번 시험의 저녁 기록은 서버에 없다(보내지 않는다)").toEqual([]);
 
     // 연결: 보낼 줄이 차례로 서버에 간다
     await ctx.setOffline(false);
-    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "todos"), beforeTodos).length === 1 && fresh(await ids(nodeA, "evening_logs"), beforeLogs).length === 1, 60_000, 250);
+    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "todos"), beforeTodos).length === 1 && (await freshLogs(nodeA, beforeLogs, startedMs)).length === 1, 60_000, 250);
     expect(arrived, "연결 뒤 60초 안에 할 일 하나와 저녁 기록 하나가 서버에 들어간다").toBeGreaterThanOrEqual(0);
 
     // 서버에는 한 번씩만: 끝냄 표시도 들어갔고, 저녁 기록은 기기에서 정한 값 그대로
     const todoId = fresh(await ids(nodeA, "todos"), beforeTodos)[0];
     const todoRow = await nodeA.from("todos").select("done, day").eq("id", todoId).single();
     expect(todoRow.data?.done).toBe(true);
-    const logId = fresh(await ids(nodeA, "evening_logs"), beforeLogs)[0];
+    const logId = (await freshLogs(nodeA, beforeLogs, startedMs))[0];
     const logRow = await nodeA.from("evening_logs").select("total_minutes, save_mode, target_day, items, client_saved_at").eq("id", logId).single();
     expect(logRow.data).toMatchObject({ total_minutes: hours * 60, save_mode: "not_split", items: [{ categoryId: null, minutes: hours * 60 }] });
     expect(logRow.data?.client_saved_at).not.toBeNull();
@@ -101,7 +114,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await expect(page.getByText(`${marker} 끊긴 채 적음`, { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(3000);
     expect(fresh(await ids(nodeA, "todos"), beforeTodos)).toHaveLength(1);
-    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toHaveLength(1);
+    expect(await freshLogs(nodeA, beforeLogs, startedMs)).toHaveLength(1);
     await expect(page.getByRole("checkbox", { name: `${marker} 끊긴 채 적음` })).toBeChecked();
   } finally {
     await ctx.close();
@@ -119,6 +132,7 @@ test("누르면 서버 응답 전에 화면이 바뀐다(서버 Action 요청을
   const beforeLogs = await ids(nodeA, "evening_logs");
   const ctx = await contextFor(browser, await sessionCookies(env, A));
   const marker = `hold-${Date.now().toString(36)}`;
+  const startedMs = Date.now() - 1000;
   try {
     const page = await openApp(ctx);
 
@@ -163,17 +177,17 @@ test("누르면 서버 응답 전에 화면이 바뀐다(서버 Action 요청을
     // 그동안 서버 요청은 붙잡혀 있었고 서버에는 아무것도 없다
     expect(held.length, "서버 Action 요청이 아직 답을 못 받은 채 붙잡혀 있다").toBeGreaterThan(0);
     expect(fresh(await ids(nodeA, "todos"), beforeTodos)).toEqual([]);
-    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toEqual([]);
+    expect(await freshLogs(nodeA, beforeLogs, startedMs)).toEqual([]);
     console.log(`LOCALFIRST held-request check: 적기 ${addMs}ms · 끝냄 ${doneMs}ms · 저녁 기록 저장 ${eveningMs}ms (서버 요청 ${held.length}개 붙잡힘)`);
 
     // 풀어 주면 차례로 서버에 한 번씩 들어간다
     holding = false;
     for (const route of held.splice(0)) await route.continue().catch(() => {});
-    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "todos"), beforeTodos).length === 1 && fresh(await ids(nodeA, "evening_logs"), beforeLogs).length === 1, 60_000, 250);
+    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "todos"), beforeTodos).length === 1 && (await freshLogs(nodeA, beforeLogs, startedMs)).length === 1, 60_000, 250);
     expect(arrived).toBeGreaterThanOrEqual(0);
     await page.waitForTimeout(2000);
     expect(fresh(await ids(nodeA, "todos"), beforeTodos)).toHaveLength(1);
-    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toHaveLength(1);
+    expect(await freshLogs(nodeA, beforeLogs, startedMs)).toHaveLength(1);
   } finally {
     await ctx.close();
     await cleanup(nodeA, beforeTodos);
@@ -220,12 +234,13 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
             const db = open.result;
             if (!db.objectStoreNames.contains("kv")) return resolve(0);
             const req = db.transaction("kv", "readonly").objectStore("kv").getAllKeys();
-            req.onsuccess = () => resolve((req.result as string[]).filter((k) => k.startsWith("base/") || k.startsWith("op/")).length);
+            // 거울·보낼 줄·고른 값·보냈다는 표시·받지 않은 글 보관(고침 4바퀴)
+            req.onsuccess = () => resolve((req.result as string[]).filter((k) => ["base/", "op/", "pref/", "sent/", "rej/"].some((p) => k.startsWith(p))).length);
             req.onerror = () => resolve(-1);
           };
         }),
     );
-    expect(left, "로그아웃 뒤 기기 저장소에 거울·보낼 줄이 없다").toBe(0);
+    expect(left, "로그아웃 뒤 기기 저장소에 거울·보낼 줄·고른 값·보냈다는 표시·받지 않은 글 보관이 없다").toBe(0);
   } finally {
     await ctx.close();
     await cleanup(nodeA, beforeTodos);
@@ -255,14 +270,19 @@ async function restoreRatios(client: SupabaseClient, before: RatioState) {
   const keep = new Set(before.rows.map((r) => r.category_id));
   const now = await readRatios(client);
   const extra = now.rows.map((r) => r.category_id).filter((id) => !keep.has(id));
-  if (extra.length > 0) await client.from("category_ratios").delete().eq("user_id", userId).in("category_id", extra);
+  // 되돌리기가 실패하면 시험 계정이 바뀐 채 남는다: 오류는 던진다(고침 4바퀴)
+  const fail = (step: string, error: { code?: string; message?: string } | null) => {
+    if (error) throw new Error(`처음 정한 비율 되돌리기 실패(${step}): ${error.code ?? error.message ?? "unknown"}`);
+  };
+  if (extra.length > 0) fail("delete", (await client.from("category_ratios").delete().eq("user_id", userId).in("category_id", extra)).error);
   if (before.rows.length > 0) {
-    await client.from("category_ratios").upsert(
+    const upserted = await client.from("category_ratios").upsert(
       before.rows.map((r) => ({ user_id: userId, ...r })),
       { onConflict: "user_id,category_id" },
     );
+    fail("upsert", upserted.error);
   }
-  await client.from("user_settings").update({ ratio_other_percent: before.other }).eq("user_id", userId);
+  fail("update", (await client.from("user_settings").update({ ratio_other_percent: before.other }).eq("user_id", userId)).error);
 }
 
 test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) 저장 → 연결 → 서버에 한 번, 나눈 값 그대로", async ({ browser }) => {
@@ -277,6 +297,7 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) �
   const hours = 2 + (Date.now() % 20); // 2~21시간
   const total = hours * 60;
   const piece = 65; // 첫 분야에 나누는 분(5의 배수)
+  const startedMs = Date.now() - 1000;
   try {
     const page = await openApp(ctx);
     await ctx.setOffline(true);
@@ -303,14 +324,14 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) �
 
     // 끊긴 동안 서버에는 아무것도 없다
     await page.waitForTimeout(1500);
-    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toEqual([]);
+    expect(await freshLogs(nodeA, beforeLogs, startedMs)).toEqual([]);
 
     // 연결: 서버에 한 번 들어가고, 나눈 값 그대로다
     await ctx.setOffline(false);
-    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "evening_logs"), beforeLogs).length === 1, 60_000, 250);
+    const arrived = await pollUntil(async () => (await freshLogs(nodeA, beforeLogs, startedMs)).length === 1, 60_000, 250);
     expect(arrived, "연결 뒤 60초 안에 저녁 기록 하나가 서버에 들어간다").toBeGreaterThanOrEqual(0);
     await page.waitForTimeout(3000);
-    const logIds = fresh(await ids(nodeA, "evening_logs"), beforeLogs);
+    const logIds = await freshLogs(nodeA, beforeLogs, startedMs);
     expect(logIds, "서버에는 한 번만").toHaveLength(1);
     const row = await nodeA.from("evening_logs").select("total_minutes, save_mode, items").eq("id", logIds[0]).single();
     expect(row.data?.total_minutes).toBe(total);

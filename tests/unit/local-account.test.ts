@@ -20,8 +20,8 @@ vi.mock("../../lib/supabase/server", () => ({
     },
   }),
 }));
-const addTodo = vi.fn(async (..._a: unknown[]) => ({ ok: true }));
-const addCategory = vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ ok: true }));
+const addTodo = vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ ok: true }));
+const addCategory = vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({ ok: true }));
 vi.mock("../../app/todos/actions", () => ({ addTodo: (...a: unknown[]) => addTodo(...a), setTodoDone: vi.fn(), addCategory: (...a: unknown[]) => addCategory(...a) }));
 vi.mock("../../app/todos/manage-actions", () => ({ editTodo: vi.fn(), deleteTodo: vi.fn(), reorderTodos: vi.fn(), carryOverTodos: vi.fn(), addNote: vi.fn(), deleteNote: vi.fn() }));
 vi.mock("../../app/settings/actions", () => ({ saveRatios: vi.fn(), saveSettings: vi.fn() }));

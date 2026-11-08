@@ -91,7 +91,7 @@ describe("ArchivedWrites: 받지 않은 쓰기 보관 자리", () => {
     expect(text.style.overflowWrap).toBe("anywhere");
   });
   it("「복사」는 그 글을 클립보드에 넣고 알린다. 실패하면 길게 눌러 고르라고 알린다", async () => {
-    const writeText = vi.fn(async (_t: string) => {});
+    const writeText = vi.fn<(t: string) => Promise<void>>(async () => {});
     render(<ArchivedWrites items={[item("k1", "첫 글"), item("k2", "둘째 글", "note.add")]} onDismiss={() => {}} clipboard={{ writeText }} />);
     expect(screen.getByText("할 일")).toBeTruthy();
     expect(screen.getByText("작업 기록")).toBeTruthy();
@@ -112,7 +112,7 @@ describe("앱 화면: 서버가 거절하면 그 글이 보관 자리에 보이�
   it("기기에 보관된 글이 열 때 보이고, 서버가 새로 거절한 글도 보인다. 복사·지우기", async () => {
     await holder.kv!.set(kvKeys.base(USER), mirror());
     await holder.kv!.set(kvKeys.rejected(USER, "0000000000001-0000-aaaa"), item("0000000000001-0000-aaaa", "지난번에 받지 않은 글"));
-    const writeText = vi.fn(async (_t: string) => {});
+    const writeText = vi.fn<(t: string) => Promise<void>>(async () => {});
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     holder.reply = (q) => (q.op.kind === "todo.add" ? { ok: false, error: "daily_limit" } : { ok: true });
     render(<LocalAppShell userKey={USER} />);

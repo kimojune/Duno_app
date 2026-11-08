@@ -78,6 +78,9 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
   await markOnboardingDone(nodeA, "A");
   const before = await nodeA.from("todos").select("id");
   const beforeIds = new Set((before.data ?? []).map((r: { id: string }) => r.id));
+  // 저녁 기록 표는 지울 수 없다(쌓기만 함): 이 시험이 저장한 기록이 서버에 닿은 뒤에 끝내려고 시작 때의 행을 적어 둔다(뒤의 local-first 시험이 남의 행을 세지 않게)
+  const beforeLogs = await nodeA.from("evening_logs").select("id");
+  const beforeLogIds = new Set((beforeLogs.data ?? []).map((r: { id: string }) => r.id));
 
   const label = `${process.env.LATENCY_LABEL ?? "run"}-${scenario.name}`;
   const marker = `lat-${Date.now().toString(36)}`;
@@ -213,6 +216,13 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
     }
     result.eveningOpen = { median: median(eveningOpen), all: eveningOpen };
     result.eveningSave = { median: median(eveningSave), all: eveningSave };
+
+    // 저장한 저녁 기록 3개가 서버에 닿을 때까지 기다린다(기기 먼저 저장은 뒤에서 보낸다. 닿기 전에 창을 닫으면 다음 시험 중에 도착할 수 있다)
+    const landed = await pollUntil(async () => {
+      const all = await nodeA.from("evening_logs").select("id");
+      return (all.data ?? []).filter((r: { id: string }) => !beforeLogIds.has(r.id)).length >= eveningSave.length;
+    }, 60_000, 250);
+    expect(landed, "저장한 저녁 기록이 60초 안에 서버에 닿는다").toBeGreaterThanOrEqual(0);
 
     fs.mkdirSync("test-results/latency", { recursive: true });
     fs.writeFileSync(`test-results/latency/${label}.json`, JSON.stringify(result, null, 2));
