@@ -1,5 +1,5 @@
 import type { RatioItem } from "../settings/types";
-import { barPercents, shortfallByRatio, type CategoryMinutes } from "./logic";
+import { barPercents, shortfallByGoal, shortfallByRatio, type CategoryMinutes, type ShortfallBasis } from "./logic";
 
 /**
  * 상태보기 그래프(분야 색 띠 두 줄 · 원그래프 둘 · 분야 줄의 막대와 눈금)의 순수 계산. React·DOM 없음.
@@ -137,9 +137,13 @@ export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioIte
     };
   });
 
-  // 놓친 분야: 지금 shortfallByRatio(상태보기 「채울 시간」과 같은 계산)를 그대로 쓰고, 분야 줄이 없는 분야만 뺀다.
-  const shown = new Set<ChartCategoryId>(ids);
-  const missed = shortfallByRatio(args.ratios, args.totals).filter((m) => shown.has(m.categoryId));
+  // 놓친 분야: 지금 shortfallByRatio(상태보기 「채울 시간」과 같은 계산)를 그대로 쓴다. 다만 rows(차이·눈금)와 같은 분모를 쓰도록
+  // 값 정리를 거친 「보이는 분야만」의 비율·분을 넘긴다(숨은 분야의 분은 분모에서 뺀다). 그래서 missed의 분 = −rows의 diffMinutes다.
+  // 같은 차이는 조각 순서(받은 분야 순서, 기타 맨 끝)가 먼저.
+  const missed = shortfallByRatio(
+    ids.map((categoryId, i) => ({ categoryId, percent: ratioValues[i] })),
+    ids.map((categoryId, i) => ({ categoryId, minutes: spentMinutes[i] })),
+  );
 
   return {
     ratio: ids.map((categoryId, i) => ({ categoryId, percent: ratioPercents[i] })),
@@ -151,6 +155,22 @@ export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioIte
     hiddenMinutes: spentTotalMinutes - visibleMinutes,
     missed,
   };
+}
+
+/**
+ * 채울 시간(상태보기 「채울 시간」·저장 직후 한 줄). 임시값(PM 답 전, d-69 ⑤ · docs/oneshot-v2/임시값.md):
+ * - 이번 주 목표를 세운 주 → 목표 기준. 목표는 달력 주(월~일)에 묶여 있어 이번 주(thisWeek)에 쓴 시간과 견준다
+ * - 아니면 처음 정한 비율 기준 → 그래프와 같은 기간인 최근 1주(recentWeek)에 쓴 시간과 견준다. 계산은 buildStatusChart().missed와 같다(같은 분모)
+ */
+export function fillTimeFor(args: {
+  categoryIds: string[];
+  ratios: RatioItem[];
+  goalItems: CategoryMinutes[] | null;
+  thisWeek: CategoryMinutes[];
+  recentWeek: CategoryMinutes[];
+}): { basis: ShortfallBasis; items: CategoryMinutes[] } {
+  if (args.goalItems && args.goalItems.length > 0) return { basis: "goal", items: shortfallByGoal(args.goalItems, args.thisWeek) };
+  return { basis: "ratio", items: buildStatusChart({ categoryIds: args.categoryIds, ratios: args.ratios, totals: args.recentWeek }).missed };
 }
 
 /** 띠·원에 실제로 그릴 조각: 0% 조각을 뺀다(순서는 그대로). 줄이 비었으면 빈 목록 */

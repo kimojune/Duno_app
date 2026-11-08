@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
- * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「저녁 기록 남기기」(B17), 새 전체 화면 창 넷(B6·B7).
+ * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「저녁 기록 남기기」(B17), 상태보기 기간 × 보기 방식(고침 4바퀴 C), 새 전체 화면 창 넷(B6·B7).
  * 파일 이름: v2-<상태>-<크기>.png. 글자 200%는 screens.spec.ts와 같은 방법으로 흉내 낸다(토큰의 px를 두 배로).
  * 고침 1바퀴에서는 작성만 했고, 고침 2바퀴에서 돌려 실패를 가렸다(docs/oneshot-v2/보고.md 「고침 2바퀴」).
  */
@@ -92,6 +92,83 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     const b = (await button.boundingBox())!;
     expect(b.y).toBeGreaterThanOrEqual(t.y + t.height - 0.5);
     expect(b.height).toBeGreaterThanOrEqual(48);
+  });
+}
+
+// ---- 상태보기 기간 × 보기 방식 (고침 4바퀴 C 2단계) ----
+// 대표 상태: 최근 1주 띠그래프(처음 상태) · 원그래프 · 분야별 줄 막대 · 총 시간 · 기록 없음 · 분야 50개.
+// 모두 가로로 넘치지 않는다(scrollWidth ≤ clientWidth, 위 창들과 같은 측정). 360px 폭과 글자 200% 흉내에서 잰다.
+async function noHorizontalScroll(page: Page, what: string) {
+  const sw = await scrollSizes(page);
+  expect(sw.scrollWidth, `${what}: 가로 스크롤 없음`).toBeLessThanOrEqual(sw.clientWidth);
+}
+/** 화면 안에 든다: 요소의 오른쪽 끝이 보이는 폭을 넘지 않는다 */
+async function insideViewport(page: Page, selector: string, what: string) {
+  const width = await page.evaluate(() => document.documentElement.clientWidth);
+  const rights = await page.$$eval(selector, (els) => els.map((el) => el.getBoundingClientRect().right));
+  expect(rights.length, `${what}: 요소가 있다`).toBeGreaterThan(0);
+  expect(Math.max(...rights), `${what}: 화면 폭 안`).toBeLessThanOrEqual(width + 0.5);
+}
+
+for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
+  test(`growth-recent ${size}: 최근 1주 띠그래프(처음) → 원그래프 → 분야별 줄 막대 → 총 시간, 모두 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-recent", size);
+    await expect(page.getByRole("button", { name: "최근 1주" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "띠그래프" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".growth-band")).toHaveCount(2);
+    await shot(page, `growth-band-${size}`);
+    await noHorizontalScroll(page, "띠그래프");
+    await insideViewport(page, ".growth-band", "띠");
+
+    await page.getByRole("button", { name: "원그래프" }).click();
+    await expect(page.getByRole("button", { name: "원그래프" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("svg.growth-pie")).toHaveCount(2);
+    await shot(page, `growth-pie-${size}`);
+    await noHorizontalScroll(page, "원그래프");
+    await insideViewport(page, "svg.growth-pie", "원");
+
+    await page.getByRole("button", { name: "분야별 줄 막대" }).click();
+    await expect(page.locator(".growth-bar")).toHaveCount(4);
+    await shot(page, `growth-rows-${size}`);
+    await noHorizontalScroll(page, "분야별 줄 막대");
+    await insideViewport(page, ".growth-bar", "막대");
+
+    await page.getByRole("button", { name: "총 시간" }).click();
+    await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
+    await shot(page, `growth-total-${size}`);
+    await noHorizontalScroll(page, "총 시간");
+    // 고르는 단추는 누르는 면 높이 48 이상
+    const heights = await page.$$eval(".detail-chips .chip", (els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+  });
+}
+
+for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
+  test(`growth-empty ${size}: 기록 없음에서 보기를 바꿔도 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-empty", size);
+    await noHorizontalScroll(page, "기록 없음 띠그래프");
+    await page.getByRole("button", { name: "원그래프" }).click();
+    await shot(page, `growth-empty-pie-${size}`);
+    await noHorizontalScroll(page, "기록 없음 원그래프");
+    await page.getByRole("button", { name: "총 시간" }).click();
+    await noHorizontalScroll(page, "기록 없음 총 시간");
+  });
+
+  test(`growth-many ${size}: 분야 50개(꺾쇠·아주 긴 이름)에서도 보기 셋과 총 시간이 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-many", size);
+    await expect(page.locator(".growth-item")).toHaveCount(51);
+    await shot(page, `growth-many-band-${size}`);
+    await noHorizontalScroll(page, "분야 50개 띠그래프");
+    await page.getByRole("button", { name: "원그래프" }).click();
+    await noHorizontalScroll(page, "분야 50개 원그래프");
+    await insideViewport(page, "svg.growth-pie", "원");
+    await page.getByRole("button", { name: "분야별 줄 막대" }).click();
+    await noHorizontalScroll(page, "분야 50개 줄 막대");
+    await page.getByRole("button", { name: "총 시간" }).click();
+    await noHorizontalScroll(page, "분야 50개 총 시간");
+    // 꺾쇠 이름은 글자로 보인다(요소가 되지 않는다)
+    expect(await page.locator("img[src='x']").count()).toBe(0);
+    await expect(page.getByText("<b>굵게</b>", { exact: false }).first()).toBeVisible();
   });
 }
 

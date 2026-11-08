@@ -400,6 +400,12 @@ export function createRuntime(deps: RuntimeDeps) {
     patchBase,
     persistNow: persistBaseNow,
     wipe,
+    /** 화면이 기억하는 고른 값 읽기·쓰기(이 사용자 열쇠 한 칸). 실패는 던지지 않고(읽기는 undefined, 쓰기는 조용히 건너뜀), 지운(wipe) 뒤에는 다시 적지 않는다 */
+    getPref: (name: string): Promise<unknown> => safe(() => kv.get<unknown>(kvKeys.pref(userKey, name))),
+    setPref: async (name: string, value: unknown): Promise<void> => {
+      if (wiped) return;
+      await safe(() => kv.set(kvKeys.pref(userKey, name), value));
+    },
     wipeOthers: () => wipeOtherUsers(kv, userKey),
     /** 지금 화면이 볼 거울(서버 거울에 보낼 줄을 입힌 것) */
     getMirror: (): Mirror => view,

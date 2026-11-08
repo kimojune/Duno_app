@@ -484,6 +484,28 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-dl dt { font: var(--font-sub); color: var(--color-text-sub); }
 .growth-dl dd { margin: 0; font: var(--font-body); }
 .growth-short { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
+/* 상태보기 그래프(고침 4바퀴 C). 모양은 임시: 새 토큰 없이 있는 토큰만 쓴다. 디자인 확정 뒤 바꿈. 조각 색은 lib/growth/piece-color.ts가 정한다 */
+.growth-total { margin: var(--space-3) 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+.growth-total-label { font: var(--font-sub); color: var(--color-text-sub); }
+.growth-total-number { font: var(--font-title); overflow-wrap: anywhere; }
+.growth-graph { margin: var(--space-3) 0 var(--space-2); }
+.growth-band-line { display: grid; gap: var(--space-1); margin-bottom: var(--space-2); }
+.growth-line-caption { font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.growth-band { display: flex; inline-size: 100%; block-size: 24px; background: var(--color-skeleton); border-radius: var(--radius-check); overflow: hidden; }
+.growth-band.is-empty { background: transparent; box-shadow: inset 0 0 0 1px var(--color-divider); }
+.growth-band-seg { display: block; flex: none; min-inline-size: 0; block-size: 100%; box-shadow: inset -1px 0 0 var(--color-surface); }
+.growth-pies { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-3); }
+.growth-pie-box { display: grid; justify-items: center; gap: var(--space-1); min-inline-size: 0; text-align: center; }
+.growth-pie { inline-size: 100%; max-inline-size: 160px; block-size: auto; aspect-ratio: 1; }
+.growth-pie-slice { stroke: var(--color-surface); stroke-width: 1; }
+.growth-pie-empty { fill: none; stroke: var(--color-divider); stroke-width: 2; }
+.growth-dot { display: inline-block; flex: none; inline-size: 12px; block-size: 12px; margin-inline-end: var(--space-2); border-radius: 50%; }
+.growth-bar { position: relative; }
+.growth-tick { position: absolute; inset-block: 0; inline-size: 2px; background: var(--color-text); }
+.growth-diff { grid-column: 1 / -1; font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.growth-missed { margin: var(--space-3) 0 0; font: var(--font-body); overflow-wrap: anywhere; }
+/* 채울 시간 목록: 공백 없는 긴 분야 이름이 줄을 밀어 가로로 넘치지 않게(분야 50개·긴 이름 시험에서 찾은 것) */
+.growth-short li { overflow-wrap: anywhere; }
 .done-tag { margin-left: var(--space-2); }
 .note-sublist { list-style: none; margin: var(--space-1) 0 0; padding: 0 0 0 var(--space-3); border-left: 2px solid var(--color-divider); }
 .note-sublist > li { margin: 0 0 var(--space-1); }

@@ -6,6 +6,7 @@ import {
   bandSegments,
   buildStatusChart,
   drawablePieces,
+  fillTimeFor,
   pieSlices,
   polarPoint,
 } from "../../lib/growth/status-chart";
@@ -22,6 +23,15 @@ describe("apportionPercents(최대 나머지 방식)", () => {
     expect(apportionPercents([1, 1, 1])).toEqual([34, 33, 33]); // 같은 나머지는 앞 자리가 먼저
     expect(sum(apportionPercents([7, 11, 13, 17, 19]))).toBe(100);
     expect(apportionPercents([60, 30, 10])).toEqual([60, 30, 10]);
+  });
+  it("나머지가 큰 자리가 1을 더 받는다: 큰 나머지가 뒤에 있어도 앞 자리가 먼저 받지 않는다(정렬 키를 지우면 깨진다)", () => {
+    // 10:10:11 → 32.26 / 32.26 / 35.48 → 몫 32·32·35(합 99), 남은 1은 나머지가 가장 큰 마지막 자리(.48)가 받는다
+    expect(apportionPercents([10, 10, 11])).toEqual([32, 32, 36]);
+    // 3:5:4 → 25 / 41.67 / 33.33 → 몫 25·41·33(합 99), 나머지 .67이 가장 큰 가운데가 받는다
+    expect(apportionPercents([3, 5, 4])).toEqual([25, 42, 33]);
+    // 나머지가 같으면 앞 자리가 먼저
+    expect(apportionPercents([1, 1, 1])).toEqual([34, 33, 33]);
+    expect(sum(apportionPercents([7, 11, 13, 17, 19, 33]))).toBe(100);
   });
   it("모두 0이면 모두 0(빈 줄)", () => {
     expect(apportionPercents([0, 0, 0])).toEqual([0, 0, 0]);
@@ -101,8 +111,10 @@ describe("buildStatusChart: 두 줄(처음 정한 비율 / 쓴 시간)", () => {
         { categoryId: B, minutes: 90 },
       ],
     });
-    // A: 처음 정한 비율만큼 90분 ÷ 최대 90분 = 100 → 안 넘음. B: 10분 → 11
+    // A: 처음 정한 비율만큼 90분 ÷ 최대 90분 = 정확히 100 → 안 넘는다(clipped 아님). B: 10분 → 11
     expect(c.rows.map((r) => r.tickPercent)).toEqual([100, 11, 0]);
+    expect(c.rows[0].tickClipped).toBe(false);
+    expect(c.rows.map((r) => r.tickClipped)).toEqual([false, false, false]);
     const d = buildStatusChart({
       categoryIds: [A, B],
       ratios: [
@@ -254,7 +266,7 @@ describe("buildStatusChart: 경계", () => {
     expect(c.ratio.map((p) => p.percent)).toEqual([50, 50, 0]);
   });
 
-  it("분야 번호가 겹치거나 null로 들어와도 조각이 겹치지 않는다", () => {
+  it("분야 번호가 겹쳐 들어와도 조각이 겹치지 않는다(기타는 늘 맨 끝에 하나)", () => {
     const c = buildStatusChart({ categoryIds: [A, A, B], ratios: [], totals: [] });
     expect(c.rows.map((r) => r.categoryId)).toEqual([A, B, null]);
   });
@@ -327,6 +339,81 @@ describe("놓친 분야(missed): 지금 shortfallByRatio를 그대로 쓴다", (
     expect(shortfallByRatio(withGone, totals).some((m) => m.categoryId === GONE)).toBe(true);
     const c = buildStatusChart({ categoryIds: [A, B, C], ratios: withGone, totals });
     expect(c.missed.some((m) => m.categoryId === GONE)).toBe(false);
+  });
+  it("숨은 분야가 있어도 missed와 rows의 차이는 같은 분모(보이는 분야의 분)라 같은 값을 낸다: missed 분 = −diffMinutes", () => {
+    const totals = [
+      { categoryId: A, minutes: 60 },
+      { categoryId: B, minutes: 120 },
+      { categoryId: GONE, minutes: 600 }, // 숨은 분야: 합계에는 들지만 분모에서는 뺀다
+    ];
+    const c = buildStatusChart({ categoryIds: [A, B, C], ratios, totals });
+    expect(c.hiddenMinutes).toBe(600);
+    // 보이는 분야 합 180분 기준: A 90분 중 60 → 30, C 36분 중 0 → 36 (숨은 분 600을 분모에 넣었다면 값이 크게 달라진다)
+    expect(c.missed).toEqual([
+      { categoryId: C, minutes: 36 },
+      { categoryId: A, minutes: 30 },
+    ]);
+    for (const m of c.missed) expect(c.rows.find((r) => r.categoryId === m.categoryId)?.diffMinutes).toBe(-m.minutes);
+    // 모자란 분(5분 이상)이 있는 분야는 모두 missed에 있고, missed는 그것뿐이다
+    const fromRows = c.rows.filter((r) => r.diffMinutes !== null && r.diffMinutes <= -5).map((r) => r.categoryId).sort();
+    expect(c.missed.map((m) => m.categoryId).sort()).toEqual(fromRows);
+  });
+  it("입력은 값 정리를 거쳐 넘긴다: 음수·NaN·무한 비율은 0, 소수 분은 반올림, 예외 없음", () => {
+    const run = () =>
+      buildStatusChart({
+        categoryIds: [A, B, C],
+        ratios: [
+          { categoryId: A, percent: 50 },
+          { categoryId: B, percent: -30 }, // 0으로 읽는다
+          { categoryId: C, percent: Number.NaN }, // 0으로 읽는다
+        ],
+        totals: [
+          { categoryId: A, minutes: Number.NaN }, // 0
+          { categoryId: B, minutes: 99.6 }, // 100
+          { categoryId: C, minutes: Number.POSITIVE_INFINITY }, // 0
+        ],
+      });
+    expect(run).not.toThrow();
+    const c = run();
+    // 정리하면 비율은 A 100%뿐, 쓴 시간은 B 100분뿐 → A는 100분이 모자라다(정리 안 했다면 음수·NaN이 몫을 깨뜨린다)
+    expect(c.missed).toEqual([{ categoryId: A, minutes: 100 }]);
+    expect(c.rows.find((r) => r.categoryId === A)?.diffMinutes).toBe(-100);
+    expect(c.ratio.map((p) => p.percent)).toEqual([100, 0, 0, 0]);
+  });
+});
+
+describe("fillTimeFor(채울 시간의 기간 짝, 임시값)", () => {
+  const ids = [A, B, C];
+  const ratios = [
+    { categoryId: A, percent: 60 },
+    { categoryId: B, percent: 40 },
+  ];
+  const thisWeek = [{ categoryId: B, minutes: 30 }];
+  const recentWeek = [
+    { categoryId: A, minutes: 60 },
+    { categoryId: B, minutes: 120 },
+  ];
+  it("목표가 없으면 처음 정한 비율 기준: 최근 1주에 쓴 시간과 견준다(이번 주가 아니라)", () => {
+    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek, recentWeek });
+    expect(r.basis).toBe("ratio");
+    // 최근 1주 180분: A 108분 중 60 → 48. (이번 주 30분 기준이었다면 A는 18분)
+    expect(r.items).toEqual([{ categoryId: A, minutes: 48 }]);
+  });
+  it("목표가 있으면 목표 기준: 달력 주(이번 주)에 쓴 시간과 견준다(최근 1주가 아니라)", () => {
+    const goalItems = [
+      { categoryId: A, minutes: 100 },
+      { categoryId: B, minutes: 20 },
+    ];
+    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems, thisWeek, recentWeek });
+    expect(r.basis).toBe("goal");
+    // 이번 주 A 0분 → 100 남음, B 30분 ≥ 20 → 없음. (최근 1주 기준이었다면 A는 40이 남는다)
+    expect(r.items).toEqual([{ categoryId: A, minutes: 100 }]);
+  });
+  it("목표 목록이 비어 있으면 목표가 없는 것과 같다", () => {
+    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: [], thisWeek, recentWeek }).basis).toBe("ratio");
+  });
+  it("쓴 시간이 없으면 빈 목록", () => {
+    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek: [], recentWeek: [] }).items).toEqual([]);
   });
 });
 

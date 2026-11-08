@@ -16,12 +16,15 @@ export type GrowthData = {
   ratios: RatioItem[];
   /** 분야별로 쓴 시간(기타는 categoryId null) */
   thisWeek: CategoryMinutes[];
+  /** 최근 1주: 오늘 포함 지난 7일(두노 하루 기준, today-6 ~ today)에 분야별로 쓴 시간. 달력 주(월~일)인 thisWeek와 다르다 */
+  recentWeek: CategoryMinutes[];
   lastWeek: CategoryMinutes[];
   lastMonth: CategoryMinutes[];
   /** 쓰기 시작한 때부터 쌓인 것 */
   cumulative: CategoryMinutes[];
   /** 저녁 기록이 있는 날 수 */
   loggedDaysThisWeek: number;
+  loggedDaysRecentWeek: number;
   loggedDaysTotal: number;
   /** 이번 주 목표(없으면 null). 시간은 분 */
   goal: { weekStart: string; items: CategoryMinutes[] } | null;

@@ -12,6 +12,11 @@ import type { ViewEntry, ViewScreen } from "./views/core-types";
 export type GrowthApi = {
   /** 기기 먼저 저장 구현이면 true(고침 3바퀴): 쓰기가 기기에 먼저 반영되고 서버에는 뒤에서 가므로 끊겨 있어도 막지 않는다 */
   localFirst?: boolean;
+  /**
+   * 상태보기에서 고른 기간·보기 방식을 이 기기·이 사용자에 기억하는 길(기기 먼저 저장 구현에만 있다. 없으면 기억하지 않고 처음 값으로 돈다).
+   * load는 저장된 값을 그대로(믿지 않는다: 화면이 parseStatusPref로 걸러 읽는다), 실패하면 undefined. save는 던지지 않는다
+   */
+  viewPref?: { load(): Promise<unknown>; save(value: unknown): Promise<void> };
   fetchGrowth(): Promise<RecordResult<GrowthData>>;
   fetchCategoryPage(categoryId: string | null): Promise<RecordResult<CategoryPageData>>;
   /** 화면이 그려진 뒤 한 번. id는 화면이 만든 uuid */
