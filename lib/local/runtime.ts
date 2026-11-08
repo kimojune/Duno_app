@@ -11,7 +11,7 @@ import type { ArchivedWrite, Mirror, MirrorSnapshot, Op, QueuedOp, Rejection, Se
  *   · 성공하면 「보냈다는 표시」를 남기고 줄에서 빼고 서버 거울(base)에도 입힌다.
  *   · 서버에 닿지 못했으면(끊김) 멈추고 연결·보이는 때·시간이 지난 뒤 다시 한다(횟수에 세지 않는다).
  *   · 로그인이 풀렸으면 멈추고 알린다(줄은 그대로 둔다).
- *   · 서버가 일시 오류로 답하면 멈추고 다시 한다. 일시 오류로는 버리지 않는다(간격은 최대 60초). STALLED_AFTER_ATTEMPTS번 넘게 못 보내면 화면이 「보내지 못함」을 보인다.
+ *   · 서버가 일시 오류로 답하면 멈추고 다시 한다. 일시 오류로는 버리지 않는다(간격은 최대 60초). 일시 오류가 STALLED_AFTER_ATTEMPTS번 쌓이면(그 번째부터) 화면이 「보내지 못함」을 보인다.
  *   · 서버가 거절하면(권한·검사 실패 등) 줄에서 빼고 거울을 다시 입혀 되돌리고, 화면이 한 줄로 알린다. 글이 있는 쓰기는 그 내용을 보관한다(화면에서 보고 복사).
  *   · 분야 만들기가 duplicate(같은 이름이 서버에 이미 있음)면, 뒤의 쓰기가 가리키는 분야 번호를 서버가 알려 준 분야 번호로 바꿔 보낸다.
  *   · 서버의 세션 사용자가 이 장치의 사용자와 다르면(account_mismatch) 멈추고 이 사용자의 기기 저장소를 지운 뒤 화면에 알린다.
@@ -64,7 +64,7 @@ export type RuntimeDeps = {
 };
 
 /**
- * 서버가 일시 오류로 이만큼 넘게 답하면 화면이 「보내지 못함」을 보인다(버리지 않고 계속 다시 보낸다).
+ * 서버가 일시 오류로 이만큼 답하면(이 번째부터, attempts >= 이 값) 화면이 「보내지 못함」을 보인다(버리지 않고 계속 다시 보낸다).
  * 6번 ≈ 2+4+8+16+32초 ≈ 1분: 그보다 오래 못 보내면 사용자가 알 만하다(임시).
  */
 export const STALLED_AFTER_ATTEMPTS = 6;
@@ -576,7 +576,8 @@ export function createRuntime(deps: RuntimeDeps) {
     channel?.subscribe((message) => {
       if (message === null || typeof message !== "object") return;
       const m = message as { type?: unknown; user?: unknown };
-      if (m.type === "signed-out") void resetFor("signed_out_elsewhere");
+      // 로그아웃 알림은 이 탭 사용자의 것일 때만 지운다(「active」를 놓친 낡은 다른 사용자 탭이 로그아웃해도 이 사용자의 못 보낸 줄을 지우지 않게)
+      if (m.type === "signed-out" && m.user === userKey) void resetFor("signed_out_elsewhere");
       else if (m.type === "active" && typeof m.user === "string" && m.user !== userKey) void resetFor("account_mismatch");
     }) ?? (() => {});
 
@@ -641,7 +642,7 @@ export function createRuntime(deps: RuntimeDeps) {
       emitState();
       for (const a of gone) await safe(() => kv.delete(kvKeys.rejected(userKey, a.key)));
     },
-    /** 서버가 일시 오류로 오래(STALLED_AFTER_ATTEMPTS번 넘게) 받지 못하고 있는가. 줄은 그대로 두고 계속 다시 보낸다 */
+    /** 서버가 일시 오류로 오래(맨 앞 줄의 일시 오류가 STALLED_AFTER_ATTEMPTS번 이상) 받지 못하고 있는가. 줄은 그대로 두고 계속 다시 보낸다 */
     isStalled: () => (queue[0]?.attempts ?? 0) >= STALLED_AFTER_ATTEMPTS,
     /** 계정이 바뀌었거나 다른 탭에서 로그아웃해 지우고 멈췄는가 */
     isReset: () => resetting,

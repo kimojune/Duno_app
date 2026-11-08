@@ -10,6 +10,11 @@ import { createRuntime, RETRY_MAX_MS, WIPE_WAIT_MS, type ResetReason, type Runti
 import { createLocalTodos } from "../../lib/local/todos";
 import type { LocalApis } from "../../lib/local/apis";
 import type { Mirror, MirrorSnapshot, Op, QueuedOp, SendResult } from "../../lib/local/types";
+import { saveEveningLogForUser } from "../../lib/evening/core";
+import { checkGoalItems } from "../../lib/goals/validation";
+import { checkRatios } from "../../lib/settings/validation";
+import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
+import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
 
 /**
  * 기기 먼저 저장 고침 4바퀴(R2 발견 S1·S2·F1~F4): 계정 섞임·로그아웃 뒤 다시 적기·글 사라짐.
@@ -157,6 +162,30 @@ describe("S1 두 탭: 한 탭이 로그아웃하면 다른 탭도 지우고 다�
     expect(tabA.resets).toEqual(["account_mismatch"]);
     await tabA.runtime.persistNow();
     expect(await kv.keys(`base/${USER}`)).toEqual([]);
+  });
+});
+
+describe("S1 다른 사용자의 로그아웃 알림(고침2)", () => {
+  it("다른 사용자의 signed-out을 받은 탭은 지우지 않는다(「active」를 놓친 낡은 탭의 로그아웃이 이 사용자의 못 보낸 줄을 지우지 않게)", async () => {
+    const kv = persistentKv();
+    await kv.set(kvKeys.base(USER), syncedMirror());
+    const mine = tab(kv, { channel: channel() });
+    await mine.runtime.boot();
+    mine.setOnline(false);
+    mine.runtime.enqueue({ kind: "todo.add", id: T1, text: "이 사용자의 못 보낸 글" });
+    await settle();
+    // 낡은 다른 사용자 탭(얼려졌거나 bfcache): 이 탭의 「active」를 놓친 채 로그아웃 알림을 보낸다
+    const stale = channel();
+    stale.post({ type: "signed-out", user: OTHER });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(mine.resets).toEqual([]);
+    expect(mine.runtime.isReset()).toBe(false);
+    expect(mine.runtime.pendingCount()).toBe(1);
+    expect(await kv.keys(kvKeys.opPrefix(USER))).toHaveLength(1);
+    // 같은 사용자의 로그아웃 알림이면 지운다
+    stale.post({ type: "signed-out", user: USER });
+    expect(await waitFor(() => mine.resets.length > 0)).toBe(true);
+    expect(mine.resets).toEqual(["signed_out_elsewhere"]);
   });
 });
 
@@ -475,6 +504,47 @@ describe("F4 (b) 분야 만들기가 duplicate면 뒤의 쓰기를 서버의 그
     const keys = await kv.keys(kvKeys.opPrefix(USER));
     expect(keys).toHaveLength(1);
     expect((await kv.get<QueuedOp>(keys[0]))?.op).toEqual({ kind: "todo.add", id: T1, text: "달리기", categoryId: C_OLD });
+  });
+});
+
+describe("F4 (b) 같은 분야가 둘이 되면 분·퍼센트를 더한다(고침2)", () => {
+  it("기존 분야와 새 분야를 함께 가진 저녁 기록·비율·목표를 바꿔 끼우면 같은 분야는 한 번만, 합은 그대로, 서버 검사를 통과한다", async () => {
+    const kv = persistentKv();
+    await kv.set(kvKeys.base(USER), syncedMirror({ categories: [{ id: C1, readable: true, name: "어학", createdAt: "x" }, { id: C_OLD, readable: true, name: "운동", createdAt: "x" }] }));
+    const t = tab(kv, { fetchSnapshot: async () => ({ ok: false, error: "unavailable" }) });
+    await t.runtime.boot();
+    t.setOnline(false);
+    // 이 기기는 「운동」(C_OLD)을 받기 전에 같은 이름의 「운동」(C_NEW)을 끊긴 채 만들었고, 두 분야를 함께 썼다
+    t.runtime.enqueue({ kind: "category.add", id: C_NEW, name: "운동" });
+    t.runtime.enqueue({ kind: "evening.save", input: { id: E1, targetDay: "2026-11-07", totalMinutes: 100, items: [{ categoryId: C_OLD, minutes: 30 }, { categoryId: C_NEW, minutes: 50 }, { categoryId: null, minutes: 20 }], saveMode: "edited", clientSavedAt: iso(NOON) } });
+    t.runtime.enqueue({ kind: "ratios.save", ratios: [{ categoryId: C1, percent: 40 }, { categoryId: C_OLD, percent: 25 }, { categoryId: C_NEW, percent: 35 }] });
+    t.runtime.enqueue({ kind: "goal.save", items: [{ categoryId: C_NEW, minutes: 120 }, { categoryId: C_OLD, minutes: 60 }] });
+    await settle();
+    t.setReply((q) => (q.op.kind === "category.add" ? { ok: false, error: "duplicate", existing: { id: C_OLD, name: "운동" } } : { ok: true }));
+    t.setOnline(true);
+    const r = await t.runtime.flush();
+    expect(r).toMatchObject({ rejected: [], remaining: 0 });
+    const [evening, ratios, goal] = t.sent.slice(1).map((s) => s.op);
+
+    if (evening.kind !== "evening.save") throw new Error("저녁 기록이 아님");
+    expect(evening.input.items).toEqual([{ categoryId: C_OLD, minutes: 80 }, { categoryId: null, minutes: 20 }]);
+    expect(evening.input.items.reduce((sum, i) => sum + i.minutes, 0)).toBe(evening.input.totalMinutes);
+    if (ratios.kind !== "ratios.save") throw new Error("비율이 아님");
+    expect(ratios.ratios).toEqual([{ categoryId: C1, percent: 40 }, { categoryId: C_OLD, percent: 60 }]);
+    expect(ratios.ratios.reduce((sum, i) => sum + i.percent, 0)).toBe(100);
+    if (goal.kind !== "goal.save") throw new Error("목표가 아님");
+    expect(goal.items).toEqual([{ categoryId: C_OLD, minutes: 180 }]);
+
+    // 서버 검사 함수를 그대로 통과한다(같은 분야 두 번이면 invalid_input이었다)
+    expect(checkRatios(ratios.ratios).ok).toBe(true);
+    expect(checkGoalItems(goal.items).ok).toBe(true);
+    const KEY = parseTodoKey(Buffer.alloc(32, 3).toString("base64"))!;
+    const store = new FakeStore();
+    store.rules = v2Rules();
+    store.fixedNow = new Date(NOON);
+    for (const [id, name] of [[C1, "어학"], [C_OLD, "운동"]] as const) store.seed("categories", { id, user_id: USER, name_encrypted: encryptCategoryName(name, USER, KEY), archived_at: null });
+    const saved = await saveEveningLogForUser({ supabase: fakeTablesClient(store, { sub: USER }), key: KEY, now: () => new Date(NOON) }, evening.input);
+    expect(saved.ok).toBe(true);
   });
 });
 
