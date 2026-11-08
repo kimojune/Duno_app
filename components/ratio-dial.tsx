@@ -149,7 +149,10 @@ export function RatioDial({
     if (!want) return;
     focusSide.current = null;
     const el = document.getElementById(`${id}-handle-${want}`) ?? document.getElementById(`${id}-handle-both`);
-    if (el && document.activeElement !== el) (el as unknown as HTMLElement).focus();
+    // 포커스가 이 다이얼 안에 있거나(손잡이가 갈리거나 합쳐진 직후) 아무 데도 없을 때만 옮긴다 — 바깥(−/+·숫자 칸·Stepper)의 포커스는 뺏지 않는다
+    const active = document.activeElement;
+    const inDial = !active || active === document.body || (svg.current?.contains(active) ?? false);
+    if (el && inDial && active !== el) (el as unknown as HTMLElement).focus();
   });
 
   function apply(next: number[]) {
@@ -207,8 +210,8 @@ export function RatioDial({
       use = norm[si + 1] > 0 ? "end" : "start";
     }
     const next = use === "end" ? dragBoundary(norm, si, grow, step) : dragBoundary(norm, si - 1, -grow, step);
-    focusSide.current = use;
-    apply(next);
+    // 값이 실제로 바뀐 때만 포커스 표시를 세운다(끝에서 한 번 더 눌러 안 바뀌면 렌더가 없어 표시가 남았다가 뒤에 포커스를 뺏었다)
+    if (apply(next)) focusSide.current = use;
   }
 
   /** 다이얼(원 전체)의 키보드: 조각 고르기. 화살표로 앞뒤, Home/End로 처음·끝. 폭 0인 조각도 고른다 */
@@ -285,7 +288,7 @@ export function RatioDial({
             />
           ) : null,
         )}
-        <path className="dial-rim" aria-hidden="true" d={sel ? rimPath(starts[si] / total, (starts[si] + selValue) / total) : ""} />
+        <path className="dial-rim" aria-hidden="true" d={sel && total > 0 ? rimPath(starts[si] / total, (starts[si] + selValue) / total) : ""} />
         <circle r={R * HOLE} className="dial-hole" />
         {n >= 2 && <line className="dial-noon" id={`${id}-noon`} x1={0} y1={-R - 3} x2={0} y2={-R - 11} aria-hidden="true" />}
         {/* 가운데 표시: 줄인 이름이라 읽어 주지 않는다(전체 이름은 손잡이 이름·바뀐 내용 안내에 있다) */}

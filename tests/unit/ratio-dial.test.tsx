@@ -534,3 +534,15 @@ describe("원형 다이얼: 키보드만으로 조각 고르기(부품 안의 �
     expect(handles()).toHaveLength(0);
   });
 });
+
+describe("원형 다이얼: 합(total)이 0 이하(다이얼 고침1)", () => {
+  it("total 0에 조각이 골라져 있어도 띠·조각·손잡이를 그리지 않고 NaN이 나오지 않는다", () => {
+    render(
+      <RatioDial id="d" total={0} slices={slicesOf([0, 0, 0])} selectedKey="k0" onSelect={() => {}} onChange={() => {}} format={(v) => `${v}분`} />,
+    );
+    expect(document.querySelector(".dial-rim")!.getAttribute("d")).toBe("");
+    expect(document.querySelectorAll(".dial-slice")).toHaveLength(0);
+    expect(handles()).toHaveLength(0);
+    expect(document.querySelector("svg.dial")!.outerHTML).not.toMatch(/NaN|Infinity/);
+  });
+});

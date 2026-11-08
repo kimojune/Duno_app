@@ -100,10 +100,16 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
   it("처음 정한 비율 40·30·20·10을 손잡이·−/+·숫자 칸으로 만들 수 있다", () => {
     const seen: RatioEntry[][] = [];
     render(<Host initial={[E("a", "어학", 0), E("b", "코딩", 0), E("c", "운동", 0), E("other", "기타", 0)]} seen={seen} />);
-    type("어학", "40"); // 35·35·30·0 → 40·30·30·0
-    type("코딩", "30", "enter");
-    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" })); // 기타는 앞 줄(운동)에서
-    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" }));
+    expect(values("어학", "코딩", "운동", "기타")).toEqual([35, 35, 30, 0]);
+    // 손잡이(키보드): 어학이 골라져 있다 → 끝 손잡이 PageUp으로 어학 +5(코딩에서)
+    expect(screen.getByRole("button", { name: "어학", pressed: true })).toBeTruthy();
+    fireEvent.keyDown(slider("end"), { key: "PageUp" });
+    expect(values("어학", "코딩", "운동", "기타")).toEqual([40, 30, 30, 0]);
+    // −/+: 운동 −5 → 줄인 몫은 뒤 줄(기타)로
+    fireEvent.click(screen.getByRole("button", { name: "운동 5% 줄이기" }));
+    expect(values("어학", "코딩", "운동", "기타")).toEqual([40, 30, 25, 5]);
+    // 숫자 칸: 기타 10 → 맨 끝 줄이라 앞 줄(운동)에서
+    type("기타", "10", "enter");
     expect(values("어학", "코딩", "운동", "기타")).toEqual([40, 30, 20, 10]);
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(4);
     expect(seen.at(-1)!.map((e) => e.percent)).toEqual([40, 30, 20, 10]);
@@ -240,5 +246,33 @@ describe("키보드만으로 조각 고르기와 바꾸기", () => {
     fireEvent.keyDown(slider("end"), { key: "End" });
     expect(values("어학", "코딩", "운동", "기타")).toEqual([40, 50, 0, 10]);
     expect(seen.every((n) => sum(n.map((e) => e.percent)) === 100)).toBe(true);
+  });
+});
+
+describe("포커스를 뺏지 않는다(다이얼 고침1)", () => {
+  it("끝에서 값이 안 바뀐 키를 누른 뒤 숫자 칸을 고치고 Tab으로 나가도 포커스가 손잡이로 안 간다", () => {
+    const seen: RatioEntry[][] = [];
+    render(<Host initial={[E("a", "어학", 40), E("b", "코딩", 30), E("other", "기타", 30)]} seen={seen} />);
+    const end = slider("end");
+    act(() => end.focus());
+    fireEvent.keyDown(end, { key: "End" }); // 어학이 코딩을 다 가져간다
+    expect(values("어학", "코딩", "기타")).toEqual([70, 0, 30]);
+    expect(document.activeElement).toBe(slider("end"));
+    const n = seen.length;
+    fireEvent.keyDown(slider("end"), { key: "End" }); // 끝에서 한 번 더: 값이 안 바뀐다
+    fireEvent.keyDown(slider("end"), { key: "ArrowRight" });
+    expect(seen).toHaveLength(n);
+    // 숫자 칸으로 가서 고친 뒤 Tab으로 나간다(다음 칸 = 기타 − 단추) — 칸을 떠나는 순간 값이 바뀌고 다이얼이 다시 그려진다
+    const field = screen.getByLabelText("기타 비율(%)") as HTMLInputElement;
+    act(() => field.focus());
+    fireEvent.change(field, { target: { value: "20" } });
+    const next = screen.getByRole("button", { name: "기타 5% 늘리기" });
+    act(() => next.focus()); // Tab: 숫자 칸 blur → 반영 → 다시 그림
+    expect(values("어학", "코딩", "기타")).toEqual([70, 10, 20]); // 기타는 맨 끝 줄: 줄인 몫은 앞 줄(코딩)로
+    expect(document.activeElement).toBe(next);
+    // −/+ 단추를 눌러 다시 그려져도 그대로
+    fireEvent.click(next);
+    expect(values("어학", "코딩", "기타")).toEqual([70, 5, 25]);
+    expect(document.activeElement).toBe(next);
   });
 });

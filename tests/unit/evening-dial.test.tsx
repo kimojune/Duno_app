@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// 기기 먼저 저장 API(lib/local/apis)가 부르는 서버 Action은 시험에서 쓰지 않는다(local-apis.test.ts와 같은 가짜)
+vi.mock("../../app/offers/actions", () => ({ requestOffer: vi.fn(), dismissOffer: vi.fn() }));
+vi.mock("../../lib/push/subscribe", () => ({ defaultPushApi: { enable: vi.fn(async () => "ok") } }));
+
 import { EveningRecord } from "../../components/evening-record";
+import { createLocalApis } from "../../lib/local/apis";
+import { createMemoryKv, kvKeys } from "../../lib/local/kv";
+import { emptyMirror } from "../../lib/local/reduce";
+import { createRuntime } from "../../lib/local/runtime";
+import type { Mirror, QueuedOp, SendResult } from "../../lib/local/types";
 import { saveEveningLogForUser } from "../../lib/evening/core";
 import type { EveningState } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
@@ -270,5 +280,98 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(document.querySelectorAll(".dial-slice").length).toBeGreaterThanOrEqual(10);
     expect(document.querySelector("img")).toBeNull();
     expect(handle("end").getAttribute("aria-label")).toContain("<img src=x onerror=alert(1)>");
+  });
+});
+
+describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
+  it("끝에서 값이 안 바뀐 키를 누른 뒤 Stepper에 쳐도 포커스가 손잡이로 안 간다", async () => {
+    await openSplit120();
+    const end = handle("end"); // 어학·포트폴리오 경계
+    act(() => end.focus());
+    key(end, "End"); // 어학이 포트폴리오를 다 가져간다
+    expect(stepper("어학")).toBe(120);
+    key(handle("end"), "End"); // 끝에서 한 번 더: 값이 안 바뀐다
+    key(handle("end"), "PageUp");
+    const input = screen.getByLabelText("포트폴리오") as HTMLInputElement;
+    act(() => input.focus());
+    // 어학을 줄여 기타에 자리를 만든 뒤 포트폴리오에 친다 — 칠 때마다 다이얼이 다시 그려진다
+    // (단추를 눌러도 포커스는 숫자 칸에 둔 채로 다시 그린다 — 여기서 손잡이로 가면 안 된다)
+    fireEvent.click(screen.getByRole("button", { name: "어학 5분 줄이기" }));
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "5" } });
+    expect(stepper("포트폴리오")).toBe(5);
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "0" } });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("숨은 분야(이미 남긴 기록에만 있는 분야)가 쓴 시간을 다 차지해 원의 합이 0이어도 띠가 NaN을 그리지 않는다", async () => {
+    const HIDDEN = "c9c9c9c9-c9c9-4c9c-8c9c-c9c9c9c9c9c9";
+    const existing = {
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      targetDay: "2026-11-07",
+      totalMinutes: 60,
+      items: [{ categoryId: HIDDEN, minutes: 60 }],
+      saveMode: "edited" as const,
+      savedAt: "x",
+    };
+    const { api } = realApi(state({ existing }));
+    await mount(api);
+    await press("분야마다 나누기");
+    const svg = dial()!;
+    expect(svg).toBeTruthy();
+    expect(document.querySelector(".dial-rim")!.getAttribute("d")).toBe("");
+    expect(svg.outerHTML).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("기기 먼저 저장 + 끊김: 다이얼로 나눈 값이 기기 쪽 저장 요청(보낼 줄)에 그대로 실리고, 서버에는 아직 안 간다", async () => {
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const mirror: Mirror = {
+      ...emptyMirror(),
+      synced: true,
+      categories: [
+        { id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" },
+        { id: C2, readable: true, name: "포트폴리오", createdAt: "2026-11-01T00:00:00.000Z" },
+      ],
+    };
+    const kv = createMemoryKv();
+    await kv.set(kvKeys.base(USER), mirror);
+    const sent: QueuedOp[] = [];
+    const send = vi.fn(async (q: QueuedOp): Promise<SendResult> => {
+      sent.push(q);
+      return { ok: true };
+    });
+    const runtime = createRuntime({ userKey: USER, kv, send, fetchSnapshot: async () => ({ ok: false, error: "unavailable" }), now: () => NOW.getTime(), online: () => false });
+    await runtime.boot();
+    const apis = createLocalApis(runtime);
+    expect(apis.evening.localFirst).toBe(true);
+    await mount(apis.evening);
+    expect(screen.queryByText("인터넷에 연결되면 저장할 수 있어요. 넣은 값은 그대로 있어요.")).toBeNull(); // 기기 먼저 저장은 끊겨도 막지 않는다
+    setNumber("시간", 2);
+    await press("분야마다 나누기");
+    expect(stepper("어학")).toBe(0);
+    expect(otherText()).toBe("2시간");
+    // 다이얼(키보드)로 나눈다: 포트폴리오 고름 → 기타 쪽 손잡이 PageUp 두 번(+60분) → 어학 고름 → 끝 손잡이 PageUp(+30분, 포트폴리오에서)
+    key(dial()!, "ArrowRight");
+    key(handle("both"), "PageUp"); // 포트폴리오는 0분이라 손잡이가 하나(겹침) — 뒤 이웃(기타)에서 가져온다
+    key(handle("end"), "PageUp");
+    key(dial()!, "Home");
+    key(handle("end"), "PageUp");
+    expect(stepper("어학")).toBe(30);
+    expect(stepper("포트폴리오")).toBe(30);
+    expect(otherText()).toBe("1시간");
+    await press("저장");
+    expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
+    const op = runtime.pendingOps().at(-1)?.op;
+    expect(op).toMatchObject({
+      kind: "evening.save",
+      input: {
+        totalMinutes: 120,
+        items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 30 }, { categoryId: null, minutes: 60 }],
+        saveMode: "edited",
+      },
+    });
+    expect(sent).toHaveLength(0); // 끊겨 있어 서버에는 아직 보내지 않았다
   });
 });
