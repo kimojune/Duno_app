@@ -1,6 +1,8 @@
 "use client";
 
+import { EveningEntry } from "../../../components/evening-record";
 import { LoginActionsView, LoginLayout } from "../../../components/login-button";
+import { OfferCard } from "../../../components/offer-card";
 import {
   categoryAddedText,
   categoryDuplicateText,
@@ -62,6 +64,39 @@ function manyChips(n: number): ChipView[] {
 }
 
 type Partial2 = Partial<TodoViewProps> & { sheetOpen?: boolean };
+
+/** C30·C31: 먼저 할 일 카드 하나만(C31은 먼저 할 일 글이 200자). C30은 응답 전 자리(.slot-card)만 */
+const LONG_OFFER_TEXT = "긴 할 일 글 ".repeat(40).slice(0, 200);
+function OfferOnly({ text }: { text: string | null }) {
+  return (
+    <OfferCard
+      offer={{ id: "o2", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: text ? "t-long" : null, todoText: text, state: "new" }}
+      busy={false}
+      error={null}
+      onStart={noop}
+      onDismiss={noop}
+    />
+  );
+}
+
+/** C29: 목록 위에 얹히는 것(진짜 화면은 app-shell.tsx topSlot). 가짜 데이터만 쓴다 */
+function TopCards() {
+  return (
+    <>
+      <button type="button" className="goal-line">
+        이번 주 목표 15시간 중 9시간
+      </button>
+      <OfferCard
+        offer={{ id: "o1", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: null, todoText: null, state: "new" }}
+        busy={false}
+        error={null}
+        onStart={noop}
+        onDismiss={noop}
+      />
+      <EveningEntry evening={false} onOpen={noop} />
+    </>
+  );
+}
 
 /** 상태마다 원래 창 모습(sheetOpen)을 둔다. 사진 시험은 &sheet=로 닫힘·열림을 둘 다 찍는 상태도 있다 */
 const TODO_STATES: Record<string, Partial2> = {
@@ -152,6 +187,20 @@ const TODO_STATES: Record<string, Partial2> = {
     selectedCategoryId: "long",
   },
   C24: { list: "ready", rows: BASIC, sheetOpen: true, chips: manyChips(10), selectedCategoryId: "k1" },
+  // 고침 4바퀴: 분야 칩 두 줄 감싸기. C27 = 분야 여섯 개(좁은 화면에서 두 줄), C28 = 분야 한도 50개(꺾쇠 든 이름·긴 이름 포함, 두 줄을 넘어 세로로 밀림)
+  C27: { list: "ready", rows: BASIC, sheetOpen: true, chips: manyChips(6), selectedCategoryId: "k1" },
+  C28: {
+    list: "ready",
+    rows: BASIC,
+    sheetOpen: true,
+    chips: [{ id: "angle", name: "<b>굵게</b> & \"따옴표\"" }, { id: "long", name: NAME_20 }, ...manyChips(48)],
+    selectedCategoryId: "long",
+  },
+  // 고침 4바퀴: 목록 위 카드(이번 주 목표 줄·오늘 먼저 할 일·저녁 기록 입구)는 한 줄 줄
+  C29: { list: "ready", rows: BASIC, sheetOpen: false, topSlot: <TopCards /> },
+  // 고침 4바퀴 고침1: 카드가 오기 전 자리(.slot-card)와 카드의 높이를 같은 크기에서 재려고(C30 자리, C29 카드, C31 먼저 할 일 글 200자)
+  C30: { list: "ready", rows: BASIC, sheetOpen: false, topSlot: <div className="slot-card" aria-hidden="true" /> },
+  C31: { list: "ready", rows: BASIC, sheetOpen: false, topSlot: <OfferOnly text={LONG_OFFER_TEXT} /> },
   C25: { list: "ready", rows: BASIC, sheetOpen: true, selectedCategoryId: "c1" },
   C26: { list: "ready", rows: BASIC, sheetOpen: true, newCategoryOpen: true, newCategoryDraft: "자격증", draft: "정보처리기사 원서" },
   // C-D11 포커스 사진: 할 일 12개(창 닫힘·열림)

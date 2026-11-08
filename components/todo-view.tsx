@@ -3,7 +3,6 @@
 import {
   useLayoutEffect,
   useRef,
-  type CSSProperties,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -14,6 +13,7 @@ import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { LiveRegion, Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /**
  * 할 일 화면의 그리는 쪽(디자인 명세 12절 방향 C). 상태를 받아 그리기만 한다.
@@ -92,12 +92,6 @@ export function categoryDuplicateText(name: string): string {
 export function categoryAddedText(name: string): string {
   return `분야를 더하고 골랐어요: ${name}`;
 }
-
-/**
- * 칩 최대 폭 = 칩 줄 보이는 폭 − 이 값(12-3 CategoryChip).
- * 임시, 결정 필요: 32px(다음 칩이 조금 보이게). 바꾸면 화면 구조는 그대로다(12-12).
- */
-export const CHIP_MAX_GAP_PX = 32;
 
 /**
  * 창 높이가 보이는 화면의 이 비율을 넘으면 디자인 검토에서 다시 본다(C26).
@@ -432,9 +426,8 @@ export function CategoryChipRow(
       </div>
     );
   }
-  const style = { "--chip-max-gap": `${CHIP_MAX_GAP_PX}px` } as CSSProperties;
   return (
-    <div className="chip-row" role="group" aria-labelledby="category-label" style={style}>
+    <div className="chip-row" role="group" aria-labelledby="category-label">
       {props.chips.map((chip) => (
         <CategoryChip key={chip.id} chip={chip} pressed={chip.id === props.selectedCategoryId} onToggle={props.onToggleChip} />
       ))}
@@ -540,22 +533,15 @@ export function TodoSheet({ sheetRef, inputRef, newCategoryInputRef, ...props }:
       onKeyDown={onSheetKeyDown}
       noValidate
     >
+      {/* 순서(고침 4바퀴): 글 칸이 먼저, 분야 칩은 그 아래. 창을 열면 포커스는 글 칸이고, 탭은 닫기 → 글 칸 → 적기 → 칩 → + 분야 순이다 */}
       <div className="sheet-head">
-        <span id="category-label" className="sheet-label">
-          {TODO_TEXT.categoryLabel}
-        </span>
+        <label htmlFor="todo-input" className="sheet-label">
+          {TODO_TEXT.label}
+        </label>
         <TextButton id="sheet-close" className="btn-flush-end" aria-label={TODO_TEXT.sheetCloseName} onClick={() => props.onCloseSheet("button")}>
           {TODO_TEXT.sheetClose}
         </TextButton>
       </div>
-      {props.newCategoryOpen ? <NewCategoryRow {...props} newCategoryInputRef={newCategoryInputRef} /> : <CategoryChipRow {...props} />}
-      {/* 칩 줄 아래 한 줄 안내(C17·C18·C20). 자리를 늘 두어 새 안내가 옛 안내를 바꾼다 */}
-      <p className="cat-notice" role="status">
-        {props.categoryNotice}
-      </p>
-      <label htmlFor="todo-input" className="input-label sheet-todo-label">
-        {TODO_TEXT.label}
-      </label>
       <div className="input-row">
         {/* maxLength를 걸지 않는다: 붙여 넣은 글을 몰래 자르지 않는다(T11) */}
         <input
@@ -577,6 +563,14 @@ export function TodoSheet({ sheetRef, inputRef, newCategoryInputRef, ...props }:
       </div>
       <p id="todo-help" className="input-help">
         {help}
+      </p>
+      <span id="category-label" className="sheet-label sheet-category-label">
+        {TODO_TEXT.categoryLabel}
+      </span>
+      {props.newCategoryOpen ? <NewCategoryRow {...props} newCategoryInputRef={newCategoryInputRef} /> : <CategoryChipRow {...props} />}
+      {/* 칩 줄 아래 한 줄 안내(C17·C18·C20). 자리를 늘 두어 새 안내가 옛 안내를 바꾼다 */}
+      <p className="cat-notice" role="status">
+        {props.categoryNotice}
       </p>
     </form>
   );
@@ -613,6 +607,7 @@ export function TodoView(props: TodoViewProps) {
   const header = (
     <header className="today-header">
       <div>
+        <Wordmark className="today-wordmark" />
         <h1 className="today-title">{TODO_TEXT.title}</h1>
         <p className="today-date">{dateLine}</p>
       </div>

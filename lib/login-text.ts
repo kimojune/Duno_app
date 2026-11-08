@@ -4,7 +4,6 @@
 export type LoginNotice = "failed" | "cancelled" | "offline" | "config";
 
 export const LOGIN_TEXT = {
-  name: "duno",
   sentence: "로그인하면 할 일을 어느 기기에서나 볼 수 있어요.",
   button: "Google로 로그인",
   busy: "Google로 이동하는 중",
