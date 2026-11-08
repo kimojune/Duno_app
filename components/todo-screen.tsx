@@ -43,7 +43,9 @@ import { TodoDetail } from "./todo-detail";
  * - 적는 창은 모달이 아니다. 창 상태(할 일 칸 글·고른 분야·새 분야 줄·그 칸 글)는 화면이 연 동안 하나로 살고,
  *   창을 닫아도 지우지 않는다(C-D1). 뒤로 가기는 창부터 닫는다(C-D2, history 한 칸).
  * 클라이언트는 user_id·날짜를 보내지 않는다. 브라우저 Supabase 클라이언트로 표를 직접 읽고 쓰지 않는다.
- * 저장 전 글·분야 이름은 기기에 두지 않는다(D6): localStorage·sessionStorage·IndexedDB·서비스 워커 캐시 없음.
+ * 아직 「적기」를 누르지 않은 글(할 일 칸·새 분야 칸)은 기기에 두지 않는다(D6): 화면 메모리에만 있다.
+ * 누른 쓰기는 기기 먼저 저장(local, 고침 3바퀴)이면 이 사용자의 IndexedDB(거울·보낼 줄, 서버가 받지 않은 글 보관)에 두고,
+ * 예전 방식이면 못 올린 할 일만 localStorage 보관함(lib/outbox.ts)에 둔다. 둘 다 로그아웃 때 지운다. 서비스 워커 캐시는 쓰지 않는다.
  */
 
 export type { LocalTodos };

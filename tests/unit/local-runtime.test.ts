@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deriveEveningState, deriveFocusState, deriveGoalSummary, deriveGrowth, derivePastDay, deriveToday, deriveYesterday } from "../../lib/local/derive";
 import { createMemoryKv, kvKeys, wipeOtherUsers } from "../../lib/local/kv";
 import { applyOp, emptyMirror, mergeSnapshot, replay } from "../../lib/local/reduce";
-import { createRuntime, MAX_ATTEMPTS, type RuntimeDeps } from "../../lib/local/runtime";
+import { createRuntime, RETRY_MAX_MS, STALLED_AFTER_ATTEMPTS, type RuntimeDeps } from "../../lib/local/runtime";
 import type { Mirror, MirrorSnapshot, MirrorTodo, Op, QueuedOp, SendResult } from "../../lib/local/types";
 
 /**
@@ -353,19 +353,23 @@ describe("runtime: 쓰기는 화면을 먼저 바꾸고 보낼 줄에 넣는다"
     expect(h.runtime.isAuthLost()).toBe(true);
     expect(h.runtime.getMirror().todos).toHaveLength(1); // 되돌리지 않는다
   });
-  it(`서버가 일시 오류로 ${MAX_ATTEMPTS}번 답하면 거절로 본다(마이그레이션 전 DB 등으로 줄이 영원히 막히지 않게)`, async () => {
+  // 고침 4바퀴(F3)에서 규칙이 바뀌었다: 예전에는 일시 오류 6번(MAX_ATTEMPTS)이면 거절로 보고 글을 버렸다. 이제는 버리지 않고 계속 다시 보내며,
+  // STALLED_AFTER_ATTEMPTS번을 넘기면 「보내지 못함」(isStalled)으로 화면에 알린다
+  it(`서버가 일시 오류로 ${STALLED_AFTER_ATTEMPTS}번 넘게 답해도 버리지 않고 줄에 둔 채 「보내지 못함」이 된다`, async () => {
     const h = harness();
     await h.runtime.boot();
     h.setReply(() => ({ ok: false, error: "unavailable" }));
     h.runtime.enqueue({ kind: "todo.add", id: T1, text: "a" });
-    for (let i = 1; i < MAX_ATTEMPTS; i++) {
+    for (let i = 1; i <= STALLED_AFTER_ATTEMPTS + 2; i++) {
       const r = await h.runtime.flush();
       expect(r.stopped).toBe("server_error");
+      expect(r.rejected).toEqual([]);
       expect(h.runtime.pendingOps()[0].attempts).toBe(i);
+      expect(h.runtime.isStalled()).toBe(i >= STALLED_AFTER_ATTEMPTS);
     }
-    const last = await h.runtime.flush();
-    expect(last.rejected).toEqual([{ kind: "todo.add", error: "unavailable" }]);
-    expect(h.runtime.pendingCount()).toBe(0);
+    expect(h.runtime.pendingCount()).toBe(1);
+    expect(h.runtime.getMirror().todos.map((t) => t.id)).toEqual([T1]); // 되돌리지 않는다
+    expect(h.timers.every((t) => t.ms <= RETRY_MAX_MS)).toBe(true);
   });
   it("여러 번 flush를 불러도 동시에 한 번만 돈다. 보내는 사이에 새로 들어온 쓰기도 곧 보낸다", async () => {
     const h = harness();

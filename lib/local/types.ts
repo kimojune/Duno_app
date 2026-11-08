@@ -55,6 +55,8 @@ export type Mirror = {
 export type MirrorSnapshot = {
   /** 서버 시각(ISO) */
   serverNow: string;
+  /** 이 사본의 주인(세션 사용자 번호, 고침 4바퀴). 기기 운영 장치의 사용자와 다르면 받지 않는다(옛 서버가 주는 사본에는 없을 수 있다) */
+  userId?: string;
   todos: MirrorTodo[] | null;
   categories: CategoryItem[] | null;
   settings: SettingsData | null;
@@ -95,9 +97,27 @@ export type OpKind = Op["kind"];
  */
 export type QueuedOp = { key: string; clientAt: string; attempts: number; op: Op };
 
-/** 보내기 결과. network는 서버에 닿지 못한 것(끊김·시간 초과)이라 횟수에 세지 않는다 */
-export type SendResult = { ok: true } | { ok: false; error: string; network?: boolean };
+/**
+ * 보내기 결과. network는 서버에 닿지 못한 것(끊김·시간 초과)이라 횟수에 세지 않는다.
+ * existing은 분야 만들기가 duplicate일 때 서버가 알려 준 같은 이름의 내 분야(고침 4바퀴: 뒤의 쓰기의 분야 번호를 이것으로 바꿔 보낸다).
+ * account_mismatch는 서버의 세션 사용자가 이 기기 운영 장치의 사용자와 다르다는 뜻이다(보내지 않고 이 사용자 것을 지운다).
+ */
+export type SendResult = { ok: true } | { ok: false; error: string; network?: boolean; existing?: { id: string; name: string } };
 export type Sender = (queued: QueuedOp) => Promise<SendResult>;
 
 /** 서버가 거절한 쓰기(기기 것은 되돌렸다). 화면이 한 줄로 알린다 */
 export type Rejection = { kind: OpKind; error: string };
+
+/**
+ * 서버가 받지 않은 쓰기의 내용(고침 4바퀴). 이 사용자 기기 저장소에 남겨 화면에서 보고 복사할 수 있다(다시 적기는 사용자가 붙여 넣어 한다).
+ * text는 사용자가 적은 글(할 일·작업 기록·분야 이름·목표 한 문장) 또는 저녁 기록의 시간 줄. 사용자 입력이니 화면은 텍스트로만 그린다.
+ */
+export type ArchivedWrite = {
+  /** 보낼 줄의 열쇠(보관 열쇠로도 쓴다) */
+  key: string;
+  kind: OpKind;
+  error: string;
+  /** 누른 때(기기 시계, ISO) */
+  clientAt: string;
+  text: string;
+};

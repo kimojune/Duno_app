@@ -23,9 +23,9 @@ export type LocalTodos = {
   refresh(): void;
   /** 로그인이 풀려 서버에 보내지 못하고 있는가 */
   isAuthLost(): boolean;
-  /** 로그아웃 직전: 보낼 줄을 서버에 보내 보고(최대 limitMs), 못 보낸 쓰기 수를 돌려준다 */
+  /** 로그아웃 직전: 기기의 보낼 줄(다른 탭 것 포함)을 서버에 보내 보고(최대 limitMs), 기기에 남은 못 보낸 쓰기 수를 돌려준다 */
   flushBeforeSignOut(): Promise<number>;
-  /** 로그아웃: 이 사용자의 기기 저장소(거울·보낼 줄)를 지운다 */
+  /** 로그아웃: 이 사용자의 기기 저장소(거울·보낼 줄·고른 값·받지 않은 쓰기 보관)를 지우고 다른 탭에 알린다 */
   discard(): Promise<void>;
 };
 
@@ -50,14 +50,20 @@ export function createLocalTodos(runtime: Runtime, apis: LocalApis): LocalTodos 
     },
     isAuthLost: runtime.isAuthLost,
     flushBeforeSignOut: async () => {
+      // 다른 탭이 적어 둔 보낼 줄도 함께 보내 보고, 못 보낸 수는 기기 저장소의 이 사용자 줄 칸으로 센다(F1: 로그아웃이 다른 탭의 줄까지 지운다)
       let timer: ReturnType<typeof setTimeout> | undefined;
-      await Promise.race([runtime.flush(), new Promise((resolve) => (timer = setTimeout(resolve, SIGN_OUT_FLUSH_LIMIT_MS)))]);
+      const work = (async () => {
+        await runtime.adoptStoredQueue();
+        await runtime.flush();
+      })();
+      await Promise.race([work, new Promise((resolve) => (timer = setTimeout(resolve, SIGN_OUT_FLUSH_LIMIT_MS)))]);
       clearTimeout(timer);
-      return runtime.pendingCount();
+      return runtime.storedPendingCount();
     },
     discard: () => {
       clearDeviceHint(); // 이 기기에 거울이 없어졌다: 다음에 열 때 서버가 사본을 한 번 실어 보낸다
-      return runtime.wipe();
+      // 같은 기기의 다른 탭에도 알려 그 탭들이 자기 것을 지우고 멈추게 한다(S1)
+      return runtime.wipe({ broadcast: true });
     },
   };
 }

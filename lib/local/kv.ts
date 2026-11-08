@@ -1,6 +1,6 @@
 /**
  * 기기 저장소(고침 3바퀴, 기기 먼저 저장). 새 패키지 없이 브라우저 IndexedDB 하나에 열쇠-값으로 둔다.
- * 사용자마다 열쇠 머리를 나눈다(`base/<사용자 번호>`, `op/<사용자 번호>/<줄 순서>`). 다른 사용자의 것은 읽지도 쓰지도 않는다.
+ * 사용자마다 열쇠 머리를 나눈다(`base/<사용자 번호>`, `op/<사용자 번호>/<줄 순서>`, `pref/`·`sent/`·`rej/` 같은 꼴). 다른 사용자의 것은 읽지도 쓰지도 않는다.
  * 저장소를 못 쓰면(시크릿 창·막힘·가득 참) createIdbKv가 null을 돌려주고, 앱은 기기에 남기지 않는 메모리 저장소로 돈다(새로고침하면 사라진다).
  * 값은 구조 복제(structured clone)로 들어가므로 평범한 객체·배열·문자열·숫자만 둔다.
  */
@@ -63,7 +63,15 @@ export function createIdbKv(name: string = DB_NAME): KvStore | null {
       };
       req.onsuccess = () => {
         const db = req.result;
-        db.onversionchange = () => db.close(); // 다른 탭이 판을 올리면 닫아 준다
+        // 다른 탭이 판을 올리면 닫아 주고, 열어 둔 것을 비워 다음 읽기·쓰기가 다시 열게 한다(닫힌 DB를 계속 쓰면 그 뒤 모두 실패한다)
+        db.onversionchange = () => {
+          db.close();
+          opened = null;
+        };
+        // 브라우저가 DB를 닫았을 때(저장소 지움 등)도 다시 연다
+        db.onclose = () => {
+          opened = null;
+        };
         resolve(db);
       };
       req.onerror = () => reject(req.error ?? new Error("indexeddb open failed"));
@@ -112,14 +120,26 @@ export const kvKeys = {
   /** 화면이 기억하는 고른 값(상태보기 기간·보기 방식 등). 사용자마다 나뉘고 로그아웃·다른 사용자 로그인 때 함께 지워진다 */
   pref: (userKey: string, name: string) => `pref/${userKey}/${name}`,
   prefPrefix: (userKey: string) => `pref/${userKey}/`,
+  /**
+   * 「보냈다」는 표시(비석, 고침 4바퀴). 보낸 탭이 줄 칸을 지우기 전에 남긴다. 다른 탭은 줄 칸이 저장소에 없고 이 표시가 있을 때만
+   * 「다른 탭이 보냈다」로 보고 건너뛴다. 표시가 없으면 보낸다(서버가 같은 id는 한 번만 받는다). 값은 남긴 때(ms). 하루가 지나면 지운다
+   */
+  sent: (userKey: string, opKey: string) => `sent/${userKey}/${opKey}`,
+  sentPrefix: (userKey: string) => `sent/${userKey}/`,
+  /** 서버가 받지 않은 쓰기의 내용(고침 4바퀴). 화면에서 보고 복사할 수 있게 남긴다. 사용자가 지우거나 로그아웃·다른 사용자 로그인 때 지운다 */
+  rejected: (userKey: string, opKey: string) => `rej/${userKey}/${opKey}`,
+  rejectedPrefix: (userKey: string) => `rej/${userKey}/`,
   /** 이 기기에 마지막으로 로그인한 사용자(다른 사용자가 로그인하면 이전 사용자의 것을 지운다) */
   lastUser: "meta/lastUser",
 } as const;
 
+/** 사용자마다 나뉜 열쇠 머리들(지울 때 모두 본다) */
+export const USER_PREFIXES = ["base/", "op/", "pref/", "sent/", "rej/"] as const;
+
 /** 이 사용자 것이 아닌 기기 저장소 항목을 모두 지운다(로그인 직후, 다른 계정의 글이 남지 않게). 실패는 조용히 넘긴다 */
 export async function wipeOtherUsers(kv: KvStore, userKey: string): Promise<void> {
   try {
-    for (const prefix of ["base/", "op/", "pref/"]) {
+    for (const prefix of USER_PREFIXES) {
       for (const key of await kv.keys(prefix)) {
         const owner = key.slice(prefix.length).split("/")[0];
         if (owner !== userKey) await kv.delete(key);
@@ -130,12 +150,14 @@ export async function wipeOtherUsers(kv: KvStore, userKey: string): Promise<void
   }
 }
 
-/** 이 사용자 것을 모두 지운다(로그아웃 때) */
+/** 이 사용자 것을 모두 지운다(로그아웃 때: 거울·보낼 줄·고른 값·보냈다는 표시·받지 않은 쓰기 보관) */
 export async function wipeUser(kv: KvStore, userKey: string): Promise<void> {
   try {
     await kv.delete(kvKeys.base(userKey));
-    for (const key of await kv.keys(kvKeys.opPrefix(userKey))) await kv.delete(key);
-    for (const key of await kv.keys(kvKeys.prefPrefix(userKey))) await kv.delete(key);
+    for (const prefix of USER_PREFIXES) {
+      if (prefix === "base/") continue;
+      for (const key of await kv.keys(`${prefix}${userKey}/`)) await kv.delete(key);
+    }
   } catch {
     // 조용히 둔다
   }

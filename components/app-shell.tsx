@@ -13,6 +13,7 @@ import { readableCategories as readableMirrorCategories } from "../lib/local/der
 import { readTodayFromMirror, type LocalApis } from "../lib/local/apis";
 import { createLocalTodos, type LocalTodos } from "../lib/local/todos";
 import type { Runtime } from "../lib/local/runtime";
+import type { ArchivedWrite } from "../lib/local/types";
 import { clearOtherOutboxes, createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
@@ -46,6 +47,79 @@ import { Notice, TextButton } from "./ui";
  */
 
 type Entry = { id: string; name: string };
+
+/**
+ * 기기 먼저 저장의 화면 글(고침 4바퀴): 서버가 받지 않은 쓰기 보관 자리 · 「보내지 못함」 · 계정 바뀜 안내.
+ * 임시 글, 디자인 확정 뒤 바꾼다. 말투(PM 확정 d-96): 해요체, 숫자 먼저, 말은 최소. 재촉·평가·끊김 탓 없음.
+ */
+export const LOCAL_SAVE_TEXT = {
+  archivedTitle: (n: number) => `${n}개 기록을 서버가 받지 않았어요. 적은 글은 여기 남겨 뒀어요`,
+  archivedKind: {
+    "todo.add": "할 일",
+    "todo.edit": "고친 할 일",
+    "note.add": "작업 기록",
+    "category.add": "분야",
+    "settings.save": "목표 한 문장",
+    "evening.save": "저녁 기록",
+  } as Partial<Record<string, string>>,
+  archivedKindOther: "기록",
+  copy: "복사",
+  copied: "복사했어요",
+  copyFailed: "복사하지 못했어요. 글을 길게 눌러 골라 주세요",
+  dismiss: "지우기",
+  dismissAll: "모두 지우기",
+  stalled: (n: number) => `${n}개 기록을 아직 보내지 못했어요. 계속 보내고 있어요`,
+  resetAccount: "다른 계정으로 바뀌었어요. 화면을 다시 열어요",
+  resetSignedOut: "다른 탭에서 로그아웃했어요",
+  reopen: "다시 열기",
+} as const;
+
+/**
+ * 서버가 받지 않은 쓰기의 내용(보관). 글은 사용자 입력이라 React 텍스트로만 그리고, 길면 줄을 바꿔 감싼다.
+ * 「복사」는 그 글을 클립보드에 넣는다(다시 적기는 사용자가 붙여 넣어 한다). 「지우기」는 이 기기 보관에서 뺀다.
+ */
+export function ArchivedWrites({
+  items,
+  onDismiss,
+  clipboard,
+}: {
+  items: ArchivedWrite[];
+  onDismiss: (key?: string) => void;
+  clipboard?: { writeText(text: string): Promise<void> };
+}) {
+  const [copied, setCopied] = useState<{ key: string; ok: boolean } | null>(null);
+  if (items.length === 0) return null;
+  async function copy(item: ArchivedWrite) {
+    const board = clipboard ?? (typeof navigator !== "undefined" ? navigator.clipboard : undefined);
+    try {
+      if (!board) throw new Error("no clipboard");
+      await board.writeText(item.text);
+      setCopied({ key: item.key, ok: true });
+    } catch {
+      setCopied({ key: item.key, ok: false });
+    }
+  }
+  return (
+    <Notice role="status" className="notice-top" actions={<TextButton onClick={() => onDismiss()}>{LOCAL_SAVE_TEXT.dismissAll}</TextButton>}>
+      <p>{LOCAL_SAVE_TEXT.archivedTitle(items.length)}</p>
+      <ul aria-label="받지 않은 기록" style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        {items.map((item) => (
+          <li key={item.key} style={{ minWidth: 0 }}>
+            <p style={{ margin: 0 }}>{LOCAL_SAVE_TEXT.archivedKind[item.kind] ?? LOCAL_SAVE_TEXT.archivedKindOther}</p>
+            <p className="archived-text" style={{ margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: "12em", overflowY: "auto" }}>
+              {item.text}
+            </p>
+            <div className="notice-actions">
+              <TextButton onClick={() => void copy(item)}>{LOCAL_SAVE_TEXT.copy}</TextButton>
+              <TextButton onClick={() => onDismiss(item.key)}>{LOCAL_SAVE_TEXT.dismiss}</TextButton>
+            </div>
+            {copied?.key === item.key && <p role="status">{copied.ok ? LOCAL_SAVE_TEXT.copied : LOCAL_SAVE_TEXT.copyFailed}</p>}
+          </li>
+        ))}
+      </ul>
+    </Notice>
+  );
+}
 
 /** 처음 설정에서 새로 더한 분야를 오늘 화면의 처음 읽기(initial)에 끼워 넣는다 */
 export function withCategories(initial: TodayRead, added: Entry[]): TodayRead {
@@ -166,6 +240,9 @@ function MainShell({
   const [startNoticeOpen, setStartNoticeOpen] = useState(startNotice !== null);
   // 기기 먼저 저장: 서버가 받지 않아 되돌린 쓰기 수(알림을 보이고 닫을 때까지 쌓인다)
   const [rejectedCount, setRejectedCount] = useState(0);
+  // 기기 먼저 저장(고침 4바퀴): 서버가 받지 않은 쓰기의 내용(보관)과, 서버가 오래 받지 못하는 중인가(「보내지 못함」)
+  const [archived, setArchived] = useState<ArchivedWrite[]>(() => local?.runtime.archivedWrites() ?? []);
+  const [stalled, setStalled] = useState<number>(() => (local?.runtime.isStalled() ? local.runtime.pendingCount() : 0));
   // 기기 거울이 바뀌면 이 화면도 다시 그린다(내 정보 탭의 분야 목록 등이 거울을 읽는다)
   const [, setMirrorVersion] = useState(0);
   useEffect(() => {
@@ -175,10 +252,16 @@ function MainShell({
     const stopRejections = runtime.subscribeRejections(() => {
       const taken = runtime.takeRejections().length;
       if (taken > 0) setRejectedCount((n) => n + taken);
+      setArchived(runtime.archivedWrites());
+    });
+    const stopState = runtime.subscribeState(() => {
+      setArchived(runtime.archivedWrites());
+      setStalled(runtime.isStalled() ? runtime.pendingCount() : 0);
     });
     return () => {
       stopMirror();
       stopRejections();
+      stopState();
     };
   }, [local]);
   // 기기 먼저 저장에서 할 일 화면이 쓰는 것
@@ -390,6 +473,12 @@ function MainShell({
                   actions={<TextButton onClick={() => setRejectedCount(0)}>닫기</TextButton>}
                 >
                   {TODO_TEXT.rejected(rejectedCount)}
+                </Notice>
+              )}
+              {local && <ArchivedWrites items={archived} onDismiss={(key) => void local.runtime.dismissArchived(key)} />}
+              {stalled > 0 && (
+                <Notice role="status" className="notice-top">
+                  {LOCAL_SAVE_TEXT.stalled(stalled)}
                 </Notice>
               )}
               {startNotice && startNoticeOpen && (

@@ -5,14 +5,18 @@ import type { HomeRead } from "../lib/home-types";
 import { readTodayFromMirror, createLocalApis } from "../lib/local/apis";
 import { createBrowserRuntime, migrateLegacyOutbox, startBrowserSync } from "../lib/local/browser";
 import { markDeviceHint } from "../lib/local/device-hint";
+import type { ResetReason } from "../lib/local/runtime";
 import type { MirrorSnapshot } from "../lib/local/types";
-import { AppShell, type LocalBundle } from "./app-shell";
+import { AppShell, LOCAL_SAVE_TEXT, type LocalBundle } from "./app-shell";
+import { TextButton } from "./ui";
 
 /**
  * 기기 먼저 저장(고침 3바퀴)으로 앱을 여는 입구. 서버는 로그인한 사용자 번호만 넘기고 개인 데이터는 HTML에 싣지 않는다(첫 화면이 데이터를 기다려 늦어지지 않는다).
  * 열면: ① 기기 저장소(IndexedDB)에서 거울과 보낼 줄을 읽어 바로 그린다(네트워크 없이). ② 뒤에서 보낼 줄을 보내고 서버 것을 받아 맞춘다.
  * 이 기기에서 처음 쓰는 사용자(기기에 거울이 없음)만 서버 사본이 올 때까지 「불러오는 중」을 보인다(연결이 없거나 8초가 지나면 그냥 연다: 읽기 실패 안내가 뜬다).
  * 이 기기에 남은 다른 사용자의 기기 저장소는 지운다(로그아웃 없이 계정이 바뀐 경우).
+ * 고침 4바퀴: 운영 장치가 「계정이 바뀜」(서버의 세션 사용자가 다름·다른 사용자가 다른 탭에서 열림)으로 자기 것을 지우면 안내를 보이고 페이지를 다시 연다.
+ * 「다른 탭에서 로그아웃함」이면 안내와 「다시 열기」만 보인다(그 탭이 로그아웃을 마치기 전에 다시 열면 같은 세션으로 다시 받아 적을 수 있어, 사용자가 누를 때 연다).
  */
 
 /** 이 기기에서 처음 쓰는 사용자가 서버 사본을 기다리는 시간 상한(밀리초, 임시) */
@@ -38,11 +42,23 @@ export function LocalAppShell({
 }) {
   const [bundle, setBundle] = useState<LocalBundle | null>(null);
   const [, setVersion] = useState(0);
+  const [reset, setReset] = useState<ResetReason | null>(null);
 
   useEffect(() => {
     let alive = true;
     let stopSync = () => {};
-    const runtime = createBrowserRuntime(userKey);
+    const runtime = createBrowserRuntime(userKey, (reason) => {
+      stopSync();
+      if (!alive) return;
+      setReset(reason);
+      if (reason === "account_mismatch") {
+        try {
+          window.location.reload();
+        } catch {
+          // 다시 열지 못하면 안내의 「다시 열기」를 누른다
+        }
+      }
+    });
     const apis = createLocalApis(runtime);
     void (async () => {
       await runtime.boot();
@@ -78,6 +94,16 @@ export function LocalAppShell({
     return bundle.runtime.subscribe(() => setVersion((n) => n + 1));
   }, [bundle]);
 
+  if (reset) {
+    return (
+      <div className="app-shell">
+        <p className="todo-sub" role="status">
+          {reset === "account_mismatch" ? LOCAL_SAVE_TEXT.resetAccount : LOCAL_SAVE_TEXT.resetSignedOut}
+        </p>
+        <TextButton onClick={() => window.location.reload()}>{LOCAL_SAVE_TEXT.reopen}</TextButton>
+      </div>
+    );
+  }
   if (!bundle) {
     return (
       <div className="app-shell">

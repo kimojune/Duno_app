@@ -1,14 +1,52 @@
 import { createOutbox, clearAllOutboxes, safeLocalStorage } from "../outbox";
-import { createRuntime, type Runtime } from "./runtime";
-import { fetchMirrorSnapshot, sendToServer } from "./sender";
+import { createRuntime, type LocalChannel, type ResetReason, type Runtime } from "./runtime";
+import { createSender, createSnapshotFetcher } from "./sender";
 
 /**
  * 브라우저에서 기기 먼저 저장을 켜는 길(고침 3바퀴). 운영 장치를 만들고, 연결·화면 보임·닫힘 같은 브라우저 사건에 보내기·받기를 묶는다.
  * 서버 렌더에서는 부르지 않는다(IndexedDB가 없다).
+ * 고침 4바퀴: 보내기·받기에 이 장치의 사용자 번호를 싣고(서버가 세션 사용자와 다르면 거절), 같은 출처의 다른 탭과 BroadcastChannel로 잇는다.
  */
 
-export function createBrowserRuntime(userKey: string): Runtime {
-  return createRuntime({ userKey, send: sendToServer, fetchSnapshot: fetchMirrorSnapshot });
+/** 같은 출처의 탭끼리 알림 통로 이름 */
+export const LOCAL_CHANNEL_NAME = "duno-local";
+
+/** BroadcastChannel을 운영 장치가 쓰는 모양으로 감싼다. 없으면(오래된 브라우저) null */
+export function createBroadcastChannel(name: string = LOCAL_CHANNEL_NAME): (LocalChannel & { close(): void }) | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  try {
+    const bc = new BroadcastChannel(name);
+    return {
+      post: (message) => {
+        try {
+          bc.postMessage(message);
+        } catch {
+          // 닫힌 통로: 조용히 둔다
+        }
+      },
+      subscribe: (listener) => {
+        const onMessage = (event: MessageEvent) => listener(event.data);
+        bc.addEventListener("message", onMessage);
+        return () => {
+          bc.removeEventListener("message", onMessage);
+          bc.close();
+        };
+      },
+      close: () => bc.close(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function createBrowserRuntime(userKey: string, onReset?: (reason: ResetReason) => void): Runtime {
+  return createRuntime({
+    userKey,
+    send: createSender(userKey),
+    fetchSnapshot: createSnapshotFetcher(userKey),
+    channel: createBroadcastChannel(),
+    onReset,
+  });
 }
 
 /**

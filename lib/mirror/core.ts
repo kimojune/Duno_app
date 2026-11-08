@@ -23,10 +23,18 @@ export type MirrorDeps = { supabase: SupabaseClient; key: TodoKey | null; now?: 
 
 const serverNow = () => new Date();
 
-export async function readMirrorForUser(deps: MirrorDeps): Promise<RecordResult<MirrorSnapshot>> {
+/**
+ * expectedUser(고침 4바퀴): 기기가 실어 보낸 「이 기기 장치의 사용자」. 주어졌는데 세션 사용자와 다르면 account_mismatch로 거절한다.
+ * 거절에만 쓴다(같아도 권한을 넓히지 않는다. 읽기는 늘 세션 사용자로). 사본에는 주인(userId = 세션 사용자)을 싣는다.
+ */
+export async function readMirrorForUser(
+  deps: MirrorDeps,
+  expectedUser?: string,
+): Promise<RecordResult<MirrorSnapshot> | { ok: false; error: "account_mismatch" }> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
+    if (expectedUser !== undefined && expectedUser.toLowerCase() !== user.data.toLowerCase()) return { ok: false, error: "account_mismatch" };
     if (!deps.key) return recordFail("config");
     const key = deps.key;
     const now = (deps.now ?? serverNow)();
@@ -49,6 +57,7 @@ export async function readMirrorForUser(deps: MirrorDeps): Promise<RecordResult<
       ok: true,
       data: {
         serverNow: now.toISOString(),
+        userId: user.data,
         todos: todos.ok ? todos.data : null,
         categories: categories.ok ? categories.data.categories : null,
         settings: settings.ok ? settings.data : null,
