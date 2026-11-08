@@ -25,6 +25,7 @@ export function computeGrowth(args: {
   const lastMonthRange = previousMonthRange(args.today);
   const weekEnd = weekDates(weekStart)[6];
   const lastWeekEnd = weekDates(lastWeekStart)[6];
+  const recentWeekFrom = addDays(args.today, -6); // 최근 1주 = 오늘 포함 지난 7일(두노 하루 기준)
   return {
     today: args.today,
     weekStart,
@@ -33,10 +34,12 @@ export function computeGrowth(args: {
     categories: args.categories,
     ratios: args.ratios,
     thisWeek: sumRange(args.logs, weekStart, weekEnd),
+    recentWeek: sumRange(args.logs, recentWeekFrom, args.today),
     lastWeek: sumRange(args.logs, lastWeekStart, lastWeekEnd),
     lastMonth: sumRange(args.logs, lastMonthRange.from, lastMonthRange.to),
     cumulative: sumRange(args.logs),
     loggedDaysThisWeek: countLoggedDays(args.logs, weekStart, weekEnd),
+    loggedDaysRecentWeek: countLoggedDays(args.logs, recentWeekFrom, args.today),
     loggedDaysTotal: countLoggedDays(args.logs),
     goal: args.goalItems ? { weekStart, items: args.goalItems } : null,
   };

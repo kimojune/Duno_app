@@ -21,8 +21,10 @@ import type { SettingsData } from "../../../lib/settings/types";
 
 /**
  * 원샷 v2 화면 모음(개발용, B10). 서버 Action·DB·네트워크를 부르지 않고 진짜 화면 컴포넌트에 가짜 데이터만 넣는다.
- * 쓰는 법: /dev/v2?s=tabbar | growth-empty | goal | evening | category | detail
+ * 쓰는 법: /dev/v2?s=tabbar | growth-empty | growth-recent | growth-many | goal | evening | category | detail
  *          | ratio-onboarding | ratio-onboarding-many | me-ratio | me-ratio-many | evening-split | evening-split-many (고침4 2단계: 원형 다이얼)
+ *  - growth-recent: 상태보기에 한 주 쓴 기록이 있는 것(최근 1주·띠그래프가 처음. 기간·보기 방식은 화면 시험이 눌러서 바꾼다)
+ *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
@@ -147,12 +149,42 @@ const EMPTY_GROWTH: GrowthData = {
   categories: CATEGORIES,
   ratios: SETTINGS.ratios,
   thisWeek: [],
+  recentWeek: [],
   lastWeek: [],
   lastMonth: [],
   cumulative: [],
   loggedDaysThisWeek: 0,
+  loggedDaysRecentWeek: 0,
   loggedDaysTotal: 0,
   goal: null,
+};
+
+/** 한 주 쓴 사람: 처음 정한 비율 50·30·20인데 최근 1주는 어학과 기타로 쏠림 */
+const RECENT_GROWTH: GrowthData = {
+  ...EMPTY_GROWTH,
+  thisWeek: [{ categoryId: C1, minutes: 360 }, { categoryId: null, minutes: 60 }],
+  recentWeek: [{ categoryId: C1, minutes: 420 }, { categoryId: C3, minutes: 30 }, { categoryId: null, minutes: 90 }],
+  lastWeek: [{ categoryId: C1, minutes: 240 }],
+  lastMonth: [{ categoryId: C2, minutes: 600 }],
+  cumulative: [{ categoryId: C1, minutes: 2400 }, { categoryId: C2, minutes: 900 }, { categoryId: C3, minutes: 300 }],
+  loggedDaysThisWeek: 5,
+  loggedDaysRecentWeek: 6,
+  loggedDaysTotal: 20,
+};
+
+/** 분야 50개(꺾쇠·긴 이름 포함): 화면이 가로로 넘치지 않는지 본다. 이름은 모두 지어낸 예시 */
+const MANY_IDS = Array.from({ length: 50 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
+const MANY_NAMES = MANY_IDS.map((_, i) =>
+  i === 0 ? "<b>굵게</b><img src=x onerror=alert(1)>" : i === 1 ? "아주아주아주아주아주아주아주아주아주아주아주아주아주아주아주긴분야이름공백없음" : `분야 ${i + 1}`,
+);
+const MANY_GROWTH: GrowthData = {
+  ...EMPTY_GROWTH,
+  categories: MANY_IDS.map((id, i) => ({ id, name: MANY_NAMES[i] })),
+  ratios: MANY_IDS.map((id) => ({ categoryId: id, percent: 2 })),
+  recentWeek: MANY_IDS.map((id, i) => ({ categoryId: id, minutes: 5 * ((i % 7) + 1) })),
+  cumulative: MANY_IDS.map((id, i) => ({ categoryId: id, minutes: 60 * ((i % 9) + 1) })),
+  loggedDaysRecentWeek: 7,
+  loggedDaysTotal: 30,
 };
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
@@ -241,6 +273,14 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "growth-recent" || id === "growth-many") {
+    return (
+      <Shell>
+        <GrowthScreen api={growthApi(id === "growth-recent" ? RECENT_GROWTH : MANY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
   if (id === "goal") {
     return <Opener render={(close) => <GoalEditor api={goalsApi} categories={CATEGORIES} goal={null} onClose={close} onSaved={noop} />} />;
   }
@@ -275,6 +315,8 @@ export function V2Gallery({ id }: { id: string }) {
         {[
           "tabbar",
           "growth-empty",
+          "growth-recent",
+          "growth-many",
           "goal",
           "evening",
           "category",

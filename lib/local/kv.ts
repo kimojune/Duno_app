@@ -109,6 +109,9 @@ export const kvKeys = {
   base: (userKey: string) => `base/${userKey}`,
   opPrefix: (userKey: string) => `op/${userKey}/`,
   op: (userKey: string, opKey: string) => `op/${userKey}/${opKey}`,
+  /** 화면이 기억하는 고른 값(상태보기 기간·보기 방식 등). 사용자마다 나뉘고 로그아웃·다른 사용자 로그인 때 함께 지워진다 */
+  pref: (userKey: string, name: string) => `pref/${userKey}/${name}`,
+  prefPrefix: (userKey: string) => `pref/${userKey}/`,
   /** 이 기기에 마지막으로 로그인한 사용자(다른 사용자가 로그인하면 이전 사용자의 것을 지운다) */
   lastUser: "meta/lastUser",
 } as const;
@@ -116,7 +119,7 @@ export const kvKeys = {
 /** 이 사용자 것이 아닌 기기 저장소 항목을 모두 지운다(로그인 직후, 다른 계정의 글이 남지 않게). 실패는 조용히 넘긴다 */
 export async function wipeOtherUsers(kv: KvStore, userKey: string): Promise<void> {
   try {
-    for (const prefix of ["base/", "op/"]) {
+    for (const prefix of ["base/", "op/", "pref/"]) {
       for (const key of await kv.keys(prefix)) {
         const owner = key.slice(prefix.length).split("/")[0];
         if (owner !== userKey) await kv.delete(key);
@@ -132,6 +135,7 @@ export async function wipeUser(kv: KvStore, userKey: string): Promise<void> {
   try {
     await kv.delete(kvKeys.base(userKey));
     for (const key of await kv.keys(kvKeys.opPrefix(userKey))) await kv.delete(key);
+    for (const key of await kv.keys(kvKeys.prefPrefix(userKey))) await kv.delete(key);
   } catch {
     // 조용히 둔다
   }

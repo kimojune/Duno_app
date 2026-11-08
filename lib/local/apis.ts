@@ -9,6 +9,7 @@ import { isActive } from "../focus/logic";
 import type { GoalsApi } from "../goals-api";
 import { checkGoalItems } from "../goals/validation";
 import type { GrowthApi } from "../growth-api";
+import { STATUS_PREF_NAME } from "../growth/status-view-pref";
 import { getJson, type ManageApi } from "../manage-api";
 import { checkNoteText } from "../notes/public";
 import type { NoteItem } from "../notes/types";
@@ -212,6 +213,10 @@ export function createLocalApis(runtime: Runtime): LocalApis {
 
   const growth: GrowthApi = {
     localFirst: true,
+    viewPref: {
+      load: () => runtime.getPref(STATUS_PREF_NAME),
+      save: (value) => runtime.setPref(STATUS_PREF_NAME, value),
+    },
     async fetchGrowth() {
       return deriveGrowth(mirror(), nowMs());
     },
