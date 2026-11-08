@@ -160,17 +160,16 @@ export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioIte
 /**
  * 채울 시간(상태보기 「채울 시간」·저장 직후 한 줄). 임시값(PM 답 전, d-69 ⑤ · docs/oneshot-v2/임시값.md):
  * - 이번 주 목표를 세운 주 → 목표 기준. 목표는 달력 주(월~일)에 묶여 있어 이번 주(thisWeek)에 쓴 시간과 견준다
- * - 아니면 처음 정한 비율 기준 → 그래프와 같은 기간인 최근 1주(recentWeek)에 쓴 시간과 견준다. 계산은 buildStatusChart().missed와 같다(같은 분모)
+ * - 아니면 처음 정한 비율 기준 → 같은 이번 주(thisWeek)에 쓴 시간과 견준다(PM 확정 11-09). 계산은 buildStatusChart().missed와 같다(같은 분모)
  */
 export function fillTimeFor(args: {
   categoryIds: string[];
   ratios: RatioItem[];
   goalItems: CategoryMinutes[] | null;
   thisWeek: CategoryMinutes[];
-  recentWeek: CategoryMinutes[];
 }): { basis: ShortfallBasis; items: CategoryMinutes[] } {
   if (args.goalItems && args.goalItems.length > 0) return { basis: "goal", items: shortfallByGoal(args.goalItems, args.thisWeek) };
-  return { basis: "ratio", items: buildStatusChart({ categoryIds: args.categoryIds, ratios: args.ratios, totals: args.recentWeek }).missed };
+  return { basis: "ratio", items: buildStatusChart({ categoryIds: args.categoryIds, ratios: args.ratios, totals: args.thisWeek }).missed };
 }
 
 /** 띠·원에 실제로 그릴 조각: 0% 조각을 뺀다(순서는 그대로). 줄이 비었으면 빈 목록 */

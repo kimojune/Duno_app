@@ -14,17 +14,14 @@ export type GrowthData = {
   categories: { id: string; name: string }[];
   /** 처음 정한 비율(부족 기준) */
   ratios: RatioItem[];
-  /** 분야별로 쓴 시간(기타는 categoryId null) */
+  /** 이번 주(달력 주 월~일, 두노 하루 기준)에 분야별로 쓴 시간(기타는 categoryId null). 상태보기 「이번 주」·놓친 분야·채울 시간이 쓴다 */
   thisWeek: CategoryMinutes[];
-  /** 최근 1주: 오늘 포함 지난 7일(두노 하루 기준, today-6 ~ today)에 분야별로 쓴 시간. 달력 주(월~일)인 thisWeek와 다르다 */
-  recentWeek: CategoryMinutes[];
   lastWeek: CategoryMinutes[];
   lastMonth: CategoryMinutes[];
   /** 쓰기 시작한 때부터 쌓인 것 */
   cumulative: CategoryMinutes[];
   /** 저녁 기록이 있는 날 수 */
   loggedDaysThisWeek: number;
-  loggedDaysRecentWeek: number;
   loggedDaysTotal: number;
   /** 이번 주 목표(없으면 null). 시간은 분 */
   goal: { weekStart: string; items: CategoryMinutes[] } | null;

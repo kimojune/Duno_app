@@ -39,7 +39,6 @@ import { TabBar } from "../../components/tab-bar";
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 
-// 최근 1주(오늘 포함 지난 7일)는 달력 주(월~일, 이 날짜에서는 11-02~11-07)를 늘 품는다. 따로 안 주면 이번 주와 같은 값으로 둔다(고침 4바퀴 2단계에서 최근 1주가 처음 보기가 되었다)
 function growth(over: Partial<GrowthData> = {}): GrowthData {
   const thisWeek = over.thisWeek ?? [
     { categoryId: C1, minutes: 30 },
@@ -59,12 +58,10 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
       { categoryId: C2, percent: 40 },
     ],
     thisWeek,
-    recentWeek: over.recentWeek ?? thisWeek,
     lastWeek: [{ categoryId: C1, minutes: 60 }],
     lastMonth: [{ categoryId: C2, minutes: 600 }],
     cumulative: [{ categoryId: C1, minutes: 900 }],
     loggedDaysThisWeek: 2,
-    loggedDaysRecentWeek: over.loggedDaysThisWeek ?? 2,
     loggedDaysTotal: 10,
     goal: null,
     ...over,

@@ -91,7 +91,7 @@ describe("분야 50개 + 기타 저장은 서버 저장 함수(가짜 DB)를 통
     expect(chart.rows.find((r) => r.categoryId === IDS[3])?.ratioPercent).toBe(0);
     // 놓친 분야: 몫이 있는 분야만(IDS[5]는 몫이 없는데 많이 썼다 → 놓친 것이 아니다)
     expect(chart.missed.map((m) => m.categoryId).sort()).toEqual([IDS[0], IDS[1], IDS[2], null].sort());
-    const fill = fillTimeFor({ categoryIds: IDS, ratios, goalItems: null, thisWeek: [], recentWeek: [{ categoryId: IDS[5], minutes: 120 }] });
+    const fill = fillTimeFor({ categoryIds: IDS, ratios, goalItems: null, thisWeek: [{ categoryId: IDS[5], minutes: 120 }] });
     expect(fill.items.some((i) => i.categoryId === IDS[3] || i.categoryId === IDS[49])).toBe(false);
   });
 });

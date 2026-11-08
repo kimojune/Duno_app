@@ -9,9 +9,23 @@ const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const VIEWS = ["band", "pie", "rows"];
 
 describe("parseStatusPref: 기기 저장소의 값은 믿지 않는다", () => {
-  it("처음 값은 최근 1주 · 띠그래프", () => {
-    expect(DEFAULT_STATUS_PREF).toEqual({ period: "recent", view: "band" });
+  it("처음 값은 이번 주 · 분야별 줄 막대(PM 확정 11-09)", () => {
+    expect(DEFAULT_STATUS_PREF).toEqual({ period: "week", view: "rows" });
     expect(parseStatusPref(undefined, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
+  });
+  it("이미 기억된 보기는 그대로 존중한다: 이전 판에서 고른 띠그래프·원그래프는 처음 값(줄 막대)으로 바뀌지 않는다", () => {
+    expect(parseStatusPref({ period: "week", view: "band" }, VIEWS)).toEqual({ period: "week", view: "band" });
+    expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie" });
+  });
+  it("옛 기간 값 「recent」(최근 1주에 해당하던 값)는 「이번 주」로 읽는다. 보기 방식은 그대로 살린다", () => {
+    expect(parseStatusPref({ period: "recent", view: "band" }, VIEWS)).toEqual({ period: "week", view: "band" });
+    expect(parseStatusPref({ period: "recent", view: "rows" }, VIEWS)).toEqual({ period: "week", view: "rows" });
+    expect(parseStatusPref({ period: "recent", view: "nope" }, VIEWS)).toEqual({ period: "week", view: "rows" });
+  });
+  it("옛 기간 이름의 모양만 받는다: 객체 기본 속성 이름(toString·__proto__ 등)은 옛 값으로 읽지 않는다", () => {
+    for (const period of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+      expect(parseStatusPref({ period, view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie" });
+    }
   });
   it("알아볼 수 있는 값은 그대로 읽는다", () => {
     expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie" });
@@ -21,14 +35,14 @@ describe("parseStatusPref: 기기 저장소의 값은 믿지 않는다", () => {
     for (const raw of [null, "recent", 7, [], [{ period: "total" }], true]) expect(parseStatusPref(raw, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
   });
   it("모르는 기간·보기 번호는 그 칸만 처음 값으로 돌리고 알아본 칸은 살린다", () => {
-    expect(parseStatusPref({ period: "year", view: "pie" }, VIEWS)).toEqual({ period: "recent", view: "pie" });
-    expect(parseStatusPref({ period: "total", view: "sunburst" }, VIEWS)).toEqual({ period: "total", view: "band" });
+    expect(parseStatusPref({ period: "year", view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie" });
+    expect(parseStatusPref({ period: "total", view: "sunburst" }, VIEWS)).toEqual({ period: "total", view: "rows" });
     expect(parseStatusPref({ period: 1, view: { id: "pie" } }, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
   });
   it("보기 목록에 새 보기를 더하면 그 번호도 읽히고, 목록에서 빠진 보기는 처음 값으로 돌아온다", () => {
-    expect(parseStatusPref({ period: "recent", view: "stack" }, [...VIEWS, "stack"]).view).toBe("stack");
-    expect(parseStatusPref({ period: "recent", view: "rows" }, ["band", "pie"]).view).toBe("band");
-    expect(parseStatusPref({ period: "recent", view: "x" }, ["pie", "rows"]).view).toBe("pie"); // 목록에 band가 없으면 첫 보기
+    expect(parseStatusPref({ period: "week", view: "stack" }, [...VIEWS, "stack"]).view).toBe("stack");
+    expect(parseStatusPref({ period: "week", view: "rows" }, ["band", "pie"]).view).toBe("band"); // 목록에 줄 막대가 없으면 첫 보기
+    expect(parseStatusPref({ period: "week", view: "x" }, ["pie", "rows"]).view).toBe("rows"); // 목록에 처음 보기(줄 막대)가 있으면 그것
   });
   it("별난 객체(__proto__·여분 칸)가 와도 두 칸만 읽는다", () => {
     const raw = JSON.parse('{"__proto__":{"polluted":1},"period":"total","view":"rows","extra":"x"}');
@@ -112,7 +126,7 @@ describe("기억한 보기 방식은 이 기기·이 사용자에 한정된다",
       set: (key, value) => new Promise<void>((resolve) => setTimeout(() => void inner.set(key, value).then(resolve), 10)),
     };
     const rt = makeRuntime(USER, slow);
-    void rt.setPref(STATUS_PREF_NAME, { period: "recent", view: "band" });
+    void rt.setPref(STATUS_PREF_NAME, { period: "week", view: "band" });
     void rt.setPref("other-pref", { x: 1 });
     void rt.setPref(STATUS_PREF_NAME, { period: "total", view: "rows" });
     await rt.wipe();

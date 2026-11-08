@@ -26,7 +26,7 @@ const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 const C3 = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
 const C4 = "c4c4c4c4-c4c4-4c4c-8c4c-c4c4c4c4c4c4";
 
-/** 한 주 쓴 사람: 분야 넷, 처음 정한 비율 40·30·20·10, 최근 1주는 어학 하나로 쏠림(600분) */
+/** 한 주 쓴 사람: 분야 넷, 처음 정한 비율 40·30·20·10, 이번 주(달력 주)는 어학 하나로 쏠림(600분) */
 function data(over: Partial<GrowthData> = {}): GrowthData {
   return {
     today: "2026-11-07",
@@ -46,7 +46,6 @@ function data(over: Partial<GrowthData> = {}): GrowthData {
       { categoryId: C4, percent: 10 },
     ],
     thisWeek: [{ categoryId: C1, minutes: 600 }],
-    recentWeek: [{ categoryId: C1, minutes: 600 }],
     lastWeek: [],
     lastMonth: [],
     cumulative: [
@@ -54,8 +53,7 @@ function data(over: Partial<GrowthData> = {}): GrowthData {
       { categoryId: C2, minutes: 600 },
       { categoryId: C3, minutes: 600 },
     ],
-    loggedDaysThisWeek: 5,
-    loggedDaysRecentWeek: 6,
+    loggedDaysThisWeek: 6,
     loggedDaysTotal: 20,
     goal: null,
     ...over,
@@ -76,6 +74,12 @@ async function mount(api: GrowthApi, onOpenCategory = vi.fn()) {
   await screen.findByRole("group", { name: GROWTH_TEXT.periodGroup });
   return { onOpenCategory, ...view };
 }
+/** 처음 보기가 줄 막대라, 띠그래프를 보는 시험은 띠그래프를 눌러 시작한다 */
+async function mountBand(api: GrowthApi) {
+  const mounted = await mount(api);
+  fireEvent.click(screen.getByRole("button", { name: "띠그래프" }));
+  return mounted;
+}
 const chip = (name: string) => screen.getByRole("button", { name });
 const pressed = (name: string) => chip(name).getAttribute("aria-pressed");
 const graph = () => screen.queryByRole("img");
@@ -89,13 +93,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("처음 상태: 최근 1주 · 띠그래프", () => {
-  it("기간 「최근 1주」와 보기 「띠그래프」가 눌린 상태로 시작하고, 띠 두 줄(처음 정한 비율 위, 쓴 시간 바로 아래)이 있다", async () => {
+describe("처음 상태: 이번 주 · 분야별 줄 막대(PM 확정 11-09)", () => {
+  it("기간 「이번 주」와 보기 「분야별 줄 막대」가 눌린 상태로 시작하고, 분야 줄과 막대가 보인다(그림 보기가 아니다)", async () => {
     const { container } = await mount(fakeApi());
-    expect(pressed("최근 1주")).toBe("true");
+    expect(pressed("이번 주")).toBe("true");
     expect(pressed("총 시간")).toBe("false");
-    expect(pressed("띠그래프")).toBe("true");
+    expect(pressed("분야별 줄 막대")).toBe("true");
+    expect(pressed("띠그래프")).toBe("false");
     expect(pressed("원그래프")).toBe("false");
+    expect(screen.queryByRole("button", { name: "최근 1주" })).toBeNull(); // 「최근 1주」는 없다
+    expect(container.querySelectorAll(".growth-item")).toHaveLength(5);
+    expect(container.querySelectorAll(".growth-bar")).toHaveLength(5);
+    expect(container.querySelector(".growth-band")).toBeNull();
+    expect(container.querySelector(".growth-pie")).toBeNull();
+  });
+
+  it("띠그래프로 바꾸면 띠 두 줄(처음 정한 비율 위, 쓴 시간 바로 아래)이 있다", async () => {
+    const { container } = await mountBand(fakeApi());
+    expect(pressed("띠그래프")).toBe("true");
+    expect(pressed("분야별 줄 막대")).toBe("false");
     const captions = Array.from(container.querySelectorAll(".growth-band-line .growth-line-caption")).map((el) => el.textContent);
     expect(captions).toEqual(["처음 정한 비율", "쓴 시간"]);
     expect(container.querySelectorAll(".growth-band")).toHaveLength(2);
@@ -106,15 +122,15 @@ describe("처음 상태: 최근 1주 · 띠그래프", () => {
     expect(spentBand.querySelectorAll(".growth-band-seg")).toHaveLength(1);
   });
 
-  it("쓴 시간 합계가 큰 숫자로 보인다(최근 1주 값, 달력 이번 주 값이 아니다)", async () => {
-    await mount(fakeApi(data({ thisWeek: [{ categoryId: C1, minutes: 60 }], recentWeek: [{ categoryId: C1, minutes: 600 }] })));
+  it("쓴 시간 합계가 큰 숫자로 보인다(이번 주 달력 주의 값이고, 총 시간 값이 아니다)", async () => {
+    await mount(fakeApi(data({ thisWeek: [{ categoryId: C1, minutes: 600 }], loggedDaysThisWeek: 6 })));
     expect(screen.getByText("쓴 시간 합계")).toBeTruthy();
-    expect(document.querySelector(".growth-total-number")?.textContent).toBe("10시간");
-    expect(screen.getByText("저녁 기록 6일")).toBeTruthy(); // loggedDaysRecentWeek
+    expect(document.querySelector(".growth-total-number")?.textContent).toBe("10시간"); // 누적은 40시간
+    expect(screen.getByText("저녁 기록 6일")).toBeTruthy(); // loggedDaysThisWeek
   });
 
   it("그래프는 글로도 읽힌다: 그림 둘레에 두 줄의 내용이 aria-label로 있고 안쪽 그림은 숨김", async () => {
-    const { container } = await mount(fakeApi());
+    const { container } = await mountBand(fakeApi());
     expect(graph()).not.toBeNull();
     expect(graphLabel()).toBe("처음 정한 비율 어학 40%, 포트폴리오 30%, CS 공부 20%, 글쓰기 10%. 쓴 시간 어학 100%");
     expect(container.querySelector(".growth-graph-art")?.getAttribute("aria-hidden")).toBe("true");
@@ -160,7 +176,7 @@ describe("보기 방식 바꾸기", () => {
   });
 
   it("「분야별 줄 막대」: 분야마다 얇은 막대와 처음 정한 비율 눈금과 차이 글(0분도, 기타도)", async () => {
-    const { container } = await mount(fakeApi());
+    const { container } = await mountBand(fakeApi());
     fireEvent.click(chip("분야별 줄 막대"));
     expect(graph()).toBeNull(); // 그림 보기가 아니다
     expect(container.querySelectorAll(".growth-item")).toHaveLength(5);
@@ -181,7 +197,7 @@ describe("보기 방식 바꾸기", () => {
     const real = await vi.importActual<typeof import("../../lib/category-color")>("../../lib/category-color");
     vi.mocked(categoryColorValue).mockImplementation(() => "rgb(1, 2, 3)");
     try {
-      const { container } = await mount(fakeApi());
+      const { container } = await mountBand(fakeApi());
       const colorsOf = (selector: string, prop: "background" | "fill") =>
         Array.from(container.querySelectorAll<HTMLElement | SVGElement>(selector)).map((el) => (el as HTMLElement).style[prop]);
       // 띠그래프: 띠 조각(처음 정한 비율 4 + 쓴 시간 1)과 분야 줄의 색점(분야 4 + 기타)
@@ -206,7 +222,7 @@ describe("보기 방식 바꾸기", () => {
 
 describe("총 시간", () => {
   it("기간을 총 시간으로 바꾸면 누적 값으로 세 보기가 다 된다", async () => {
-    const { container } = await mount(fakeApi());
+    const { container } = await mountBand(fakeApi());
     fireEvent.click(chip("총 시간"));
     expect(pressed("총 시간")).toBe("true");
     expect(screen.getByRole("heading", { name: GROWTH_TEXT.totalHeading })).toBeTruthy();
@@ -221,7 +237,7 @@ describe("총 시간", () => {
     expect(container.querySelectorAll(".growth-bar")).toHaveLength(5);
   });
 
-  it("총 시간에는 채울 시간(주 단위)이 없다. 최근 1주에는 있다", async () => {
+  it("총 시간에는 채울 시간(주 단위)이 없다. 이번 주에는 있다", async () => {
     await mount(fakeApi());
     expect(screen.getByRole("heading", { name: "채울 시간" })).toBeTruthy();
     fireEvent.click(chip("총 시간"));
@@ -229,7 +245,7 @@ describe("총 시간", () => {
   });
 
   it("기록이 하나도 없으면 안내와 단추, 큰 숫자·놓친 분야 문장은 없다", async () => {
-    await mount(fakeApi(data({ recentWeek: [], cumulative: [], loggedDaysRecentWeek: 0, loggedDaysTotal: 0 })));
+    await mount(fakeApi(data({ thisWeek: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0 })));
     fireEvent.click(chip("총 시간"));
     expect(screen.getByText(GROWTH_TEXT.emptyTotal)).toBeTruthy();
     expect(screen.queryByText("쓴 시간 합계")).toBeNull();
@@ -240,7 +256,7 @@ describe("총 시간", () => {
 describe("놓친 분야 문장과 채울 시간", () => {
   it("한 주 쓴 사람(처음 정한 비율 40·30·20·10, 어학 하나로 쏠림): 가장 덜 쓴 분야 하나를 사실로, 채울 시간은 차이 큰 순", async () => {
     await mount(fakeApi());
-    // 최근 1주 600분: 포트폴리오 180분 · CS 공부 120분 · 글쓰기 60분을 덜 썼다
+    // 이번 주 600분: 포트폴리오 180분 · CS 공부 120분 · 글쓰기 60분을 덜 썼다
     expect(screen.getByText("「포트폴리오」 시간을 채울 수 있어요")).toBeTruthy();
     expect(document.querySelectorAll(".growth-missed")).toHaveLength(1);
     expect(screen.getByText("처음 정한 비율 기준")).toBeTruthy();
@@ -257,7 +273,7 @@ describe("놓친 분야 문장과 채울 시간", () => {
   });
 
   it("쓴 시간이 0이면 문장이 나오지 않는다", async () => {
-    await mount(fakeApi(data({ recentWeek: [], thisWeek: [], loggedDaysRecentWeek: 0 })));
+    await mount(fakeApi(data({ thisWeek: [], loggedDaysThisWeek: 0 })));
     expect(document.querySelector(".growth-missed")).toBeNull();
     expect(screen.getByText(GROWTH_TEXT.shortfallWait)).toBeTruthy();
   });
@@ -272,7 +288,7 @@ describe("놓친 분야 문장과 채울 시간", () => {
     await mount(
       fakeApi(
         data({
-          recentWeek: [
+          thisWeek: [
             { categoryId: C1, minutes: 240 },
             { categoryId: C2, minutes: 180 },
             { categoryId: C3, minutes: 120 },
@@ -285,16 +301,17 @@ describe("놓친 분야 문장과 채울 시간", () => {
     expect(screen.getByText(GROWTH_TEXT.shortfallEmpty)).toBeTruthy();
   });
 
-  it("채울 시간의 기간 짝(임시값): 목표가 없으면 최근 1주에, 목표가 있으면 달력 이번 주에 쓴 시간과 견준다", async () => {
-    const week = data({ thisWeek: [{ categoryId: C2, minutes: 60 }], recentWeek: [{ categoryId: C1, minutes: 600 }] });
+  it("채울 시간의 기간 짝(PM 확정 11-09): 목표가 있든 없든 같은 이번 주(달력 주)에 쓴 시간과 견준다", async () => {
+    const week = data({ thisWeek: [{ categoryId: C2, minutes: 600 }] });
+    const shortOf = () => within(document.querySelector(".growth-short") as HTMLElement).getAllByRole("listitem").map((li) => li.textContent);
     const { unmount } = await mount(fakeApi(week));
     expect(screen.getByText("처음 정한 비율 기준")).toBeTruthy();
-    expect(screen.getByText("포트폴리오 3시간")).toBeTruthy(); // 최근 1주 600분의 30% = 180분 − 0
+    expect(shortOf()).toEqual(["어학 4시간", "CS 공부 2시간", "글쓰기 1시간"]); // 이번 주 600분을 포트폴리오에만 쓴 것과 처음 정한 비율을 견줌
     unmount();
     cleanup();
-    await mount(fakeApi({ ...week, goal: { weekStart: "2026-11-02", items: [{ categoryId: C2, minutes: 180 }] } }));
+    await mount(fakeApi({ ...week, goal: { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 180 }] } }));
     expect(screen.getByText("이번 주 목표 기준")).toBeTruthy();
-    expect(screen.getByText("포트폴리오 2시간")).toBeTruthy(); // 목표 180분 − 이번 주 60분
+    expect(shortOf()).toEqual(["어학 5시간"]); // 목표 300분 − 이번 주 0분. 포트폴리오는 이번 주 600분 ≥ 목표 180분
   });
 });
 
@@ -304,13 +321,11 @@ describe("처음 쓰는 사람(기록 0일, 분야 하나)", () => {
       categories: [{ id: C1, name: "어학" }],
       ratios: [{ categoryId: C1, percent: 100 }],
       thisWeek: [],
-      recentWeek: [],
       cumulative: [],
       loggedDaysThisWeek: 0,
-      loggedDaysRecentWeek: 0,
       loggedDaysTotal: 0,
     });
-    const { container } = await mount(fakeApi(d));
+    const { container } = await mountBand(fakeApi(d));
     expect(screen.getByText(GROWTH_TEXT.empty)).toBeTruthy();
     expect(screen.getByRole("button", { name: "저녁 기록 남기기" })).toBeTruthy();
     expect(screen.getByText("저녁 기록 0일")).toBeTruthy();
@@ -334,7 +349,7 @@ describe("비교 보기는 그대로 남아 있다(D-093, 결정 대기)", () =>
     expect(within(language).getByText("지난주").nextSibling?.textContent).toBe("1시간");
     expect(within(language).getByText("쌓인 것").nextSibling?.textContent).toBe("20시간");
     expect(screen.queryByRole("group", { name: GROWTH_TEXT.viewGroup })).toBeNull();
-    fireEvent.click(chip("최근 1주"));
+    fireEvent.click(chip("이번 주"));
     expect(screen.getByRole("group", { name: GROWTH_TEXT.viewGroup })).toBeTruthy();
   });
 });
@@ -354,10 +369,10 @@ describe("기억한 기간·보기 방식", () => {
     await mount(fakeApi(data(), { load: async () => undefined, save }));
     expect(save).not.toHaveBeenCalled(); // 읽기만으로는 적지 않는다
     fireEvent.click(chip("총 시간"));
-    fireEvent.click(chip("분야별 줄 막대"));
+    fireEvent.click(chip("띠그래프"));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
-    expect(save).toHaveBeenNthCalledWith(1, { period: "total", view: "band" });
-    expect(save).toHaveBeenNthCalledWith(2, { period: "total", view: "rows" });
+    expect(save).toHaveBeenNthCalledWith(1, { period: "total", view: "rows" }); // 처음 보기는 줄 막대라 기간만 바뀐다
+    expect(save).toHaveBeenNthCalledWith(2, { period: "total", view: "band" });
   });
 
   it("다시 열면 그대로(고른 값을 적은 저장소에서 새 화면이 읽는다)", async () => {
@@ -377,8 +392,8 @@ describe("기억한 기간·보기 방식", () => {
   it("읽기가 실패해도(던지거나 모양이 이상해도) 처음 값으로 돈다", async () => {
     for (const load of [async () => Promise.reject(new Error("blocked")), async () => ({ period: "decade", view: 3 }), async () => "이상한 글", async () => undefined]) {
       const { unmount } = await mount(fakeApi(data(), { load, save: async () => {} }));
-      expect(pressed("최근 1주")).toBe("true");
-      expect(pressed("띠그래프")).toBe("true");
+      expect(pressed("이번 주")).toBe("true");
+      expect(pressed("분야별 줄 막대")).toBe("true");
       unmount();
       cleanup();
     }
@@ -396,16 +411,17 @@ describe("기억한 기간·보기 방식", () => {
     const load = vi.fn(() => new Promise<unknown>((resolve) => (release = resolve)));
     render(<GrowthScreen api={fakeApi(data(), { load, save: async () => {} })} active activation={1} entry="self" onOpenCategory={vi.fn()} />);
     await screen.findByRole("group", { name: GROWTH_TEXT.periodGroup }, { timeout: 3000 });
-    expect(pressed("최근 1주")).toBe("true");
+    expect(pressed("이번 주")).toBe("true");
     fireEvent.click(chip("원그래프"));
     await act(async () => release({ period: "total", view: "rows" }));
     expect(pressed("원그래프")).toBe("true");
-    expect(pressed("최근 1주")).toBe("true");
+    expect(pressed("이번 주")).toBe("true");
   });
 
   it("기억하는 길이 없는 구현(viewPref 없음)은 기다리지 않고 처음 값으로 돈다", async () => {
     await mount(fakeApi());
-    expect(pressed("최근 1주")).toBe("true");
+    expect(pressed("이번 주")).toBe("true");
+    expect(pressed("분야별 줄 막대")).toBe("true");
   });
 });
 
@@ -415,13 +431,13 @@ describe("기억한 값이 늦게 올 때(기다리는 시간 800ms 넘김)", ()
     const load = vi.fn(() => new Promise<unknown>((resolve) => (release = resolve)));
     const { container } = render(<GrowthScreen api={fakeApi(data(), { load, save: async () => {} })} active activation={1} entry="self" onOpenCategory={vi.fn()} />);
     await screen.findByRole("group", { name: GROWTH_TEXT.periodGroup }, { timeout: 3000 });
-    expect(pressed("최근 1주")).toBe("true");
-    expect(pressed("띠그래프")).toBe("true");
-    await act(async () => release({ period: "total", view: "rows" }));
-    expect(pressed("최근 1주")).toBe("true"); // 바뀌지 않는다
-    expect(pressed("띠그래프")).toBe("true");
-    expect(container.querySelector(".growth-band")).not.toBeNull();
-    expect(container.querySelector(".growth-bar")).toBeNull();
+    expect(pressed("이번 주")).toBe("true");
+    expect(pressed("분야별 줄 막대")).toBe("true");
+    await act(async () => release({ period: "total", view: "pie" }));
+    expect(pressed("이번 주")).toBe("true"); // 바뀌지 않는다
+    expect(pressed("분야별 줄 막대")).toBe("true");
+    expect(container.querySelector(".growth-bar")).not.toBeNull();
+    expect(container.querySelector(".growth-pie")).toBeNull();
   });
   it("기다리는 시간 안에 오면 처음부터 그 값으로 그린다(위 시험과 대비)", async () => {
     const load = vi.fn(async () => {
@@ -435,12 +451,12 @@ describe("기억한 값이 늦게 올 때(기다리는 시간 800ms 넘김)", ()
 });
 
 describe("목표가 있는 주의 기준(임시, 결정 대기: 임시값.md ③-1)", () => {
-  it("놓친 분야 문장은 처음 정한 비율·최근 1주 기준 그대로이고, 채울 시간은 목표·이번 주 기준이라 분야가 다를 수 있다", async () => {
+  it("놓친 분야 문장은 처음 정한 비율·이번 주 기준 그대로이고, 채울 시간은 목표·이번 주 기준이라 분야가 다를 수 있다", async () => {
     await mount(fakeApi(data({ goal: { weekStart: "2026-11-02", items: [{ categoryId: C4, minutes: 120 }] } })));
     // 채울 시간: 목표 기준 — 글쓰기 목표 120분을 이번 주(0분)와 견줌
     expect(screen.getByText("이번 주 목표 기준")).toBeTruthy();
     expect(within(document.querySelector(".growth-short") as HTMLElement).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["글쓰기 2시간"]);
-    // 놓친 분야 문장: 목표를 안 보고 처음 정한 비율·최근 1주 기준 — 가장 덜 쓴 포트폴리오
+    // 놓친 분야 문장: 목표를 안 보고 처음 정한 비율·이번 주 기준 — 가장 덜 쓴 포트폴리오
     expect(screen.getByText("「포트폴리오」 시간을 채울 수 있어요")).toBeTruthy();
     expect(screen.queryByText("「글쓰기」 시간을 채울 수 있어요")).toBeNull();
   });
@@ -467,16 +483,16 @@ describe("접근성", () => {
     expect(pressed("원그래프")).toBe("true");
   });
 
-  it("키보드 차례: 기간 셋 → 보기 방식 셋 → 분야 줄 순서로 문서 차례대로 이어지고, 건너뛰는 단추나 tabindex가 없다(Enter·Space는 진짜 브라우저 시험 screens의 growth-recent에서)", async () => {
+  it("키보드 차례: 기간 셋 → 보기 방식 셋 → 분야 줄 순서로 문서 차례대로 이어지고, 건너뛰는 단추나 tabindex가 없다(Enter·Space는 진짜 브라우저 시험 screens의 growth-week에서)", async () => {
     const { container } = await mount(fakeApi());
     const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>(".growth-body button"));
-    expect(buttons.slice(0, 6).map((b) => b.textContent)).toEqual(["최근 1주", "총 시간", "비교", "띠그래프", "원그래프", "분야별 줄 막대"]);
+    expect(buttons.slice(0, 6).map((b) => b.textContent)).toEqual(["이번 주", "총 시간", "비교", "띠그래프", "원그래프", "분야별 줄 막대"]);
     expect(buttons.slice(6, 11).map((b) => b.querySelector(".growth-name")?.textContent)).toEqual(["어학", "포트폴리오", "CS 공부", "글쓰기", "기타"]);
     expect(buttons.every((b) => !b.disabled && !b.hasAttribute("tabindex"))).toBe(true);
   });
 
   it("그림 요소는 글로 읽히지 않게 숨기고(aria-hidden) 색점도 장식이다", async () => {
-    const { container } = await mount(fakeApi());
+    const { container } = await mountBand(fakeApi());
     expect(container.querySelector(".growth-graph-art")?.getAttribute("aria-hidden")).toBe("true");
     expect(Array.from(container.querySelectorAll(".growth-dot")).every((el) => el.getAttribute("aria-hidden") === "true")).toBe(true);
     fireEvent.click(chip("분야별 줄 막대"));
@@ -487,7 +503,7 @@ describe("접근성", () => {
 describe("분야 이름은 사용자 입력이다", () => {
   it("꺾쇠·스크립트 모양 이름은 글자 그대로 보이고 그림 글(aria-label)에도 글자로만 들어간다", async () => {
     const evil = '<img src=x onerror="window.__g=1">';
-    const { container } = await mount(fakeApi(data({ categories: [{ id: C1, name: evil }], ratios: [{ categoryId: C1, percent: 100 }] })));
+    const { container } = await mountBand(fakeApi(data({ categories: [{ id: C1, name: evil }], ratios: [{ categoryId: C1, percent: 100 }] })));
     expect(screen.getByRole("button", { name: new RegExp("^" + evil.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) })).toBeTruthy();
     expect(graphLabel()).toContain(`${evil} 100%`);
     expect(container.querySelector("img[src='x']")).toBeNull();
@@ -500,9 +516,9 @@ describe("분야 이름은 사용자 입력이다", () => {
     const many = data({
       categories: ids.map((id, i) => ({ id, name: names[i] })),
       ratios: ids.map((id) => ({ categoryId: id, percent: 2 })),
-      recentWeek: ids.map((id, i) => ({ categoryId: id, minutes: 5 * ((i % 7) + 1) })),
+      thisWeek: ids.map((id, i) => ({ categoryId: id, minutes: 5 * ((i % 7) + 1) })),
     });
-    const { container } = await mount(fakeApi(many));
+    const { container } = await mountBand(fakeApi(many));
     expect(container.querySelectorAll(".growth-item")).toHaveLength(51); // 분야 50 + 기타
     const segs = Array.from(container.querySelectorAll<HTMLElement>(".growth-band-seg"));
     expect(segs.length).toBeGreaterThan(40);

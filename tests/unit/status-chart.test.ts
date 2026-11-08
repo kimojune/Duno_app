@@ -382,38 +382,41 @@ describe("놓친 분야(missed): 지금 shortfallByRatio를 그대로 쓴다", (
   });
 });
 
-describe("fillTimeFor(채울 시간의 기간 짝, 임시값)", () => {
+describe("fillTimeFor(채울 시간의 기간 짝: 둘 다 같은 이번 주 시간과 견준다, PM 확정 11-09)", () => {
   const ids = [A, B, C];
   const ratios = [
     { categoryId: A, percent: 60 },
     { categoryId: B, percent: 40 },
   ];
-  const thisWeek = [{ categoryId: B, minutes: 30 }];
-  const recentWeek = [
+  const thisWeek = [
     { categoryId: A, minutes: 60 },
     { categoryId: B, minutes: 120 },
   ];
-  it("목표가 없으면 처음 정한 비율 기준: 최근 1주에 쓴 시간과 견준다(이번 주가 아니라)", () => {
-    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek, recentWeek });
+  it("목표가 없으면 처음 정한 비율 기준: 이번 주에 쓴 시간과 견준다", () => {
+    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek });
     expect(r.basis).toBe("ratio");
-    // 최근 1주 180분: A 108분 중 60 → 48. (이번 주 30분 기준이었다면 A는 18분)
+    // 이번 주 180분: A 108분 중 60 → 48
     expect(r.items).toEqual([{ categoryId: A, minutes: 48 }]);
   });
-  it("목표가 있으면 목표 기준: 달력 주(이번 주)에 쓴 시간과 견준다(최근 1주가 아니라)", () => {
+  it("처음 정한 비율 기준의 채울 시간은 같은 이번 주 시간으로 그린 그래프의 놓친 분야(missed)와 같다", () => {
+    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek });
+    expect(r.items).toEqual(buildStatusChart({ categoryIds: ids, ratios, totals: thisWeek }).missed);
+  });
+  it("목표가 있으면 목표 기준: 같은 이번 주 시간과 견준다", () => {
     const goalItems = [
       { categoryId: A, minutes: 100 },
       { categoryId: B, minutes: 20 },
     ];
-    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems, thisWeek, recentWeek });
+    const r = fillTimeFor({ categoryIds: ids, ratios, goalItems, thisWeek });
     expect(r.basis).toBe("goal");
-    // 이번 주 A 0분 → 100 남음, B 30분 ≥ 20 → 없음. (최근 1주 기준이었다면 A는 40이 남는다)
-    expect(r.items).toEqual([{ categoryId: A, minutes: 100 }]);
+    // 이번 주 A 60분 → 40 남음, B 120분 ≥ 20 → 없음
+    expect(r.items).toEqual([{ categoryId: A, minutes: 40 }]);
   });
   it("목표 목록이 비어 있으면 목표가 없는 것과 같다", () => {
-    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: [], thisWeek, recentWeek }).basis).toBe("ratio");
+    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: [], thisWeek }).basis).toBe("ratio");
   });
   it("쓴 시간이 없으면 빈 목록", () => {
-    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek: [], recentWeek: [] }).items).toEqual([]);
+    expect(fillTimeFor({ categoryIds: ids, ratios, goalItems: null, thisWeek: [] }).items).toEqual([]);
   });
 });
 

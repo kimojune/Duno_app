@@ -117,12 +117,10 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
     categories: [],
     ratios: [],
     thisWeek: [],
-    recentWeek: [],
     lastWeek: [],
     lastMonth: [],
     cumulative: [],
     loggedDaysThisWeek: 0,
-    loggedDaysRecentWeek: 0,
     loggedDaysTotal: 0,
     goal: null,
   };
@@ -142,7 +140,7 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
     await act(async () => {
       render(
         <GrowthScreen
-          api={api({ ...empty, thisWeek: [{ categoryId: null, minutes: 30 }], recentWeek: [{ categoryId: null, minutes: 30 }] })}
+          api={api({ ...empty, thisWeek: [{ categoryId: null, minutes: 30 }] })}
           active
           activation={1}
           entry="self"
