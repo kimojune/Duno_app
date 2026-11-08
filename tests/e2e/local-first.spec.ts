@@ -231,3 +231,157 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
     await cleanup(nodeA, beforeTodos);
   }
 });
+
+// ── 고침 4바퀴: 원형 다이얼·처음 정한 비율(0% 분야는 저장 목록에서 뺌)도 끊긴 채 저장 → 연결 → 서버에 한 번씩 ─────────────
+// 시험 계정 A만 쓴다. 처음 설정(온보딩)이 실제 서버로 가는 흐름은 시험 계정의 상태를 바꾸므로 이 파일에서 하지 않는다(확인 못 함).
+
+type RatioRows = { category_id: string; percent: number }[];
+type RatioState = { rows: RatioRows; other: number | null };
+
+async function readRatios(client: SupabaseClient): Promise<RatioState> {
+  const rows = await client.from("category_ratios").select("category_id, percent");
+  const other = await client.from("user_settings").select("ratio_other_percent");
+  return {
+    rows: ((rows.data ?? []) as RatioRows).map((r) => ({ category_id: r.category_id, percent: r.percent })),
+    other: ((other.data ?? []) as { ratio_other_percent: number | null }[])[0]?.ratio_other_percent ?? null,
+  };
+}
+
+/** 시험이 바꾼 처음 정한 비율을 시험 전 모습으로 되돌린다(시험 계정 A의 자기 행만) */
+async function restoreRatios(client: SupabaseClient, before: RatioState) {
+  const { data } = await client.auth.getUser();
+  const userId = data.user?.id;
+  if (!userId) throw new Error("A 사용자 번호를 읽지 못했다");
+  const keep = new Set(before.rows.map((r) => r.category_id));
+  const now = await readRatios(client);
+  const extra = now.rows.map((r) => r.category_id).filter((id) => !keep.has(id));
+  if (extra.length > 0) await client.from("category_ratios").delete().eq("user_id", userId).in("category_id", extra);
+  if (before.rows.length > 0) {
+    await client.from("category_ratios").upsert(
+      before.rows.map((r) => ({ user_id: userId, ...r })),
+      { onConflict: "user_id,category_id" },
+    );
+  }
+  await client.from("user_settings").update({ ratio_other_percent: before.other }).eq("user_id", userId);
+}
+
+test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) 저장 → 연결 → 서버에 한 번, 나눈 값 그대로", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const env = loadIntegrationEnv();
+  const A = accountA(env);
+  const nodeA = await nodeClient(env, A);
+  await markOnboardingDone(nodeA, "A");
+  const beforeTodos = await ids(nodeA, "todos");
+  const beforeLogs = await ids(nodeA, "evening_logs");
+  const ctx = await contextFor(browser, await sessionCookies(env, A));
+  const hours = 2 + (Date.now() % 20); // 2~21시간
+  const total = hours * 60;
+  const piece = 65; // 첫 분야에 나누는 분(5의 배수)
+  try {
+    const page = await openApp(ctx);
+    await ctx.setOffline(true);
+
+    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 2_000 });
+    await dialog.getByLabel("시간", { exact: true }).fill(String(hours));
+    await dialog.getByLabel("분", { exact: true }).fill("0");
+    await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
+    await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible({ timeout: 2_000 });
+    await expect(dialog.locator("svg.dial")).toBeVisible(); // 다이얼이 같이 보인다
+
+    // 분야마다 Stepper: 미리 채운 값을 모두 0으로 두고 첫 분야에만 piece분(그날 이미 남긴 기록이 있어도 같은 결과)
+    const fields = dialog.locator(".ratio-row input.stepper-input");
+    const count = await fields.count();
+    expect(count, "시험 계정 A에 분야가 하나 이상 있어야 나누기를 시험할 수 있다").toBeGreaterThan(0);
+    for (let i = 0; i < count; i += 1) await fields.nth(i).fill("0");
+    await fields.first().fill(String(piece));
+    await expect(fields.first()).toHaveValue(String(piece));
+    await dialog.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 2_000 });
+    await dialog.getByRole("button", { name: "닫기" }).last().click();
+
+    // 끊긴 동안 서버에는 아무것도 없다
+    await page.waitForTimeout(1500);
+    expect(fresh(await ids(nodeA, "evening_logs"), beforeLogs)).toEqual([]);
+
+    // 연결: 서버에 한 번 들어가고, 나눈 값 그대로다
+    await ctx.setOffline(false);
+    const arrived = await pollUntil(async () => fresh(await ids(nodeA, "evening_logs"), beforeLogs).length === 1, 60_000, 250);
+    expect(arrived, "연결 뒤 60초 안에 저녁 기록 하나가 서버에 들어간다").toBeGreaterThanOrEqual(0);
+    await page.waitForTimeout(3000);
+    const logIds = fresh(await ids(nodeA, "evening_logs"), beforeLogs);
+    expect(logIds, "서버에는 한 번만").toHaveLength(1);
+    const row = await nodeA.from("evening_logs").select("total_minutes, save_mode, items").eq("id", logIds[0]).single();
+    expect(row.data?.total_minutes).toBe(total);
+    expect(row.data?.save_mode).toBe("edited");
+    const items = (row.data?.items ?? []) as { categoryId: string | null; minutes: number }[];
+    expect(items.reduce((s, i) => s + i.minutes, 0), "나눈 합 = 쓴 시간").toBe(total);
+    expect(items.filter((i) => i.categoryId !== null).map((i) => i.minutes)).toEqual([piece]);
+    expect(items.filter((i) => i.categoryId === null).map((i) => i.minutes)).toEqual([total - piece]);
+  } finally {
+    await ctx.close();
+    await cleanup(nodeA, beforeTodos);
+  }
+});
+
+test("끊긴 채 내 정보 「비율 고치기」 저장 → 연결 → 서버에 한 번, 0% 분야는 저장 목록에 없다", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const env = loadIntegrationEnv();
+  const A = accountA(env);
+  const nodeA = await nodeClient(env, A);
+  await markOnboardingDone(nodeA, "A");
+  const beforeTodos = await ids(nodeA, "todos");
+  const before = await readRatios(nodeA);
+  const ctx = await contextFor(browser, await sessionCookies(env, A));
+  try {
+    const page = await openApp(ctx);
+    // 내 정보 탭을 연결된 채 열어 분야 목록을 받아 둔다
+    await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "내 정보" }).click();
+    const fields = page.locator("input.ratio-field");
+    await expect(fields.first()).toBeVisible({ timeout: 30_000 });
+    const readFields = async () => (await fields.evaluateAll((els) => els.map((e) => Number((e as HTMLInputElement).value)))) as number[];
+    const initial = await readFields();
+    expect(initial.length, "분야 하나 이상 + 기타 줄").toBeGreaterThanOrEqual(2);
+    expect(initial.reduce((s, v) => s + v, 0), "열 때 합 100").toBe(100);
+    await page.waitForTimeout(1500);
+
+    await ctx.setOffline(true);
+    const next = initial[0] === 35 ? 40 : 35;
+    await fields.first().fill(String(next));
+    await fields.first().press("Enter");
+    const shown = await readFields();
+    expect(shown[0]).toBe(next);
+    expect(shown.reduce((s, v) => s + v, 0), "고친 뒤에도 합 100").toBe(100);
+    await page.getByRole("button", { name: "비율 저장" }).click();
+    await expect(page.getByText("저장했어요", { exact: true })).toBeVisible({ timeout: 2_000 });
+
+    // 끊긴 동안 서버 값은 그대로
+    await page.waitForTimeout(1500);
+    expect(await readRatios(nodeA)).toEqual(before);
+
+    // 연결: 화면에 보이던 값이 서버에 그대로 가고(0%인 분야는 행이 없다), 합이 100이다
+    await ctx.setOffline(false);
+    const otherShown = shown[shown.length - 1];
+    const wantRows = shown
+      .slice(0, -1)
+      .filter((v) => v > 0)
+      .sort((a, b) => a - b);
+    const match = (now: RatioState) =>
+      JSON.stringify(now.rows.map((r) => r.percent).sort((a, b) => a - b)) === JSON.stringify(wantRows) && (now.other ?? 0) === otherShown;
+    const arrived = await pollUntil(async () => match(await readRatios(nodeA)), 60_000, 250);
+    expect(arrived, "연결 뒤 60초 안에 고친 비율이 서버에 들어간다").toBeGreaterThanOrEqual(0);
+    await page.waitForTimeout(3000);
+    const after = await readRatios(nodeA);
+    expect(match(after), "더 기다려도 같은 값(한 번만, 다시 쓰지 않는다)").toBe(true);
+    expect(
+      after.rows.every((r) => r.percent > 0),
+      "0% 분야는 저장 목록에 없다",
+    ).toBe(true);
+    expect(after.rows.reduce((s, r) => s + r.percent, 0) + (after.other ?? 0), "서버 합 100").toBe(100);
+  } finally {
+    await ctx.close();
+    await restoreRatios(nodeA, before);
+    await cleanup(nodeA, beforeTodos);
+  }
+});

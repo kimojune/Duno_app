@@ -147,6 +147,12 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
       addServer.push(serverMs < 0 ? -1 : Date.now() - tServer);
       // 끝냄: 방금 적은 줄의 체크 칸. 줄이 「저장하는 중」을 벗어난 뒤에 누른다(옛 화면은 서버에 올라가기 전의 줄은 체크할 수 없다)
       await page.waitForFunction(() => !document.body.innerText.includes("저장하는 중"), undefined, { timeout: 30_000 });
+      // 줄의 체크 칸이 화면에 있을 때까지 기다린 뒤 잰다(없는 칸을 누르다 던지는 경쟁을 막는다. 줄이 끝내 없으면 이 기다림이 시간 초과로 실패한다)
+      await page.waitForFunction(
+        (needle) => [...document.querySelectorAll("li.todo-row input[type=checkbox]")].some((x) => x.closest("li")?.textContent?.includes(needle)),
+        text,
+        { timeout: 30_000 },
+      );
       const tDone = Date.now();
       const doneMs = await clickUntil(
         page,
