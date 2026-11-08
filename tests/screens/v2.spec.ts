@@ -140,3 +140,85 @@ for (const w of WINDOWS) {
     });
   }
 }
+
+// ---- 고침4 2단계: 원형 다이얼 (처음 정한 비율·내 정보 비율 고치기·저녁 기록 나누기) ----
+// 측정: 가로 넘침 없음(문서·비율 줄·다이얼), 손잡이 누르는 자리 48 이상, 합계 100%, 저녁 창에서 뒤로 가기는 창만 닫는다.
+
+/** 다이얼 둘레의 측정: 다이얼이 화면 안에 있고, 손잡이 누르는 자리(보이지 않는 원)가 48 이상 */
+async function measureDial(page: Page, dialId: string) {
+  const svg = page.locator(`svg.dial`).first();
+  await expect(svg).toBeVisible();
+  const box = (await svg.boundingBox())!;
+  const vw = page.viewportSize()!.width;
+  expect(box.x, "다이얼 왼쪽이 화면 안").toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, "다이얼 오른쪽이 화면 안").toBeLessThanOrEqual(vw + 0.5);
+  const hits = await page.$$eval(`[id^="${dialId}-handle-"] .dial-hit`, (els) => els.map((e) => e.getBoundingClientRect().width));
+  expect(hits.length, "고른 조각의 손잡이가 있다").toBeGreaterThan(0);
+  expect(Math.min(...hits), "손잡이 누르는 자리 지름 48 이상").toBeGreaterThanOrEqual(48);
+}
+async function noRowOverflow(page: Page) {
+  const rows = await page.$$eval(".ratio-row", (els) => els.map((e) => e.scrollWidth - e.clientWidth));
+  expect(rows.length).toBeGreaterThan(0);
+  expect(Math.max(...rows), "비율 줄이 넘치지 않는다").toBeLessThanOrEqual(1);
+  const sw = await scrollSizes(page);
+  expect(sw.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(sw.clientWidth);
+}
+
+const DIAL_SIZES: SizeTag[] = ["360x800", "320x640", "text200-sim"];
+for (const many of [false, true]) {
+  const tag = many ? "-many" : "";
+  for (const size of DIAL_SIZES) {
+    test(`ratio-onboarding${tag} ${size}: 처음 설정 3단계 비율 다이얼, 합 100, 가로 넘침 없음`, async ({ page }) => {
+      await open(page, `ratio-onboarding${tag}`, size);
+      await page.getByRole("button", { name: "다음" }).click();
+      await page.getByRole("button", { name: "다음" }).click();
+      await expect(page.getByText("합계 100%")).toBeVisible();
+      await measureDial(page, "ratio-dial");
+      await noRowOverflow(page);
+      await shot(page, `ratio-onboarding${tag}-${size}`);
+      // 키보드만: 다이얼에 포커스 → 다음 조각 → 손잡이 PageUp → 합 100 그대로
+      await page.locator("svg.dial").focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("PageUp");
+      await expect(page.getByText("합계 100%")).toBeVisible();
+      if (many) {
+        const fills = await page.$$eval(".dial-slice", (els) => els.map((e) => getComputedStyle(e).fill));
+        expect(fills.length, "분야 9개 이상이 조각으로 그려진다").toBeGreaterThanOrEqual(9);
+      }
+    });
+
+    test(`me-ratio${tag} ${size}: 내 정보 비율 고치기 다이얼, 저장값 30·30이 합 100으로 열린다, 가로 넘침 없음`, async ({ page }) => {
+      await open(page, `me-ratio${tag}`, size);
+      const dial = page.locator("svg.dial");
+      await dial.scrollIntoViewIfNeeded();
+      await expect(page.getByText("합계 100%")).toBeVisible();
+      await measureDial(page, "ratio-dial");
+      await noRowOverflow(page);
+      await shot(page, `me-ratio${tag}-${size}`);
+    });
+
+    test(`evening-split${tag} ${size}: 저녁 기록 나누기 다이얼, 가로 넘침 없음, 뒤로 가기는 창만 닫는다`, async ({ page }) => {
+      await open(page, `evening-split${tag}`, size);
+      const startUrl = page.url();
+      await page.locator("#dev-open-window").click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await page.getByLabel("시간", { exact: true }).fill("2");
+      await page.getByRole("button", { name: "분야마다 나누기" }).click();
+      await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
+      await measureDial(page, "evening-dial");
+      await noRowOverflow(page);
+      await shot(page, `evening-split${tag}-${size}`);
+      // 다이얼로 바꾸면 Stepper가 따라온다(키보드)
+      await page.locator("svg.dial").focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator("#evening-dial-handle-end")).toHaveAttribute("aria-valuenow", "35");
+      // 안드로이드 뒤로 가기(브라우저 뒤로): 다이얼이 든 창만 닫히고 문서를 떠나지 않는다
+      await page.goBack();
+      await expect(dialog).toHaveCount(0);
+      expect(page.url()).toBe(startUrl);
+    });
+  }
+}
