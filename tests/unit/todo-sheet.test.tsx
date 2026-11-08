@@ -151,21 +151,66 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     expect(screen.getByRole("form", { name: "할 일 적기" })).toBeTruthy();
   });
 
-  it("포커스 순서(DOM 순서): 로그아웃 → 목록 → 창(닫기 → 칩 → + 분야 → 할 일 칸 → 적기)", () => {
+  it("포커스 순서(DOM 순서, 고침 4바퀴): 로그아웃 → 목록 → 창(닫기 → 할 일 칸 → 적기 → 칩 → + 분야)", () => {
     renderScreen(read([item(ID_A, "목록 글")]));
     open();
     const order = [
       document.getElementById("logout-button")!,
       screen.getByRole("checkbox", { name: "목록 글" }),
       screen.getByRole("button", { name: "적는 창 닫기" }),
-      chip("취업 준비"),
-      addCategoryChip(),
       todoInput(),
       screen.getByRole("button", { name: "적기" }),
+      chip("취업 준비"),
+      chip("운동"),
+      chip("CS 공부"),
+      addCategoryChip(),
     ];
     for (let i = 1; i < order.length; i += 1) {
-      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${i}번째`).toBeTruthy();
     }
+  });
+
+  it("창 안에서 키보드가 닿는 것은 정확히 이 순서다: 닫기 → 할 일 칸 → 적기 → 칩들 → + 분야 (탭 순서를 바꾸는 tabindex 없음)", () => {
+    renderScreen();
+    open();
+    const form = screen.getByRole("form", { name: "할 일 적기" });
+    const focusables = [...form.querySelectorAll<HTMLElement>("button, input, select, textarea, a[href], [tabindex]")].filter(
+      (el) => !(el as HTMLButtonElement).disabled && el.getAttribute("tabindex") !== "-1",
+    );
+    expect(focusables.every((el) => el.getAttribute("tabindex") === null), "tabindex로 순서를 바꾸지 않는다").toBe(true);
+    expect(focusables.map((el) => el.id || el.textContent)).toEqual(["sheet-close", "todo-input", "적기", "취업 준비", "운동", "CS 공부", "add-category-chip"]);
+  });
+
+  it("창 안 위에서 아래 구조: 머리(할 일 적기 라벨·닫기) → 글 칸 줄 → 도움말 → 분야 라벨 → 칩 줄 → 안내", () => {
+    renderScreen();
+    open();
+    const form = screen.getByRole("form", { name: "할 일 적기" });
+    const parts = [
+      form.querySelector(".sheet-head")!,
+      form.querySelector(".input-row")!,
+      form.querySelector("#todo-help")!,
+      form.querySelector("#category-label")!,
+      chipGroup(),
+      form.querySelector(".cat-notice")!,
+    ];
+    expect(parts.every(Boolean)).toBe(true);
+    for (let i = 1; i < parts.length; i += 1) {
+      expect(parts[i - 1].compareDocumentPosition(parts[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${i}번째`).toBeTruthy();
+    }
+    // 글 칸의 라벨은 머리에 있고, 칩 묶음의 이름은 분야 라벨이다
+    expect(form.querySelector(".sheet-head label[for=todo-input]")!.textContent).toBe("할 일 적기");
+    expect(document.getElementById("category-label")!.textContent).toBe("분야 (고르지 않으면 기타)");
+    expect(chipGroup().getAttribute("aria-labelledby")).toBe("category-label");
+  });
+
+  it("새 분야 줄이 열려도 글 칸이 위, 새 분야 줄이 그 아래다", () => {
+    renderScreen();
+    open();
+    fireEvent.click(addCategoryChip());
+    const form = screen.getByRole("form", { name: "할 일 적기" });
+    expect(todoInput().compareDocumentPosition(newCategoryInput()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(form.querySelector(".newcat")).not.toBeNull();
+    expect(form.querySelector(".chip-row")).toBeNull();
   });
 });
 
@@ -1107,5 +1152,89 @@ describe("C-D11 scroll-padding-bottom을 창 높이에 맞춰 다시 잰다(Todo
     unmount();
     expect(clearance()).toBe("");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 감싼다", () => {
+  const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
+  /** `선택자 { … }` 규칙 하나의 안쪽(주석 제외, 그 선택자만 단독으로 쓴 첫 규칙) */
+  const rule = (selector: string) => {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const chunk of stripped.split("}")) {
+      const open = chunk.indexOf("{");
+      if (open !== -1 && chunk.slice(0, open).trim() === selector) return chunk.slice(open + 1);
+    }
+    return "";
+  };
+
+  it("CSS: 감싸기(flex-wrap), 가로 넘침 없음(overflow-x hidden), 높이 상한은 두 줄 + 16, 넘으면 세로로 밀기", () => {
+    const row = rule(".chip-row");
+    expect(row, ".chip-row 규칙을 읽었다").toContain("display: flex");
+    expect(row).toMatch(/flex-wrap:\s*wrap/);
+    expect(row).toMatch(/overflow-x:\s*hidden/);
+    expect(row).toMatch(/overflow-y:\s*auto/);
+    expect(row).toMatch(/max-height:\s*calc\(var\(--tap-min\)\s*\*\s*2\s*\+\s*var\(--space-4\)\)/);
+    expect(row, "옛 가로 밀기가 남지 않았다").not.toMatch(/overflow-x:\s*auto/);
+    // 칩은 줄 폭을 넘지 않고, 긴 이름은 칩 글에서 한 줄 말줄임(C23)
+    expect(rule(".chip")).toMatch(/max-width:\s*100%/);
+    expect(rule(".chip")).not.toContain("--chip-max-gap");
+    expect(rule(".chip-label")).toContain("text-overflow: ellipsis");
+    expect(rule(".chip-label")).toContain("white-space: nowrap");
+  });
+
+  it("구조: 칩 줄 바로 아래 자식이 칩 단추들뿐이고(안쪽 가로 밀이 칸 없음), 「+ 분야」가 맨 끝이다", () => {
+    renderScreen();
+    open();
+    const kids = [...chipGroup().children];
+    expect(kids.every((el) => el.tagName === "BUTTON" && el.classList.contains("chip"))).toBe(true);
+    expect(kids.map((el) => el.textContent)).toEqual(["취업 준비", "운동", "CS 공부", "+ 분야"]);
+    expect(kids[kids.length - 1].id).toBe("add-category-chip");
+  });
+
+  it("분야 50개(한도): 칩 50개와 「+ 분야」가 모두 그려지고 모두 키보드로 닿는다(숨김·tabindex -1 없음)", () => {
+    const many = Array.from({ length: 50 }, (_, i) => cat(`${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`, `분야${i + 1}`));
+    renderScreen(read([], many));
+    open();
+    const buttons = within(chipGroup()).getAllByRole("button");
+    expect(buttons).toHaveLength(51);
+    for (const el of buttons) {
+      expect(el.getAttribute("tabindex")).toBeNull();
+      expect((el as HTMLButtonElement).disabled).toBe(false);
+      expect(el.hasAttribute("hidden")).toBe(false);
+    }
+    // 포커스를 받으면 그 칩이 줄 안에서 보이게 밀린다(세로 감싸기에서도 같은 호출: block·inline nearest)
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    scroll.mockClear();
+    fireEvent.focus(buttons[49]);
+    expect(scroll).toHaveBeenCalledWith({ inline: "nearest", block: "nearest" });
+  });
+
+  it("악용: 꺾쇠·따옴표가 든 분야 이름은 글자 그대로 칩에 보이고 요소가 생기지 않는다", () => {
+    const evil = `<img src=x onerror=alert(1)>"&amp;`;
+    renderScreen(read([], [cat(CAT_WORK, evil), cat(CAT_GYM, "가".repeat(20))]));
+    open();
+    expect(chip(evil).textContent).toBe(evil);
+    expect(chipGroup().querySelector("img")).toBeNull();
+    expect(chip(evil).querySelector(".chip-label")!.textContent).toBe(evil);
+    // 긴 이름(20자)도 전체 이름이 접근 이름이다(말줄임은 CSS로만)
+    expect(chip("가".repeat(20)).textContent).toBe("가".repeat(20));
+  });
+
+  it("창을 열면 포커스는 글 칸이고(분야가 많아도), 분야 칩을 눌러도 포커스는 칩에 머문다(방향 C의 입력 방향 그대로)", () => {
+    const many = Array.from({ length: 12 }, (_, i) => cat(`${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`, `분야${i + 1}`));
+    renderScreen(read([], many));
+    open();
+    expect(document.activeElement).toBe(todoInput());
+  });
+});
+
+describe("고침 4바퀴: 목록 위 카드는 한 줄 줄(CSS)", () => {
+  const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  it(".entry-card가 감싸는 한 줄(flex-wrap), 단추는 오른쪽, 자리(.slot-card)는 한 줄 높이다", () => {
+    const entry = /\.entry-card\s*\{([^}]*)\}/.exec(css)![1];
+    expect(entry).toContain("display: flex");
+    expect(entry).toMatch(/flex-wrap:\s*wrap/);
+    expect(/\.entry-card\s*>\s*\.btn\s*\{[^}]*margin-left:\s*auto/.test(css)).toBe(true);
+    expect(/\.slot-card\s*\{[^}]*min-height:\s*calc\(var\(--tap-min\)\s*\+\s*var\(--space-2\)\)/.test(css)).toBe(true);
   });
 });

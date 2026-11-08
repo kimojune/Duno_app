@@ -80,6 +80,10 @@ const C_STATES: { id: string; sheets: Sheet[]; sizes?: SizeTag[] }[] = [
   { id: "C23", sheets: OPEN },
   { id: "C24", sheets: OPEN },
   { id: "C25", sheets: BOTH, sizes: ["360x640", "360x800", "320x640"] },
+  // 고침 4바퀴: 분야 칩 두 줄 감싸기(여섯 개 / 한도 50개)와 목록 위 한 줄 카드. 글자 200%에서도 가로로 넘치지 않는다
+  { id: "C27", sheets: OPEN, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
+  { id: "C28", sheets: OPEN, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
+  { id: "C29", sheets: CLOSED, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
   { id: "C26", sheets: OPEN, sizes: ["360x640", "360x800", "text200-sim"] },
   // 5절 T 상태를 C로 읽은 것
   { id: "T5", sheets: OPEN },
@@ -124,6 +128,48 @@ async function scrollSizes(page: Page) {
     clientWidth: document.documentElement.clientWidth,
     innerWidth: window.innerWidth,
   }));
+}
+
+/** 분야 칩 줄 높이 상한 = 두 줄(칩 누름 영역 48 x 2) + 셋째 줄이 있다는 것이 보이게 16(globals.css .chip-row max-height) */
+const CHIP_ROW_MAX_HEIGHT = 48 * 2 + 16;
+
+/**
+ * 분야 칩 줄은 두 줄까지 감싸고 가로로 넘치지 않는다(고침 4바퀴, 옛 「가로 밀기」 단언을 대신한다).
+ * 칩이 두 줄을 넘으면 줄 안에서 세로로만 밀린다. 돌려주는 값은 측정 기록용이다.
+ */
+async function assertChipWrap(page: Page, label: string, vw: number) {
+  const row = await page.locator(".chip-row").evaluate((el) => {
+    const s = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    const chips = [...el.querySelectorAll<HTMLElement>(".chip")].map((c) => {
+      const r = c.getBoundingClientRect();
+      return { top: Math.round(r.top - box.top + el.scrollTop), left: r.left - box.left, right: r.right - box.left };
+    });
+    return {
+      flexWrap: s.flexWrap,
+      overflowX: s.overflowX,
+      overflowY: s.overflowY,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      boxRight: box.right,
+      chips,
+      rows: new Set(chips.map((c) => c.top)).size,
+    };
+  });
+  measurements[`${label}-chip-wrap`] = { ...row, chips: row.chips.length };
+  expect(row.flexWrap, "칩 줄은 줄바꿈으로 감싼다").toBe("wrap");
+  expect(row.overflowX, "가로로 밀지 않는다").toBe("hidden");
+  expect(row.overflowY).toBe("auto");
+  expect(row.scrollWidth, "칩 줄이 가로로 넘치지 않는다").toBeLessThanOrEqual(row.clientWidth + 1);
+  expect(row.clientHeight, "칩 줄 높이는 두 줄(+16) 안").toBeLessThanOrEqual(CHIP_ROW_MAX_HEIGHT + 1);
+  for (const c of row.chips) {
+    expect(c.left, "칩이 줄 왼쪽 밖으로 나가지 않는다").toBeGreaterThanOrEqual(-0.5);
+    expect(c.right, "칩이 줄 오른쪽 밖으로 나가지 않는다").toBeLessThanOrEqual(row.clientWidth + 0.5);
+  }
+  expect(row.boxRight, "칩 줄이 화면 밖으로 나가지 않는다").toBeLessThanOrEqual(vw + 0.5);
+  return row;
 }
 
 /** 가리는 것(창이 열렸으면 창, 닫혔으면 단추)의 위 끝 */
@@ -328,28 +374,47 @@ for (const state of C_STATES) {
           measurements[`${name}-long-name`] = { chipLabel, tag, rowClientWidth: row, chipWidth: longChip.width };
           expect(chipLabel.overflow).toBe("ellipsis");
           expect(chipLabel.lines).toBe(1);
-          expect(longChip.width).toBeLessThanOrEqual(row + 20 - 32 + 0.5); // 칩 최대 폭 = 보이는 폭 − 32(임시)
+          expect(longChip.width).toBeLessThanOrEqual(row - 8 + 0.5); // 칩 최대 폭 = 칩 줄 안쪽 폭(감싸기라 한 줄을 넘지 않는다)
           expect(tag.scrollWidth).toBeLessThanOrEqual(tag.clientWidth + 1);
           expect(tag.wrap).toBe("anywhere");
         }
-        if (state.id === "C24") {
-          const row = await page.locator(".chip-row").evaluate((el) => {
-            const s = getComputedStyle(el);
-            return { overflowX: s.overflowX, overscrollX: s.overscrollBehaviorX, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
-          });
-          measurements[`${name}-chip-row`] = row;
-          expect(row.overflowX).toBe("auto");
-          expect(row.overscrollX).toBe("contain");
-          expect(row.scrollWidth).toBeGreaterThan(row.clientWidth); // 칩 줄만 밀린다
-          await expect(page.locator(".chip")).toHaveCount(11); // 분야 10개 + 「+ 분야」
-          // 끝까지 밀면 「+ 분야」가 칩 줄 안에 다 들어온다(오른쪽 16px 여백)
-          await page.locator(".chip-row").evaluate((el) => (el.scrollLeft = el.scrollWidth));
+        if (state.id === "C24" || state.id === "C27" || state.id === "C28") {
+          // 분야 칩은 두 줄까지 감싸고 가로로 넘치지 않는다(옛 가로 밀기 단언을 새 구조 단언으로 바꿈)
+          const row = await assertChipWrap(page, name, vw);
+          if (state.id === "C24") await expect(page.locator(".chip")).toHaveCount(11); // 분야 10개 + 「+ 분야」
+          if (state.id === "C28") {
+            await expect(page.locator(".chip")).toHaveCount(51); // 분야 50개(한도) + 「+ 분야」
+            expect(row.scrollHeight, "두 줄을 넘으면 줄 안에서 세로로 민다").toBeGreaterThan(row.clientHeight + 1);
+          }
+          if (state.id === "C27" && (size === "360x640" || size === "360x800")) {
+            // 분야 여섯 개는 두 줄에 감싸이고 세로로 밀 일이 없다
+            expect(row.rows, "칩이 두 줄 안에 감싸인다").toBeLessThanOrEqual(2);
+            expect(row.scrollHeight).toBeLessThanOrEqual(row.clientHeight + 1);
+          }
+          // 끝(「+ 분야」)까지 밀면 줄 안에 다 들어온다
+          await page.locator(".chip-row").evaluate((el) => (el.scrollTop = el.scrollHeight));
           const rowBox = (await page.locator(".chip-row").boundingBox())!;
           const addBox = (await page.locator("#add-category-chip").boundingBox())!;
-          expect(addBox.x + addBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width - 15.5);
+          expect(addBox.y).toBeGreaterThanOrEqual(rowBox.y - 0.5);
+          expect(addBox.y + addBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 0.5);
           await shot(page, `${name}-scrolled-end`, false);
         }
-        if (state.id === "C26" || size === "text200-sim") {
+        if (state.id === "C29") {
+          // 목록 위 카드는 한 줄 줄이다: 저녁 기록 입구는 단추 높이(48)+위아래 4 한 줄, 먼저 할 일 카드는 많아야 두 줄
+          const cards = await page.locator(".entry-card").evaluateAll((els) =>
+            els.map((el) => ({ label: el.getAttribute("aria-label"), height: el.getBoundingClientRect().height })),
+          );
+          measurements[`${name}-cards`] = cards;
+          expect(cards).toHaveLength(2);
+          if (size === "360x640" || size === "360x800") {
+            const evening = cards.find((c) => c.label === "저녁 기록")!;
+            const offer = cards.find((c) => c.label === "오늘 먼저 할 일")!;
+            expect(evening.height, "저녁 기록 입구는 한 줄").toBeLessThanOrEqual(56 + 0.5);
+            expect(offer.height, "먼저 할 일 카드는 두 줄 안").toBeLessThanOrEqual(48 * 2 + 4 * 2 + 4 + 0.5);
+          }
+          await shot(page, `${name}-cards`, false);
+        }
+        if ((state.id === "C26" || size === "text200-sim") && sheet === "open") { // 창이 닫힌 상태(C29)에는 잴 창이 없다
           // C26: 창이 보이는 화면보다 높으면 창 안이 스크롤된다. 3분의 2(임시)를 넘는지는 기록만 한다(디자인 검토)
           const sheetBox = await page.locator(".todo-sheet").evaluate((el) => ({
             height: el.getBoundingClientRect().height,
@@ -460,17 +525,52 @@ test("C5·T5 적는 중: 할 일 칸 포커스 (키보드 없음 — 키보드�
   await shot(page, "C5-focus-nokeyboard-open-360x640", false);
 });
 
-test("C24 칩에 키보드 포커스가 가면 그 칩이 보이게 칩 줄이 밀린다", async ({ page }) => {
+test("C24 칩에 키보드 포커스가 가면 그 칩이 보이게 칩 줄이 세로로 밀린다", async ({ page }) => {
   await open(page, "/dev/states?s=C24", "360x640");
-  const last = page.locator(".chip").nth(9); // 분야 열째(오른쪽 밖)
+  const last = page.locator(".chip").nth(9); // 분야 열째(두 줄 밖일 수 있다)
   await last.focus();
   const rowBox = (await page.locator(".chip-row").boundingBox())!;
   const chipBox = (await last.boundingBox())!;
   measurements["C24-focus-scroll"] = { rowBox, chipBox };
+  expect(chipBox.y).toBeGreaterThanOrEqual(rowBox.y - 0.5);
+  expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 0.5);
   expect(chipBox.x).toBeGreaterThanOrEqual(rowBox.x - 0.5);
   expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 0.5);
   await shot(page, "C24-focus-last-chip-open-360x640", false);
 });
+
+// 고침 4바퀴: 분야 50개여도 Tab만으로 모든 칩과 「+ 분야」에 닿고, 닿은 칩은 칩 줄 안에 보인다
+for (const size of ["360x640", "text200-sim"] as SizeTag[]) {
+  test(`C28 키보드만 ${size}: 글 칸 → 적기 → 칩 50개 → + 분야 순으로 닿고 매번 칩 줄 안에 보인다`, async ({ page }) => {
+    await open(page, "/dev/states?s=C28&sheet=open", size);
+    await page.locator("#todo-input").focus();
+    const visited: string[] = [];
+    for (let i = 0; i < 60; i += 1) {
+      await page.keyboard.press("Tab");
+      const info = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        const row = document.querySelector(".chip-row")!.getBoundingClientRect();
+        const r = el?.getBoundingClientRect();
+        return {
+          label: el?.id || el?.textContent || "",
+          inRow: !!el?.closest(".chip-row"),
+          visibleInRow: !!r && r.top >= row.top - 0.5 && r.bottom <= row.bottom + 0.5 && r.left >= row.left - 0.5 && r.right <= row.right + 0.5,
+        };
+      });
+      visited.push(info.label);
+      if (info.inRow) expect(info.visibleInRow, `${info.label}이 칩 줄 안에 보인다`).toBe(true);
+      if (info.label === "add-category-chip") break;
+    }
+    measurements[`C28-keyboard-${size}`] = { tabs: visited.length, first: visited[0], last: visited[visited.length - 1] };
+    expect(visited[0]).toBe("적기");
+    expect(visited).toHaveLength(52); // 적기 1 + 칩 50 + 「+ 분야」 1
+    expect(visited[visited.length - 1]).toBe("add-category-chip");
+    expect(new Set(visited).size, "같은 곳을 두 번 지나지 않는다").toBe(52);
+    const sw = await scrollSizes(page);
+    expect(sw.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(sw.clientWidth);
+    await shot(page, `C28-keyboard-end-open-${size}`, false);
+  });
+}
 
 // ---- 오프라인 화면 O1~O4 (public/offline.html, 6절 그대로) ----
 for (const size of ["360x800", "320x640", "text200-sim"] as SizeTag[]) {
