@@ -6,13 +6,13 @@ import type { GrowthApi } from "../../lib/growth-api";
 
 vi.mock("../../app/views/actions", () => ({ recordView: vi.fn(async () => ({ ok: true })) }));
 vi.mock("../../app/evening/actions", () => ({ saveEveningLog: vi.fn() }));
-// 조각 색을 정하는 곳(pieceColor) 호출을 가로챌 수 있게 감싼다(기본은 진짜 함수 그대로)
-vi.mock("../../lib/growth/piece-color", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../../lib/growth/piece-color")>();
-  return { ...real, pieceColor: vi.fn(real.pieceColor) };
+// 조각 색을 정하는 곳(categoryColorValue) 호출을 가로챌 수 있게 감싼다(기본은 진짜 함수 그대로)
+vi.mock("../../lib/category-color", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../lib/category-color")>();
+  return { ...real, categoryColorValue: vi.fn(real.categoryColorValue) };
 });
 
-import { pieceColor } from "../../lib/growth/piece-color";
+import { categoryColorValue } from "../../lib/category-color";
 import { GROWTH_TEXT, GrowthScreen } from "../../components/growth-screen";
 import { STATUS_VIEWS } from "../../components/growth-views";
 
@@ -177,9 +177,9 @@ describe("보기 방식 바꾸기", () => {
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(STATUS_VIEWS.map((v) => GROWTH_TEXT[v.label]));
   });
 
-  it("조각 색은 한 군데(pieceColor)에서만 정한다: 그 함수가 낸 색이 띠·원·줄 막대·색점에 그대로 쓰인다(동작 시험)", async () => {
-    const real = await vi.importActual<typeof import("../../lib/growth/piece-color")>("../../lib/growth/piece-color");
-    vi.mocked(pieceColor).mockImplementation(() => "rgb(1, 2, 3)");
+  it("조각 색은 한 군데(categoryColorValue)에서만 정한다: 그 함수가 낸 색이 띠·원·줄 막대·색점에 그대로 쓰인다(동작 시험)", async () => {
+    const real = await vi.importActual<typeof import("../../lib/category-color")>("../../lib/category-color");
+    vi.mocked(categoryColorValue).mockImplementation(() => "rgb(1, 2, 3)");
     try {
       const { container } = await mount(fakeApi());
       const colorsOf = (selector: string, prop: "background" | "fill") =>
@@ -192,12 +192,14 @@ describe("보기 방식 바꾸기", () => {
       expect(colorsOf(".growth-dot", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
       fireEvent.click(chip("분야별 줄 막대"));
       expect(colorsOf(".growth-bar-fill", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
-      // 분야와 자리가 함수에 넘어간다(자리는 받은 분야 순서, 기타는 null)
-      const calls = vi.mocked(pieceColor).mock.calls;
-      expect(calls.some(([id, index]) => id === C1 && index === 0)).toBe(true);
-      expect(calls.some(([id, index]) => id === null && index === 4)).toBe(true);
+      // 분야 자리(받은 분야 순서, 0부터)와 기타(null)가 함수에 넘어간다
+      const calls = vi.mocked(categoryColorValue).mock.calls.map(([order]) => order);
+      expect(calls).toContain(0);
+      expect(calls).toContain(3); // 분야 넷의 마지막 자리
+      expect(calls).toContain(null);
+      expect(calls.filter((order) => order !== null && order > 3)).toEqual([]); // 기타에 분야 자리를 주지 않는다
     } finally {
-      vi.mocked(pieceColor).mockImplementation(real.pieceColor);
+      vi.mocked(categoryColorValue).mockImplementation(real.categoryColorValue);
     }
   });
 });

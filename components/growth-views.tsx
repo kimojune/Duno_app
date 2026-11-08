@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
-import { pieceColor } from "../lib/growth/piece-color";
+import { categoryColorValue } from "../lib/category-color";
 import { bandSegments, pieSlices, type ChartCategoryId, type StatusChart } from "../lib/growth/status-chart";
 import { formatMinutes } from "../lib/time-format";
 
@@ -9,7 +9,7 @@ import { formatMinutes } from "../lib/time-format";
  * 상태보기의 보기 방식들(띠그래프 · 원그래프 · 분야별 줄 막대). 보기 하나 = 같은 데이터(buildStatusChart 결과)를 받는 부품 하나.
  * 보기를 늘리려면 STATUS_VIEWS 목록에 {id, label, Component} 한 줄을 더한다 — 고르는 줄·기억한 값 검사(parseStatusPref)가 이 목록을 따른다.
  * 어떤 보기를 최종으로 넣을지·모양·「그래프 전환 문구」(D-049)를 셋 이상에서 어떻게 할지는 디자인(23)이 정한다. 지금은 고르는 줄(단추 셋)이 자리다.
- * 색: 조각 색을 정하는 곳은 pieceColor 한 군데(lib/growth/piece-color.ts)다. 모든 모양·글은 임시(디자인 확정 뒤 바꿈).
+ * 색: 조각 색을 정하는 곳은 categoryColorValue 한 군데(lib/category-color.ts)다. 다이얼과 같은 분야에 같은 색이다. 모든 모양·글은 임시(디자인 확정 뒤 바꿈).
  */
 
 /** 보기들이 쓰는 글(화면의 GROWTH_TEXT가 넘긴다. 임시 글) */
@@ -34,6 +34,8 @@ export type StatusViewProps = {
 
 const indexOfRow = (chart: StatusChart, id: ChartCategoryId) => chart.rows.findIndex((r) => r.categoryId === id);
 const keyOf = (id: ChartCategoryId) => id ?? "other";
+/** 조각 색: 분야는 줄 안의 자리(받은 분야 순서), 기타는 기타 색 */
+const colorOf = (chart: StatusChart, id: ChartCategoryId) => categoryColorValue(id === null ? null : indexOfRow(chart, id));
 
 /** 한 줄(처음 정한 비율 또는 쓴 시간)을 글로: 0%는 빼고 「이름 n%」를 모은다. 줄이 비었으면 「… 없음」 */
 function lineText(chart: StatusChart, line: { categoryId: ChartCategoryId; percent: number }[], empty: boolean, label: string, props: StatusViewProps): string {
@@ -67,19 +69,19 @@ function graphLabel(props: StatusViewProps): string {
 export function CategoryRows({ chart, text, nameOf, onOpenCategory, bars }: StatusViewProps & { bars: boolean }) {
   return (
     <ul className="growth-list">
-      {chart.rows.map((r, i) => {
+      {chart.rows.map((r) => {
         const name = nameOf(r.categoryId);
         return (
           <li key={keyOf(r.categoryId)} className="growth-item">
             <button type="button" className="growth-row" onClick={() => onOpenCategory(r.categoryId, name)}>
               <span className="growth-name">
-                <span className="growth-dot" aria-hidden="true" style={{ background: pieceColor(r.categoryId, i) }} />
+                <span className="growth-dot" aria-hidden="true" style={{ background: colorOf(chart, r.categoryId) }} />
                 {name}
               </span>
               <span className="growth-time">{formatMinutes(r.spentMinutes)}</span>
               {bars && (
                 <span className="growth-bar" aria-hidden="true">
-                  <span className="growth-bar-fill" style={{ inlineSize: `${r.barPercent}%`, background: pieceColor(r.categoryId, i) }} />
+                  <span className="growth-bar-fill" style={{ inlineSize: `${r.barPercent}%`, background: colorOf(chart, r.categoryId) }} />
                   {r.tickPercent !== null && <span className="growth-tick" style={{ insetInlineStart: `clamp(0px, calc(${r.tickPercent}% - 1px), calc(100% - 2px))` }} />}
                 </span>
               )}
@@ -98,7 +100,7 @@ function BandLine({ chart, line, empty, caption }: { chart: StatusChart; line: {
       <span className="growth-line-caption">{caption}</span>
       <div className={empty ? "growth-band is-empty" : "growth-band"}>
         {bandSegments(line).map((seg) => (
-          <span key={keyOf(seg.categoryId)} className="growth-band-seg" style={{ inlineSize: `${seg.percent}%`, background: pieceColor(seg.categoryId, indexOfRow(chart, seg.categoryId)) }} />
+          <span key={keyOf(seg.categoryId)} className="growth-band-seg" style={{ inlineSize: `${seg.percent}%`, background: colorOf(chart, seg.categoryId) }} />
         ))}
       </div>
     </div>
@@ -129,7 +131,7 @@ function Pie({ chart, line, empty, caption }: { chart: StatusChart; line: { cate
           <circle r={PIE_RADIUS} className="growth-pie-empty" />
         ) : (
           pieSlices(line, PIE_RADIUS).map((s) =>
-            s.d === null ? null : <path key={keyOf(s.categoryId)} d={s.d} className="growth-pie-slice" style={{ fill: pieceColor(s.categoryId, indexOfRow(chart, s.categoryId)) }} />,
+            s.d === null ? null : <path key={keyOf(s.categoryId)} d={s.d} className="growth-pie-slice" style={{ fill: colorOf(chart, s.categoryId) }} />,
           )
         )}
       </svg>

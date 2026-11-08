@@ -37,7 +37,7 @@ export const CATEGORY_COLOR_TOKENS = {
   "--color-category-1": "#2F5D50",
   "--color-category-2": "#24493F",
   "--color-category-3": "#5C5B55",
-  "--color-category-4": "#7A7972",
+  "--color-category-4": "#FFFFFF",
   "--color-category-5": "#1C1C1A",
   "--color-category-6": "#E3E1D9",
   "--color-category-7": "#EFEDE6",

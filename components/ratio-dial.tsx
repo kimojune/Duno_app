@@ -41,17 +41,6 @@ export const DIAL_TEXT = {
   picked: (name: string, value: string) => `${name} 고름, ${value}`,
 } as const;
 
-/**
- * 조각 색을 정하는 한 곳(처음 정한 비율·저녁 나누기가 같이 쓴다). 지금은 있는 토큰만 돌려 쓴다(임시, 1단계 값 그대로).
- * 합치기 워커가 분야 색 배정 함수(lib/category-color.ts, 다른 워커가 만든다)에 이 함수를 잇는다: index = 분야 순서(0부터), other = 기타 조각.
- * 분야 색은 9번째부터 돌려 쓴다(PM 확정 11-08) — 그 규칙은 분야 색 함수가 맡는다.
- */
-const SLICE_COLORS = ["var(--color-primary)", "var(--color-text-sub)", "var(--color-primary-pressed)", "var(--color-text)"];
-const OTHER_SLICE_COLOR = "var(--color-border-input)";
-export function dialSliceColor(index: number, other: boolean): string {
-  return other ? OTHER_SLICE_COLOR : SLICE_COLORS[((index % SLICE_COLORS.length) + SLICE_COLORS.length) % SLICE_COLORS.length];
-}
-
 interface Props {
   id: string;
   slices: DialSlice[];

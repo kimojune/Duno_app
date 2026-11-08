@@ -143,7 +143,7 @@ export function Onboarding({
     selected
       .map((id) => catalog.find((c) => c.id === id))
       .filter((c): c is CategoryEntry => c !== undefined)
-      .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 })),
+      .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: catalog.findIndex((x) => x.id === c.id) })),
     percents,
   );
   const total = entries.reduce((s, e) => s + e.percent, 0);

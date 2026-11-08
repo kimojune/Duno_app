@@ -161,7 +161,7 @@ function MeBody({
 
   // 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다)
   const entries: RatioEntry[] = withOtherEntry(
-    categories.map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0 })),
+    categories.map((c, i) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: i })),
     percents,
   );
   const ratioTotal = entries.reduce((s, e) => s + e.percent, 0);

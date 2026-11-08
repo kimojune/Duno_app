@@ -96,7 +96,8 @@ describe("내 정보 탭", () => {
     expect(screen.getByText("합계 100%")).toBeTruthy();
     await press("비율 저장");
     expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
-    expect(api.saveRatios).toHaveBeenLastCalledWith([{ categoryId: C1, percent: 0 }, { categoryId: C2, percent: 0 }, { categoryId: null, percent: 100 }]);
+    // 0%가 된 분야는 저장 목록에 싣지 않는다(저장 목록에 없는 분야는 0%로 읽는다, 고침4 합치기). 기타 100만 간다
+    expect(api.saveRatios).toHaveBeenLastCalledWith([{ categoryId: null, percent: 100 }]);
   });
 
   it("저장값의 합이 100이 아니면 열 때 비율을 지켜 합 100의 정수로 맞추고, 그대로 저장하면 그 값이 간다", async () => {

@@ -10,7 +10,8 @@ import { useOnline } from "../lib/use-online";
 import { addDays } from "../lib/week";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { rescaleSplit } from "../lib/ratio-dial-calc";
-import { dialSliceColor, RatioDial, type DialSlice } from "./ratio-dial";
+import { categoryColorValue } from "../lib/category-color";
+import { RatioDial, type DialSlice } from "./ratio-dial";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -186,8 +187,8 @@ export function EveningRecord({
   const hiddenSum = Object.entries(perCategory).reduce((s, [id, m]) => s + (shownIds.has(id) ? 0 : Math.max(0, m)), 0);
   const dialTotal = Math.max(0, total - hiddenSum);
   const dialSlices: DialSlice[] = [
-    ...(state?.categories ?? []).map((c, i) => ({ key: c.id, name: c.name, color: dialSliceColor(i, false), value: perCategory[c.id] ?? 0 })),
-    { key: OTHER_KEY, name: EVENING_TEXT.other, color: dialSliceColor(0, true), value: Math.max(0, total - splitSum) },
+    ...(state?.categories ?? []).map((c, i) => ({ key: c.id, name: c.name, color: categoryColorValue(i), value: perCategory[c.id] ?? 0 })),
+    { key: OTHER_KEY, name: EVENING_TEXT.other, color: categoryColorValue(null), value: Math.max(0, total - splitSum) },
   ];
 
   function toSplit() {

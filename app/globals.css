@@ -21,7 +21,7 @@
   --color-category-1: #2F5D50;
   --color-category-2: #24493F;
   --color-category-3: #5C5B55;
-  --color-category-4: #7A7972;
+  --color-category-4: #FFFFFF;
   --color-category-5: #1C1C1A;
   --color-category-6: #E3E1D9;
   --color-category-7: #EFEDE6;
@@ -537,7 +537,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-dl dt { font: var(--font-sub); color: var(--color-text-sub); }
 .growth-dl dd { margin: 0; font: var(--font-body); }
 .growth-short { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
-/* 상태보기 그래프(고침 4바퀴 C). 모양은 임시: 새 토큰 없이 있는 토큰만 쓴다. 디자인 확정 뒤 바꿈. 조각 색은 lib/growth/piece-color.ts가 정한다 */
+/* 상태보기 그래프(고침 4바퀴 C). 모양은 임시: 새 토큰 없이 있는 토큰만 쓴다. 디자인 확정 뒤 바꿈. 조각 색은 lib/category-color.ts의 categoryColorValue가 정한다 */
 .growth-total { margin: var(--space-3) 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
 .growth-total-label { font: var(--font-sub); color: var(--color-text-sub); }
 .growth-total-number { font: var(--font-title); overflow-wrap: anywhere; }

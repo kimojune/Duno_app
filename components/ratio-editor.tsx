@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { parseShare, setShare, startHundred } from "../lib/ratio-dial-calc";
 import type { RatioItem } from "../lib/settings/types";
 import { evenRatios, RATIO_STEP } from "../lib/settings/validation";
-import { dialSliceColor, RatioDial, type DialSlice } from "./ratio-dial";
+import { categoryColorValue } from "../lib/category-color";
+import { RatioDial, type DialSlice } from "./ratio-dial";
 import { SecondaryButton } from "./ui";
 
 /**
@@ -16,7 +17,11 @@ import { SecondaryButton } from "./ui";
  * 모든 글은 React 텍스트로만 그린다. 숫자 칸 값은 0~100 정수로 읽은 뒤에만 쓴다.
  */
 
-export type RatioEntry = { id: string; name: string; percent: number };
+/**
+ * colorOrder: 분야 색을 정하는 분야 순서(0부터, 보관하지 않은 읽을 수 있는 내 분야를 만든 순서에서의 자리). 상태보기·저녁 다이얼과 같은 분야에 같은 색을 주려고
+ * 부르는 쪽이 넣는다(처음 설정은 고르지 않은 분야도 자리를 차지한다). 없으면 목록 안의 자리를 쓴다. 기타 줄은 쓰지 않는다.
+ */
+export type RatioEntry = { id: string; name: string; percent: number; colorOrder?: number };
 
 /**
  * 기타(분야 없음)도 비율 한 줄이다(고침 3바퀴, PM 답 d-69). 줄을 가리키는 표시는 uuid가 아니라 이 값이고, 저장할 때 categoryId null로 바꾼다.
@@ -35,10 +40,14 @@ export function withOtherEntry(entries: RatioEntry[], percents: Record<string, n
   return [...entries, { id: OTHER_RATIO_ID, name: OTHER_RATIO_NAME, percent: percents[OTHER_RATIO_ID] ?? 0 }];
 }
 
-/** 화면 줄들을 저장할 비율로(기타는 0보다 클 때만) */
+/**
+ * 화면 줄들을 저장할 비율로. 0% 줄은 분야든 기타든 싣지 않는다(저장 목록에 없는 분야는 어디서나 0%로 읽는다: 상태보기·놓친 분야·채울 시간,
+ * 처음 설정·내 정보를 다시 열 때의 숫자 칸). 분야 50개인 사람이 기타에 몫을 줘도 목록이 51항목이 되어 상한 50에 거절되는 일이 없다.
+ * 서버 저장은 받은 목록에 없는 분야의 옛 비율 행을 지우므로(saveRatiosForUser), 0%로 줄인 분야의 옛 몫이 남지 않는다.
+ */
 export function entriesToRatios(entries: RatioEntry[]): RatioItem[] {
   return entries.flatMap((e): RatioItem[] =>
-    e.id === OTHER_RATIO_ID ? (e.percent > 0 ? [{ categoryId: null, percent: e.percent }] : []) : [{ categoryId: e.id, percent: e.percent }],
+    e.percent > 0 ? [{ categoryId: e.id === OTHER_RATIO_ID ? null : e.id, percent: e.percent }] : [],
   );
 }
 
@@ -102,7 +111,7 @@ export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onCh
   const slices: DialSlice[] = entries.map((e, i) => ({
     key: e.id,
     name: e.name,
-    color: dialSliceColor(i, e.id === OTHER_RATIO_ID),
+    color: categoryColorValue(e.id === OTHER_RATIO_ID ? null : (e.colorOrder ?? i)),
     value: shown[i],
   }));
   const withValues = (values: number[]) => entries.map((e, i) => ({ ...e, percent: values[i] }));

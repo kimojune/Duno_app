@@ -552,6 +552,7 @@ for (const size of ["360x640", "360x800", "320x640", "text200-sim"] as SizeTag[]
     measurements[`slot-vs-card-${size}`] = result;
     const bound = SLOT_VS_CARD_BOUNDS[size];
     expect(slot, "자리 높이").toBeLessThanOrEqual(bound.slot + 0.5);
+    expect(slot, "자리가 0px로 줄지 않는다(지금 값 56 근처가 하한)").toBeGreaterThanOrEqual(bound.slot - 1);
     expect(card, "먼저 할 일 카드 높이").toBeLessThanOrEqual(bound.card + 0.5);
     expect(longCard, "먼저 할 일 글 200자 카드 높이").toBeLessThanOrEqual(bound.longCard + 0.5);
     expect(longCard, "글이 길면 카드가 짧은 카드보다 낮을 수 없다(측정 확인)").toBeGreaterThanOrEqual(card - 0.5);

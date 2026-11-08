@@ -29,9 +29,9 @@ end
 $$;
 
 -- 2) check 제약 지우기
-alter table public.user_settings
+alter table if exists public.user_settings
   drop constraint if exists user_settings_ratio_other_range;
 
 -- 3) 열 지우기(열의 comment도 함께 사라진다)
-alter table public.user_settings
+alter table if exists public.user_settings
   drop column if exists ratio_other_percent;

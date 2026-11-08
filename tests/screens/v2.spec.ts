@@ -66,6 +66,7 @@ for (const size of ALL_SIZES) {
     expect(sw.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(sw.clientWidth);
     // 각 탭의 누르는 면은 높이 48 이상
     const heights = await page.$$eval(".tabbar-btn", (buttons) => buttons.map((b) => b.getBoundingClientRect().height));
+    expect(heights.length, "탭 단추가 있다(없으면 Math.min이 Infinity라 그냥 통과한다)").toBeGreaterThan(0);
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(48);
   });
 }
@@ -139,6 +140,7 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     await noHorizontalScroll(page, "총 시간");
     // 고르는 단추는 누르는 면 높이 48 이상(--tap-min)
     const heights = await page.$$eval(".detail-chips .chip", (els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(heights.length, "고르는 단추가 있다(없으면 Math.min이 Infinity라 그냥 통과한다)").toBeGreaterThan(0);
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(48);
   });
 }
