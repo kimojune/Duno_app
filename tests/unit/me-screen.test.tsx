@@ -81,26 +81,39 @@ describe("내 정보 탭", () => {
     expect(screen.getByText("목표를 읽을 수 없어요. 새로 적으면 바뀌어요.")).toBeTruthy();
   });
 
-  it("처음 정한 비율을 −/+ 단추로 고쳐 저장한다. 합이 0이면 못 한다", async () => {
+  it("처음 정한 비율을 −/+ 단추로 고쳐 저장한다. 합은 늘 100이다(줄여도 0이 되지 않고 기타로 간다, PM 확정 11-08)", async () => {
     const api = fakeApi();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" }));
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 늘리기" }));
+    fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" })); // 60·40·0 → 55·45·0 (뒤 줄로)
+    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" })); // → 55·40·5 (뒤 줄 기타로)
     await press("비율 저장");
-    expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 55 }, { categoryId: C2, percent: 45 }]);
+    expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 55 }, { categoryId: C2, percent: 40 }, { categoryId: null, percent: 5 }]);
     for (let i = 0; i < 20; i++) {
       fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" }));
       fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" }));
     }
+    expect(screen.getByText("합계 100%")).toBeTruthy();
     await press("비율 저장");
-    expect(screen.getByText("하나 이상은 0%보다 커야 해요.")).toBeTruthy();
-    expect(api.saveRatios).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
+    expect(api.saveRatios).toHaveBeenLastCalledWith([{ categoryId: C1, percent: 0 }, { categoryId: C2, percent: 0 }, { categoryId: null, percent: 100 }]);
+  });
+
+  it("저장값의 합이 100이 아니면 열 때 비율을 지켜 합 100의 정수로 맞추고, 그대로 저장하면 그 값이 간다", async () => {
+    const api = fakeApi();
+    render(<MeScreen settings={settings({ ratios: [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 30 }] })} categories={categories} api={api} push={fakePush()} />);
+    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
+    await press("비율 저장");
+    expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 50 }, { categoryId: C2, percent: 50 }]);
   });
 
   it("비율이 아직 없으면 고르게 나눈 값으로 열린다. 분야가 없으면 안내", () => {
     const { unmount } = render(<MeScreen settings={settings({ ratios: [] })} categories={categories} api={fakeApi()} push={fakePush()} />);
-    expect(screen.getAllByText("50%")).toHaveLength(2);
+    expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("0");
     unmount();
     render(<MeScreen settings={settings({ ratios: [] })} categories={[]} api={fakeApi()} push={fakePush()} />);
     expect(screen.getByText("분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.")).toBeTruthy();
@@ -223,11 +236,12 @@ describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
     );
     expect(screen.getByText("합계 100%")).toBeTruthy();
     expect(screen.getByRole("button", { name: "기타 5% 줄이기" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" }));
+    expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("10");
+    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" })); // 기타는 맨 끝 줄: 앞 줄(포트폴리오)에서 떼어 온다
     await press("비율 저장");
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 60 },
-      { categoryId: C2, percent: 30 },
+      { categoryId: C2, percent: 25 },
       { categoryId: null, percent: 15 },
     ]);
   });

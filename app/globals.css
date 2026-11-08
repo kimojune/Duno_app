@@ -429,6 +429,11 @@ button, input { font: inherit; color: inherit; }
 .dial-changes { margin: var(--space-1) 0 0; min-height: 20px; font: var(--font-sub); color: var(--color-text-sub); text-align: center; overflow-wrap: anywhere; }
 .ratio-name-btn { min-width: 0; min-height: var(--tap-min); padding: 0; border: 0; background: none; text-align: start; cursor: pointer; }
 .ratio-name-btn[aria-pressed="true"] { font-weight: 700; }
+/* 고침4 2단계: 비율 줄(처음 정한 비율의 숫자 칸·저녁 나누기의 Stepper)이 글자 200%·360px에서 넘치지 않게 감싸고 숫자 칸을 줄인다(크기는 임시).
+   .stepper-input(5.5em)보다 뒤에 와도 이기게 두 단계 선택자. 4em이면 4자리(최대 1440분)가 들어간다 */
+.ratio-row { flex-wrap: wrap; }
+.ratio-row .stepper-input { inline-size: 4em; }
+.evening-dial { margin-top: var(--space-2); }
 .notify-row { margin-top: var(--space-4); }
 .notify-toggle { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap-min); }
 .notify-toggle input { flex: none; inline-size: 24px; block-size: 24px; margin: 0; }
