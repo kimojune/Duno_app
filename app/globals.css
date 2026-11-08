@@ -175,6 +175,9 @@ button, input { font: inherit; color: inherit; }
   padding: var(--space-6) var(--page-x) var(--space-4);
 }
 .today-title { font: var(--font-title); }
+/* 워드마크 「DUNO」 자리표시(components/wordmark.tsx). 로고가 확정되기 전이라 지금 토큰의 글자·색을 그대로 쓴다 */
+.wordmark { font: inherit; color: inherit; }
+.today-wordmark { display: block; margin-bottom: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); }
 .today-date { margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--page-x) var(--space-4); }
 /* 목록 끝 여백(12-2): 창이 닫혔으면 88px, 열렸으면 창 높이 + 16px. 둘 다 + 안전 영역. scroll-padding-bottom과 같은 값 */

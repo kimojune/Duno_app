@@ -14,6 +14,7 @@ import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { LiveRegion, Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /**
  * 할 일 화면의 그리는 쪽(디자인 명세 12절 방향 C). 상태를 받아 그리기만 한다.
@@ -613,6 +614,7 @@ export function TodoView(props: TodoViewProps) {
   const header = (
     <header className="today-header">
       <div>
+        <Wordmark className="today-wordmark" />
         <h1 className="today-title">{TODO_TEXT.title}</h1>
         <p className="today-date">{dateLine}</p>
       </div>

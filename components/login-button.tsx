@@ -6,6 +6,7 @@ import { createClient } from "../lib/supabase/client";
 import { useAnnouncer } from "../lib/use-announcer";
 import { useOnline } from "../lib/use-online";
 import { LiveRegion, Notice } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /** 로그인 화면의 바깥 틀: 이름과 한 문장 위, 단추 묶음 아래(방향 A) 또는 이어서(방향 B). */
 export function LoginLayout({
@@ -18,7 +19,9 @@ export function LoginLayout({
   return (
     <main className={direction === "B" ? "login dir-b" : "login"}>
       <div className="login-head">
-        <h1 className="login-name">{LOGIN_TEXT.name}</h1>
+        <h1 className="login-name">
+          <Wordmark />
+        </h1>
         <p className="login-sentence">{LOGIN_TEXT.sentence}</p>
       </div>
       {children}
