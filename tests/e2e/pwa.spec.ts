@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 
-const BASE = "http://localhost:3100";
+// playwright.config.ts와 같은 변수(E2E_PORT)를 따른다. 없으면 3100.
+const BASE = `http://localhost:${process.env.E2E_PORT || "3100"}`;
 
 test("a. 360x800에서 로그인 단추가 보이고 가로 스크롤이 없다", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
