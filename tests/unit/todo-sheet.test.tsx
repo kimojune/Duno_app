@@ -1238,3 +1238,19 @@ describe("고침 4바퀴: 목록 위 카드는 한 줄 줄(CSS)", () => {
     expect(/\.slot-card\s*\{[^}]*min-height:\s*calc\(var\(--tap-min\)\s*\+\s*var\(--space-2\)\)/.test(css)).toBe(true);
   });
 });
+
+describe("고침 4바퀴 시나리오 ① 처음 쓰는 사람: 분야가 하나", () => {
+  it("칩은 그 분야 하나와 「+ 분야」뿐이고, 창을 열면 포커스는 글 칸, 탭은 글 칸 → 적기 → 칩 → + 분야다. 칩 줄은 감싸는 줄 하나다", () => {
+    renderScreen(read([], [cat(CAT_WORK, "취업 준비")]));
+    open();
+    expect(document.activeElement).toBe(todoInput());
+    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["취업 준비", "+ 분야"]);
+    const form = screen.getByRole("form", { name: "할 일 적기" });
+    const ids = [...form.querySelectorAll<HTMLElement>("button, input")].map((el) => el.id || el.textContent);
+    expect(ids).toEqual(["sheet-close", "todo-input", "적기", "취업 준비", "add-category-chip"]);
+    expect(chipGroup().classList.contains("chip-row")).toBe(true);
+    // 고르고 적으면 그 분야가 붙는다(입력 방향은 그대로)
+    fireEvent.click(chip("취업 준비"));
+    expect(chip("취업 준비").getAttribute("aria-pressed")).toBe("true");
+  });
+});
