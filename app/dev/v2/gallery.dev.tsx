@@ -6,6 +6,7 @@ import { EveningRecord } from "../../../components/evening-record";
 import { GoalEditor } from "../../../components/goal";
 import { GrowthScreen } from "../../../components/growth-screen";
 import { MeScreen } from "../../../components/me-screen";
+import { Onboarding } from "../../../components/onboarding";
 import { TabBar, type TabId } from "../../../components/tab-bar";
 import { TodoDetail } from "../../../components/todo-detail";
 import type { EveningApi } from "../../../lib/evening-api";
@@ -21,6 +22,7 @@ import type { SettingsData } from "../../../lib/settings/types";
 /**
  * 원샷 v2 화면 모음(개발용, B10). 서버 Action·DB·네트워크를 부르지 않고 진짜 화면 컴포넌트에 가짜 데이터만 넣는다.
  * 쓰는 법: /dev/v2?s=tabbar | growth-empty | goal | evening | category | detail
+ *          | ratio-onboarding | ratio-onboarding-many | me-ratio | me-ratio-many | evening-split | evening-split-many (고침4 2단계: 원형 다이얼)
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
@@ -36,6 +38,12 @@ const CATEGORIES = [
   { id: C2, name: "포트폴리오" },
   { id: C3, name: "CS 공부" },
 ];
+
+/** 분야 9개 이상(분야 색을 9번째부터 돌려 쓰는지·가로 넘침 보기). 이름 하나는 아주 길게 */
+const MANY = Array.from({ length: 10 }, (_, i) => ({
+  id: `d${i}d${i}d${i}d${i}-0000-4000-8000-00000000000${i}`,
+  name: i === 3 ? "아주아주아주긴분야이름이라서한줄에다안들어갑니다" : `분야 ${i + 1}`,
+}));
 
 const SETTINGS: SettingsData = {
   goal: "토익 900점",
@@ -83,6 +91,21 @@ const eveningApi: EveningApi = {
   }),
   save: never,
 };
+/** 저녁 나누기 다이얼: 타이머 어학 30분, 끝낸 할 일 포트폴리오 → 쓴 시간을 2시간으로 두면 어학 30 · 포트폴리오 90 */
+const eveningSplitApi = (categories: { id: string; name: string }[]): EveningApi => ({
+  fetchState: async () => ({
+    ok: true,
+    data: {
+      today: "2026-11-07",
+      day: "2026-11-07",
+      existing: null,
+      doneCategoryIds: categories.slice(1).map((c) => c.id),
+      timerByCategory: [{ categoryId: categories[0].id, minutes: 30 }],
+      categories,
+    },
+  }),
+  save: never,
+});
 const growthApi = (data: GrowthData): GrowthApi => ({
   fetchGrowth: async () => ({ ok: true, data }),
   fetchCategoryPage: async () => ({
@@ -182,6 +205,34 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "ratio-onboarding" || id === "ratio-onboarding-many") {
+    // 처음 설정: 시험이 「다음」을 두 번 눌러 3단계(처음 정한 비율)로 간다
+    return (
+      <Onboarding
+        api={settingsApi}
+        categories={id === "ratio-onboarding" ? CATEGORIES : MANY}
+        initialGoal={null}
+        initialRatios={[]}
+        initialNotify={SETTINGS.notify}
+        onDone={noop}
+      />
+    );
+  }
+  if (id === "me-ratio" || id === "me-ratio-many") {
+    // 내 정보 「비율 고치기」: 저장값의 합이 100이 아니어도(30·30) 합 100으로 열린다
+    const cats = id === "me-ratio" ? CATEGORIES : MANY;
+    const settings: SettingsData = { ...SETTINGS, ratios: cats.slice(0, 2).map((c) => ({ categoryId: c.id, percent: 30 })) };
+    return (
+      <Shell>
+        <MeScreen settings={settings} categories={cats} api={settingsApi} push={pushApi} onLogout={noop} />
+        <TabBar tabs={TABS} current="me" onSelect={noop} />
+      </Shell>
+    );
+  }
+  if (id === "evening-split" || id === "evening-split-many") {
+    const cats = id === "evening-split" ? CATEGORIES : MANY;
+    return <Opener render={(close) => <EveningRecord api={eveningSplitApi(cats)} onClose={close} />} />;
+  }
   if (id === "growth-empty") {
     return (
       <Shell>
@@ -221,7 +272,20 @@ export function V2Gallery({ id }: { id: string }) {
     <main style={{ padding: 16 }}>
       <h1>원샷 v2 화면 모음</h1>
       <ul>
-        {["tabbar", "growth-empty", "goal", "evening", "category", "detail"].map((s) => (
+        {[
+          "tabbar",
+          "growth-empty",
+          "goal",
+          "evening",
+          "category",
+          "detail",
+          "ratio-onboarding",
+          "ratio-onboarding-many",
+          "me-ratio",
+          "me-ratio-many",
+          "evening-split",
+          "evening-split-many",
+        ].map((s) => (
           <li key={s}>
             <a href={`/dev/v2?s=${s}`}>{s}</a>
           </li>

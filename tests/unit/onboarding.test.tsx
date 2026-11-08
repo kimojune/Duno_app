@@ -57,6 +57,8 @@ function mount(api: SettingsApi, categories = [{ id: C1, name: "어학" }, { id:
   return onDone;
 }
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole("button", { name }));
+/** 처음 정한 비율 목록의 숫자 칸 값들(분야 순서, 기타 맨 끝) */
+const shares = (...names: string[]) => names.map((n) => Number((screen.getByLabelText(`${n} 비율(%)`) as HTMLInputElement).value));
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -141,32 +143,35 @@ describe("처음 설정 (7-1, ①)", () => {
     expect((screen.getByLabelText("새 분야 이름") as HTMLInputElement).value).toBe("어학");
   });
 
-  it("비율은 고르게 나눈 값으로 시작하고 −/+ 5% 단추로 고치며, 합계가 숫자로 보인다", () => {
+  it("비율은 고르게 나눈 값(합 100)으로 시작하고, −/+ 5% 단추로 고쳐도 합이 100으로 남는다(줄인 몫은 뒤 줄로, 늘린 몫은 이웃에서)", () => {
     mount(fakeApi());
     click("다음");
     click("다음");
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    expect(screen.getAllByText("50%")).toHaveLength(2);
-    click("어학 5% 줄이기");
-    click("포트폴리오 5% 늘리기");
-    expect(screen.getByText("45%")).toBeTruthy();
-    expect(screen.getByText("55%")).toBeTruthy();
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
+    click("어학 5% 줄이기"); // 줄인 5%는 뒤 줄(포트폴리오)로
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([45, 55, 0]);
+    click("포트폴리오 5% 늘리기"); // 뒤 줄(기타)이 0이라 앞 줄(어학)에서
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([40, 60, 0]);
+    expect(screen.getByText("합계 100%")).toBeTruthy();
     click("고르게 나누기");
-    expect(screen.getAllByText("50%")).toHaveLength(2);
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
   });
 
-  it("비율이 모두 0이면 다음으로 못 간다", () => {
+  it("합 100 고정: 분야를 모두 0%까지 줄여도 몫이 기타로 가서 합이 0이 되지 않고, 다음 단계로 간다(PM 확정 11-08)", () => {
     mount(fakeApi());
     click("다음");
     click("다음");
-    for (let i = 0; i < 10; i++) {
-      click("어학 5% 줄이기");
-      click("포트폴리오 5% 줄이기");
-    }
-    expect(screen.getByText("합계 0%")).toBeTruthy();
+    for (let i = 0; i < 10; i++) click("어학 5% 줄이기");
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([0, 100, 0]);
+    expect((screen.getByRole("button", { name: "어학 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "포트폴리오 5% 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    for (let i = 0; i < 20; i++) click("포트폴리오 5% 줄이기");
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([0, 0, 100]);
+    expect(screen.getByText("합계 100%")).toBeTruthy();
     click("다음");
-    expect(screen.getByText("하나 이상은 0%보다 커야 해요.")).toBeTruthy();
-    expect(screen.getByText("4단계 중 3단계")).toBeTruthy();
+    expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
+    expect(screen.getByText("4단계 중 4단계")).toBeTruthy();
   });
 
   it("끝에서 허락하면 비율과 설정(알림 둘 켜짐, 처음 설정 마침)을 저장하고 결과를 넘긴다", async () => {
@@ -357,31 +362,32 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     expect(screen.getByRole("button", { name: "+ 글쓰기" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "+ 포트폴리오" })).toBeNull();
   });
-  it("비율 단계에는 고른 분야 줄 뒤에 기타 줄이 있고 처음에는 0%다. 합계에 기타가 들지 않는다", () => {
+  it("비율 단계에는 고른 분야 줄 뒤에 기타 줄이 있고 처음에는 0%다(분야끼리 균등 배분, 합 100)", () => {
     mount(fakeApi());
     click("다음");
     click("다음");
     expect(screen.getByRole("button", { name: "기타 5% 늘리기" })).toBeTruthy();
     expect((screen.getByRole("button", { name: "기타 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    expect(screen.getAllByText("0%")).toHaveLength(1); // 기타만 0%
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]); // 기타만 0%
   });
-  it("기타를 올리면 합계에 들고, 저장 목록에 categoryId null로 실린다. 「고르게 나누기」는 기타를 0%로 돌린다", async () => {
+  it("기타를 올리면 앞 줄에서 떼어 오고(합 100 그대로), 저장 목록에 categoryId null로 실린다. 「고르게 나누기」는 기타를 0%로 돌린다", async () => {
     const api = fakeApi();
     mount(api);
     click("다음");
     click("다음");
     click("기타 5% 늘리기");
     click("기타 5% 늘리기");
-    expect(screen.getByText("합계 110%")).toBeTruthy();
-    click("고르게 나누기");
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 40, 10]); // 기타는 맨 끝 줄이라 앞 줄(포트폴리오)에서
     expect(screen.getByText("합계 100%")).toBeTruthy();
+    click("고르게 나누기");
+    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
     click("기타 5% 늘리기");
     click("다음");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 50 },
-      { categoryId: C2, percent: 50 },
+      { categoryId: C2, percent: 45 },
       { categoryId: null, percent: 5 },
     ]);
   });

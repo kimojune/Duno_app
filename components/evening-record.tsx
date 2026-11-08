@@ -9,6 +9,8 @@ import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { addDays } from "../lib/week";
 import { useOverlayWindow } from "../lib/use-overlay-window";
+import { rescaleSplit } from "../lib/ratio-dial-calc";
+import { dialSliceColor, RatioDial, type DialSlice } from "./ratio-dial";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -19,6 +21,11 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  * - 저장하면 바로 「오늘 바뀐 분야별 시간」 한 줄을 보인다(값은 목표 대비가 아니라 바뀐 것). 그 줄을 누르면 상태보기로 간다.
  * - 저장할 때마다 저장 방식(미리 채운 그대로·고침·나누지 않음)·대상 날·저장 시각이 남는다(G9, 서버가 시각을 정한다).
  * - 오늘과 어제 중 대상 날을 고를 수 있다. 입력 모양은 PM이 써 보며 확정한다(임시: −/+ 단추와 숫자 칸).
+ * - 「분야마다 나누기」 위쪽에 원형 다이얼(고침4 2단계): 원 전체 = 쓴 시간, 조각 = 분야마다 분, 맨 끝 조각 = 기타(쓴 시간 − 나눈 합).
+ *   다이얼과 분야마다 Stepper는 같은 값을 쓴다(Stepper는 끌지 않는 길, WCAG 2.5.7). 손잡이 한 걸음은 minuteStep(5분), 끌기도 5분 단위.
+ *   나눈 합은 쓴 시간을 넘지 못한다(PM 확정 11-08): Stepper도 기타에 남은 만큼까지만 늘어난다. 쓴 시간 0분이면 다이얼을 그리지 않는다.
+ * - 나눈 뒤 앞 단계로 돌아가 쓴 시간을 고치면: 나눈 값을 고친 적이 없으면 새 쓴 시간으로 다시 미리 채우고,
+ *   고친 적이 있거나 이미 남긴 기록이면 비율을 지키며 5분 단위로 다시 나눈다(남는 것은 기타).
  * 연결이 끊기면 저장하지 않고(이번 범위는 할 일만 오프라인) 안내한다. 입력한 값은 그대로 둔다.
  */
 
@@ -42,6 +49,8 @@ export const EVENING_TEXT = {
   other: "기타",
   otherRemain: (m: number) => formatMinutes(m),
   raised: (m: number) => `나눈 시간이 합계보다 많아서 합계를 ${formatMinutes(m)}으로 맞춰 저장해요.`,
+  // 임시 글, 디자인 확정 뒤: 나누기 다이얼의 가운데 표시(아무 조각도 안 골랐을 때 = 쓴 시간)
+  dialCenter: (m: number) => formatMinutes(m),
   back: "이전",
   save: "저장",
   saving: "저장하는 중",
@@ -66,6 +75,11 @@ function composing(event: KeyboardEvent): boolean {
 }
 
 type Phase = "time" | "split" | "saved";
+
+/** 나누기 다이얼의 기타 조각 key(분야 id는 uuid라 겹치지 않는다) */
+const OTHER_KEY = "other";
+/** 나누기 다이얼의 PageUp/PageDown 한 걸음(분). 임시: minuteStep의 6배 = 30분 */
+const DIAL_BIG_STEP = APP_CONFIG.minuteStep * 6;
 
 export function EveningRecord({
   api,
@@ -93,6 +107,11 @@ export function EveningRecord({
   const [total, setTotal] = useState(0);
   const [perCategory, setPerCategory] = useState<Record<string, number>>({});
   const prefilledRef = useRef<EveningItem[]>([]);
+  /* 나눈 값(perCategory)이 맞춰져 있는 쓴 시간. null이면 아직 나누지 않았다(미리 채울 차례) */
+  const splitBaseRef = useRef<number | null>(null);
+  /* 나누기 단계에서 사용자가 값을 고쳤나(고친 값은 다시 미리 채우지 않는다) */
+  const editedRef = useRef(false);
+  const [dialPick, setDialPick] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [saved, setSaved] = useState<SavedEvening | null>(null);
@@ -113,11 +132,15 @@ export function EveningRecord({
       setTotal(existing.totalMinutes);
       setPerCategory(Object.fromEntries(existing.items.filter((i) => i.categoryId !== null).map((i) => [i.categoryId as string, i.minutes])));
       prefilledRef.current = existing.items;
+      splitBaseRef.current = existing.totalMinutes;
     } else {
       setTotal(timerSum); // 임시: 타이머 합을 총시간 처음 값으로
       setPerCategory({});
       prefilledRef.current = [];
+      splitBaseRef.current = null;
     }
+    editedRef.current = false;
+    setDialPick(state.categories[0]?.id ?? null);
     setLoad({ status: "ready", state });
   }, []);
 
@@ -157,11 +180,34 @@ export function EveningRecord({
   const timerSum = state ? state.timerByCategory.reduce((s, t) => s + t.minutes, 0) : 0;
   const built = buildItems(total, perCategory);
   const otherMinutes = built.items.find((i) => i.categoryId === null)?.minutes ?? 0;
+  // 나누기 다이얼: 보이는 분야 조각 + 맨 끝 기타. 보이지 않는 분야(이미 남긴 기록에만 있는 분야)의 분은 원에서 빼 둔다(저장에는 그대로 실린다)
+  const splitSum = Object.values(perCategory).reduce((s, m) => s + Math.max(0, m), 0);
+  const shownIds = new Set((state?.categories ?? []).map((c) => c.id));
+  const hiddenSum = Object.entries(perCategory).reduce((s, [id, m]) => s + (shownIds.has(id) ? 0 : Math.max(0, m)), 0);
+  const dialTotal = Math.max(0, total - hiddenSum);
+  const dialSlices: DialSlice[] = [
+    ...(state?.categories ?? []).map((c, i) => ({ key: c.id, name: c.name, color: dialSliceColor(i, false), value: perCategory[c.id] ?? 0 })),
+    { key: OTHER_KEY, name: EVENING_TEXT.other, color: dialSliceColor(0, true), value: Math.max(0, total - splitSum) },
+  ];
 
   function toSplit() {
     if (!state) return;
     setMessage("");
-    if (!state.existing) {
+    const base = splitBaseRef.current;
+    if (base !== null && (state.existing || editedRef.current)) {
+      // 이미 나눈 값이 있다: 쓴 시간이 바뀌었으면 비율을 지키며 5분 단위로 다시 나누고 남는 것은 기타(나눈 합 ≤ 쓴 시간)
+      if (base !== total) {
+        const ids = Object.keys(perCategory);
+        const next = rescaleSplit(
+          ids.map((id) => perCategory[id]),
+          base,
+          total,
+          APP_CONFIG.minuteStep,
+        );
+        setPerCategory(Object.fromEntries(ids.map((id, i) => [id, next[i]])));
+        splitBaseRef.current = total;
+      }
+    } else if (!state.existing) {
       const timer: Record<string, number> = {};
       let timerOther = 0;
       for (const t of state.timerByCategory) {
@@ -173,6 +219,8 @@ export function EveningRecord({
       const total2 = prefilled.reduce((s, i) => s + i.minutes, 0);
       setTotal(Math.max(total, total2));
       setPerCategory(Object.fromEntries(prefilled.filter((i) => i.categoryId !== null).map((i) => [i.categoryId as string, i.minutes])));
+      splitBaseRef.current = Math.max(total, total2);
+      editedRef.current = false;
     }
     setPhase("split");
   }
@@ -297,6 +345,25 @@ export function EveningRecord({
         {state && phase === "split" && (
           <div className="detail-section">
             <p className="todo-sub">{EVENING_TEXT.splitHint}</p>
+            {total > 0 && state.categories.length > 0 && (
+              <div className="evening-dial">
+                <RatioDial
+                  id="evening-dial"
+                  slices={dialSlices}
+                  total={dialTotal}
+                  step={APP_CONFIG.minuteStep}
+                  bigStep={DIAL_BIG_STEP}
+                  selectedKey={dialPick}
+                  onSelect={setDialPick}
+                  onChange={(values) => {
+                    editedRef.current = true;
+                    setPerCategory((prev) => ({ ...prev, ...Object.fromEntries(state.categories.map((c, i) => [c.id, values[i]])) }));
+                  }}
+                  format={formatMinutes}
+                  center={EVENING_TEXT.dialCenter(total)}
+                />
+              </div>
+            )}
             <ul className="ratio-list">
               {state.categories.map((c) => (
                 <li key={c.id} className="ratio-row">
@@ -305,9 +372,13 @@ export function EveningRecord({
                     label={c.name}
                     unit={EVENING_TEXT.minutes}
                     value={perCategory[c.id] ?? 0}
-                    max={APP_CONFIG.maxDayMinutes}
+                    // 나눈 합은 쓴 시간을 넘지 못한다: 이 분야는 기타에 남은 만큼까지만 늘어난다
+                    max={Math.max(0, total - (splitSum - (perCategory[c.id] ?? 0)))}
                     step={APP_CONFIG.minuteStep}
-                    onChange={(m) => setPerCategory((prev) => ({ ...prev, [c.id]: m }))}
+                    onChange={(m) => {
+                      editedRef.current = true;
+                      setPerCategory((prev) => ({ ...prev, [c.id]: m }));
+                    }}
                   />
                 </li>
               ))}

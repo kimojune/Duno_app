@@ -1,13 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { parseShare, setShare, startHundred } from "../lib/ratio-dial-calc";
 import type { RatioItem } from "../lib/settings/types";
 import { evenRatios, RATIO_STEP } from "../lib/settings/validation";
+import { dialSliceColor, RatioDial, type DialSlice } from "./ratio-dial";
 import { SecondaryButton } from "./ui";
 
 /**
  * 처음 정한 비율 입력(처음 설정 3단계와 내 정보 「비율 고치기」가 같이 쓴다).
- * 원형 다이얼 대신 분야마다 −/+ 단추(5% 단위)다: 끌지 않고도 넣을 수 있다(WCAG 2.5.7, 23 5-5 보기). 숫자를 숨기지 않고 합계도 보인다.
- * 합이 100이 아니어도 된다(앱이 합으로 나눠 읽는다). 모든 글은 React 텍스트로만 그린다.
+ * 위에 원형 다이얼, 아래에 분야마다 −/+ 단추(5% 단위)와 숫자 칸 목록이다. 셋은 같은 값과 같은 「고른 조각」을 쓴다.
+ * 끌지 않는 길이 늘 함께 있다(WCAG 2.5.7): 다이얼 손잡이의 화살표 키, −/+ 단추, 숫자 칸. 숫자를 숨기지 않고 합계도 보인다.
+ * 합은 늘 100이다(PM 확정 11-08). 열 때 저장값의 합이 100이 아니면 비율을 지켜 합 100의 정수로 맞추고(바깥 상태에도 바로 알린다),
+ * 모두 0이면 분야끼리 균등 배분(기타 0)으로 시작한다. −/+·숫자 칸은 고른 줄과 이웃끼리 주고받는다(setShare: 뒤 줄 먼저, 마지막 줄은 앞 줄).
+ * 모든 글은 React 텍스트로만 그린다. 숫자 칸 값은 0~100 정수로 읽은 뒤에만 쓴다.
  */
 
 export type RatioEntry = { id: string; name: string; percent: number };
@@ -38,52 +44,113 @@ export function entriesToRatios(entries: RatioEntry[]): RatioItem[] {
 
 export const RATIO_TEXT = {
   total: (n: number) => `합계 ${n}%`,
+  // 글은 지금 그대로(기존 시험이 이 글로 단추를 찾는다). 이름 기준(2026-10-13-feature-names)의 이름은 「균등 배분」 — 디자인 바퀴에서 맞춘다
   even: "고르게 나누기",
   minus: (name: string) => `${name} ${RATIO_STEP}% 줄이기`,
   plus: (name: string) => `${name} ${RATIO_STEP}% 늘리기`,
-  hint: "대략이면 돼요. 합이 100이 아니어도 비율로 읽어요. 나중에 고칠 수 있어요.",
+  // 임시 글, 디자인 확정 뒤: 숫자 칸의 접근성 이름(고침4 2단계)
+  field: (name: string) => `${name} 비율(%)`,
+  // 임시 글, 디자인 확정 뒤: 합 100 고정(PM 확정 11-08)으로 「합이 100이 아니어도 비율로 읽어요」가 거짓이 되어 바꿨다
+  hint: "대략이면 돼요. 합은 늘 100%로 맞춰져요. 나중에 고칠 수 있어요.",
 } as const;
 
-export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onChange: (next: RatioEntry[]) => void }) {
-  const total = entries.reduce((sum, e) => sum + e.percent, 0);
+/** 「고르게 나누기」와 모두 0에서 시작할 때의 값: 분야 n개를 5% 단위로 고르게(evenRatios와 같은 값) */
+const evenPercents = (count: number) => evenRatios(Array.from({ length: count }, (_, i) => String(i))).map((r) => r.percent);
 
-  function set(id: string, percent: number) {
-    onChange(entries.map((e) => (e.id === id ? { ...e, percent: Math.min(100, Math.max(0, percent)) } : e)));
+/** 숫자 칸: 쓰는 동안은 글 그대로 두고, 칸을 떠나거나 Enter를 누를 때 0~100 정수로 읽는다. 아니면(빈 칸·글자·소수·음수·100 넘음·붙여넣은 이상한 글) 이전 값으로 돌린다 */
+function ShareField({ id, label, value, onCommit }: { id: string; label: string; value: number; onCommit: (next: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  function commit() {
+    if (draft === null) return;
+    const next = parseShare(draft);
+    setDraft(null);
+    if (next !== null && next !== value) onCommit(next);
   }
-  // 「고르게 나누기」는 분야끼리 나눈다(기타 줄은 0%로 돌아간다: 기타를 비율에 넣는 것은 사용자가 고른 때만)
+  return (
+    <input
+      id={id}
+      className="input stepper-input ratio-field"
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      aria-label={label}
+      value={draft ?? String(value)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        }
+      }}
+    />
+  );
+}
+
+export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onChange: (next: RatioEntry[]) => void }) {
+  // 합 100 고정: 열 때(그리고 분야가 빠져 합이 바뀔 때) 합 100의 정수로 맞춘 값을 그리고, 바깥 상태에도 알린다(저장 값이 화면과 같게)
+  const raw = entries.map((e) => e.percent);
+  const categoryIdx = entries.flatMap((e, i) => (e.id === OTHER_RATIO_ID ? [] : [i]));
+  const shown = startHundred(raw, evenPercents, categoryIdx);
+  const needsFix = shown.some((v, i) => v !== raw[i]);
+  useEffect(() => {
+    if (needsFix) onChange(entries.map((e, i) => ({ ...e, percent: shown[i] })));
+  });
+  const total = shown.reduce((sum, v) => sum + v, 0);
+  // 고른 조각: 처음에는 첫 조각. 다이얼의 조각과 목록의 이름 단추가 같이 쓴다. 목록에 없는 id면 둘 다 아무것도 안 고른 것으로 보인다
+  const [selected, setSelected] = useState<string | null>(entries[0]?.id ?? null);
+  const slices: DialSlice[] = entries.map((e, i) => ({
+    key: e.id,
+    name: e.name,
+    color: dialSliceColor(i, e.id === OTHER_RATIO_ID),
+    value: shown[i],
+  }));
+  const withValues = (values: number[]) => entries.map((e, i) => ({ ...e, percent: values[i] }));
+
+  function set(i: number, percent: number) {
+    onChange(withValues(setShare(shown, i, percent, 100)));
+  }
+  // 「고르게 나누기」는 분야끼리 나눈다(기타 줄은 0%로 돌아간다: 기타를 비율에 넣는 것은 사용자가 고른 때만). 분야가 없으면 기타가 100%
   function even() {
-    const split = evenRatios(entries.filter((e) => e.id !== OTHER_RATIO_ID).map((e) => e.id));
-    onChange(entries.map((e) => ({ ...e, percent: e.id === OTHER_RATIO_ID ? 0 : (split.find((s) => s.categoryId === e.id)?.percent ?? 0) })));
+    onChange(withValues(startHundred(raw.map(() => 0), evenPercents, categoryIdx)));
   }
 
   return (
     <div className="ratio">
       <p className="todo-sub">{RATIO_TEXT.hint}</p>
+      <RatioDial id="ratio-dial" slices={slices} selectedKey={selected} onSelect={setSelected} onChange={(values) => onChange(withValues(values))} />
       <ul className="ratio-list">
-        {entries.map((e) => (
+        {entries.map((e, i) => (
           <li key={e.id} className="ratio-row">
-            <span className="ratio-name" id={`ratio-name-${e.id}`}>
+            <button
+              type="button"
+              className="ratio-name ratio-name-btn"
+              id={`ratio-name-${e.id}`}
+              aria-pressed={selected === e.id}
+              onClick={() => setSelected(selected === e.id ? null : e.id)}
+            >
               {e.name}
-            </span>
+            </button>
             <span className="ratio-control">
               <button
                 type="button"
                 className="btn btn-secondary ratio-btn"
                 aria-label={RATIO_TEXT.minus(e.name)}
-                disabled={e.percent <= 0}
-                onClick={() => set(e.id, e.percent - RATIO_STEP)}
+                disabled={shown[i] <= 0 || entries.length < 2}
+                onClick={() => set(i, shown[i] - RATIO_STEP)}
               >
                 −
               </button>
-              <output className="ratio-value" aria-labelledby={`ratio-name-${e.id}`}>
-                {e.percent}%
-              </output>
+              <ShareField id={`ratio-field-${e.id}`} label={RATIO_TEXT.field(e.name)} value={shown[i]} onCommit={(v) => set(i, v)} />
+              <span className="stepper-unit" aria-hidden="true">
+                %
+              </span>
               <button
                 type="button"
                 className="btn btn-secondary ratio-btn"
                 aria-label={RATIO_TEXT.plus(e.name)}
-                disabled={e.percent >= 100}
-                onClick={() => set(e.id, e.percent + RATIO_STEP)}
+                disabled={shown[i] >= 100 || entries.length < 2}
+                onClick={() => set(i, shown[i] + RATIO_STEP)}
               >
                 +
               </button>
