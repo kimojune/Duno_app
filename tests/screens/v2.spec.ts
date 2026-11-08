@@ -137,11 +137,53 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
     await shot(page, `growth-total-${size}`);
     await noHorizontalScroll(page, "총 시간");
-    // 고르는 단추는 누르는 면 높이 48 이상
+    // 고르는 단추는 누르는 면 높이 48 이상(--tap-min)
     const heights = await page.$$eval(".detail-chips .chip", (els) => els.map((el) => el.getBoundingClientRect().height));
-    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(48);
   });
 }
+
+// 비교 보기(D-093, 남겨 둔 보기): 분야 줄마다 이번 주·지난주·지난달·쌓인 것 나란히. 분야 50개·긴 이름에서도 가로로 넘치지 않는다
+for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
+  for (const state of ["growth-recent", "growth-many"]) {
+    test(`${state} ${size}: 비교 보기가 가로로 넘치지 않는다`, async ({ page }) => {
+      await open(page, state, size);
+      await page.getByRole("button", { name: "비교" }).click();
+      await expect(page.getByRole("button", { name: "비교" })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByRole("heading", { name: "분야마다 나란히" })).toBeVisible();
+      await expect(page.locator(".growth-compare")).toHaveCount(state === "growth-many" ? 51 : 4);
+      await shot(page, `${state}-compare-${size}`);
+      await noHorizontalScroll(page, "비교");
+      await insideViewport(page, ".growth-compare", "비교 줄");
+    });
+  }
+}
+
+// 키보드만: Tab으로 기간 → 보기 방식 단추를 차례로 지나고, Enter와 Space로 바뀐다(진짜 브라우저의 Tab 차례·키 동작)
+test("growth-recent 키보드: Tab으로 기간·보기 방식 단추를 차례로 지나고 Enter·Space로 바꾼다", async ({ page }) => {
+  await open(page, "growth-recent", "360x800");
+  const name = (n: string) => page.getByRole("button", { name: n, exact: true });
+  await name("최근 1주").focus();
+  for (const next of ["총 시간", "비교", "띠그래프", "원그래프", "분야별 줄 막대"]) {
+    await page.keyboard.press("Tab");
+    await expect(name(next)).toBeFocused();
+  }
+  await page.keyboard.press("Shift+Tab");
+  await expect(name("원그래프")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(name("원그래프")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("svg.growth-pie")).toHaveCount(2);
+  await expect(name("원그래프")).toBeFocused(); // 바꿔도 포커스가 단추에 그대로
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Space");
+  await expect(name("분야별 줄 막대")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".growth-bar")).toHaveCount(4);
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+Tab"); // 분야별 줄 막대 → 원그래프 → 띠그래프 → 비교
+  await expect(name("비교")).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(name("비교")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: "분야마다 나란히" })).toBeVisible();
+});
 
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
   test(`growth-empty ${size}: 기록 없음에서 보기를 바꿔도 가로로 넘치지 않는다`, async ({ page }) => {

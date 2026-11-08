@@ -105,15 +105,20 @@ export function GrowthScreen({
     const store = api.viewPref;
     if (!store) return;
     let alive = true;
+    // 기다리는 시간을 넘겨 이미 처음 값으로 그린 뒤에 온 값은 무시한다(읽고 있는 화면이 갑자기 다른 보기로 바뀌지 않게. 다음에 열 때 반영된다)
+    let late = false;
     const settle = () => {
       if (alive) setPrefReady(true);
     };
-    const timer = setTimeout(settle, PREF_WAIT_MS);
+    const timer = setTimeout(() => {
+      late = true;
+      settle();
+    }, PREF_WAIT_MS);
     Promise.resolve()
       .then(() => store.load())
       .then(
         (raw) => {
-          if (alive && !touchedRef.current) setPref(parseStatusPref(raw, VIEW_IDS));
+          if (alive && !late && !touchedRef.current) setPref(parseStatusPref(raw, VIEW_IDS));
         },
         () => {},
       )

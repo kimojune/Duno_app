@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GrowthData } from "../../lib/growth/types";
@@ -8,7 +6,13 @@ import type { GrowthApi } from "../../lib/growth-api";
 
 vi.mock("../../app/views/actions", () => ({ recordView: vi.fn(async () => ({ ok: true })) }));
 vi.mock("../../app/evening/actions", () => ({ saveEveningLog: vi.fn() }));
+// 조각 색을 정하는 곳(pieceColor) 호출을 가로챌 수 있게 감싼다(기본은 진짜 함수 그대로)
+vi.mock("../../lib/growth/piece-color", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../lib/growth/piece-color")>();
+  return { ...real, pieceColor: vi.fn(real.pieceColor) };
+});
 
+import { pieceColor } from "../../lib/growth/piece-color";
 import { GROWTH_TEXT, GrowthScreen } from "../../components/growth-screen";
 import { STATUS_VIEWS } from "../../components/growth-views";
 
@@ -173,11 +177,28 @@ describe("보기 방식 바꾸기", () => {
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(STATUS_VIEWS.map((v) => GROWTH_TEXT[v.label]));
   });
 
-  it("조각 색은 한 군데(pieceColor)에서만 정한다: 보기 부품에는 색 값이 직접 없다", () => {
-    const src = readFileSync(path.join(__dirname, "../../components/growth-views.tsx"), "utf8");
-    expect(src).not.toMatch(/var\(--/);
-    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect((src.match(/pieceColor\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
+  it("조각 색은 한 군데(pieceColor)에서만 정한다: 그 함수가 낸 색이 띠·원·줄 막대·색점에 그대로 쓰인다(동작 시험)", async () => {
+    const real = await vi.importActual<typeof import("../../lib/growth/piece-color")>("../../lib/growth/piece-color");
+    vi.mocked(pieceColor).mockImplementation(() => "rgb(1, 2, 3)");
+    try {
+      const { container } = await mount(fakeApi());
+      const colorsOf = (selector: string, prop: "background" | "fill") =>
+        Array.from(container.querySelectorAll<HTMLElement | SVGElement>(selector)).map((el) => (el as HTMLElement).style[prop]);
+      // 띠그래프: 띠 조각(처음 정한 비율 4 + 쓴 시간 1)과 분야 줄의 색점(분야 4 + 기타)
+      expect(colorsOf(".growth-band-seg", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
+      expect(colorsOf(".growth-dot", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
+      fireEvent.click(chip("원그래프"));
+      expect(colorsOf("svg.growth-pie path", "fill")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
+      expect(colorsOf(".growth-dot", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
+      fireEvent.click(chip("분야별 줄 막대"));
+      expect(colorsOf(".growth-bar-fill", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
+      // 분야와 자리가 함수에 넘어간다(자리는 받은 분야 순서, 기타는 null)
+      const calls = vi.mocked(pieceColor).mock.calls;
+      expect(calls.some(([id, index]) => id === C1 && index === 0)).toBe(true);
+      expect(calls.some(([id, index]) => id === null && index === 4)).toBe(true);
+    } finally {
+      vi.mocked(pieceColor).mockImplementation(real.pieceColor);
+    }
   });
 });
 
@@ -386,6 +407,43 @@ describe("기억한 기간·보기 방식", () => {
   });
 });
 
+describe("기억한 값이 늦게 올 때(기다리는 시간 800ms 넘김)", () => {
+  it("처음 값으로 이미 그렸고 사용자가 아직 안 골랐으면 늦게 온 값은 무시한다(읽고 있는 화면이 바뀌지 않는다). 다음에 열 때 반영된다", async () => {
+    let release: (v: unknown) => void = () => {};
+    const load = vi.fn(() => new Promise<unknown>((resolve) => (release = resolve)));
+    const { container } = render(<GrowthScreen api={fakeApi(data(), { load, save: async () => {} })} active activation={1} entry="self" onOpenCategory={vi.fn()} />);
+    await screen.findByRole("group", { name: GROWTH_TEXT.periodGroup }, { timeout: 3000 });
+    expect(pressed("최근 1주")).toBe("true");
+    expect(pressed("띠그래프")).toBe("true");
+    await act(async () => release({ period: "total", view: "rows" }));
+    expect(pressed("최근 1주")).toBe("true"); // 바뀌지 않는다
+    expect(pressed("띠그래프")).toBe("true");
+    expect(container.querySelector(".growth-band")).not.toBeNull();
+    expect(container.querySelector(".growth-bar")).toBeNull();
+  });
+  it("기다리는 시간 안에 오면 처음부터 그 값으로 그린다(위 시험과 대비)", async () => {
+    const load = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      return { period: "total", view: "rows" };
+    });
+    await mount(fakeApi(data(), { load, save: async () => {} }));
+    expect(pressed("총 시간")).toBe("true");
+    expect(pressed("분야별 줄 막대")).toBe("true");
+  });
+});
+
+describe("목표가 있는 주의 기준(임시, 결정 대기: 임시값.md ③-1)", () => {
+  it("놓친 분야 문장은 처음 정한 비율·최근 1주 기준 그대로이고, 채울 시간은 목표·이번 주 기준이라 분야가 다를 수 있다", async () => {
+    await mount(fakeApi(data({ goal: { weekStart: "2026-11-02", items: [{ categoryId: C4, minutes: 120 }] } })));
+    // 채울 시간: 목표 기준 — 글쓰기 목표 120분을 이번 주(0분)와 견줌
+    expect(screen.getByText("이번 주 목표 기준")).toBeTruthy();
+    expect(within(document.querySelector(".growth-short") as HTMLElement).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["글쓰기 2시간"]);
+    // 놓친 분야 문장: 목표를 안 보고 처음 정한 비율·최근 1주 기준 — 가장 덜 쓴 포트폴리오
+    expect(screen.getByText("「포트폴리오」 시간을 채울 수 있어요")).toBeTruthy();
+    expect(screen.queryByText("「글쓰기」 시간을 채울 수 있어요")).toBeNull();
+  });
+});
+
 describe("접근성", () => {
   it("기간·보기 방식 고르기는 이름 있는 묶음 안의 실제 단추이고 누름 상태(aria-pressed)로 지금 값을 알린다", async () => {
     await mount(fakeApi());
@@ -405,6 +463,14 @@ describe("접근성", () => {
     expect(pie.getAttribute("tabindex")).toBeNull();
     fireEvent.click(pie);
     expect(pressed("원그래프")).toBe("true");
+  });
+
+  it("키보드 차례: 기간 셋 → 보기 방식 셋 → 분야 줄 순서로 문서 차례대로 이어지고, 건너뛰는 단추나 tabindex가 없다(Enter·Space는 진짜 브라우저 시험 screens의 growth-recent에서)", async () => {
+    const { container } = await mount(fakeApi());
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>(".growth-body button"));
+    expect(buttons.slice(0, 6).map((b) => b.textContent)).toEqual(["최근 1주", "총 시간", "비교", "띠그래프", "원그래프", "분야별 줄 막대"]);
+    expect(buttons.slice(6, 11).map((b) => b.querySelector(".growth-name")?.textContent)).toEqual(["어학", "포트폴리오", "CS 공부", "글쓰기", "기타"]);
+    expect(buttons.every((b) => !b.disabled && !b.hasAttribute("tabindex"))).toBe(true);
   });
 
   it("그림 요소는 글로 읽히지 않게 숨기고(aria-hidden) 색점도 장식이다", async () => {

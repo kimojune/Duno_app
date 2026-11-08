@@ -90,6 +90,36 @@ describe("기억한 보기 방식은 이 기기·이 사용자에 한정된다",
     expect(rt.pendingCount()).toBe(0);
   });
 
+  it("setPref 직후 wipe(로그아웃)해도 pref/가 남지 않는다: 아직 끝나지 않은 쓰기를 기다린 뒤 지운다(진행 중 쓰기와 지움의 경쟁)", async () => {
+    // 실제 IndexedDB처럼 쓰기가 늦게 끝나는 저장소: set은 한 박자 늦게 반영되고, keys는 그 시점의 열쇠만 본다
+    const inner = createMemoryKv();
+    const slow: KvStore = {
+      ...inner,
+      set: (key, value) => new Promise<void>((resolve) => setTimeout(() => void inner.set(key, value).then(resolve), 20)),
+    };
+    const rt = makeRuntime(USER, slow);
+    const writing = rt.setPref(STATUS_PREF_NAME, { period: "total", view: "pie" }); // 기다리지 않는다
+    await rt.wipe(); // 쓰기가 끝나기 전에 로그아웃
+    await writing;
+    expect(await inner.keys("pref/")).toEqual([]);
+    expect(await rt.getPref(STATUS_PREF_NAME)).toBeUndefined();
+  });
+
+  it("쓰기를 여러 번 부른 직후 wipe해도 모두 지워진다", async () => {
+    const inner = createMemoryKv();
+    const slow: KvStore = {
+      ...inner,
+      set: (key, value) => new Promise<void>((resolve) => setTimeout(() => void inner.set(key, value).then(resolve), 10)),
+    };
+    const rt = makeRuntime(USER, slow);
+    void rt.setPref(STATUS_PREF_NAME, { period: "recent", view: "band" });
+    void rt.setPref("other-pref", { x: 1 });
+    void rt.setPref(STATUS_PREF_NAME, { period: "total", view: "rows" });
+    await rt.wipe();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(await inner.keys("pref/")).toEqual([]);
+  });
+
   it("저장소가 읽기·쓰기에 실패해도(사생활 창 등) 던지지 않고 읽기는 undefined", async () => {
     const broken: KvStore = {
       persistent: false,

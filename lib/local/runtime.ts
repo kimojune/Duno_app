@@ -79,6 +79,8 @@ export function createRuntime(deps: RuntimeDeps) {
   let stopped = false;
   /** wipe로 이 사용자의 기기 저장소를 지웠다: 그 뒤로는 아무것도 다시 적지 않는다(닫히며 거울을 적는 것이 지운 것을 되살리지 않게) */
   let wiped = false;
+  /** 아직 끝나지 않은 고른 값 쓰기들. wipe가 이것들이 끝난 뒤에 지워서, 로그아웃 직후에 늦게 반영되는 쓰기가 pref/를 남기지 않게 한다 */
+  const prefWrites = new Set<Promise<void>>();
   let authLost = false;
   /** 마지막으로 서버가 거절해 되돌린 것들(화면이 알림을 보이고 닫을 때까지 쌓인다) */
   let rejections: Rejection[] = [];
@@ -380,6 +382,7 @@ export function createRuntime(deps: RuntimeDeps) {
     queue = [];
     base = emptyMirror();
     view = base;
+    await Promise.allSettled([...prefWrites]);
     await wipeUser(kv, userKey);
     emit();
     emitState();
@@ -402,9 +405,12 @@ export function createRuntime(deps: RuntimeDeps) {
     wipe,
     /** 화면이 기억하는 고른 값 읽기·쓰기(이 사용자 열쇠 한 칸). 실패는 던지지 않고(읽기는 undefined, 쓰기는 조용히 건너뜀), 지운(wipe) 뒤에는 다시 적지 않는다 */
     getPref: (name: string): Promise<unknown> => safe(() => kv.get<unknown>(kvKeys.pref(userKey, name))),
-    setPref: async (name: string, value: unknown): Promise<void> => {
-      if (wiped) return;
-      await safe(() => kv.set(kvKeys.pref(userKey, name), value));
+    setPref: (name: string, value: unknown): Promise<void> => {
+      if (wiped) return Promise.resolve();
+      const write = safe(() => kv.set(kvKeys.pref(userKey, name), value)).then(() => {});
+      prefWrites.add(write);
+      void write.finally(() => prefWrites.delete(write));
+      return write;
     },
     wipeOthers: () => wipeOtherUsers(kv, userKey),
     /** 지금 화면이 볼 거울(서버 거울에 보낼 줄을 입힌 것) */
