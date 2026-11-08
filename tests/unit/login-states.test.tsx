@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginButton } from "../../components/login-button";
+import { COLOR_TOKENS, FONT_TOKENS, SIZE_TOKENS } from "../../lib/design-tokens";
 import { LOGIN_TEXT, noticeFromErrorParam } from "../../lib/login-text";
 
 const signInWithOAuth = vi.fn();
@@ -124,31 +125,16 @@ describe("noticeFromErrorParam (D2)", () => {
 describe("토큰·단추 값 (명세 2-1, 2-4)", () => {
   const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
   it("명세 2-1 토큰 값이 그대로 있고, 빠졌던 --color-secondary-pressed가 더해졌다", () => {
-    const expected: Record<string, string> = {
-      "--color-bg": "#FAFAF7",
-      "--color-surface": "#FFFFFF",
-      "--color-text": "#1C1C1A",
-      "--color-text-sub": "#5C5B55",
-      "--color-primary": "#2F5D50",
-      "--color-primary-pressed": "#24493F",
-      "--color-secondary-pressed": "#E3E1D9",
-      "--color-on-primary": "#FFFFFF",
-      "--color-border-input": "#7A7972",
-      "--color-border-check": "#5C5B55",
-      "--color-divider": "#E6E4DD",
-      "--color-notice-bg": "#EFEDE6",
-      "--color-skeleton": "#E6E4DD",
-      "--tap-min": "48px",
-      "--page-x": "16px",
-      "--page-max": "480px",
-    };
+    // 기대값은 lib/design-tokens.ts 한 출처에서 읽는다. 디자인 값이 오면 그 표와 globals.css만 바꾸면 이 시험이 그대로 통과한다.
+    // 여전히 globals.css의 각 토큰이 표의 값과 정확히 같은지 본다(같은 줄 모양 `이름: 값;`).
+    const expected: Record<string, string> = { ...COLOR_TOKENS, ...SIZE_TOKENS };
+    expect(Object.keys(expected).length, "표가 비지 않았다").toBeGreaterThanOrEqual(16);
     for (const [name, value] of Object.entries(expected)) {
       expect(css, name).toContain(`${name}: ${value};`);
     }
-    expect(css).toContain("--font-name: 700 32px/40px");
-    expect(css).toContain("--font-title: 700 24px/32px");
-    expect(css).toContain("--font-body: 400 16px/24px");
-    expect(css).toContain("--font-sub: 400 14px/20px");
+    for (const name of ["--font-name", "--font-title", "--font-body", "--font-sub"] as const) {
+      expect(css, name).toContain(`${name}: ${FONT_TOKENS[name]};`);
+    }
   });
 
   it("단추·입력·할 일 줄에 고정 height가 없고(min-height만), 노랑 알림 색이 없다 (D12)", () => {

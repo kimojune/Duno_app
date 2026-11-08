@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { COLOR_TOKENS } from "../../lib/design-tokens";
 
 /**
  * 상태별 스크린샷과 치수 확인(디자인 명세 12-13 방향 C). 개발 서버(next dev, 3200 포트)에서만 돈다: npm run screens
@@ -28,6 +29,14 @@ const TEXT200_CSS = `:root{
   --font-sub: 400 28px/40px var(--font-family);
   --font-google: 500 28px/40px var(--font-family);
 }`;
+
+/** 출처 표(lib/design-tokens.ts)의 hex를 브라우저 계산값 모양 `rgb(r, g, b)`로 */
+function hexToRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
+/** 고른 칩 면이 칠해져야 하는 색 = 주색 토큰의 출처 값. 디자인 값이 오면 출처 표만 바꾸면 된다 */
+const PRIMARY_RGB = hexToRgb(COLOR_TOKENS["--color-primary"]);
 
 /** 12-6 C26의 「창 높이가 보이는 화면의 3분의 2(임시)」. components/todo-view.tsx SHEET_REVIEW_MAX_RATIO와 같은 값 */
 const SHEET_REVIEW_MAX_RATIO = 2 / 3;
@@ -274,13 +283,23 @@ for (const state of C_STATES) {
             }),
           );
           measurements[`${name}-chips`] = chips;
+          // 브라우저가 푼 --color-primary가 출처 표의 값과 같다(globals.css가 표에서 벗어나지 않았다)
+          const tokenRgb = await page.evaluate(() => {
+            const probe = document.createElement("i");
+            probe.style.background = "var(--color-primary)";
+            document.body.appendChild(probe);
+            const value = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return value;
+          });
+          expect(tokenRgb, "--color-primary 계산값").toBe(PRIMARY_RGB);
           for (const c of chips) {
             expect(c.w, `${c.label} 폭`).toBeGreaterThanOrEqual(48);
             expect(c.h, `${c.label} 높이`).toBeGreaterThanOrEqual(48);
             expect(c.faceH, `${c.label} 보이는 면 높이`).toBeGreaterThanOrEqual(32);
             if (c.pressed !== null) {
               expect(c.pressed === "true").toBe(c.check);
-              expect(c.bg === "rgb(47, 93, 80)").toBe(c.pressed === "true"); // 고름 = 주색 면
+              expect(c.bg === PRIMARY_RGB).toBe(c.pressed === "true"); // 고름 = 주색 토큰의 값으로 칠한 면
             }
           }
         }

@@ -1,4 +1,6 @@
-/* 디자인 명세 2-1 토큰을 값 그대로 옮김(임시 값 포함). 뜻이 바뀌면 명세를 먼저 고친다. */
+/* 디자인 명세 2-1 토큰을 값 그대로 옮김(임시 값 포함). 뜻이 바뀌면 명세를 먼저 고친다.
+   값의 한 출처는 lib/design-tokens.ts다. 여기 :root의 값을 바꾸면 그 표도 같이 바꾼다(tests/unit/design-tokens.test.ts가 같은지 본다).
+   :root 밖에서는 색 hex를 쓰지 않는다(Google 단추만 Google 지침 값). public/offline.html의 :root도 같은 값이다. */
 :root {
   /* 색 (임시) */
   --color-bg: #FAFAF7;
@@ -14,6 +16,17 @@
   --color-divider: #E6E4DD;
   --color-notice-bg: #EFEDE6;
   --color-skeleton: #E6E4DD;
+
+  /* 분야 색(자리값). 임시, 디자인 확정 뒤 바꾼다. 번호는 분야 순서 0부터 1~8, 9번째부터 다시 1(lib/category-color.ts). 기타는 따로 */
+  --color-category-1: #2F5D50;
+  --color-category-2: #24493F;
+  --color-category-3: #5C5B55;
+  --color-category-4: #7A7972;
+  --color-category-5: #1C1C1A;
+  --color-category-6: #E3E1D9;
+  --color-category-7: #EFEDE6;
+  --color-category-8: #E6E4DD;
+  --color-category-other: #7A7972;
 
   /* 글자 — 한 화면에 크기 셋 */
   --font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif;

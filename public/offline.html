@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>duno</title>
 <style>
+/* :root의 값은 lib/design-tokens.ts와 같아야 한다(정적 파일이라 그 모듈을 못 읽는다. tests/unit/design-tokens.test.ts가 같은지 본다).
+   값을 바꿀 때는 그 표와 app/globals.css :root도 같이 바꾼다. :root 밖에서는 색 hex를 쓰지 않는다. */
 :root{
   --color-bg:#FAFAF7;--color-text:#1C1C1A;--color-text-sub:#5C5B55;
   --color-primary:#2F5D50;--color-primary-pressed:#24493F;--color-on-primary:#FFFFFF;--color-notice-bg:#EFEDE6;
