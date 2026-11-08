@@ -84,6 +84,8 @@ const C_STATES: { id: string; sheets: Sheet[]; sizes?: SizeTag[] }[] = [
   { id: "C27", sheets: OPEN, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
   { id: "C28", sheets: OPEN, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
   { id: "C29", sheets: CLOSED, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
+  { id: "C30", sheets: CLOSED, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
+  { id: "C31", sheets: CLOSED, sizes: ["360x640", "360x800", "320x640", "text200-sim"] },
   { id: "C26", sheets: OPEN, sizes: ["360x640", "360x800", "text200-sim"] },
   // 5절 T 상태를 C로 읽은 것
   { id: "T5", sheets: OPEN },
@@ -524,6 +526,38 @@ test("C5·T5 적는 중: 할 일 칸 포커스 (키보드 없음 — 키보드�
   await expect(page.getByRole("textbox", { name: "할 일 적기" })).toBeFocused();
   await shot(page, "C5-focus-nokeyboard-open-360x640", false);
 });
+
+// 고침 4바퀴 고침1: 먼저 할 일 카드가 오기 전 자리(.slot-card)와 카드의 높이를 같은 크기에서 잰다.
+// 둘의 차이가 카드가 왔을 때 목록이 밀리는 양이다. 동작은 안 바꿨고 **지금 값을 상한으로** 단언한다(더 커지면 깨진다).
+// 줄이는 방법(카드를 한 줄로 줄일지)은 결정 대기: docs/oneshot-v2/임시값.md 「고침 4바퀴」 절.
+const SLOT_VS_CARD_BOUNDS: Record<SizeTag, { slot: number; card: number; longCard: number }> = {
+  // 측정(고침1 시점): 자리 56 · 카드 84 · 글 200자 카드 280(360 폭) / 304(320 폭). 글자 200%는 56 · 210 · 882
+  "360x640": { slot: 56, card: 84, longCard: 280 },
+  "360x800": { slot: 56, card: 84, longCard: 280 },
+  "320x640": { slot: 56, card: 84, longCard: 304 },
+  "text200-sim": { slot: 56, card: 210, longCard: 882 },
+};
+for (const size of ["360x640", "360x800", "320x640", "text200-sim"] as SizeTag[]) {
+  test(`카드 자리와 카드 높이 ${size}: 자리(.slot-card)·먼저 할 일 카드·먼저 할 일 글 200자 카드를 같은 크기에서 잰다`, async ({ page }) => {
+    const heightOf = async (selector: string) => (await page.locator(selector).first().boundingBox())!.height;
+    await open(page, "/dev/states?s=C30&sheet=closed", size);
+    const slot = await heightOf(".slot-card");
+    await open(page, "/dev/states?s=C29&sheet=closed", size);
+    const card = await heightOf('.entry-card[aria-label="오늘 먼저 할 일"]');
+    await open(page, "/dev/states?s=C31&sheet=closed", size);
+    const longCard = await heightOf('.entry-card[aria-label="오늘 먼저 할 일"]');
+    const longSw = await scrollSizes(page);
+    await shot(page, `C31-long-offer-${size}`, false);
+    const result = { slot, card, longCard, shiftWhenCardArrives: card - slot, shiftWhenLongCardArrives: longCard - slot };
+    measurements[`slot-vs-card-${size}`] = result;
+    const bound = SLOT_VS_CARD_BOUNDS[size];
+    expect(slot, "자리 높이").toBeLessThanOrEqual(bound.slot + 0.5);
+    expect(card, "먼저 할 일 카드 높이").toBeLessThanOrEqual(bound.card + 0.5);
+    expect(longCard, "먼저 할 일 글 200자 카드 높이").toBeLessThanOrEqual(bound.longCard + 0.5);
+    expect(longCard, "글이 길면 카드가 짧은 카드보다 낮을 수 없다(측정 확인)").toBeGreaterThanOrEqual(card - 0.5);
+    expect(longSw.scrollWidth, "먼저 할 일 글이 길어도 가로로 넘치지 않는다").toBeLessThanOrEqual(longSw.clientWidth);
+  });
+}
 
 test("C24 칩에 키보드 포커스가 가면 그 칩이 보이게 칩 줄이 세로로 밀린다", async ({ page }) => {
   await open(page, "/dev/states?s=C24", "360x640");

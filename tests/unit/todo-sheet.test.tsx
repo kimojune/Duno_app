@@ -1225,6 +1225,16 @@ describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 �
     renderScreen(read([], many));
     open();
     expect(document.activeElement).toBe(todoInput());
+    // 칩을 누른 뒤에도 포커스는 그 칩에 머문다(글 칸으로 옮기지 않는다). 브라우저가 누른 단추에 주는 포커스를 그대로 흉내 낸다
+    const second = chip("분야2");
+    second.focus();
+    fireEvent.click(second);
+    expect(second.getAttribute("aria-pressed")).toBe("true");
+    expect(document.activeElement).toBe(second);
+    // 같은 칩을 다시 눌러 고름을 풀어도 포커스는 그 칩이다
+    fireEvent.click(second);
+    expect(second.getAttribute("aria-pressed")).toBe("false");
+    expect(document.activeElement).toBe(second);
   });
 });
 
@@ -1235,7 +1245,10 @@ describe("고침 4바퀴: 목록 위 카드는 한 줄 줄(CSS)", () => {
     expect(entry).toContain("display: flex");
     expect(entry).toMatch(/flex-wrap:\s*wrap/);
     expect(/\.entry-card\s*>\s*\.btn\s*\{[^}]*margin-left:\s*auto/.test(css)).toBe(true);
-    expect(/\.slot-card\s*\{[^}]*min-height:\s*calc\(var\(--tap-min\)\s*\+\s*var\(--space-2\)\)/.test(css)).toBe(true);
+    // 자리(.slot-card)의 높이와 카드의 높이는 CSS 글자가 아니라 화면 사진 측정이 근거다:
+    // tests/screens/screens.spec.ts 「카드 자리와 카드 높이」(자리 56 · 카드 84 · 글 200자 카드 280을 같은 크기에서 재어 상한으로 단언).
+    // 자리에 min-height 규칙이 있다는 것만 여기서 본다(tests/unit/ui-polish.test.tsx도 같은 것을 본다).
+    expect(/\.slot-card\s*\{[^}]*min-height:/.test(css)).toBe(true);
   });
 });
 
@@ -1249,8 +1262,13 @@ describe("고침 4바퀴 시나리오 ① 처음 쓰는 사람: 분야가 하나
     const ids = [...form.querySelectorAll<HTMLElement>("button, input")].map((el) => el.id || el.textContent);
     expect(ids).toEqual(["sheet-close", "todo-input", "적기", "취업 준비", "add-category-chip"]);
     expect(chipGroup().classList.contains("chip-row")).toBe(true);
-    // 고르고 적으면 그 분야가 붙는다(입력 방향은 그대로)
+    // 고르고 적으면 그 분야가 붙는다(입력 방향은 그대로): 칩을 고르고 글을 쓰고 「적기」를 누르면 할 일 더하기 호출에 그 분야 번호가 실려 간다
+    addTodo.mockReturnValue(new Promise(() => {}));
     fireEvent.click(chip("취업 준비"));
     expect(chip("취업 준비").getAttribute("aria-pressed")).toBe("true");
+    typeTodo("이력서 첫 줄 고치기");
+    pressWrite();
+    expect(addTodo).toHaveBeenCalledTimes(1);
+    expect(addTodo.mock.calls[0]).toEqual([expect.any(String), "이력서 첫 줄 고치기", CAT_WORK]);
   });
 });
