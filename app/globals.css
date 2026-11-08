@@ -411,6 +411,24 @@ button, input { font: inherit; color: inherit; }
 .ratio-value { min-width: 3.5em; text-align: center; font: var(--font-body); }
 .ratio-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); }
 .ratio-total { margin: 0; font: var(--font-body); }
+/* ---- 원샷 v2 고침4: 원형 다이얼 (1단계. 색은 지금 토큰만, 크기는 임시 — 2단계에서 디자인 명세 값으로 바꾼다) ---- */
+.ratio-dial { display: flex; flex-direction: column; align-items: center; margin: var(--space-3) 0; }
+.dial { display: block; width: 100%; max-width: 240px; }
+.dial-slice { stroke: var(--color-surface); stroke-width: 1; cursor: pointer; }
+.dial-rim { fill: none; stroke: var(--color-text); stroke-width: 3; pointer-events: none; }
+.dial-hole { fill: var(--color-surface); pointer-events: none; }
+.dial-noon { stroke: var(--color-text); stroke-width: 2; }
+.dial-center-name { font: var(--font-sub); fill: var(--color-text-sub); pointer-events: none; }
+.dial-center-value { font: var(--font-body); fill: var(--color-text); pointer-events: none; }
+.dial-center-unit { font: var(--font-sub); fill: var(--color-text-sub); }
+.dial-handle { touch-action: none; cursor: grab; }
+.dial-handle.dragging { cursor: grabbing; }
+.dial-ring { fill: var(--color-surface); stroke: var(--color-text); stroke-width: 2; }
+.dial-hit { fill: transparent; }
+.dial-knob { fill: var(--color-surface); stroke: var(--color-border-input); stroke-width: 1; }
+.dial-changes { margin: var(--space-1) 0 0; min-height: 20px; font: var(--font-sub); color: var(--color-text-sub); text-align: center; overflow-wrap: anywhere; }
+.ratio-name-btn { min-width: 0; min-height: var(--tap-min); padding: 0; border: 0; background: none; text-align: start; cursor: pointer; }
+.ratio-name-btn[aria-pressed="true"] { font-weight: 700; }
 .notify-row { margin-top: var(--space-4); }
 .notify-toggle { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap-min); }
 .notify-toggle input { flex: none; inline-size: 24px; block-size: 24px; margin: 0; }
