@@ -205,7 +205,7 @@ describe("스킬 검토 O-12 · O-10(PM d-150)", () => {
     for (const sel of [".growth-card-title", ".growth-card-total", "\n.growth-row-value", ".growth-seg-label", ".growth-pie-text"]) expect(rule(sel)).toContain("font-variant-numeric: tabular-nums");
     const group = css.match(/\n([^\n{]*\.growth-goal-of[^{]*)\{ font-variant-numeric: tabular-nums; \}/);
     expect(group).not.toBeNull();
-    for (const sel of [".growth-goal-of", ".growth-week-zero", ".growth-streak", ".growth-dl dd", ".growth-compare .todo-sub"]) expect(group![1]).toContain(sel);
+    for (const sel of [".growth-goal-of", ".growth-week-zero", ".growth-streak"]) expect(group![1]).toContain(sel);
   });
 });
 
@@ -250,21 +250,20 @@ describe("기간 칩 하나(메뉴 단추) — 열기·고르기·키보드·Esc
     fireEvent.keyDown(menu, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(menu, { key: "ArrowDown" });
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(items[0]); // 끝에서 돌아감
+    expect(document.activeElement).toBe(items[0]); // 끝에서 돌아감(항목 둘: 이번 주 · 총 시간)
     fireEvent.keyDown(menu, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(menu, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(menu, { key: "End" });
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(menu, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(chip());
     expect(chip().textContent).toBe("이번 주 ▾"); // Esc는 고르지 않는다
     fireEvent.keyDown(chip(), { key: "ArrowUp" });
     items = screen.getAllByRole("menuitemradio");
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[1]);
     // Tab은 목록을 닫는다(포커스는 브라우저가 다음 자리로)
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
     expect(screen.queryByRole("menu")).toBeNull();
@@ -290,14 +289,14 @@ describe("기간 칩 하나(메뉴 단추) — 열기·고르기·키보드·Esc
     const pref: Pref = { load: async () => stored, save: async (v) => void (stored = v) };
     const view = await mount(data({ goal: null }), pref);
     fireEvent.click(chip());
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "비교" }));
-    await waitFor(() => expect(stored).toEqual({ period: "compare", periodWeek: WEEK, view: "band", tab: null, tabWeek: null }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "총 시간" }));
+    await waitFor(() => expect(stored).toEqual({ period: "total", periodWeek: WEEK, view: "band", tab: null, tabWeek: null }));
     view.unmount();
     cleanup();
     await mount(data({ goal: null }), pref);
-    expect(chip().getAttribute("aria-label")).toBe("기간, 비교");
+    expect(chip().getAttribute("aria-label")).toBe("기간, 총 시간");
     fireEvent.click(chip());
-    expect(screen.getAllByRole("menuitemradio").map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "false", "true"]);
+    expect(screen.getAllByRole("menuitemradio").map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "true"]);
   });
 
   it("고침7 빈 상태 규칙 그대로: 이번 주 0시간 + 쌓인 것 있음 → 칩이 「총 시간」으로 시작", async () => {
@@ -346,9 +345,10 @@ describe("보기 단추 자리 · 목록 「›」 · 줄 사이 선", () => {
     expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타", d);
   });
 
-  it("CSS: 목표 뷰·비율 뷰 줄 사이 선 없음(비교만), 비율 뷰는 범례 아래 선 하나", () => {
+  it("CSS: 목표 뷰·비율 뷰 줄 사이 선 없음(「비교」 보기는 d-171로 없어졌다), 비율 뷰는 범례 아래 선 하나", () => {
     expect(css).not.toMatch(/(^|\n)\.growth-item \{[^}]*border-bottom/);
-    expect(rule(".growth-list.is-compare .growth-item")).toContain("border-bottom: 1px solid var(--color-divider)");
+    expect(css).not.toContain("is-compare");
+    expect(css).not.toContain(".growth-compare");
     expect(rule(".growth-graph + .growth-list")).toContain("border-top: 1px solid var(--color-divider)");
     expect(rule(".growth-chevron")).toContain("color: var(--color-text-sub)");
   });

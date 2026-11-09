@@ -450,7 +450,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
 });
 
 describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
-  it("카드 머리 한 줄: 합계 「20시간」 · 기간 칩 하나 「이번 주 ▾」(이번 주 / 총 시간 / 비교) · 오른쪽 끝 보기 바꾸기 글 단추(칩 아님) — 고침9, Figma 50:208·50:212·60:8", async () => {
+  it("카드 머리 한 줄: 합계 「20시간」 · 기간 칩 하나 「이번 주 ▾」(이번 주 / 총 시간) · 오른쪽 끝 보기 바꾸기 글 단추(칩 아님) — 고침9, Figma 50:208·50:212·60:8", async () => {
     const { container } = await mount(fakeApi(noGoal()));
     const head = container.querySelector<HTMLElement>(".growth-card-head")!;
     expect(head.querySelector(".growth-card-total")?.textContent).toBe("20시간");
@@ -459,7 +459,7 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
     expect(c.textContent).toBe("이번 주 ▾");
     expect(c.querySelector("[aria-hidden='true']")?.textContent).toBe(" ▾");
     expect(period()).toBe("이번 주");
-    expect(periodOptions()).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(periodOptions()).toEqual(["이번 주", "총 시간"]);
     // 기간 알약 셋(옛 판)은 없다
     expect(container.querySelector("[aria-pressed]")).toBeNull();
     expect(screen.queryByRole("group", { name: GROWTH_TEXT.periodGroup })).toBeNull();
@@ -577,20 +577,16 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
     expect(Array.from(container.querySelectorAll(".growth-pie-box .growth-line-caption")).map((el) => el.textContent)).toEqual(["목표 비율", "총 시간"]);
   });
 
-  it("비교(D-093, 결정 대기): 꼴은 그대로 이번 주·지난주·지난달·총 시간 나란히, 보기 바꾸기 단추는 숨는다(「쌓인 것」 없음)", async () => {
+  it("고침10 H(d-171): 「비교」 기간이 없다 — 칩 목록은 이번 주 · 총 시간 둘, 비교 목록 꼴도 없고 보기 바꾸기 단추는 두 기간 모두 있다", async () => {
     const { container } = await mount(fakeApi(noGoal()));
-    pick("비교");
-    expect(period()).toBe("비교");
-    expect(screen.queryByRole("heading", { name: "분야마다 나란히" })).toBeNull(); // 고침9: 카드 위 머리 줄 없앰
-    expect(container.querySelectorAll(".growth-list.is-compare .growth-item")).toHaveLength(5);
-    const language = screen.getByRole("button", { name: /^어학/ });
-    expect(within(language).getByText("이번 주").nextSibling?.textContent).toBe("2시간");
-    expect(within(language).getByText("지난주").nextSibling?.textContent).toBe("1시간");
-    expect(within(language).getByText("총 시간").nextSibling?.textContent).toBe("20시간");
-    expect(container.textContent).not.toContain("쌓인 것");
-    expect(screen.queryByRole("button", { name: "원그래프로 보기" })).toBeNull();
-    pick("이번 주");
-    expect(chip("원그래프로 보기")).toBeTruthy();
+    expect(periodOptions()).toEqual(["이번 주", "총 시간"]);
+    expect(screen.queryByRole("menuitemradio", { name: "비교" })).toBeNull();
+    for (const name of ["총 시간", "이번 주"]) {
+      pick(name);
+      expect(period()).toBe(name);
+      expect(container.querySelector(".growth-list.is-compare")).toBeNull();
+      expect(chip("원그래프로 보기")).toBeTruthy();
+    }
   });
 
   it("보기 방식 목록(STATUS_VIEWS)은 띠그래프(처음)·원그래프 둘이고, 글 단추가 다음 보기로 돌린다", () => {
@@ -629,10 +625,10 @@ describe("기록 없음 · 처음 쓰는 사람(분야 하나)", () => {
     expect(lines[0].closest(".growth-graph")?.classList.contains("is-empty")).toBe(true);
     expect(empty.querySelector(".growth-band-cell")).toBeNull();
     expect(container.querySelector(".growth-card-total")?.textContent).toBe("0시간");
-    // 그림 아래 목록은 없다(띠 둘 + 단추). 고침7 ②: 보기 바꾸기 글 단추·칩 셋은 데이터 있는 판과 같은 자리에 있다
+    // 그림 아래 목록은 없다(띠 둘 + 단추). 고침7 ②: 보기 바꾸기 글 단추·칩 둘은 데이터 있는 판과 같은 자리에 있다
     expect(container.querySelector(".growth-list")).toBeNull();
     expect(chip("원그래프로 보기").classList.contains("growth-switch")).toBe(true);
-    expect(periodOptions()).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(periodOptions()).toEqual(["이번 주", "총 시간"]);
     expect(period()).toBe("이번 주");
     expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%, 목표 100%. 기타 0%.");
     const evening = screen.getByRole("button", { name: "오늘 기록" });
@@ -659,17 +655,17 @@ describe("기록 없음 · 처음 쓰는 사람(분야 하나)", () => {
 });
 
 describe("없앤 것(⑩ PM 8 · 명세 ③-S 두 뷰 공통)", () => {
-  /** 두 탭 × 세 기간 × 두 보기를 모두 돌며 상태보기 DOM을 모은다 */
+  /** 두 탭 × 두 기간 × 두 보기를 모두 돌며 상태보기 DOM을 모은다 */
   async function everyDom(d: GrowthData): Promise<string[]> {
     const { container } = await mount(fakeApi(d));
     const doms: string[] = [];
     fireEvent.click(tab("이번 주 목표"));
     doms.push(container.innerHTML);
     fireEvent.click(tab("목표 비율"));
-    for (const period of ["이번 주", "총 시간", "비교"]) {
+    for (const period of ["이번 주", "총 시간"]) {
       pick(period);
       doms.push(container.innerHTML);
-      // 원그래프도 본다(고침7: 기록 없음에도 보기 바꾸기 단추가 있다. 비교에는 없다)
+      // 원그래프도 본다(고침7: 기록 없음에도 보기 바꾸기 단추가 있다)
       const toPie = screen.queryByRole("button", { name: "원그래프로 보기" });
       if (toPie) {
         fireEvent.click(toPie);
@@ -683,7 +679,7 @@ describe("없앤 것(⑩ PM 8 · 명세 ③-S 두 뷰 공통)", () => {
   it("「채울」·「쌓인 것」·「처음 정한 비율」·「저녁 기록」·「분야별 줄 막대」 글과 살구(--color-accent)가 상태보기 어디에도 없다", async () => {
     for (const d of [spec(), noGoal(), spec({ thisWeek: [], cumulative: [] })]) {
       const doms = await everyDom(d);
-      expect(doms.length).toBe(6); // 목표 뷰 1 + 기간 셋 + 원그래프 둘(이번 주·총 시간 — 고침7부터 기록 없음도)
+      expect(doms.length).toBe(5); // 목표 뷰 1 + 기간 둘 + 원그래프 둘(이번 주·총 시간 — 고침7부터 기록 없음도)
       for (const html of doms) {
         expect(html.length).toBeGreaterThan(200);
         for (const word of ["채울", "쌓인 것", "처음 정한 비율", "저녁 기록", "분야별 줄 막대", "--color-accent", "놓친"]) expect(html).not.toContain(word);
@@ -714,13 +710,13 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
   /** 고침9: 머리 줄(합계 · 칩 · 보기 바꾸기)은 카드의 첫 요소 */
   const headOf = (c: HTMLElement) => card(c).querySelector<HTMLElement>(":scope > .growth-card-head")!;
 
-  it("경우 1: 처음 칩은 「총 시간」, 머리 = 합계 「40시간」 · 칩 셋 · 「원그래프로 보기」(데이터 있는 판과 같은 자리), 머리 바로 아래 「이번 주 0시간」", async () => {
+  it("경우 1: 처음 칩은 「총 시간」, 머리 = 합계 「40시간」 · 칩 둘 · 「원그래프로 보기」(데이터 있는 판과 같은 자리), 머리 바로 아래 「이번 주 0시간」", async () => {
     const save = vi.fn(async () => {});
     const { container } = await mount(fakeApi(weekZero(), { load: async () => undefined, save }));
     expect(selected("목표 비율")).toBe("true");
     expect(period()).toBe("총 시간");
     expect(period()).not.toBe("이번 주");
-    expect(periodChips()).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(periodChips()).toEqual(["이번 주", "총 시간"]);
     expect(screen.queryByRole("heading", { name: "분야마다 쌓인 시간" })).toBeNull(); // 고침9: 카드 위 머리 줄 없앰
     expect(screen.queryByText(/오늘 기록 \d+일/)).toBeNull();
     const head = headOf(container);
@@ -821,10 +817,10 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(container.querySelectorAll(".growth-band")).toHaveLength(2);
   });
 
-  it("경우 2: 기록이 하나도 없어도 머리 = 「0시간」 · 칩 셋(이번 주 켜짐) · 「원그래프로 보기」, 칩 「총 시간」·「비교」를 고르면 0인 판", async () => {
+  it("경우 2: 기록이 하나도 없어도 머리 = 「0시간」 · 칩 둘(이번 주 켜짐) · 「원그래프로 보기」, 칩 「총 시간」을 고르면 0인 판", async () => {
     const { container } = await mount(fakeApi(noRecord()));
     expect(period()).toBe("이번 주");
-    expect(periodChips()).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(periodChips()).toEqual(["이번 주", "총 시간"]);
     expect(container.querySelector(".growth-card-head .growth-card-total")?.textContent).toBe("0시간");
     expect(chip("원그래프로 보기").parentElement).toBe(headOf(container));
     expect(container.querySelector(".growth-week-zero")).toBeNull();
@@ -836,12 +832,6 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(container.querySelector(".growth-band.is-empty")?.textContent).toBe("0시간");
     expect(container.querySelector(".growth-week-zero")).toBeNull(); // 쌓인 것도 0이면 「이번 주 0시간」 줄은 없다
     expect(summary(container)).toMatch(/^목표 비율과 견준 총 시간\. 0시간\. 어학 0%/);
-    pick("비교");
-    expect(period()).toBe("비교");
-    expect(periodChips()).toEqual(["이번 주", "총 시간", "비교"]);
-    const dds = Array.from(container.querySelectorAll(".growth-dl dd"));
-    expect(dds.length).toBeGreaterThan(0);
-    expect(dds.every((dd) => dd.textContent === "0분")).toBe(true);
   });
 
   it("경우 3: 빈 상태에서 「원그래프로 보기」 → 왼쪽 「목표 비율」 원 그대로 · 오른쪽 회색 빈 고리 1px + 가운데 「0시간」 + 아래 목록 「0% / 목표 n%」(고침9, Figma 121:240), 「띠그래프로 보기」로 다시 띠", async () => {
@@ -897,11 +887,11 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(css).toMatch(/\.growth-week-zero \{[^}]*font: 500 12px\/16px var\(--font-family\);[^}]*color: var\(--color-text-sub\);/);
   });
 
-  it("목표 비율이 없으면 띠·원 없이 머리(「0시간」 · 칩 셋)와 「오늘 기록」만 — 바꿀 그림이 없어 보기 바꾸기 단추는 두지 않는다", async () => {
+  it("목표 비율이 없으면 띠·원 없이 머리(「0시간」 · 칩 둘)와 「오늘 기록」만 — 바꿀 그림이 없어 보기 바꾸기 단추는 두지 않는다", async () => {
     const { container } = await mount(fakeApi(noRecord({ ratios: [] })));
     expect(container.querySelector(".growth-graph")).toBeNull();
     expect(container.querySelector(".growth-card-total")?.textContent).toBe("0시간");
-    expect(periodChips()).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(periodChips()).toEqual(["이번 주", "총 시간"]);
     expect(screen.queryByRole("button", { name: "원그래프로 보기" })).toBeNull();
     expect(screen.getByRole("button", { name: "오늘 기록" })).toBeTruthy();
     expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%. 글쓰기 0%. 자격증 0%. 운동 0%. 기타 0%.");
@@ -1110,7 +1100,7 @@ describe("색: 한 군데(categoryColorValue)에서만 정한다", () => {
 });
 
 describe("접근성", () => {
-  it("기간 고르기(고침9)는 실제 단추 하나(메뉴 단추: aria-haspopup=menu · aria-expanded)이고, 열면 이름 있는 목록(role=menu) 안 menuitemradio 셋 중 지금 값 하나만 aria-checked", async () => {
+  it("기간 고르기(고침9)는 실제 단추 하나(메뉴 단추: aria-haspopup=menu · aria-expanded)이고, 열면 이름 있는 목록(role=menu) 안 menuitemradio 둘 중 지금 값 하나만 aria-checked", async () => {
     await mount(fakeApi(noGoal()));
     const c = periodChip();
     expect(c.tagName).toBe("BUTTON");
@@ -1122,9 +1112,9 @@ describe("접근성", () => {
     const menu = screen.getByRole("menu", { name: GROWTH_TEXT.periodGroup });
     expect(c.getAttribute("aria-controls")).toBe(menu.id);
     const options = within(menu).getAllByRole("menuitemradio");
-    expect(options).toHaveLength(3);
+    expect(options).toHaveLength(2);
     expect(options.every((b) => b.tagName === "BUTTON")).toBe(true);
-    expect(options.map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false", "false"]);
+    expect(options.map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false"]);
   });
 
   it("키보드 차례: 켜진 탭 → 기간 칩 하나(고침9) → 보기 바꾸기 → 분야 줄, 건너뛰는 단추나 tabindex가 없다", async () => {

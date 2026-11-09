@@ -181,13 +181,15 @@ describe("고침 5바퀴 확정 값(디자인 명세 ①)", () => {
     expect(Object.keys(RADIUS_TOKENS)).toEqual(expect.arrayContaining(["--radius-card", "--radius-pill"]));
   });
 
-  it("살구(--color-accent)는 글자색·단추 채움·테두리로 쓰지 않는다(이번 판에는 쓰는 자리 없음)", () => {
-    const rest = stripComments(css).replace(/:root\s*\{[^}]*\}/, "");
-    expect(rest).not.toContain("--color-accent");
+  it("살구(--color-accent)는 글자색·단추 채움·테두리로 쓰지 않는다. 쓰는 자리는 로그인 큰 고리의 조각(.login-ring-piece · .login-ring-glow, 고침10 D)뿐", () => {
+    // 고침10 D(Figma 54:15 「L1 조각 (살구 · 8px 바깥 · 빛 번짐)」): 그림의 선(stroke)으로만 쓴다
+    const used = [...stripComments(css).replace(/:root\s*\{[^}]*\}/, "").matchAll(/([^{}]+)\{[^}]*--color-accent[^}]*\}/g)].map((m) => m[1].trim());
+    expect(used).toEqual([".login-ring-piece", ".login-ring-glow"]);
+    for (const sel of used) expect(css).toContain(`${sel} { stroke: var(--color-accent);`);
     for (const dir of ["app", "components"]) {
       const walk = (d: string): string[] =>
         fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.(ts|tsx)$/.test(e.name) ? [`${d}/${e.name}`] : []));
-      for (const f of walk(dir)) expect(read(f), f).not.toContain("--color-accent");
+      for (const f of walk(dir)) expect(read(f), f).not.toContain("--color-accent"); // 색은 CSS 클래스로만
     }
   });
 

@@ -11,7 +11,7 @@ import { GoalSentenceEditor } from "./goal-sentence";
 import { NotifyRow } from "./onboarding";
 import { normalizedPercents, OTHER_RATIO_ID, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
 import { RatioSettings } from "./ratio-settings";
-import { Notice, TextButton } from "./ui";
+import { Notice } from "./ui";
 import { Wordmark } from "./wordmark";
 
 /**
@@ -77,9 +77,10 @@ export function MeScreen({
 }) {
   const logout = onLogout ? (
     <div className="me-logout">
-      <TextButton id="me-logout-button" className="text-tap" onClick={onLogout}>
+      {/* 고침10 I(Figma 147:142): 알림 카드 아래 흰 카드 한 줄(320×56 · 모서리 16 · 16 Regular · 경고 색 없음), 카드 전체가 누름 */}
+      <button type="button" id="me-logout-button" className="me-logout-row" onClick={onLogout}>
         {ME_TEXT.logout}
-      </TextButton>
+      </button>
     </div>
   ) : null;
   if (!settings) {

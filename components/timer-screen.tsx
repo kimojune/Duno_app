@@ -3,15 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import type { FocusApi } from "../lib/focus-api";
-import { remainingSeconds, sessionMinutes } from "../lib/focus/logic";
+import { remainingSeconds } from "../lib/focus/logic";
 import type { FocusSession, FocusSurface } from "../lib/focus/types";
 import type { TodayRead } from "../lib/today-types";
-import { formatMinutes, formatTimer } from "../lib/time-format";
+import { formatTimer } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, OtherChip } from "./todo-view";
 import { categoryColorValue } from "../lib/category-color";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /**
  * 타이머 탭(PRD 7-6, ④). 타이머는 할 일마다 붙이지 않고 따로 된 기능이다(D-103). 들어가는 길은 둘: 「오늘 먼저 할 일」 카드의 「30분 시작」(⑤)과 이 탭.
@@ -19,7 +20,7 @@ import { Notice, PrimaryButton, SecondaryButton } from "./ui";
  * - 이 탭에서는 오늘 적은(끝내지 않은) 할 일 가운데 골라 시작하거나, 할 일 없이 분야만 골라 시작한다. 앱의 추천(⑤)은 맨 앞에 놓인다.
  * - 도는 동안 다른 탭을 보고 와도 남은 시간이 이어진다(탭을 지우지 않고 숨긴다). 서버 시각과 기기 시계의 차이를 맞춰 센다.
  * - 정한 길이(30분)가 지나면 「30분이 지났어요」만 알린다(재촉·평가 없음). 끝내기를 누르면 진행한 시간이 남는다.
- * - 오늘 시작한 기록 줄은 숫자만 보인다(예: 「타이머 · 어학 12분」). 「중간에 멈춤」 같은 말은 없다(D-114).
+ * - 고침10(d-172, 50:390): 「오늘 시작한 타이머」 제목·「0개」·기록 목록은 이 탭에 없다(기록은 서버에 그대로 남고 상태보기가 쓴다). 머리는 워드마크(제목 「타이머」는 화면 읽기용으로만).
  * 연결이 끊기면 시작하지 않고 안내한다(이번 범위는 할 일만 오프라인). 모든 글은 React 텍스트로만 그린다.
  */
 
@@ -42,8 +43,6 @@ export const TIMER_TEXT = {
   endFailed: "끝내지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 시작할 수 있어요.",
   todosFailed: "오늘 할 일을 불러오지 못했어요. 할 일 없이 시작할 수 있어요.",
-  recordsHeading: "오늘 시작한 타이머",
-  noRecords: "0개", // 고침9 ⑬ 15: 숫자 먼저(옛 「아직 없어요」)
   loadFailed: "타이머를 불러오지 못했어요.",
   reload: "다시 불러오기",
   unreadable: "읽을 수 없는 할 일",
@@ -85,7 +84,6 @@ export function TimerScreen({
   const online = useOnline() || api.localFirst === true;
   const [load, setLoad] = useState<"loading" | "error" | "ready">("loading");
   const [running, setRunning] = useState<ActiveTimer | null>(null);
-  const [today, setToday] = useState<FocusSession[]>([]);
   const [todos, setTodos] = useState<TodoOption[]>([]);
   const [categories, setCategories] = useState<Entry[]>([]);
   const [todosFailed, setTodosFailed] = useState(false);
@@ -109,7 +107,6 @@ export function TimerScreen({
         const offsetMs = Date.parse(focus.data.serverNow) - now();
         const current = focus.data.active ? { session: focus.data.active, offsetMs } : null;
         setRunning(current);
-        setToday(focus.data.today);
         setLoad("ready");
         onActiveChange?.(current?.session ?? null);
       } else {
@@ -187,7 +184,6 @@ export function TimerScreen({
     if (res.ok) {
       const current = { session: res.data.session, offsetMs: Date.parse(res.data.serverNow) - now() };
       setRunning(current);
-      setToday((prev) => (prev.some((s) => s.id === current.session.id) ? prev : [...prev, current.session]));
       setMessage(TIMER_TEXT.started(current.session.plannedMinutes));
       onActiveChange?.(current.session);
       startKeyRef.current = null;
@@ -208,9 +204,6 @@ export function TimerScreen({
     const res = await api.end(running.session.id);
     setBusy(null);
     if (res.ok) {
-      const ended = res.data.session;
-      // 오늘 목록에 있으면 바꾸고, 없으면(어제 시작해 새벽 4시를 넘겨 끝낸 것) 끝에 붙인다
-      setToday((prev) => (prev.some((s) => s.id === ended.id) ? prev.map((s) => (s.id === ended.id ? ended : s)) : [...prev, ended]));
       setRunning(null);
       onActiveChange?.(null);
       titleRef.current?.focus();
@@ -228,7 +221,6 @@ export function TimerScreen({
       }
       const current = focus.data.active ? { session: focus.data.active, offsetMs: Date.parse(focus.data.serverNow) - now() } : null;
       setRunning(current);
-      setToday(focus.data.today);
       setLoad("ready");
       onActiveChange?.(current?.session ?? null);
     });
@@ -237,15 +229,15 @@ export function TimerScreen({
   const remaining = running ? remainingSeconds(startedMs(running.session), now() + running.offsetMs, running.session.plannedMinutes) : 0;
   const runningTodo = running?.session.todoId ? todos.find((t) => t.id === running.session.todoId) : undefined;
   const runningLabel = runningTodo ? runningTodo.text : nameOf(running?.session.categoryId ?? null);
-  const ended = today.filter((s) => s.endedAt !== null);
 
   return (
     <section className="timer" aria-labelledby="timer-title">
       <header className="today-header">
         <div>
-          <h1 id="timer-title" className="today-title" tabIndex={-1} ref={titleRef}>
+          <h1 id="timer-title" className="sr-only" tabIndex={-1} ref={titleRef}>
             {TIMER_TEXT.title}
           </h1>
+          <Wordmark className="today-wordmark" />
         </div>
       </header>
       <div className="growth-body">
@@ -336,23 +328,6 @@ export function TimerScreen({
         <p className="input-help" role="status">
           {message}
         </p>
-
-        {load === "ready" && (
-          <section aria-labelledby="timer-records-title" className={ended.length === 0 ? "timer-records is-empty" : "timer-records"}>
-            <h2 id="timer-records-title" className="growth-sub-title">
-              {TIMER_TEXT.recordsHeading}
-            </h2>
-            {ended.length === 0 ? (
-              <p className="todo-sub">{TIMER_TEXT.noRecords}</p>
-            ) : (
-              <ul className="growth-short">
-                {ended.map((s) => (
-                  <li key={s.id}>{`타이머 · ${nameOf(s.categoryId)} ${formatMinutes(sessionMinutes(s, now()))}`}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
       </div>
     </section>
   );

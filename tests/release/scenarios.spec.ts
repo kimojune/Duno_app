@@ -188,7 +188,7 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     expect(b.height).toBeGreaterThanOrEqual(44);
     expect(await page.locator("li.todo-row").getByRole("button", { name: /타이머/ }).count()).toBe(0);
   });
-  await step(S, "⑥ 타이머 → 할 일 고름 → 「30분 시작」 → 줄어듦 · 「오늘 시작한 타이머」에 한 줄", "8-6 AC1 · AC3 · AC6", async () => {
+  await step(S, "⑥ 타이머 → 할 일 고름 → 「30분 시작」 → 줄어듦 → 끝내기(고침10 d-172: 「오늘 시작한 타이머」 줄은 이 탭에 없다)", "8-6 AC1 · AC3 · AC6", async () => {
     await tab(page, "타이머");
     await expect(page.getByRole("heading", { name: "무엇을 할까요?" })).toBeVisible({ timeout: 20_000 });
     await page.getByRole("radio", { name: new RegExp(T1) }).check();
@@ -198,8 +198,8 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     const a = await clock.textContent();
     await expect.poll(async () => clock.textContent(), { timeout: 5_000 }).not.toBe(a);
     await page.getByRole("button", { name: "끝내기" }).click();
-    await expect(page.getByRole("heading", { name: "오늘 시작한 타이머" })).toBeVisible();
-    await expect(page.getByText(T1).last()).toBeVisible();
+    await expect(page.getByRole("button", { name: "30분 시작" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: "오늘 시작한 타이머" })).toHaveCount(0);
     await tab(page, "할 일");
   });
   finish();
@@ -399,9 +399,12 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
   });
   await reopen(browser);
   await home();
-  await step(S, "(다) ② 기간 칩 「이번 주 ▾」 → 「총 시간」 → 「비교」", "8-4 AC4", async () => {
+  await step(S, "(다) ② 기간 칩 「이번 주 ▾」 → 「총 시간」 → 「이번 주」(고침10 d-171: 「비교」 없음)", "8-4 AC4", async () => {
     await growth();
-    for (const p of ["총 시간", "비교", "이번 주"]) {
+    await page.getByRole("button", { name: /^기간, / }).click();
+    await expect(page.getByRole("menuitemradio", { name: "비교" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    for (const p of ["총 시간", "이번 주"]) {
       await page.getByRole("button", { name: /^기간, / }).click();
       await page.getByRole("menuitemradio", { name: p }).click();
       await expect(page.getByRole("button", { name: new RegExp(`^기간, ${p}`) })).toBeVisible();

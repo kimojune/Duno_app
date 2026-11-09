@@ -9,6 +9,31 @@ import { useOnline } from "../lib/use-online";
 import { LiveRegion, Notice, SecondaryButton } from "./ui";
 import { Wordmark } from "./wordmark";
 
+/**
+ * 큰 L1 고리(Figma 54:14 · 54:15, 고침10 D): 지름 120 · 두께 24 · 먹남색(--color-text), 한 조각(살구)이 오른쪽 위 45°로 8px 바깥 + 빛 번짐.
+ * 작은 워드마크 고리(components/wordmark.tsx)와 같은 모양: 빠진 자리 60°(15°~75°), 조각은 그 자리의 호. 장식이라 화면 읽기에서 숨긴다(제목 「두노」는 h1).
+ */
+export const LOGIN_RING = { size: 120, thickness: 24, pieceOffset: 8 } as const;
+const RING_ARC = "M72.423 13.636 A48 48 0 1 0 106.364 47.577";
+const PIECE_ARC = "M106.364 47.577 A48 48 0 0 0 72.423 13.636";
+const PIECE_SHIFT = LOGIN_RING.pieceOffset / Math.SQRT2;
+export function LoginRing() {
+  return (
+    <svg className="login-ring" width={LOGIN_RING.size} height={LOGIN_RING.size} viewBox="0 0 120 120" fill="none" aria-hidden="true" focusable="false" overflow="visible">
+      <defs>
+        <filter id="login-ring-glow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+      </defs>
+      <path className="login-ring-body" d={RING_ARC} strokeWidth={LOGIN_RING.thickness} />
+      <g transform={`translate(${PIECE_SHIFT.toFixed(3)} ${(-PIECE_SHIFT).toFixed(3)})`}>
+        <path className="login-ring-glow" d={PIECE_ARC} strokeWidth={LOGIN_RING.thickness} filter="url(#login-ring-glow)" />
+        <path className="login-ring-piece" d={PIECE_ARC} strokeWidth={LOGIN_RING.thickness} />
+      </g>
+    </svg>
+  );
+}
+
 /** 로그인 화면의 바깥 틀: 이름과 한 문장 위, 단추 묶음 아래(방향 A) 또는 이어서(방향 B). */
 export function LoginLayout({
   direction = "A",
@@ -20,6 +45,7 @@ export function LoginLayout({
   return (
     <main className={direction === "B" ? "login dir-b" : "login"}>
       <div className="login-head">
+        <LoginRing />
         <h1 className="login-name">
           <Wordmark />
         </h1>
@@ -133,6 +159,8 @@ export function LoginActionsView({
   );
 }
 
+const SERVER_DEMO_ERRORS: readonly string[] = ["wrong_code", "rate_limited", "failed", "off"];
+
 /** 체험 코드로 시작하는 서버 행동(app/demo/actions.ts startDemo). 서버 컴포넌트(app/page.tsx)가 켜졌을 때만 넘긴다 — 코드 값은 넘어오지 않는다. */
 export type StartDemo = (code: string) => Promise<DemoStartResult>;
 
@@ -186,7 +214,8 @@ export function LoginButton({
     }
     busyRef.current = false;
     setDemoBusy(false);
-    showDemoNotice(result.error);
+    // 화면 글은 정해진 글만: 서버가 준 값이 약속한 오류 이름이 아니면 「시작하지 못했어요」로(원문·코드 값을 띄우지 않는다)
+    showDemoNotice(SERVER_DEMO_ERRORS.includes(result.error) ? result.error : "failed");
   }
 
   // Google 창에서 뒤로 가기로 돌아오면(bfcache) 페이지가 「이동하는 중」인 채 되살아날 수 있다. L1로 되돌린다.

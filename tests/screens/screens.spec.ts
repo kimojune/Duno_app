@@ -166,6 +166,7 @@ for (const id of LOGIN_IDS) {
             paddingRight: s.paddingRight,
             gap: s.columnGap,
             minHeight: s.minHeight,
+            radius: s.borderTopLeftRadius,
           };
         });
         expect(style).toEqual({
@@ -176,7 +177,9 @@ for (const id of LOGIN_IDS) {
           paddingRight: "12px",
           gap: "10px",
           minHeight: "48px",
+          radius: "999px", // 고침10 d-178: 알약
         });
+        expect(Math.round(box.width), "Google 단추 폭 320").toBe(320);
         const logo = await page.locator(".google-btn img").evaluate((img: HTMLImageElement) => ({
           w: img.getBoundingClientRect().width,
           h: img.getBoundingClientRect().height,

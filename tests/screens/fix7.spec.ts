@@ -9,7 +9,7 @@ import { photoDir } from "./photo-dir";
  * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). 개발 서버에서 돈다(SCREENS_PORT·SCREENS_DIST_DIR를 꼭 준다): npm run screens
  * - 경우 1(growth-week-zero: 이번 주 0 + 쌓인 60시간): 「총 시간」으로 시작, 머리 아래 「이번 주 0시간」, 카드 끝 「오늘 기록」 — 띠 · 원
  * - 경우 2(growth-empty: 기록 하나도 없음): 머리 「0시간」 · 칩 셋 · 「원그래프로 보기」 — 띠, 경우 3: 원(오른쪽 회색 빈 고리 + 「0시간」)
- * 고침9(J4): 기간은 칩 하나 「이번 주 ▾」(메뉴 단추 — 열면 이번 주 / 총 시간 / 비교), 보기 바꾸기는 같은 머리 줄 오른쪽 끝, 카드 밖 안내 글 없음.
+ * 고침9(J4): 기간은 칩 하나 「이번 주 ▾」(메뉴 단추 — 열면 이번 주 / 총 시간), 보기 바꾸기는 같은 머리 줄 오른쪽 끝, 카드 밖 안내 글 없음.
  * 이 시험의 사진 자리(docs/oneshot-v2/고침7)는 고침7 기록이라 고침9 사진은 fix9-status(고침9-J4)에 둔다
  */
 const OUT = photoDir("고침7"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
@@ -62,7 +62,7 @@ test("경우 1: 이번 주 0 + 쌓인 시간 → 「총 시간」으로 시작 �
 
   await open(page, "growth-week-zero");
   await expect(page.getByRole("button", { name: "기간, 총 시간" })).toHaveText("총 시간 ▾");
-  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
+  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간"]);
   await expect(page.locator(".growth-card-total")).toHaveText("60시간");
   const note = page.locator(".growth-card > .growth-week-zero");
   await expect(note).toHaveText("이번 주 0시간");
@@ -115,7 +115,7 @@ test("경우 2: 기록 하나도 없음 → 머리 「0시간」 · 칩 셋 · �
 
   await open(page, "growth-empty");
   await expect(page.getByRole("button", { name: "기간, 이번 주" })).toHaveText("이번 주 ▾");
-  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
+  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간"]);
   await expect(page.locator(".growth-card-total")).toHaveText("0시간");
   await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
   await expect(page.locator(".growth-week-zero")).toHaveCount(0);
