@@ -19,7 +19,7 @@ export default defineConfig({
   },
   webServer: {
     command: `npx next dev -H localhost -p ${PORT}`,
-    env: { DUNO_DIST_DIR: ".next/screens" },
+    env: { DUNO_DIST_DIR: process.env.SCREENS_DIST_DIR || ".next/screens" }, // SCREENS_DIST_DIR가 있으면 그 폴더(운영 서버가 .next를 쓰는 동안 다른 곳에 짓게)
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,
