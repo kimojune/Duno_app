@@ -168,9 +168,18 @@ const CATEGORY_DAYS: CategoryPageData["days"] = [
   { day: "2026-11-05", minutes: 45, todos: [] },
   { day: "2026-11-04", minutes: 0, todos: [{ id: "t4", text: "단어장 만들기", done: true, notes: [] }] },
 ];
+/** 기타 페이지(Figma 121:468, PM d-148 가): 30분 · 1시간(가장 긴 날) · 30분 */
 const OTHER_DAYS: CategoryPageData["days"] = [
-  { day: "2026-11-07", minutes: 90, todos: [{ id: "o1", text: "장보기", done: true, notes: [] }] },
-  { day: "2026-11-05", minutes: 30, todos: [] },
+  { day: "2026-11-07", minutes: 30, todos: [{ id: "o1", text: "은행 서류 내기", done: true, notes: [{ id: "on1", todoId: "o1", day: "2026-11-07", createdAt: "x", readable: true, text: "신분증 사본 챙김" }] }] },
+  {
+    day: "2026-11-06",
+    minutes: 60,
+    todos: [
+      { id: "o2", text: "방 정리", done: true, notes: [] },
+      { id: "o3", text: "장보기", done: false, notes: [] },
+    ],
+  },
+  { day: "2026-11-04", minutes: 30, todos: [{ id: "o4", text: "빨래", done: true, notes: [] }] },
 ];
 const categoryApi = (categoryId: string | null, days: CategoryPageData["days"]): GrowthApi => ({
   fetchGrowth: never,
@@ -458,8 +467,12 @@ export function V2Gallery({ id }: { id: string }) {
     return <Opener render={(close) => <CategoryPage api={categoryApi(C1, CATEGORY_DAYS)} categoryId={C1} name="어학" growth={WEEK_GROWTH} onClose={close} />} />;
   }
   if (id === "category-other") {
-    // 고침8: 기타 페이지 — 같은 꼴, 「목표 비율」 줄 없음
-    const growth: GrowthData = { ...WEEK_GROWTH, cumulative: [...WEEK_GROWTH.cumulative, { categoryId: null, minutes: 400 }] };
+    // 고침8: 기타 페이지 — 같은 꼴, 「목표 비율」 줄 없음. Figma 121:468과 같은 값(누적 50시간 중 기타 4시간 = 8%, 이번 주 1시간)
+    const growth: GrowthData = {
+      ...WEEK_GROWTH,
+      thisWeek: [{ categoryId: C1, minutes: 300 }, { categoryId: null, minutes: 60 }],
+      cumulative: [{ categoryId: C1, minutes: 1500 }, { categoryId: C2, minutes: 900 }, { categoryId: C3, minutes: 360 }, { categoryId: null, minutes: 240 }],
+    };
     return <Opener render={(close) => <CategoryPage api={categoryApi(null, OTHER_DAYS)} categoryId={null} name="기타" growth={growth} onClose={close} />} />;
   }
   if (id === "category-empty") {
