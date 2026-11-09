@@ -5,10 +5,11 @@ import { APP_CONFIG } from "../lib/app-config";
 import { checkCategoryName, sameCategoryName } from "../lib/categories/validation";
 import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
-import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
+import { evenRatios } from "../lib/settings/validation";
 import { formatClock } from "../lib/time-format";
 import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
 import { ChipScroller } from "./chip-scroller";
+import { GOAL_FIELD_TEXT, GoalField, goalFieldCheck } from "./goal-field";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -24,7 +25,7 @@ export const ONBOARDING_TEXT = {
   title: "시작하기",
   step: (n: number, total: number) => `${total}단계 중 ${n}단계`,
   goalHeading: "이루고 싶은 것을 한 문장으로 적어 주세요",
-  goalLabel: "목표",
+  goalLabel: GOAL_FIELD_TEXT.label, // 칸은 components/goal-field.tsx(S8-b와 같이 씀)
   goalHint: "흐릿해도 괜찮아요. 건너뛰어도 돼요.",
   categoryHeading: "시간을 나눠 쓸 분야를 골라 주세요",
   categoryHint: "적고 넓게 시작해요. 쓰면서 나눌 수 있어요.",
@@ -56,7 +57,7 @@ export const ONBOARDING_TEXT = {
   pushUnsupported: "이 브라우저는 알림을 받을 수 없어요.",
   pushMissingKey: "알림을 보내는 설정이 아직 없어서 알림은 켜지 않았어요. 설정이 끝나면 내 정보에서 켤 수 있어요.",
   pushFailed: "알림을 켜지 못했어요. 내 정보에서 다시 켤 수 있어요.",
-  tooLong: (n: number) => `${GOAL_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${n}자예요.`,
+  tooLong: GOAL_FIELD_TEXT.tooLong,
 } as const;
 
 type CategoryEntry = { id: string; name: string };
@@ -136,8 +137,7 @@ export function Onboarding({
     headingRef.current?.focus();
   }, [step]);
 
-  const goalCheck = checkGoal(goal);
-  const goalOver = !goalCheck.ok && goalCheck.error === "too_long";
+  const { check: goalCheck, over: goalOver } = goalFieldCheck(goal);
 
   // 고른 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다, 처음에는 0%)
   const entries: RatioEntry[] = withOtherEntry(
@@ -301,25 +301,16 @@ export function Onboarding({
             <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
               {ONBOARDING_TEXT.goalHeading}
             </h1>
-            <label htmlFor="goal-input" className="input-label">
-              {ONBOARDING_TEXT.goalLabel}
-            </label>
-            <input
-              id="goal-input"
-              className="input"
-              type="text"
+            <GoalField
+              inputId="goal-input"
+              helpId="goal-help"
               value={goal}
+              onChange={setGoal}
+              help={ONBOARDING_TEXT.goalHint}
               placeholder={APP_CONFIG.goalPlaceholder}
-              onChange={(e) => setGoal(e.target.value)}
               onKeyDown={onGoalKeyDown}
-              aria-describedby="goal-help"
-              aria-invalid={goalOver ? true : undefined}
-              autoComplete="off"
               enterKeyHint="next"
             />
-            <p id="goal-help" className="input-help">
-              {goalOver ? ONBOARDING_TEXT.tooLong(countGoalChars(goal)) : ONBOARDING_TEXT.goalHint}
-            </p>
           </section>
         )}
 

@@ -50,30 +50,38 @@ describe("내 정보 탭", () => {
     expect(screen.getByText("내 정보를 불러오지 못했어요. 앱을 다시 열어 주세요.")).toBeTruthy();
   });
 
-  it("목표를 고쳐 저장한다(비우면 목표 없음)", async () => {
+  it("목표를 고쳐 저장한다(비우면 목표 없음) — 고침6: 첫 카드를 눌러 S8-b 「목표」에서 고치고 「저장」", async () => {
     const api = fakeApi();
     const onChanged = vi.fn();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} onChanged={onChanged} />);
-    expect((screen.getByLabelText("목표 한 문장") as HTMLInputElement).value).toBe("토익 900점");
-    fireEvent.change(screen.getByLabelText("목표 한 문장"), { target: { value: "  포트폴리오   완성 " } });
-    await press("목표 저장");
+    await press("이루고 싶은 것, 토익 900점, 고치기");
+    const input = screen.getByRole("textbox", { name: "목표" }) as HTMLInputElement;
+    expect(input.value).toBe("토익 900점");
+    fireEvent.change(input, { target: { value: "  포트폴리오   완성 " } });
+    await press("저장");
     expect(api.saveSettings).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
-    expect(screen.getByText("저장했어요")).toBeTruthy();
     expect(onChanged).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
-    fireEvent.change(screen.getByLabelText("목표 한 문장"), { target: { value: "  " } });
-    await press("목표 저장");
+    expect(screen.queryByRole("dialog", { name: "목표" })).toBeNull();
+    expect(screen.getByRole("button", { name: "이루고 싶은 것, 포트폴리오 완성, 고치기" })).toBeTruthy();
+    await press("이루고 싶은 것, 포트폴리오 완성, 고치기");
+    fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "  " } });
+    await press("저장");
     expect(api.saveSettings).toHaveBeenLastCalledWith({ goal: null });
+    expect(onChanged).toHaveBeenLastCalledWith({ goal: null });
+    expect(screen.getByRole("button", { name: "이루고 싶은 것, 목표 적기" }).textContent).toBe("이루고 싶은 것목표 적기›");
   });
 
-  it("목표가 100자를 넘으면 저장이 막힌다. 저장 실패는 안내만", async () => {
+  it("목표가 100자를 넘으면 저장이 막힌다. 저장 실패는 안내만(S8-b는 닫히지 않는다)", async () => {
     const api = fakeApi({ saveSettings: vi.fn(async () => ({ ok: false as const, error: "unavailable" as const })) });
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
-    fireEvent.change(screen.getByLabelText("목표 한 문장"), { target: { value: "가".repeat(101) } });
+    await press(/^이루고 싶은 것/);
+    fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "가".repeat(101) } });
     expect(screen.getByText("100자까지 적을 수 있어요. 지금 101자예요.")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "목표 저장" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("목표 한 문장"), { target: { value: "토익 950점" } });
-    await press("목표 저장");
+    expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "토익 950점" } });
+    await press("저장");
     expect(screen.getByText("저장하지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "목표" })).toBeTruthy();
   });
 
   it("읽을 수 없는 목표는 안내를 보인다", () => {
@@ -212,14 +220,18 @@ describe("내 정보 탭", () => {
     await act(async () => {
       window.dispatchEvent(new Event("offline"));
     });
-    expect(screen.getByText("인터넷에 연결되면 저장할 수 있어요.")).toBeTruthy();
-    for (const name of ["목표 저장", "비율 저장", "알림 설정 저장"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByText("인터넷에 연결되면 저장할 수 있어요.").length).toBeGreaterThan(0);
+    for (const name of ["비율 저장", "알림 설정 저장"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    // 목표는 S8-b의 「저장」이 막힌다(고침6)
+    await press(/^이루고 싶은 것/);
+    expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("분야 이름·목표는 글자 그대로 보인다", () => {
     const evil = '<img src=x onerror="window.__me=1">';
     render(<MeScreen settings={settings({ goal: evil })} categories={[{ id: C1, name: evil }]} api={fakeApi()} push={fakePush()} />);
-    expect((screen.getByLabelText("목표 한 문장") as HTMLInputElement).value).toBe(evil);
+    // 고침6: 목표는 첫 카드의 글(글 칸이 아니다)로 글자 그대로
+    expect(document.querySelector(".me-goal-text")?.textContent).toBe(evil);
     expect(document.querySelector("img[src='x']")).toBeNull();
   });
 });

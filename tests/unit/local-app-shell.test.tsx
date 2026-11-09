@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -171,5 +171,51 @@ describe("LocalAppShell: 이 기기에서 처음 여는 사용자에게 서버�
     render(<LocalAppShell userKey={USER} initialSnapshot={snapshot()} />);
     expect(await screen.findByText("기기에 있던 글")).toBeTruthy();
     expect(screen.queryByText("서버가 실어 보낸 글")).toBeNull();
+  });
+});
+
+describe("고침6 ③: 내 정보 S8-b에서 고친 목표 한 문장 = 상태보기 맨 위 목표 줄(같은 기기 설정에서 읽는다)", () => {
+  it("저장하면 내 정보 카드와 상태보기 맨 위 줄이 새 값, 비우고 저장하면 둘 다 목표 없음(줄 사라짐). 기기 거울과 보낼 줄에도 같은 값", async () => {
+    await kvHolder.kv!.set(kvKeys.base(USER), mirror({ settings: { goal: "토익 900점", goalReadable: true, onboardingDone: true, notify: NOTIFY, ratios: [{ categoryId: C1, percent: 100 }] } }));
+    render(<LocalAppShell userKey={USER} />);
+    await screen.findByText("기기에 있던 글");
+    const goalLine = () => document.querySelector(".growth-goal-line");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
+    await waitFor(() => expect(goalLine()?.textContent).toBe("목표, 토익 900점"));
+
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "이루고 싶은 것, 토익 900점, 고치기" })));
+    const dlg = screen.getByRole("dialog", { name: "목표" });
+    await act(async () => fireEvent.change(within(dlg).getByRole("textbox", { name: "목표" }), { target: { value: "  포트폴리오  끝내기 " } }));
+    await act(async () => fireEvent.click(within(dlg).getByRole("button", { name: "저장" })));
+    expect(screen.queryByRole("dialog", { name: "목표" })).toBeNull();
+    expect(screen.getByRole("button", { name: "이루고 싶은 것, 포트폴리오 끝내기, 고치기" })).toBeTruthy();
+    // 같은 원천: 기기 거울의 설정 값이 바뀌었고, 상태보기는 그 값을 읽는다
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
+    await waitFor(() => expect(goalLine()?.textContent).toBe("목표, 포트폴리오 끝내기"));
+    await waitFor(() => expect(kvHolder.sent.some((q) => JSON.stringify(q.op).includes("포트폴리오 끝내기"))).toBe(true));
+
+    // 비우고 저장 → 목표 없음: 카드 「목표 적기」, 상태보기 맨 위 줄 사라짐
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "이루고 싶은 것, 포트폴리오 끝내기, 고치기" })));
+    const dlg2 = screen.getByRole("dialog", { name: "목표" });
+    await act(async () => fireEvent.change(within(dlg2).getByRole("textbox", { name: "목표" }), { target: { value: "" } }));
+    await act(async () => fireEvent.click(within(dlg2).getByRole("button", { name: "저장" })));
+    expect(screen.getByRole("button", { name: "이루고 싶은 것, 목표 적기" })).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
+    await waitFor(() => expect(goalLine()).toBeNull());
+    await waitFor(() => expect(kvHolder.sent.some((q) => JSON.stringify(q.op).includes('"goal":null'))).toBe(true));
+  });
+
+  it("악용: 목표에 HTML을 넣어도 상태보기 맨 위 줄·내 정보 카드에 글자 그대로, img 요소 없음", async () => {
+    const evil = "<img src=x onerror=alert(1)>";
+    await kvHolder.kv!.set(kvKeys.base(USER), mirror({ settings: { goal: evil, goalReadable: true, onboardingDone: true, notify: NOTIFY, ratios: [{ categoryId: C1, percent: 100 }] } }));
+    render(<LocalAppShell userKey={USER} />);
+    await screen.findByText("기기에 있던 글");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
+    await waitFor(() => expect(document.querySelector(".growth-goal-line")?.textContent).toBe(`목표, ${evil}`));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
+    expect(document.querySelector(".me-goal-text")?.textContent).toBe(evil);
+    expect(document.querySelector("img")).toBeNull();
   });
 });

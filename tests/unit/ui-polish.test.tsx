@@ -190,11 +190,11 @@ describe("이름 통일 (B14)", () => {
     expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "오늘 기록하기" })).toBeNull();
   });
-  it("내 정보의 목표 제목은 「이루고 싶은 것」이고 알림 이름 「오늘 기록 알림」은 그대로다", async () => {
+  it("내 정보의 목표 이름표는 「이루고 싶은 것」이고(고침6: 제목이 아니라 첫 카드 단추 안 이름표) 알림 이름 「오늘 기록 알림」은 그대로다", async () => {
     render(<AppShell home={home()} />);
     await act(async () => {});
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
-    expect(screen.getByRole("heading", { name: "이루고 싶은 것" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^이루고 싶은 것, / }).querySelector(".me-goal-label")?.textContent).toBe("이루고 싶은 것");
     expect(screen.getByRole("checkbox", { name: "오늘 기록 알림" })).toBeTruthy();
   });
 });

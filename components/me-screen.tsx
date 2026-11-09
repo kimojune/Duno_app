@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { APP_CONFIG } from "../lib/app-config";
 import type { SettingsApi } from "../lib/onboarding-api";
 import type { PushApi } from "../lib/push/subscribe";
 import type { NotifySettings, RatioItem, SettingsData } from "../lib/settings/types";
-import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
+import { evenRatios } from "../lib/settings/validation";
 import { useOnline } from "../lib/use-online";
+import { GoalSentenceEditor } from "./goal-sentence";
 import { NotifyRow } from "./onboarding";
 import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
-import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Notice, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 내 정보 탭(PRD 부록 B): 처음 설정에서 정한 것을 고치는 곳과 알림 설정. 이번 틀의 내용은 임시다(임시값 목록).
- * - 목표 한 문장 고치기, 목표 비율 고치기(처음 설정과 같은 −/+ 5% 단추. 「고칠 자리와 때」, PRD 7-1 열림), 알림 둘의 켜기·시각.
+ * - 첫 카드 = 목표 한 문장(고침6 ③): 이름표 「이루고 싶은 것」 + 문장(20/28 Bold, 두 줄까지 낱말 단위 감쌈) + 「›」. 카드 전체가 단추 하나 → S8-b 「목표」
+ *   (components/goal-sentence.tsx)에서 고친다. 내 정보에는 목표 글 칸·저장 단추가 없다. 비었으면 「목표 적기」.
+ * - 목표 비율 고치기(처음 설정과 같은 −/+ 5% 단추. 「고칠 자리와 때」, PRD 7-1 열림), 알림 둘의 켜기·시각.
  * - 알림 켜기는 알림 허락 → 푸시 구독 저장이다. 푸시 서명 공개 키가 설정에 없으면 켜지 않고 안내한다(보내는 쪽 설정은 PM이 서버 설정에 둔다).
  * - 로그아웃은 맨 아래에도 있다(B18). 적던 글이 있을 때 확인은 할 일 탭이 하므로, 누르면 할 일 탭으로 가서 같은 로그아웃 흐름을 시작한다.
  * 모든 글은 React 텍스트로만 그린다.
@@ -21,9 +23,9 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 export const ME_TEXT = {
   title: "내 정보",
-  goalHeading: "이루고 싶은 것", // 처음 설정의 첫 질문과 같은 이름
-  goalLabel: "목표 한 문장",
-  goalSave: "목표 저장",
+  goalHeading: "이루고 싶은 것", // 첫 카드 이름표(12 Medium 보조)
+  goalEmpty: "목표 적기", // 목표가 비었을 때 카드 글(16 Medium)
+  goalCardName: (goal: string | null) => (goal ? `이루고 싶은 것, ${goal}, 고치기` : "이루고 싶은 것, 목표 적기"), // 카드 단추의 화면 읽기 이름
   ratioHeading: "목표 비율",
   ratioSave: "비율 저장",
   ratioEmpty: "분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.",
@@ -34,7 +36,6 @@ export const ME_TEXT = {
   saving: "저장하는 중",
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
-  tooLong: (n: number) => `${GOAL_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${n}자예요.`,
   ratioNeed: "하나 이상은 0%보다 커야 해요.",
   permissionDenied: "이 기기에서 알림이 허락되지 않았어요. 브라우저 설정에서 바꿀 수 있어요.",
   unsupported: "이 브라우저는 알림을 받을 수 없어요.",
@@ -112,10 +113,9 @@ function MeBody({
 }) {
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다). 알림 켜기만은 서버·브라우저가 함께 해야 한다
   const online = useOnline() || api.localFirst === true;
-  // 목표
-  const [goal, setGoal] = useState(settings.goal ?? "");
-  const [goalMessage, setGoalMessage] = useState("");
-  const [goalBusy, setGoalBusy] = useState(false);
+  // 목표 한 문장(저장된 값). 고치기는 S8-b 창에서
+  const [goal, setGoal] = useState<string | null>(settings.goal);
+  const [goalEditorOpen, setGoalEditorOpen] = useState(false);
   // 비율
   const [percents, setPercents] = useState<Record<string, number>>(() => {
     if (settings.ratios.length > 0) return Object.fromEntries(settings.ratios.map((r) => [ratioKey(r.categoryId), r.percent]));
@@ -142,21 +142,9 @@ function MeBody({
     };
   }, [push]);
 
-  const goalCheck = checkGoal(goal);
-  const goalOver = !goalCheck.ok && goalCheck.error === "too_long";
-
-  async function saveGoal() {
-    if (goalBusy || !goalCheck.ok || !online) return;
-    setGoalBusy(true);
-    setGoalMessage("");
-    const res = await api.saveSettings({ goal: goalCheck.goal });
-    setGoalBusy(false);
-    if (res.ok) {
-      setGoalMessage(ME_TEXT.saved);
-      onChanged?.({ goal: goalCheck.goal });
-    } else {
-      setGoalMessage(ME_TEXT.failed);
-    }
+  function goalSaved(next: string | null) {
+    setGoal(next);
+    onChanged?.({ goal: next });
   }
 
   // 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다)
@@ -234,34 +222,17 @@ function MeBody({
       <div className="growth-body">
         {!online && <Notice role="status">{ME_TEXT.offline}</Notice>}
 
-        <section className="detail-section" aria-labelledby="me-goal-title">
-          <h2 id="me-goal-title" className="growth-sub-title">
-            {ME_TEXT.goalHeading}
-          </h2>
-          {!settings.goalReadable && <p className="todo-sub">{ME_TEXT.unreadableGoal}</p>}
-          <label htmlFor="me-goal" className="input-label">
-            {ME_TEXT.goalLabel}
-          </label>
-          <input
-            id="me-goal"
-            className="input"
-            type="text"
-            value={goal}
-            placeholder={APP_CONFIG.goalPlaceholder}
-            onChange={(e) => {
-              setGoal(e.target.value);
-              setGoalMessage("");
-            }}
-            aria-invalid={goalOver ? true : undefined}
-            aria-describedby="me-goal-help"
-            autoComplete="off"
-          />
-          <p id="me-goal-help" className="input-help" role="status">
-            {goalOver ? ME_TEXT.tooLong(countGoalChars(goal)) : goalMessage}
-          </p>
-          <PrimaryButton busy={goalBusy} disabled={goalBusy || goalOver || !online} onClick={() => void saveGoal()}>
-            {goalBusy ? ME_TEXT.saving : ME_TEXT.goalSave}
-          </PrimaryButton>
+        <section className="detail-section me-goal">
+          <button type="button" className="me-goal-card" aria-label={ME_TEXT.goalCardName(goal)} onClick={() => setGoalEditorOpen(true)}>
+            <span className="me-goal-body">
+              <span className="me-goal-label">{ME_TEXT.goalHeading}</span>
+              {goal ? <span className="me-goal-text">{goal}</span> : <span className="me-goal-empty">{ME_TEXT.goalEmpty}</span>}
+            </span>
+            <span className="me-goal-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          {!settings.goalReadable && goal === settings.goal && <p className="todo-sub">{ME_TEXT.unreadableGoal}</p>}
         </section>
 
         <section className="detail-section" aria-labelledby="me-ratio-title">
@@ -327,6 +298,7 @@ function MeBody({
         </section>
         {logout}
       </div>
+      {goalEditorOpen && <GoalSentenceEditor initial={goal} api={api} onClose={() => setGoalEditorOpen(false)} onSaved={goalSaved} />}
     </section>
   );
 }

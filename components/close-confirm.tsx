@@ -9,6 +9,8 @@ import { PrimaryButton, SecondaryButton } from "./ui";
  * - role="alertdialog" + aria-modal, 제목이 이름. 처음 포커스는 「계속 적기」(주 단추, 먹남색). 닫히면 포커스는 확인을 띄운 자리(「닫기」 단추 등)로 돌아간다.
  * - 떠 있는 동안 확인 밖(그 창의 나머지)에 inert를 단다. 앱의 다른 확인(할 일 지우기·로그아웃)은 창 안 알림 줄이라 대화 창 규칙이 없어 이 부품을 새로 둔다.
  * - 「계속 적기」·Esc·바깥 누름 = 확인만 닫는다(입력은 그대로). 「닫기」 = 창을 닫는다(저장하지 않는다 — 저장 호출 없음).
+ * - onSave를 주면 「나가기」 꼴(고침6 S8-b, S8-a와 같은 확인): 제목 「저장하지 않고 나갈까요?」, 주 단추 「저장」(처음 포커스, onSave),
+ *   「나가기」 = onClose(저장하지 않고 닫는다). Esc·바깥 누름은 그대로 onKeep(확인만 닫는다).
  */
 export const CLOSE_CONFIRM_TEXT = {
   title: "저장하지 않고 닫을까요?",
@@ -16,7 +18,14 @@ export const CLOSE_CONFIRM_TEXT = {
   close: "닫기",
 } as const;
 
-export function CloseConfirm({ onKeep, onClose }: { onKeep: () => void; onClose: () => void }) {
+/** 고친 것을 저장하지 않고 나가려 할 때(S8-b 「목표」 — 명세 ⑭ O 「S8-a와 같은 확인」) */
+export const LEAVE_CONFIRM_TEXT = {
+  title: "저장하지 않고 나갈까요?",
+  save: "저장",
+  leave: "나가기",
+} as const;
+
+export function CloseConfirm({ onKeep, onClose, onSave }: { onKeep: () => void; onClose: () => void; onSave?: () => void }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
 
@@ -45,13 +54,13 @@ export function CloseConfirm({ onKeep, onClose }: { onKeep: () => void; onClose:
       <div className="close-confirm-backdrop" aria-hidden="true" onClick={onKeep} />
       <div className="close-confirm" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <h2 id={titleId} className="close-confirm-title">
-          {CLOSE_CONFIRM_TEXT.title}
+          {onSave ? LEAVE_CONFIRM_TEXT.title : CLOSE_CONFIRM_TEXT.title}
         </h2>
         <div className="close-confirm-actions">
-          <PrimaryButton data-confirm-keep="" onClick={onKeep}>
-            {CLOSE_CONFIRM_TEXT.keep}
+          <PrimaryButton data-confirm-keep="" onClick={onSave ?? onKeep}>
+            {onSave ? LEAVE_CONFIRM_TEXT.save : CLOSE_CONFIRM_TEXT.keep}
           </PrimaryButton>
-          <SecondaryButton onClick={onClose}>{CLOSE_CONFIRM_TEXT.close}</SecondaryButton>
+          <SecondaryButton onClick={onClose}>{onSave ? LEAVE_CONFIRM_TEXT.leave : CLOSE_CONFIRM_TEXT.close}</SecondaryButton>
         </div>
       </div>
     </div>
