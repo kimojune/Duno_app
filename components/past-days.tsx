@@ -32,6 +32,8 @@ export const PAST_DAYS_TEXT = {
   done: "끝냄",
   notDone: "안 끝냄",
   recordTitle: "이날 기록",
+  /** 읽지 못했거나 읽을 수 있는 범위(오늘 기록은 7일) 밖: 「–」, 화면 읽기 이름 */
+  recordUnknown: "알 수 없음",
   unreadable: "읽을 수 없는 할 일",
 } as const;
 
@@ -47,7 +49,7 @@ export function PastDays({ api, today, onClose }: { api: ManageApi; today: strin
   const [date, setDate] = useState(yesterday);
   const [load, setLoad] = useState<Load>({ status: "loading" });
   /** 이날 기록의 합계(분). null = 읽는 중, 기록이 없으면 0 */
-  const [record, setRecord] = useState<number | null>(null);
+  const [record, setRecord] = useState<number | "unknown" | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
@@ -73,14 +75,14 @@ export function PastDays({ api, today, onClose }: { api: ManageApi; today: strin
     const read = api.fetchDayRecord;
     if (!read) {
       void Promise.resolve().then(() => {
-        if (alive) setRecord(0);
+        if (alive) setRecord("unknown");
       });
       return () => {
         alive = false;
       };
     }
     void read.call(api, date).then((res) => {
-      if (alive) setRecord(res.ok ? (res.data.totalMinutes ?? 0) : 0);
+      if (alive) setRecord(res.ok ? (res.data.totalMinutes ?? 0) : "unknown"); // 읽기 실패·범위 밖은 거짓 「0분」이 아니라 「–」
     });
     return () => {
       alive = false;
@@ -165,7 +167,13 @@ export function PastDays({ api, today, onClose }: { api: ManageApi; today: strin
             <h3 id="past-record-title" className="past-record-title">
               {PAST_DAYS_TEXT.recordTitle}
             </h3>
-            <p className="past-record-total">{formatMinutes(record)}</p>
+            {record === "unknown" ? (
+              <p className="past-record-total" aria-label={PAST_DAYS_TEXT.recordUnknown}>
+                –
+              </p>
+            ) : (
+              <p className="past-record-total">{formatMinutes(record)}</p>
+            )}
           </section>
         )}
       </div>

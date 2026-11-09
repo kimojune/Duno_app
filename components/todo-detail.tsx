@@ -279,9 +279,15 @@ export function TodoDetail({
     noteBusyRef.current = true;
     setNoteBusy(true);
     setNoteMessage("");
-    const res = await api.addNote(id, todo.id, body);
-    noteBusyRef.current = false;
-    setNoteBusy(false);
+    let res: Awaited<ReturnType<ManageApi["addNote"]>>;
+    try {
+      res = await api.addNote(id, todo.id, body);
+    } catch {
+      res = { ok: false, error: "unavailable" };
+    } finally {
+      noteBusyRef.current = false; // 던져도 막힘이 남지 않게
+      setNoteBusy(false);
+    }
     if (res.ok) {
       noteIdRef.current = null;
       setNotes((prev) => (prev.some((n) => n.id === res.data.note.id) ? prev : [...prev, res.data.note]));

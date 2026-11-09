@@ -149,7 +149,7 @@ function Detail({ notes, after }: { notes: NoteItem[]; after?: (root: HTMLElemen
   );
 }
 
-/** 오늘 기록 나누기: 쓴 시간은 타이머 합(분야 없는 타이머 = 기타 시간)으로 정해 두어, 시간 단계에서 바로 「분야마다 나누기」를 누르면 나눈 모습이 나온다 */
+/** 오늘 기록 나누기: 시간 단계에서 쓴 시간을 2시간(시간 2 · 분 0)으로 쓴 뒤 「분야마다 나누기」를 누르면 나눈 모습이 나온다(화면 시험도 그렇게 한다) */
 function splitApi(args: { done: string[]; timer: { categoryId: string | null; minutes: number }[] }): EveningApi {
   return {
     fetchState: async () => ({
@@ -221,13 +221,13 @@ export function Fix10BGallery({ id }: { id: Fix10BGalleryId }) {
     case "sheet-goal":
       return <GoalEditor api={goalsApi} categories={CATS} goal={[{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 360 }]} onClose={noop} onSaved={noop} />;
     case "split-two":
-      // 2시간(분야 없는 타이머) + 끝낸 할 일 어학·글쓰기 → 칩 둘 고름: 60 · 60
-      return <EveningRecord api={splitApi({ done: [C1, C2], timer: [{ categoryId: null, minutes: 120 }] })} onClose={noop} />;
+      // 쓴 시간 2시간 + 끝낸 할 일 어학·글쓰기 → 칩 둘 고름: 60 · 60
+      return <EveningRecord api={splitApi({ done: [C1, C2], timer: [] })} onClose={noop} />;
     case "split-three":
-      // 2시간 + 끝낸 할 일 셋 → 칩 셋 고름: 40 · 40 · 40
-      return <EveningRecord api={splitApi({ done: [C1, C2, C3], timer: [{ categoryId: null, minutes: 120 }] })} onClose={noop} />;
+      // 쓴 시간 2시간 + 끝낸 할 일 셋 → 칩 셋 고름: 40 · 40 · 40
+      return <EveningRecord api={splitApi({ done: [C1, C2, C3], timer: [] })} onClose={noop} />;
     case "split-timer-one":
-      // 타이머 어학 30분 + 끝낸 할 일 글쓰기 → 어학 30(잰 그대로) · 글쓰기 90(남은 시간), 합 2시간
-      return <EveningRecord api={splitApi({ done: [C2], timer: [{ categoryId: C1, minutes: 30 }, { categoryId: null, minutes: 90 }] })} onClose={noop} />;
+      // 타이머 어학 30분 + 쓴 시간 2시간 + 끝낸 할 일 글쓰기 → 어학 30(잰 그대로) · 글쓰기 90(남은 시간), 합 2시간
+      return <EveningRecord api={splitApi({ done: [C2], timer: [{ categoryId: C1, minutes: 30 }] })} onClose={noop} />;
   }
 }

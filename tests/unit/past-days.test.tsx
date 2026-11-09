@@ -19,6 +19,8 @@ vi.mock("../../lib/read-client", () => ({
 vi.mock("../../app/actions", () => ({ signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
+import { deriveEveningState } from "../../lib/local/derive";
+import { emptyMirror } from "../../lib/local/reduce";
 import { PastDays } from "../../components/past-days";
 import { TodoScreen } from "../../components/todo-screen";
 
@@ -143,6 +145,26 @@ describe("지난 날 (고침10 W2b — 148:56 · 148:95, PM d-173 · d-174 ①)"
     fireEvent.keyDown(within(card).getByText("못 끝낸 일"), { key: " " });
     expect([...card.querySelectorAll(".past-dot")].map((d) => d.classList.contains("is-done"))).toEqual([true, false]);
     expect(css).toMatch(/\.past-dot\.is-done \{[^}]*background: var\(--color-primary\)/);
+  });
+
+  it("읽을 수 없는 날(7일 넘음·읽기 실패)은 거짓 「0분」 대신 「–」(화면 읽기 「알 수 없음」), 기록 0인 날은 「0분」", async () => {
+    const api = manageApi(withTodos([]));
+    api.fetchDayRecord = vi.fn(async (date: string) =>
+      date === "2026-11-06" ? { ok: true as const, data: { totalMinutes: 0 } } : { ok: false as const, error: "invalid_input" as const },
+    );
+    render(<PastDays api={api} today={TODAY.date} onClose={vi.fn()} />);
+    const total = async () => (await screen.findByRole("region", { name: "이날 기록" })).querySelector(".past-record-total")!;
+    expect((await total()).textContent).toBe("0분"); // 기록 0 = 0분
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "이전 날" })));
+    await waitFor(() => expect(screen.getByRole("region", { name: "이날 기록" }).querySelector(".past-record-total")!.textContent).toBe("–"));
+    expect(screen.getByLabelText("알 수 없음")).toBeTruthy();
+    expect(screen.queryByText("0분")).toBeNull();
+  });
+
+  it("거울 읽기: 7일을 넘은 날은 범위 밖(invalid_input) — 화면이 「–」로 보인다", () => {
+    const m = { ...emptyMirror(), synced: true };
+    expect(deriveEveningState(m, "2026-10-20", Date.parse("2026-11-07T06:00:00.000Z"))).toEqual({ ok: false, error: "invalid_input" });
+    expect(deriveEveningState(m, "2026-11-05", Date.parse("2026-11-07T06:00:00.000Z")).ok).toBe(true);
   });
 
   it("빈 날 = 카드 안 「할 일 0개」(14 보조색), 「이날 기록」 카드 = 그날 합계 숫자만(기록이 없으면 0분)", async () => {

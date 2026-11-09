@@ -37,7 +37,7 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  *   - 위에 분야 칩 줄(이름표 「분야」). 칩 = 다이얼에 넣을 분야 고르기(여럿). 맨 끝 「+ 분야」는 그 자리에서 새 분야를 더하고 골라진 칩이 된다.
  *   - 다이얼과 아래 −/+ 줄 = 고른 분야 조각 + 맨 끝 기타 조각만. 고르지 않은 분야는 조각도 줄도 없다. 12시 고정(첫 조각 시작·기타 끝이 12시).
  *   - 칩을 고르거나 풀 때마다(PM d-180, 고침10) 타이머로 잰 분야는 잰 시간 그대로 두고, 고른 나머지 분야끼리 남은 시간(쓴 시간 − 타이머 분야 잰 시간)을
- *     똑같이 나눈다(5분 단위로 내리고 나머지는 기타 — lib/evening/logic.ts splitEvenly). 고른 분야가 없으면 남은 시간 전부 기타. 합(쓴 시간)은 늘 그대로.
+ *     똑같이 나눈다(분야 없이 잰 타이머 시간도 빼서 기타에 둔다 — d-205. 5분 단위로 내리고 나머지는 기타 — lib/evening/logic.ts splitEvenly). 고른 분야가 없으면 남은 시간 전부 기타. 합(쓴 시간)은 늘 그대로.
  *     손잡이·−/+로 맞춘 뒤 칩을 더 고르거나 풀면 다시 똑같이 나뉜다(맞춘 값이 덮인다). 「균등 배분」 단추는 없다(자동으로 나눌 뿐).
  *   - 0분 조각(남은 시간이 적어 0분이 된 고른 칩 등)은 다이얼에 칠하지 않고(폭 0) 줄에서만 보인다. 0분으로 생긴 칩은 다이얼 고름을 옮기지 않아
  *     12시에 0분 조각·손잡이가 새로 서지 않는다(E1 판단).
@@ -284,7 +284,9 @@ export function EveningRecord({
   const timerSum = state ? state.timerByCategory.reduce((s, t) => s + t.minutes, 0) : 0;
   // 타이머로 잰 분야별 시간(분야 없이 켠 타이머는 기타라 뺀다)
   const timerMap: Record<string, number> = {};
+  let timerOtherSum = 0; // 분야 없이 잰 타이머(기타 타이머): 나눌 몫에서 빼고 기타에 둔다(PM d-205)
   if (state) for (const t of state.timerByCategory) if (t.categoryId !== null) timerMap[t.categoryId] = (timerMap[t.categoryId] ?? 0) + t.minutes;
+    else timerOtherSum += t.minutes;
   // 저장 항목은 분야 순서(만든 순서) → 숨은 분야 → 기타. 칩을 고른 순서와 상관없이 화면 줄 순서와 같다
   const built = buildItems(total, {
     ...Object.fromEntries(catalogIds.filter((id) => has(perCategory, id)).map((id) => [id, perCategory[id]])),
@@ -351,7 +353,7 @@ export function EveningRecord({
   /** 고른 칩(ids)끼리 남은 시간을 똑같이 나눈 값(타이머 분야는 잰 시간 그대로, 칩이 없는 숨은 분야는 prev 값 그대로) */
   function evenFor(ids: string[], prev: Record<string, number>): Record<string, number> {
     const hidden = Object.fromEntries(Object.entries(prev).filter(([id]) => !names.has(id)));
-    return splitEvenly({ totalMinutes: total, chosenIds: ids, timer: timerMap, hidden });
+    return splitEvenly({ totalMinutes: total, chosenIds: ids, timer: timerMap, hidden, timerOther: timerOtherSum });
   }
 
   /** 칩을 고른다: 고른 칩끼리 남은 시간을 똑같이 다시 나눈다(손잡이·−/+로 맞춘 값은 덮인다). 0분이 아니면 그 조각을 고른다 */

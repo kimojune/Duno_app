@@ -35,7 +35,7 @@ export function otherOf(totalMinutes: number, perCategory: Record<string, number
 
 /**
  * 칩을 고르거나 풀 때의 똑같이 나누기(PM d-180, 고침10 — 옛 「새 칩은 기타에서 30분」 · d-116 「체크한 할 일 분야 = 30분 조각」을 바꾼다).
- * 규칙 1: 남은 시간 = 쓴 시간(totalMinutes) − 타이머로 잰 분야(timer)의 잰 시간(고른 것만).
+ * 규칙 1: 남은 시간 = 쓴 시간(totalMinutes) − 타이머로 잰 분야(timer)의 잰 시간(고른 것만) − 분야 없이 잰 타이머(timerOther, d-205: 그 시간은 기타에 그대로).
  * 규칙 2: 타이머 분야는 잰 시간 그대로 두고, 고른 나머지 분야끼리 남은 시간을 똑같이 나눈다. step(5분) 단위로 내리고 나머지는 기타로 남는다(기타 = 쓴 시간 − 나눈 합).
  * 규칙 3: 고른 분야(타이머 분야 빼고)가 0개면 남은 시간 전부 기타(고른 분야 값이 없다).
  * d-181~183: 타이머 잰 시간이 쓴 시간보다 크면 남은 시간은 0(고른 분야 0분 · 기타 0분, 타이머 분야는 잰 시간 그대로).
@@ -47,6 +47,8 @@ export function splitEvenly(args: {
   chosenIds: string[];
   timer: Record<string, number>;
   hidden?: Record<string, number>;
+  /** 분야 없이 잰 타이머(기타 타이머) 분. 남은 시간에서 빼고 기타에 그대로 둔다(PM d-205 — 잰 시간은 저장 값 그대로, d-181과 맞춤) */
+  timerOther?: number;
   step?: number;
 }): Record<string, number> {
   const step = args.step ?? SPLIT_STEP;
@@ -55,7 +57,7 @@ export function splitEvenly(args: {
   const chosen = [...new Set(args.chosenIds)];
   const timerSum = chosen.filter(isTimer).reduce((s, id) => s + args.timer[id], 0);
   const hiddenSum = Object.values(hidden).reduce((s, m) => s + Math.max(0, m), 0);
-  const remaining = Math.max(0, args.totalMinutes - timerSum - hiddenSum);
+  const remaining = Math.max(0, args.totalMinutes - timerSum - hiddenSum - Math.max(0, args.timerOther ?? 0));
   const shared = chosen.filter((id) => !isTimer(id));
   const each = shared.length === 0 ? 0 : Math.floor(remaining / shared.length / step) * step;
   const out: Record<string, number> = {};
@@ -68,7 +70,7 @@ export function splitEvenly(args: {
  * 나누기 단계에 처음 들어갈 때의 값(규칙 4, d-180). AI 없이 되는 길(PRD 7-3·D-102⑥).
  * 칩이 골라진 분야 = 타이머로 잰 분야 + 그날 끝낸 할 일의 분야(catalogOrder에 있는 것만, 만든 순서). 규칙 1~3으로 똑같이 나뉜다
  * (타이머 분야이기도 하면 타이머 시간 그대로). 기타(null)의 끝낸 할 일과 catalogOrder에 없는 분야(고를 칩이 없다)는 칩을 만들지 않는다.
- * 분야 없이 켠 타이머(timerOther)는 기타다(총시간에만 든다). 타이머도 끝낸 할 일도 없으면 기타 100%.
+ * 분야 없이 켠 타이머(timerOther)는 기타에 그대로 두고 나눌 몫에서 뺀다(d-205). 타이머도 끝낸 할 일도 없으면 기타 100%.
  * 총시간이 타이머 합보다 작으면 타이머 합을 총시간으로 본다(돌려주는 total). catalogOrder에 없는 분야의 타이머 시간은
  * 화면에 칩이 없어도 값(perCategory)에는 남는다(저장에 실린다 — 지금 앱의 숨은 분야와 같은 길).
  * perCategory의 열쇠 = 골라진 칩(0분 포함). items = 미리 채운 값(저장 방식 G9의 prefilled 기준, 0분은 빠진다).
@@ -90,7 +92,7 @@ export function initialSelection(args: {
   const inCatalog = new Set(args.catalogOrder);
   const chosenIds = [...args.catalogOrder.filter((id) => done.has(id) || (args.timer[id] ?? 0) > 0)];
   const hidden = Object.fromEntries(timerEntries.filter(([id]) => !inCatalog.has(id)));
-  const perCategory = splitEvenly({ totalMinutes: total, chosenIds, timer: args.timer, hidden });
+  const perCategory = splitEvenly({ totalMinutes: total, chosenIds, timer: args.timer, hidden, timerOther });
   const items = buildItems(total, perCategory).items;
   return { total, perCategory, items };
 }

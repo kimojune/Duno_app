@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { COLOR_TOKENS } from "../../lib/design-tokens";
+import { fillWheel } from "../e2e/wheel";
 import { photoDir } from "./photo-dir";
 
 /**
@@ -259,19 +260,28 @@ test("분야 줄은 한 줄(점 12 + 이름 말줄임 + −/숫자/+ 고정): �
   await photo(page, "분야줄-긴이름");
 });
 
+async function setTwoHours(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "오늘 기록" });
+  await fillWheel(dialog, "시간", 2);
+  await fillWheel(dialog, "분", 0);
+}
+
 test("오늘 기록 나누기(PM d-180): 칩 둘 · 칩 셋 · 타이머 분야 + 칩 하나가 똑같이 나뉜다", async ({ page }) => {
   const values = async () => Object.fromEntries(await page.locator(".evening-row").evaluateAll((rows) => rows.map((r) => [r.getAttribute("data-row-key"), (r.querySelector("input") as HTMLInputElement | null)?.value ?? (r.querySelector(".ratio-value")?.textContent ?? "")])));
   await open(page, "split-two");
+  await setTwoHours(page);
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
   const two = await values();
   expect(Object.values(two).slice(0, 2)).toEqual(["60", "60"]);
   await photo(page, "나누기-칩둘");
   await open(page, "split-three");
+  await setTwoHours(page);
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   expect(Object.values(await values()).slice(0, 3)).toEqual(["40", "40", "40"]);
   await photo(page, "나누기-칩셋");
   await open(page, "split-timer-one");
+  await setTwoHours(page);
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   expect(Object.values(await values()).slice(0, 2)).toEqual(["30", "90"]); // 타이머 어학 30 그대로 · 글쓰기 = 남은 90
   await photo(page, "나누기-타이머분야+칩하나");

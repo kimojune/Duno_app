@@ -63,7 +63,7 @@ describe("initialSelection (나누기 처음 값 — PM d-180 규칙 4)", () => 
   it("총시간이 타이머 합보다 작으면 타이머 합이 총시간이 된다(분야 없는 타이머는 기타)", () => {
     const r = initialSelection({ totalMinutes: 10, timer: { [C1]: 25, [C2]: 20 }, timerOther: 5, doneCategoryIds: [C3], catalogOrder: CAT });
     expect(r.total).toBe(50);
-    expect(r.perCategory).toEqual({ [C1]: 25, [C2]: 20, [C3]: 5 });
+    expect(r.perCategory).toEqual({ [C1]: 25, [C2]: 20, [C3]: 0 }); // 기타 타이머 5분은 기타에 그대로(d-205)
     expect(sumMinutes(r.items)).toBe(50);
   });
   it("총시간 0, 타이머도 없으면 빈 목록(끝낸 할 일 칩은 0분으로 골라짐)", () => {
@@ -93,6 +93,20 @@ describe("칩 고르기·풀기 똑같이 나누기 (PM d-180 규칙 1~5, d-181~
   it("규칙 2: 풀면 남은 칩끼리 다시 똑같이(고른 칩 둘 → 하나)", () => {
     expect(splitEvenly({ totalMinutes: 120, chosenIds: [C1, C2], timer: {} })).toEqual({ [C1]: 60, [C2]: 60 });
     expect(splitEvenly({ totalMinutes: 120, chosenIds: [C2], timer: {} })).toEqual({ [C2]: 120 });
+  });
+  it("d-205: 분야 없이 잰 타이머(기타 타이머)도 나눌 몫에서 빠지고 그 시간은 기타에 그대로 남는다", () => {
+    // 합 120 − 기타 타이머 30 = 90 → 칩 둘 45씩, 기타 = 30
+    const r = splitEvenly({ totalMinutes: 120, chosenIds: [C1, C2], timer: {}, timerOther: 30 });
+    expect(r).toEqual({ [C1]: 45, [C2]: 45 });
+    expect(otherOf(120, r)).toBe(30);
+    // 타이머 분야 + 기타 타이머: 합 120 − 30 − 30 = 60 → 하나가 60, 기타 30
+    const t = splitEvenly({ totalMinutes: 120, chosenIds: [C1, C2], timer: { [C1]: 30 }, timerOther: 30 });
+    expect(t).toEqual({ [C1]: 30, [C2]: 60 });
+    expect(otherOf(120, t)).toBe(30);
+    // initialSelection도 같다
+    const i = initialSelection({ totalMinutes: 120, timer: {}, timerOther: 30, doneCategoryIds: [C1], catalogOrder: [C1] });
+    expect(i.perCategory).toEqual({ [C1]: 90 });
+    expect(i.items.find((x) => x.categoryId === null)?.minutes).toBe(30);
   });
   it("규칙 5: 맞춘 값이 있어도 다시 계산하면 똑같이 나뉜다(입력에 이전 값이 없다)", () => {
     const first = splitEvenly({ totalMinutes: 120, chosenIds: [C1, C2], timer: {} });

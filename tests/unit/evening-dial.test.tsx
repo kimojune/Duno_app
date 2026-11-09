@@ -276,18 +276,18 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(screen.getByRole("spinbutton", { name: "분" }).querySelector(".time-wheel-center")!.textContent).toBe("02");
     await press("분야마다 나누기");
     expect(otherText()).toBe("1시간 2분"); // 기타 100%
-    await press("어학, 다이얼에 넣기"); // 기타에서 30분
-    await press("포트폴리오, 다이얼에 넣기"); // 기타에서 30분 → 기타 2분
-    expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
-    expect(otherText()).toBe("2분");
-    expect(handle("start").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오, 마지막으로 고른 칩)
-    key(handle("end"), "End"); // 기타 2분을 다 가져간다(5분 걸음이어도 끝은 끝값)
-    expect(stepper("포트폴리오")).toBe(32);
-    expect(otherText()).toBe("0분");
+    // PM d-205: 분야 없이 잰 타이머(62분)는 나눌 몫에서 빠지고 기타에 그대로 — 칩을 골라도 0분
+    await press("어학, 다이얼에 넣기");
+    await press("포트폴리오, 다이얼에 넣기");
+    expect(stepper("어학")).toBe(0);
+    expect(stepper("포트폴리오")).toBe(0);
+    expect(otherText()).toBe("1시간 2분");
+    fireEvent.click(screen.getByRole("button", { name: "어학 5분 늘리기" })); // 손으로는 5분 단위
+    expect(stepper("어학")).toBe(5);
+    expect(otherText()).toBe("57분");
     await press("저장");
     expect(sent[0].totalMinutes).toBe(62);
-    expect(sent[0].items).toEqual([{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 32 }]);
+    expect(sent[0].items).toEqual([{ categoryId: C1, minutes: 5 }, { categoryId: null, minutes: 57 }]);
     expect(results).toEqual([true]);
   });
 

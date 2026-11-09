@@ -691,10 +691,12 @@ describe("고침10 W2b F 할 일 페이지 · 작업 기록 (147:58 · 147:95 ·
     const box = screen.getByRole("textbox", { name: "작업 기록" });
     fireEvent.change(box, { target: { value: "한 번만" } });
     const add = within(dialog).getByRole("button", { name: "남기기" });
-    // 같은 동작 안에서 여러 번(상태가 다시 그려지기 전) — 연타
-    fireEvent.click(add);
-    fireEvent.click(add);
-    fireEvent.submit(box.closest("form")!); // Enter 제출도 같은 길
+    // 같은 act 안에서 여러 번 — React가 다시 그리기 전이라 상태 가드(disabled)로는 못 막고 ref 가드만 막는다
+    act(() => {
+      (add as HTMLButtonElement).click();
+      (add as HTMLButtonElement).click();
+      box.closest("form")!.requestSubmit(); // Enter 제출도 같은 길
+    });
     expect(addNote).toHaveBeenCalledTimes(1);
     const busy = within(dialog).getByRole("button", { name: "남기는 중" }) as HTMLButtonElement;
     expect([busy.disabled, busy.getAttribute("aria-busy")]).toEqual([true, "true"]);
@@ -702,6 +704,17 @@ describe("고침10 W2b F 할 일 페이지 · 작업 기록 (147:58 · 147:95 ·
     expect(within(dialog).getByText("한 번만", { selector: ".note-text" })).toBeTruthy();
     expect((box as HTMLTextAreaElement).value).toBe("");
     expect(addNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("api.addNote가 던져도 막힘이 풀려 다시 남길 수 있다(실패 안내, 두 번째는 저장 호출)", async () => {
+    const addNote = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue({ ok: true as const, data: { note: note("n8", "2026-11-07", "다시") } });
+    const dialog = await open(notesApi([], { addNote }));
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 기록" }), { target: { value: "다시" } });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "남기기" })));
+    expect(screen.getByText("기록을 남기지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
+    expect((within(dialog).getByRole("button", { name: "남기기" }) as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "남기기" })));
+    expect(addNote).toHaveBeenCalledTimes(2);
   });
 
   it("「⋯」 메뉴를 열면 화면 전체 막이 깔리고(58:92) 막을 누르면 메뉴만 닫힌다. 메뉴 항목 수는 그대로(위로 · 아래로 · 지우기)", async () => {
