@@ -173,10 +173,17 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
         // P1: 새 줄 높이가 적은 직후와 저장 뒤 모두 56px(「저장하는 중」이 1초 안에는 자리를 차지하지 않는다).
         // 원샷 v2의 「자세히」는 줄 오른쪽의 작은 단추(누르는 면 48px, 줄 위아래 4px씩)라 저장 뒤에도 줄 높이가 늘지 않는다(B16)
         const rowBox = page.locator("li.todo-row", { has: page.getByText(text, { exact: true }) });
-        const heightNow = (await rowBox.boundingBox())!.height;
+        // 고침9 J2 목록 꼴(Figma 50:52): 줄 사이 1px 선(.todo-row + .todo-row border-top)은 줄 순서에 따라 붙고 빠진다.
+        // 이 시험이 지키는 것은 「저장하는 중」·「›」가 줄을 키우지 않는 것이라 선을 뺀 줄 높이를 잰다(선 두께도 같이 남김)
+        const rowHeight = () => rowBox.evaluate((el) => {
+          const border = parseFloat(getComputedStyle(el).borderTopWidth) || 0;
+          return { h: el.getBoundingClientRect().height - border, border };
+        });
+        const heightNow = await rowHeight();
         await expect(page.getByText("저장하는 중")).toHaveCount(0, { timeout: 20_000 });
-        const heightSaved = (await rowBox.boundingBox())!.height;
-        expect([heightNow, heightSaved]).toEqual([56, 56]);
+        const heightSaved = await rowHeight();
+        expect([heightNow.h, heightSaved.h]).toEqual([56, 56]);
+        for (const { border } of [heightNow, heightSaved]) expect(border === 0 || border === 1, `줄 사이 선은 0 또는 1px(${border})`).toBe(true);
       }
     }
     await expect(page.getByText("저장하는 중")).toHaveCount(0, { timeout: 20_000 });
