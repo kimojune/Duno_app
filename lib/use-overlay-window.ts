@@ -118,14 +118,22 @@ export function useConfirmBack(onCancel: () => void, own: boolean, wasConfirmed:
     const mark = crypto.randomUUID();
     let pushed = false;
     let closedByPop = false;
-    try {
-      window.history.pushState({ ...currentHistoryState(), [OVERLAY_HISTORY_MARK]: mark }, "");
-      pushed = true;
-    } catch {
-      pushed = false;
+    function pushEntry() {
+      try {
+        window.history.pushState({ ...currentHistoryState(), [OVERLAY_HISTORY_MARK]: mark }, "");
+        pushed = true;
+      } catch {
+        pushed = false;
+      }
     }
+    pushEntry();
     const unsubscribe = subscribePop((kind) => {
-      if (kind !== "user" || !pushed || closedByPop) return;
+      if (!pushed || closedByPop || kind === "forward") return;
+      if (kind === "back") {
+        // 앞서 거둔 칸의 popstate가 늦게 왔다(개발 모드에서 효과를 지웠다 다시 켤 때 등). 이 확인의 칸이 빠졌으면 다시 쌓는다
+        if (currentHistoryState()[OVERLAY_HISTORY_MARK] !== mark) pushEntry();
+        return;
+      }
       if (currentHistoryState()[OVERLAY_HISTORY_MARK] === mark) return;
       closedByPop = true;
       cancelRef.current();
