@@ -718,7 +718,7 @@ export function EveningRecord({
               {onOpenGrowth && (
                 <TextButton className="evening-open-growth text-tap" onClick={onOpenGrowth}>
                   {EVENING_TEXT.openGrowth}
-                  <span aria-hidden="true"> ›</span>
+                  <span className="evening-open-growth-go" aria-hidden="true">›</span>
                 </TextButton>
               )}
             </>

@@ -224,7 +224,8 @@ test("S5-2 나누기 · 칩 하나 고른 상태 — 87:96", async ({ page }) =>
   const picked = dialog.locator(".ratio-list li.is-picked");
   expect(await style(picked, ["background-color"])).toEqual({ "background-color": "rgb(243, 238, 230)" });
   near((await box(picked.locator(".step-btn-face").first())).width, 32, 0.5, "−/+ 원 32");
-  await expect(picked.locator(".num-field")).toHaveText("30분");
+  await expect(picked.locator(".num-field input")).toHaveValue("30"); // 숫자 칸 안에 숫자 + 단위(A3)
+  await expect(picked.locator(".num-field .stepper-unit")).toHaveText("분");
   await photo(page, "S5-2 나누기 · 칩 하나 고른 상태");
 });
 
@@ -269,7 +270,7 @@ async function afterSave(page: Page, s: string) {
   near(go.x + go.width / 2, 180, 2, "글 단추 가운데");
   expect(go.y).toBeGreaterThan((await box(card)).y + (await box(card)).height - 1);
   await expect(page.locator(".bottom-actions")).toHaveCount(0);
-  await expect(dialog.getByRole("button")).toHaveText(["닫기", "상태보기에서 보기 ›"]);
+  await expect(dialog.getByRole("button")).toHaveText(["닫기", "상태보기에서 보기›"]); // 「›」는 글자 사이 4px(꾸밈, 화면 읽기에서 숨김)
   // 막대: 높이 16, 빗금 칸은 같은 분야 색 위 사선 빗금
   const hatch = card.locator(".after-save-hatch").first();
   near((await box(hatch)).height, 16, 0.5, "막대 높이");
