@@ -45,7 +45,7 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
     const list = document.querySelector("ul.ratio-list")!;
     expect(dial.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "고르게 나누기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "균등 배분" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "어학 5% 줄이기" })).toBeTruthy();
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(2); // 기타 0%는 폭이 없다
     expect(screen.queryByText(/합이 100이 아니어도/)).toBeNull(); // 거짓이 된 글은 없다
@@ -150,9 +150,9 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
     expect(document.querySelector("b")).toBeNull();
   });
 
-  it("「고르게 나누기」는 분야끼리 합 100 균등 배분, 기타 0%로 돌리고 다이얼도 따라 바뀐다", () => {
+  it("「균등 배분」은 분야끼리 합 100 균등 배분, 기타 0%로 돌리고 다이얼도 따라 바뀐다", () => {
     render(<Host initial={[E("a", "어학", 50), E("b", "코딩", 30), E("other", "기타", 20)]} />);
-    fireEvent.click(screen.getByRole("button", { name: "고르게 나누기" }));
+    fireEvent.click(screen.getByRole("button", { name: "균등 배분" }));
     expect(values("어학", "코딩", "기타")).toEqual([50, 50, 0]);
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(2);
   });

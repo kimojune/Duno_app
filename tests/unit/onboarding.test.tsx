@@ -154,7 +154,7 @@ describe("처음 설정 (7-1, ①)", () => {
     click("포트폴리오 5% 늘리기"); // 뒤 줄(기타)이 0이라 앞 줄(어학)에서
     expect(shares("어학", "포트폴리오", "기타")).toEqual([40, 60, 0]);
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    click("고르게 나누기");
+    click("균등 배분");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
   });
 
@@ -371,7 +371,7 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     expect(screen.getByText("합계 100%")).toBeTruthy();
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]); // 기타만 0%
   });
-  it("기타를 올리면 앞 줄에서 떼어 오고(합 100 그대로), 저장 목록에 categoryId null로 실린다. 「고르게 나누기」는 기타를 0%로 돌린다", async () => {
+  it("기타를 올리면 앞 줄에서 떼어 오고(합 100 그대로), 저장 목록에 categoryId null로 실린다. 「균등 배분」은 기타를 0%로 돌린다", async () => {
     const api = fakeApi();
     mount(api);
     click("다음");
@@ -380,7 +380,7 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     click("기타 5% 늘리기");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 40, 10]); // 기타는 맨 끝 줄이라 앞 줄(포트폴리오)에서
     expect(screen.getByText("합계 100%")).toBeTruthy();
-    click("고르게 나누기");
+    click("균등 배분");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
     click("기타 5% 늘리기");
     click("다음");

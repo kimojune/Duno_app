@@ -21,9 +21,9 @@ export type NotifyItem = {
   url: string;
 };
 
-/** 알림 글. 저녁 알림 이름은 「저녁 기록」, 아침 알림 이름은 「오늘 먼저 할 일」(임시, docs/oneshot-v2/임시값.md ⑦). 재촉·평가하는 말 없음 */
+/** 알림 글. 저녁 알림 이름은 「오늘 기록」, 아침 알림 이름은 「오늘 먼저 할 일」(임시, docs/oneshot-v2/임시값.md ⑦). 재촉·평가하는 말 없음 */
 export const NOTIFY_ITEMS: Record<NotifyKind, NotifyItem> = {
-  evening: { kind: "evening", title: "저녁 기록", body: "오늘 몇 시간 썼어요?", tag: "duno-evening", url: "/?open=evening" },
+  evening: { kind: "evening", title: "오늘 기록", body: "오늘 몇 시간 썼는지 적어 둘까요?", tag: "duno-evening", url: "/?open=evening" },
   morning: { kind: "morning", title: "오늘 먼저 할 일", body: "앱을 열어 오늘 할 일을 시작해 보세요", tag: "duno-morning", url: "/" },
 };
 

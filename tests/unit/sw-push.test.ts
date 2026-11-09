@@ -55,7 +55,7 @@ async function fire(handler: Handler, event: Record<string, unknown>) {
 afterEach(() => vi.useRealTimers());
 
 const answer = (items: unknown) => async () => Response.json({ ok: true, data: { items } });
-const EVENING_ITEM = { kind: "evening", title: "저녁 기록", body: "오늘 몇 시간 썼어요?", tag: "duno-evening", url: "/?open=evening" };
+const EVENING_ITEM = { kind: "evening", title: "오늘 기록", body: "오늘 몇 시간 썼는지 적어 둘까요?", tag: "duno-evening", url: "/?open=evening" };
 const MORNING_ITEM = { kind: "morning", title: "오늘 먼저 할 일", body: "앱을 열어 오늘 할 일을 시작해 보세요", tag: "duno-morning", url: "/" };
 const BAD_WORDS = /빨리|꼭|안 하면|밀렸|부족|놓치/;
 
@@ -67,12 +67,12 @@ describe("sw.js 알림 (7-8, ⑦, 고침 3바퀴: 서버에 묻는다)", () => {
     expect(sw.fetched[0].url).toBe("/api/notify/next");
     expect(sw.fetched[0].init).toMatchObject({ credentials: "same-origin", cache: "no-store" });
   });
-  it("서버가 저녁 알림이라 하면 「저녁 기록」을 보이고, 누르면 저녁 기록 주소를 연다", async () => {
+  it("서버가 저녁 알림이라 하면 「오늘 기록」을 보이고, 누르면 오늘 기록 주소를 연다", async () => {
     const sw = load(answer([EVENING_ITEM]));
     await fire(sw.handlers.push, {});
     expect(sw.shown).toHaveLength(1);
-    expect(sw.shown[0].title).toBe("저녁 기록");
-    expect(sw.shown[0].options).toMatchObject({ body: "오늘 몇 시간 썼어요?", tag: "duno-evening", data: { url: "/?open=evening" } });
+    expect(sw.shown[0].title).toBe("오늘 기록");
+    expect(sw.shown[0].options).toMatchObject({ body: "오늘 몇 시간 썼는지 적어 둘까요?", tag: "duno-evening", data: { url: "/?open=evening" } });
   });
   it("서버가 아침 알림이라 하면 아침 알림을 보이고, 누르면 앱 처음 화면을 연다", async () => {
     const sw = load(answer([MORNING_ITEM]));
@@ -85,7 +85,7 @@ describe("sw.js 알림 (7-8, ⑦, 고침 3바퀴: 서버에 묻는다)", () => {
     vi.setSystemTime(new Date("2026-11-07T01:00:00.000Z")); // 서울 10:00
     const sw = load(answer([EVENING_ITEM]));
     await fire(sw.handlers.push, {});
-    expect(sw.shown[0].title).toBe("저녁 기록");
+    expect(sw.shown[0].title).toBe("오늘 기록");
     vi.setSystemTime(new Date("2026-11-07T10:30:00.000Z")); // 서울 19:30
     const sw2 = load(answer([MORNING_ITEM]));
     await fire(sw2.handlers.push, {});

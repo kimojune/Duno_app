@@ -9,7 +9,7 @@ import { RatioDial, type DialSlice } from "./ratio-dial";
 import { SecondaryButton } from "./ui";
 
 /**
- * 처음 정한 비율 입력(처음 설정 3단계와 내 정보 「비율 고치기」가 같이 쓴다).
+ * 목표 비율 입력(처음 설정 3단계와 내 정보 「비율 고치기」가 같이 쓴다).
  * 위에 원형 다이얼, 아래에 분야마다 −/+ 단추(5% 단위)와 숫자 칸 목록이다. 셋은 같은 값과 같은 「고른 조각」을 쓴다.
  * 끌지 않는 길이 늘 함께 있다(WCAG 2.5.7): 다이얼 손잡이의 화살표 키, −/+ 단추, 숫자 칸. 숫자를 숨기지 않고 합계도 보인다.
  * 합은 늘 100이다(PM 확정 11-08). 열 때 저장값의 합이 100이 아니면 비율을 지켜 합 100의 정수로 맞추고(바깥 상태에도 바로 알린다),
@@ -53,8 +53,8 @@ export function entriesToRatios(entries: RatioEntry[]): RatioItem[] {
 
 export const RATIO_TEXT = {
   total: (n: number) => `합계 ${n}%`,
-  // 글은 지금 그대로(기존 시험이 이 글로 단추를 찾는다). 이름 기준(2026-10-13-feature-names)의 이름은 「균등 배분」 — 디자인 바퀴에서 맞춘다
-  even: "고르게 나누기",
+  // 이름 기준(2026-10-13-feature-names)의 이름 「균등 배분」(고침 5바퀴, 디자인 명세 ④)
+  even: "균등 배분",
   minus: (name: string) => `${name} ${RATIO_STEP}% 줄이기`,
   plus: (name: string) => `${name} ${RATIO_STEP}% 늘리기`,
   // 임시 글, 디자인 확정 뒤: 숫자 칸의 접근성 이름(고침4 2단계)
@@ -63,7 +63,7 @@ export const RATIO_TEXT = {
   hint: "대략이면 돼요. 합은 늘 100%로 맞춰져요. 나중에 고칠 수 있어요.",
 } as const;
 
-/** 「고르게 나누기」와 모두 0에서 시작할 때의 값: 분야 n개를 5% 단위로 고르게(evenRatios와 같은 값) */
+/** 「균등 배분」와 모두 0에서 시작할 때의 값: 분야 n개를 5% 단위로 고르게(evenRatios와 같은 값) */
 const evenPercents = (count: number) => evenRatios(Array.from({ length: count }, (_, i) => String(i))).map((r) => r.percent);
 
 /** 숫자 칸: 쓰는 동안은 글 그대로 두고, 칸을 떠나거나 Enter를 누를 때 0~100 정수로 읽는다. 아니면(빈 칸·글자·소수·음수·100 넘음·붙여넣은 이상한 글) 이전 값으로 돌린다 */
@@ -119,7 +119,7 @@ export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onCh
   function set(i: number, percent: number) {
     onChange(withValues(setShare(shown, i, percent, 100)));
   }
-  // 「고르게 나누기」는 분야끼리 나눈다(기타 줄은 0%로 돌아간다: 기타를 비율에 넣는 것은 사용자가 고른 때만). 분야가 없으면 기타가 100%
+  // 「균등 배분」는 분야끼리 나눈다(기타 줄은 0%로 돌아간다: 기타를 비율에 넣는 것은 사용자가 고른 때만). 분야가 없으면 기타가 100%
   function even() {
     onChange(withValues(startHundred(raw.map(() => 0), evenPercents, categoryIdx)));
   }

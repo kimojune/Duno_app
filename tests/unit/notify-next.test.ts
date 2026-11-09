@@ -50,7 +50,7 @@ describe("pickNotifications (지금 보낼 알림이 무엇인가)", () => {
     expect(kinds(pickNotifications({ notify: late, nowMinute: at(0, 5), windowMinutes: 15 }))).toEqual(["evening"]);
   });
   it("알림 글: 저녁은 저녁 기록을 열고 아침은 처음 화면을 연다. 이름이 서로 다르고 재촉하지 않는다", () => {
-    expect(NOTIFY_ITEMS.evening).toMatchObject({ title: "저녁 기록", url: "/?open=evening", tag: "duno-evening" });
+    expect(NOTIFY_ITEMS.evening).toMatchObject({ title: "오늘 기록", body: "오늘 몇 시간 썼는지 적어 둘까요?", url: "/?open=evening", tag: "duno-evening" });
     expect(NOTIFY_ITEMS.morning).toMatchObject({ title: "오늘 먼저 할 일", url: "/", tag: "duno-morning" });
     expect(NOTIFY_ITEMS.evening.tag).not.toBe(NOTIFY_ITEMS.morning.tag);
     for (const i of Object.values(NOTIFY_ITEMS)) expect(`${i.title} ${i.body}`).not.toMatch(/빨리|꼭|안 하면|밀렸|부족|놓치/);

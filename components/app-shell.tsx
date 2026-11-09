@@ -60,7 +60,7 @@ export const LOCAL_SAVE_TEXT = {
     "note.add": "작업 기록",
     "category.add": "분야",
     "settings.save": "목표 한 문장",
-    "evening.save": "저녁 기록",
+    "evening.save": "오늘 기록",
   } as Partial<Record<string, string>>,
   archivedKindOther: "기록",
   copy: "복사",
