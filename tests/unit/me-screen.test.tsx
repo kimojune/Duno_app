@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeScreen } from "../../components/me-screen";
 import type { SettingsApi } from "../../lib/onboarding-api";
@@ -332,5 +334,51 @@ describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
     await openRatio();
     await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }]);
+  });
+});
+
+describe("고침10 I: 로그아웃 = 알림 카드 아래 흰 카드 줄(Figma 147:142)", () => {
+  const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+  const rule = (selector: string) => {
+    const start = css.indexOf(`
+${selector} {`);
+    return start < 0 ? "" : css.slice(start, css.indexOf("}", start));
+  };
+
+  it("알림 카드 바로 아래 카드 전체가 누름인 단추 하나(이름 「로그아웃」), 누르면 onLogout 한 번", async () => {
+    const onLogout = vi.fn();
+    render(<MeScreen settings={settings()} categories={categories} api={fakeApi()} push={fakePush()} onLogout={onLogout} />);
+    const row = screen.getByRole("button", { name: "로그아웃" });
+    expect(row.tagName).toBe("BUTTON");
+    expect(row.id).toBe("me-logout-button");
+    expect(row.className).toBe("me-logout-row");
+    expect(row.textContent).toBe("로그아웃");
+    // 알림 카드 뒤(문서 순서), 단추 글(btn-text) 꼴이 아니다
+    const notify = document.getElementById("me-notify-title")!.closest("section")!;
+    expect(notify.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notify.contains(row)).toBe(false);
+    expect(row.classList.contains("btn-text")).toBe(false);
+    await press("로그아웃");
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it("onLogout이 없으면 그리지 않는다. 설정을 못 읽어도 로그아웃 줄은 있다", () => {
+    const { unmount } = render(<MeScreen settings={settings()} categories={categories} api={fakeApi()} push={fakePush()} />);
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+    unmount();
+    render(<MeScreen settings={null} categories={categories} api={fakeApi()} push={fakePush()} onLogout={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "로그아웃" })).toBeTruthy();
+  });
+
+  it("CSS: 폭 가득 · 높이 56 · 모서리 16 · 흰 바탕 · 글 16 Regular --color-text · 경고 색 없음", () => {
+    const r = rule(".me-logout-row");
+    expect(r).toContain("inline-size: 100%");
+    expect(r).toContain("min-block-size: 56px");
+    expect(r).toContain("border-radius: var(--radius-card, 16px)");
+    expect(r).toContain("background: var(--color-surface)");
+    expect(r).toContain("color: var(--color-text)");
+    expect(r).toContain("font: var(--font-body)");
+    expect(r).toContain("font-weight: 400");
+    expect(r).not.toMatch(/#[0-9a-f]{3,6}|red|danger|warn/i);
   });
 });

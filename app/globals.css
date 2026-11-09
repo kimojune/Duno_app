@@ -1041,8 +1041,11 @@ select.input { appearance: auto; }
 .slot-card { min-height: calc(var(--tap-min) + var(--space-2)); margin-bottom: var(--space-2); } /* 한 줄 카드(.entry-card)의 높이: 단추 48 + 위아래 4 */
 .slot-carry { min-height: calc(var(--tap-min) + var(--space-4)); }
 
-/* ---- 로그아웃(내 정보 맨 아래, B18) ---- */
-.me-logout { margin-top: var(--space-8); display: flex; justify-content: flex-start; }
+/* ---- 로그아웃(내 정보, B18 · 고침10 I: 알림 카드 아래 흰 카드 줄 — Figma 147:142) ----
+   카드 전체가 누름(폭 가득 · 높이 56 · 모서리 16). 글 16 Regular --color-text, 경고 색 없음. 아래 탭 줄에 가리지 않게 .me의 아래 여백을 쓴다 */
+.me-logout { margin-top: var(--space-4); }
+.me-logout-row { display: flex; align-items: center; inline-size: 100%; min-block-size: 56px; padding: 0 var(--space-4); border: 0; border-radius: var(--radius-card, 16px); background: var(--color-surface); color: var(--color-text); font: var(--font-body); font-weight: 400; text-align: start; cursor: pointer; }
+.me-logout-row:active { background: var(--color-notice-bg); }
 
 /* ---- 분야 색 윤곽(고침 5바퀴, 디자인 명세 ① · 한 곳) ----
    분야 색은 흰 바탕 3:1 미만이라 칠한 그래픽마다 --color-chart-outline 1px 윤곽을 둔다(WCAG 1.4.11).
