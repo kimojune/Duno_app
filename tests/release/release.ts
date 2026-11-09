@@ -22,7 +22,7 @@ export const PHOTO_DIR = process.env.SAVE_PHOTOS === "1" ? `docs/oneshot-v2/${PH
 export const PHOTO_SCALE = Number(process.env.PHOTO_SCALE ?? "1") || 1;
 const LOG_DIR = "test-results/release";
 
-export type PhotoRow = { name: string; node: string; file: string | null; fake: boolean; note?: string };
+export type PhotoRow = { name: string; node: string; file: string | null; fake: boolean; note?: string; /** 그날 데이터 한 줄(분야별 타이머 분 · 분야 없는 타이머 분 · 남긴 기록 유무) */ data?: string };
 
 function logRow(kind: "photos" | "scenarios", row: unknown) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -37,7 +37,7 @@ export function fileName(name: string, fake: boolean): string {
 }
 
 /** 360×800 사진(나타남 애니메이션은 끝낸 뒤) + 사진 목록 줄 */
-export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string; suffix?: string } = {}) {
+export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string; suffix?: string; data?: string } = {}) {
   const fake = opts.fake ?? false;
   const file = fileName(name, fake).replace(/\.png$/, `${opts.suffix ?? ""}.png`);
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
@@ -48,8 +48,38 @@ export async function shot(page: Page, name: string, node: string, opts: { fake?
   });
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.screenshot({ path: path.join(PHOTO_DIR, file), animations: "disabled" });
+  // 23 제안: 사진과 함께 그 화면의 계산된 글꼴·굵기·상자 크기를 JSON으로 남긴다(눈대중을 줄인다). 사진과 같은 이름 + .json
+  try {
+    const metrics = await page.evaluate(() => {
+      const first = (v: string) => v.split(",")[0].replace(/["']/g, "").trim();
+      const visible = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && r.bottom > 0 && r.top < innerHeight;
+      };
+      const items = [...document.querySelectorAll("button, a, h1, h2, h3, label, input, select, textarea, [role=timer], [role=spinbutton], p, li")]
+        .filter(visible)
+        .slice(0, 120)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          const text = (el.getAttribute("aria-label") || (el as HTMLElement).innerText || (el as HTMLInputElement).value || "").replace(/\s+/g, " ").trim().slice(0, 30);
+          return { tag: el.tagName.toLowerCase(), cls: String((el as HTMLElement).className || "").slice(0, 40), text, family: first(cs.fontFamily), size: cs.fontSize, weight: cs.fontWeight, x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 };
+        });
+      return {
+        viewport: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio },
+        bodyFamily: getComputedStyle(document.body).fontFamily,
+        notoSansKrAvailable: document.fonts.check('16px "Noto Sans KR"'),
+        loadedFontFaces: [...document.fonts].map((f) => `${f.family}:${f.status}`),
+        items,
+      };
+    });
+    fs.writeFileSync(path.join(PHOTO_DIR, file.replace(/\.png$/, ".json")), JSON.stringify(metrics, null, 1), "utf8");
+  } catch {
+    // 측정이 안 되어도 사진은 이미 남았다
+  }
   const note = [opts.note, loadingLeft ? "「불러오는 중」이 남은 채 찍힘" : ""].filter(Boolean).join(" · ") || undefined;
-  logRow("photos", { name, node, file, fake, note } satisfies PhotoRow);
+  logRow("photos", { name, node, file, fake, note, data: opts.data } satisfies PhotoRow);
 }
 
 /** 찍지 못한 화면 */

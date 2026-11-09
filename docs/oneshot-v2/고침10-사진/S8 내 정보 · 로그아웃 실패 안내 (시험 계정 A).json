@@ -1,0 +1,192 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": [
+  {
+   "tag": "h2",
+   "cls": "close-confirm-title",
+   "text": "로그아웃할까요?",
+   "family": "system-ui",
+   "size": "18px",
+   "weight": "700",
+   "x": 48,
+   "y": 285,
+   "w": 264,
+   "h": 22
+  },
+  {
+   "tag": "p",
+   "cls": "close-confirm-desc",
+   "text": "아직 저장되지 않은 기록은 이 기기에서 지워져요.",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "400",
+   "x": 48,
+   "y": 315,
+   "w": 264,
+   "h": 40
+  },
+  {
+   "tag": "p",
+   "cls": "close-confirm-error",
+   "text": "로그아웃하지 못했어요. 다시 눌러 주세요.",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "500",
+   "x": 48,
+   "y": 363,
+   "w": 264,
+   "h": 20
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-secondary",
+   "text": "로그아웃",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 48,
+   "y": 411,
+   "w": 264,
+   "h": 48
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-primary",
+   "text": "계속 쓰기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 48,
+   "y": 471,
+   "w": 264,
+   "h": 48
+  },
+  {
+   "tag": "h1",
+   "cls": "today-title",
+   "text": "내 정보",
+   "family": "system-ui",
+   "size": "24px",
+   "weight": "700",
+   "x": 16,
+   "y": 24,
+   "w": 328,
+   "h": 32
+  },
+  {
+   "tag": "button",
+   "cls": "me-logout-row",
+   "text": "로그아웃",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 16,
+   "y": 160,
+   "w": 328,
+   "h": 56
+  },
+  {
+   "tag": "li",
+   "cls": "tabbar-item",
+   "text": "상태보기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 0,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "button",
+   "cls": "tabbar-btn",
+   "text": "상태보기",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 0,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "li",
+   "cls": "tabbar-item",
+   "text": "할 일",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 90,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "button",
+   "cls": "tabbar-btn",
+   "text": "할 일",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 90,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "li",
+   "cls": "tabbar-item",
+   "text": "타이머",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 180,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "button",
+   "cls": "tabbar-btn",
+   "text": "타이머",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 180,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "li",
+   "cls": "tabbar-item",
+   "text": "내 정보",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 270,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  },
+  {
+   "tag": "button",
+   "cls": "tabbar-btn",
+   "text": "내 정보",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "700",
+   "x": 270,
+   "y": 736,
+   "w": 90,
+   "h": 64
+  }
+ ]
+}

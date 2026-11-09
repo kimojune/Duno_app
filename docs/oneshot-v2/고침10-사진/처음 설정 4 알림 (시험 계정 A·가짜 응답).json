@@ -1,0 +1,180 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": [
+  {
+   "tag": "button",
+   "cls": "head-btn head-btn-back",
+   "text": "이전",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 4,
+   "y": 10,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "tag": "p",
+   "cls": "screen-head-step",
+   "text": "4단계 중 4단계",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 44,
+   "y": 26,
+   "w": 312,
+   "h": 16
+  },
+  {
+   "tag": "h1",
+   "cls": "onboarding-title",
+   "text": "알림",
+   "family": "system-ui",
+   "size": "24px",
+   "weight": "700",
+   "x": 16,
+   "y": 78,
+   "w": 328,
+   "h": 32
+  },
+  {
+   "tag": "label",
+   "cls": "notify-toggle",
+   "text": "오늘 기록 알림",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 142,
+   "w": 296,
+   "h": 48
+  },
+  {
+   "tag": "input",
+   "cls": "notify-switch-input",
+   "text": "on",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 284,
+   "y": 142,
+   "w": 44,
+   "h": 48
+  },
+  {
+   "tag": "label",
+   "cls": "sr-only",
+   "text": "오늘 기록 알림 시각",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 31,
+   "y": 215.5,
+   "w": 1,
+   "h": 1
+  },
+  {
+   "tag": "select",
+   "cls": "input notify-time-select",
+   "text": "오전 12:00 오전 12:30 오전 1:00 오전 1",
+   "family": "system-ui",
+   "size": "13px",
+   "weight": "500",
+   "x": 32,
+   "y": 194,
+   "w": 101,
+   "h": 44
+  },
+  {
+   "tag": "p",
+   "cls": "notify-preview",
+   "text": "“오늘 몇 시간 썼는지 적어 둘까요?”",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 32,
+   "y": 246,
+   "w": 296,
+   "h": 16
+  },
+  {
+   "tag": "label",
+   "cls": "notify-toggle",
+   "text": "아침 알림",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 279,
+   "w": 296,
+   "h": 48
+  },
+  {
+   "tag": "input",
+   "cls": "notify-switch-input",
+   "text": "on",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 284,
+   "y": 279,
+   "w": 44,
+   "h": 48
+  },
+  {
+   "tag": "label",
+   "cls": "sr-only",
+   "text": "아침 알림 시각",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 31,
+   "y": 352.5,
+   "w": 1,
+   "h": 1
+  },
+  {
+   "tag": "select",
+   "cls": "input notify-time-select",
+   "text": "오전 12:00 오전 12:30 오전 1:00 오전 1",
+   "family": "system-ui",
+   "size": "13px",
+   "weight": "500",
+   "x": 32,
+   "y": 331,
+   "w": 101,
+   "h": 44
+  },
+  {
+   "tag": "p",
+   "cls": "notify-preview",
+   "text": "“오늘 먼저 할 일”",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 32,
+   "y": 383,
+   "w": 296,
+   "h": 16
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-primary",
+   "text": "시작하기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 16,
+   "y": 716,
+   "w": 328,
+   "h": 48
+  }
+ ]
+}

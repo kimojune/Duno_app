@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { parseEnv } from "node:util";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { MirrorSnapshot } from "../../lib/local/types";
 import { addDays } from "../../lib/week";
 import { todoDayFor } from "../../lib/todos/day";
+import { fillWheel } from "../e2e/wheel";
 import { forgetSession, ids, missing, openA, openHome, PHOTO_DIR, PHOTO_SCALE, removeTodos, shot, tab } from "./release";
 
 /**
@@ -27,7 +28,7 @@ function demoCode(): string {
 }
 
 /** 사진 하나: 실패하면 「찍지 못함」으로 남기고 다음으로 간다 */
-async function take(name: string, node: string, opts: { suffix?: string; note?: string; fake?: boolean }, body: () => Promise<Page>) {
+async function take(name: string, node: string, opts: { suffix?: string; note?: string; fake?: boolean; data?: string }, body: () => Promise<Page>) {
   try {
     const page = await body();
     await shot(page, name, node, opts);
@@ -509,6 +510,288 @@ test("시험 계정 A: S7 분야 페이지 · 기타 · S2-e 빈 날", async ({ 
     });
   } finally {
     await s.context.close();
+  }
+});
+
+// ============================================================ 23 디자인 QA 1바퀴 다시 찍기(고침 1~9 · 고침 10 · 보류 · 통합 검토). 체험 들어가기 0번(시험 계정 A · 가짜 응답 · 갤러리)
+const AF = " (시험 계정 A·가짜 응답)";
+const AR = " (시험 계정 A)";
+
+test("QA1 다시: S0 시작 중(체험 들어가기 0번 — 고정 가짜 글, 시작 요청은 서버에 안 보냄)", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 800 }, deviceScaleFactor: PHOTO_SCALE });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    await expect(page.locator("input.demo-input")).toBeVisible({ timeout: 30_000 });
+    // 칸에는 실제 코드가 아니라 고정 가짜 글 8자를 넣는다. 칸 글자는 점으로 보인다(8개, 길이는 실제 코드와 무관)
+    await page.locator("input.demo-input").fill("XXXXXXXX");
+    await page.addStyleTag({ content: "input.demo-input { -webkit-text-security: disc; }" });
+    // 시작 요청은 서버로 보내지 않고 붙잡아 둔다 → 「시작 중」 상태가 그대로 보인다
+    await page.route("**/*", async (route) => {
+      if (route.request().method() === "POST") await new Promise((r) => setTimeout(r, 4000));
+      await route.abort();
+    });
+    await page.locator("button.demo-start").click();
+    await take("S0-체험코드 시작 중", "141:31", { note: "고정 가짜 글 8자(점 8개) · 시작 요청은 서버에 보내지 않고 가로채 붙잡음 — 체험 들어가기 0번", data: "로그인 전 화면 · 데이터 없음" }, async () => {
+      await expect(page.locator("button.demo-start")).toContainText("시작 중", { timeout: 5_000 });
+      return page;
+    });
+  } finally {
+    await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
+    await context.close();
+  }
+});
+
+test("QA1 다시: 시험 계정 A — 고침 1~9 화면 · d-180 · 보류 · 통합 검토", async ({ browser }) => {
+  test.setTimeout(600_000);
+  let s = await openA(browser);
+  const before = await ids(s.client, "todos");
+  const open = async (fake?: (snap: MirrorSnapshot) => MirrorSnapshot) => {
+    await s.page.waitForLoadState("networkidle").catch(() => undefined);
+    await s.page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
+    await s.context.close();
+    s = await openA(browser, fake);
+    await openHome(s);
+    return s.page;
+  };
+  const todayOf = (snap: MirrorSnapshot) => todoDayFor(new Date(snap.serverNow));
+  const readable = (snap: MirrorSnapshot) => (snap.categories ?? []).filter((c) => c.readable);
+  const mkTodo = (snap: MirrorSnapshot, i: number, text: string, day: string, done: boolean, categoryId: string | null) => ({
+    id: `00000000-0000-4000-8000-00000000e${String(i).padStart(3, "0")}`,
+    day,
+    text,
+    done,
+    createdAt: new Date(new Date(snap.serverNow).getTime() - (10 - i) * 60_000).toISOString(),
+    categoryId,
+    position: i,
+    hasNotes: false,
+  });
+  const mkSession = (snap: MirrorSnapshot, i: number, categoryId: string | null, minutes: number) => {
+    const now = new Date(snap.serverNow);
+    return {
+      id: `00000000-0000-4000-8000-00000000d${String(i).padStart(3, "0")}`,
+      startedAt: new Date(now.getTime() - (minutes + 1) * 60_000).toISOString(),
+      day: todayOf(snap),
+      plannedMinutes: minutes,
+      endedAt: snap.serverNow,
+      elapsedSeconds: minutes * 60,
+      todoId: null,
+      categoryId,
+      offerId: null,
+      surface: "timer_tab" as const,
+      oppositeByGoal: null,
+      oppositeByRatio: null,
+    };
+  };
+  const noTodayLog = (snap: MirrorSnapshot) => (snap.logs ?? []).filter((l) => l.targetDay !== todayOf(snap));
+  const openEvening = async (page: Page) => {
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
+    const dialog = page.getByRole("dialog", { name: "오늘 기록" });
+    await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 20_000 });
+    return dialog;
+  };
+  const setTwoHours = async (dialog: Locator) => {
+    await fillWheel(dialog, "시간", 2);
+    await fillWheel(dialog, "분", 0);
+  };
+  const leaveSplit = async (page: Page, dialog: Locator) => {
+    await dialog.press("Escape");
+    await page.getByRole("alertdialog").getByRole("button", { name: "나가기" }).click().catch(() => undefined);
+  };
+  const intoSplit = async (dialog: Locator) => {
+    await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
+    await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
+    // 칩은 펼치지 않는다(분야 40개를 다 펼치면 다이얼·값이 화면 밖으로 밀린다). 켜진 칩은 앞쪽 분야라 접힌 줄에도 보인다
+  };
+  try {
+    // ---- 고침 4: S2-e 지난 날 · 할 일 있는 날(분야 점 + 이름 · 이날 기록 한 줄)
+    let page = await open((snap) => {
+      const cats = readable(snap);
+      const yesterday = addDays(todayOf(snap), -1);
+      return { ...snap, todos: [mkTodo(snap, 1, "토익 단어 50개", yesterday, true, cats[0]?.id ?? null), mkTodo(snap, 2, "글 한 편 초고 쓰기", yesterday, false, cats[1]?.id ?? null), mkTodo(snap, 3, "빨래", yesterday, true, null)] };
+    });
+    await take("S2-e 지난 날 · 할 일 있는 날", "148:56", { suffix: AF, data: "어제 할 일 3개(끝냄 2 · 분야 둘 + 기타) · 어제 기록은 시험 계정 A 실제 값" }, async () => {
+      await page.getByRole("button", { name: "지난 날 보기" }).click();
+      await expect(page.getByRole("dialog", { name: "지난 날" }).locator(".category-tag")).toHaveCount(2);
+      return page;
+    });
+
+    // ---- 고침 7: S8-a 목표 비율(분야 40개 — 「균등 배분」이 첫 화면에 보이고 가려지지 않음)
+    page = await open();
+    await take("S8-a 목표 비율 · 첫 화면(균등 배분 붙박이)", "81:380", { suffix: AR, data: "시험 계정 A 실제 분야 40개(e2e 잔재) · 비율은 기타 100%" }, async () => {
+      await tab(page, "내 정보");
+      await page.getByRole("button", { name: /목표 비율/ }).first().click();
+      await expect(page.getByRole("dialog", { name: "목표 비율" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "균등 배분" })).toBeVisible();
+      return page;
+    });
+    await take("S8-a 목표 비율 · 끝까지 내림", "81:380", { suffix: AR, data: "위와 같음(목록 끝까지 내린 모습)" }, async () => {
+      await page.mouse.move(180, 400);
+      await page.mouse.wheel(0, 8000);
+      await page.waitForTimeout(500);
+      return page;
+    });
+    await page.keyboard.press("Escape");
+
+    // ---- 고침 9: S2-d 이번 주 목표 시트(분야 줄 숫자 + 단위 한 덩어리)
+    page = await open();
+    await take("S2-d 이번 주 목표 시트", "50:332", { suffix: AR, data: "시험 계정 A 실제 값(이번 주 목표는 이전 시험이 남긴 상태 그대로) · 분야 40개" }, async () => {
+      await page.getByRole("button", { name: /^이번 주 목표/ }).first().click();
+      await expect(page.getByRole("dialog", { name: "이번 주 목표" })).toBeVisible();
+      return page;
+    });
+    await page.keyboard.press("Escape");
+
+    // ---- 고침 8: S5-1 시간 단계(「− 5분」「+ 5분」 보조 단추) · d-174 ② 이미 기록을 남긴 날 S5 첫 화면
+    page = await open((snap) => ({ ...snap, logs: noTodayLog(snap), sessions: [] }));
+    let dialog = await openEvening(page);
+    await take("S5-1 시간 단계", "49:5", { suffix: AF, data: "타이머 없음(분야별 0분 · 분야 없는 0분) · 오늘 기록 없음(오늘 기록을 가짜 응답에서 뺌)" }, async () => page);
+    await dialog.getByRole("button", { name: "이전" }).click();
+    page = await open((snap) => {
+      const day = todayOf(snap);
+      const base = snap.logs?.[0];
+      const log = base ? { ...base, id: "00000000-0000-4000-8000-00000000c001", targetDay: day, totalMinutes: 150, savedAt: snap.serverNow } : null;
+      return { ...snap, logs: log ? [...noTodayLog(snap), log] : snap.logs, sessions: [] };
+    });
+    dialog = await openEvening(page);
+    await take("S5-1 시간 단계 · 이미 기록을 남긴 날(d-174 ②)", "49:5", { suffix: AF, data: "타이머 없음 · 오늘 기록 있음(2시간 30분, 가짜 응답이 오늘 날짜로 더함) · 「이미 남긴 기록이 있어요…」 글이 없어야 함" }, async () => {
+      await expect(page.getByText(/이미 남긴 기록이 있어요/)).toHaveCount(0);
+      return page;
+    });
+    await dialog.getByRole("button", { name: "이전" }).click();
+
+    // ---- 고침 10 · d-180: 칩 둘 / 타이머 분야 + 칩 하나 / 칩 셋(데이터가 다르다)
+    page = await open((snap) => {
+      const cats = readable(snap);
+      const day = todayOf(snap);
+      return { ...snap, logs: noTodayLog(snap), sessions: [], todos: [mkTodo(snap, 1, "토익 단어 50개", day, true, cats[0]?.id ?? null), mkTodo(snap, 2, "글 한 편 초고 쓰기", day, true, cats[1]?.id ?? null)] };
+    });
+    dialog = await openEvening(page);
+    await setTwoHours(dialog);
+    await intoSplit(dialog);
+    await take("S5-2 나누기 · 칩 둘 고름", "49:26", { suffix: AF, data: "분야별 타이머 0분 · 분야 없는 타이머 0분 · 오늘 기록 없음 · 쓴 시간 2시간 · 끝낸 할 일 분야 둘(분야 A·B 각 1개) → 칩 둘이 처음부터 켜짐, 120분을 60·60으로 똑같이" }, async () => page);
+    await leaveSplit(page, dialog);
+
+    page = await open((snap) => {
+      const cats = readable(snap);
+      const day = todayOf(snap);
+      return { ...snap, logs: noTodayLog(snap), sessions: [mkSession(snap, 1, cats[0]?.id ?? null, 30)], todos: [mkTodo(snap, 2, "글 한 편 초고 쓰기", day, true, cats[1]?.id ?? null)] };
+    });
+    dialog = await openEvening(page);
+    await setTwoHours(dialog);
+    await intoSplit(dialog);
+    await take("S5-2 나누기 · 타이머 분야 + 칩 하나", "87:96", { suffix: AF, data: "분야 A 타이머 30분 · 분야 없는 타이머 0분 · 오늘 기록 없음 · 쓴 시간 2시간 · 끝낸 할 일 분야 B 1개 → 분야 A 30분(타이머 그대로) + 분야 B 90분" }, async () => page);
+    await leaveSplit(page, dialog);
+
+    page = await open((snap) => {
+      const cats = readable(snap);
+      const day = todayOf(snap);
+      return { ...snap, logs: noTodayLog(snap), sessions: [], todos: [0, 1, 2].map((i) => mkTodo(snap, i + 1, `할 일 ${i + 1}`, day, true, cats[i]?.id ?? null)) };
+    });
+    dialog = await openEvening(page);
+    await setTwoHours(dialog);
+    await intoSplit(dialog);
+    await take("S5-2 나누기 · 칩 셋 고름", "87:96", { suffix: AF, data: "분야별 타이머 0분 · 분야 없는 타이머 0분 · 오늘 기록 없음 · 쓴 시간 2시간 · 끝낸 할 일 분야 셋(각 1개) → 40·40·40(숫자 칸 단위 한 덩어리 고침 9 확인용)" }, async () => page);
+    await leaveSplit(page, dialog);
+
+    // ---- d-205: 분야 없는 타이머만 있는 날(62분) · 기록 없음
+    page = await open((snap) => ({ ...snap, logs: noTodayLog(snap), todos: [], sessions: [mkSession(snap, 1, null, 62)] }));
+    dialog = await openEvening(page);
+    await intoSplit(dialog);
+    await take("S5-2 나누기 · 분야 없는 타이머만 있는 날(d-205)", "87:2", { suffix: AF, data: "분야별 타이머 0분 · 분야 없는 타이머 62분 · 오늘 기록 없음 · 끝낸 할 일 없음 → 쓴 시간 1시간 2분 전부 기타에 그대로(나눌 몫 0)" }, async () => page);
+    await leaveSplit(page, dialog);
+
+    // ---- S4 타이머 고르기: 첫 할 일이 처음부터 골라진 채(나머지는 안 고른 빈 원) → 둘째를 고름
+    page = await open((snap) => {
+      const cats = readable(snap);
+      const day = todayOf(snap);
+      return { ...snap, sessions: [], todos: [mkTodo(snap, 1, "토익 단어 50개", day, false, cats[0]?.id ?? null), mkTodo(snap, 2, "글 한 편 초고 쓰기", day, false, cats[1]?.id ?? null), mkTodo(snap, 3, "빨래", day, false, null)] };
+    });
+    await take("S4 타이머 · 고르기(처음 — 첫 줄만 골라짐, 나머지 안 고름)", "50:390", { suffix: AF, data: "타이머 없음 · 오늘 할 일 3개(분야 A · 분야 B · 기타) · 처음 값 = 첫 할 일" }, async () => {
+      await tab(page, "타이머");
+      await expect(page.getByRole("heading", { name: "무엇을 할까요?" })).toBeVisible({ timeout: 20_000 });
+      return page;
+    });
+    await take("S4 타이머 · 고르기(둘째 줄 고름)", "50:390", { suffix: AF, data: "위와 같음(둘째 할 일을 고름)" }, async () => {
+      await page.getByRole("radio").nth(1).check({ force: true });
+      return page;
+    });
+
+    // ---- 보류: 작업 기록을 남긴 뒤 S2의 종이 아이콘
+    page = await open();
+    await page.getByRole("button", { name: "할 일 적기" }).click();
+    await page.getByRole("textbox", { name: "할 일 적기" }).fill("아이콘 확인 줄");
+    await page.getByRole("button", { name: "적기", exact: true }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click();
+    await page.getByRole("button", { name: "자세히 보기: 아이콘 확인 줄" }).click();
+    await page.getByRole("textbox", { name: /작업 기록/ }).fill("Day 12까지 끝내기");
+    await page.getByRole("button", { name: "남기기", exact: true }).click();
+    await expect(page.locator("li.note-item", { hasText: "Day 12까지 끝내기" })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("dialog", { name: "할 일 자세히" }).getByRole("button", { name: "이전" }).click();
+    await take("S2 할 일 · 작업 기록을 남긴 뒤(종이 아이콘)", "50:52 · 58:92", { suffix: AR, data: "방금 만든 할 일 1개에 작업 기록 1건을 남긴 직후 · 그 밖은 시험 계정 A 실제 값" }, async () => {
+      await expect(page.locator("li.todo-row", { hasText: "아이콘 확인 줄" }).getByRole("img", { name: "작업 기록 있음" })).toBeVisible();
+      return page;
+    });
+
+    // ---- 보류: 끊긴 채 적은 줄의 저장 대기 원(128:87)
+    page = await open();
+    await s.context.setOffline(true);
+    await page.getByRole("button", { name: "할 일 적기" }).click();
+    await page.getByRole("textbox", { name: "할 일 적기" }).fill("끊긴 채 적은 줄");
+    await page.getByRole("button", { name: "적기", exact: true }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click();
+    await take("S2 할 일 · 끊긴 채 적은 줄(저장 대기 원)", "128:87", { suffix: AR, data: "네트워크를 끊은 채 할 일 1개를 적은 직후(서버에 아직 없음) · 그 밖은 시험 계정 A 실제 값" }, async () => {
+      await expect(page.locator("li.todo-row", { hasText: "끊긴 채 적은 줄" }).locator(".save-pending")).toHaveCount(1);
+      return page;
+    });
+    await s.context.setOffline(false);
+    await expect(page.locator("li.todo-row", { hasText: "끊긴 채 적은 줄" }).locator(".save-pending")).toHaveCount(0, { timeout: 30_000 });
+
+    // ---- 통합 검토: 머리 단추 초점 링 「‹」 형 · 로그아웃 실패 안내
+    page = await open();
+    await take("머리 단추 · 초점 링 ‹ 형(키보드 Tab)", "146:10 · 150:58", { suffix: AR, data: "시험 계정 A 실제 값 · 내 정보 → 목표 화면 머리의 「‹」에 키보드로 초점" }, async () => {
+      await tab(page, "내 정보");
+      await page.getByRole("button", { name: /^목표,/ }).first().click();
+      const goal = page.getByRole("dialog", { name: "목표" });
+      await goal.getByRole("textbox").focus();
+      await page.keyboard.press("Shift+Tab");
+      await expect(goal.getByRole("button", { name: "이전" })).toBeFocused();
+      return page;
+    });
+    await page.keyboard.press("Escape");
+
+    page = await open();
+    const marker = `사진-${Date.now().toString(36)}`;
+    await page.route("**/*", (route) => {
+      const req = route.request();
+      if (req.method() === "POST" && (req.postData() ?? "").includes(marker)) return route.abort();
+      return route.continue();
+    });
+    await page.getByRole("button", { name: "할 일 적기" }).click();
+    await page.getByRole("textbox", { name: "할 일 적기" }).fill(`${marker} 못 보낸 글`);
+    await page.getByRole("button", { name: "적기", exact: true }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click();
+    await tab(page, "내 정보");
+    await expect(page.getByRole("button", { name: /^목표,/ }).first()).toBeVisible({ timeout: 20_000 }); // 내 정보가 다 불러와진 뒤에 로그아웃을 건다
+    await page.locator("#me-logout-button").click();
+    const confirm = page.getByRole("alertdialog", { name: "로그아웃할까요?" });
+    await expect(confirm).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("내 정보를 불러오지 못했어요")).toHaveCount(0);
+    await page.route("**/*", (route) => (route.request().method() === "POST" ? route.abort() : route.continue())); // 이제 로그아웃 요청도 못 간다
+    await confirm.getByRole("button", { name: "로그아웃", exact: true }).click();
+    await take("S8 내 정보 · 로그아웃 실패 안내", "147:2", { suffix: AR, data: "보낼 줄 1개(그 글의 요청만 막음) + 로그아웃 요청도 막음 → 「로그아웃하지 못했어요」 · 확인 창은 「내 정보」 위", note: "실제 로그아웃은 일어나지 않음(요청을 막음). 실패 뒤 뒤 화면 「내 정보」에 「불러오지 못했어요」가 보인다 — 로그아웃 요청 전에 기기 저장소(거울)가 이미 비워진 d-206 증상" }, async () => {
+      await expect(page.getByText("로그아웃하지 못했어요")).toBeVisible({ timeout: 15_000 });
+      return page;
+    });
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await confirm.getByRole("button", { name: "계속 쓰기" }).click().catch(() => undefined);
+  } finally {
+    await s.context.setOffline(false).catch(() => undefined);
+    await s.context.close();
+    const c = await openA(browser);
+    const now = await ids(c.client, "todos");
+    await removeTodos(c.client, [...now].filter((id) => !before.has(id)));
+    await c.context.close();
   }
 });
 

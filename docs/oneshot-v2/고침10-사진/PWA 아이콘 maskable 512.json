@@ -1,0 +1,11 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "\"Times New Roman\"",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": []
+}

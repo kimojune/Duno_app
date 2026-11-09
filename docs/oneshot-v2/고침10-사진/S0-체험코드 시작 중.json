@@ -1,0 +1,96 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": [
+  {
+   "tag": "h1",
+   "cls": "login-name",
+   "text": "duno",
+   "family": "system-ui",
+   "size": "32px",
+   "weight": "700",
+   "x": 140.6,
+   "y": 404,
+   "w": 78.8,
+   "h": 38
+  },
+  {
+   "tag": "p",
+   "cls": "login-sentence",
+   "text": "로그인하면 할 일을 어느 기기에서나 볼 수 있어요.",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "400",
+   "x": 20,
+   "y": 452,
+   "w": 320,
+   "h": 20
+  },
+  {
+   "tag": "button",
+   "cls": "google-btn",
+   "text": "Google로 로그인",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "500",
+   "x": 20,
+   "y": 612,
+   "w": 320,
+   "h": 48
+  },
+  {
+   "tag": "label",
+   "cls": "input-label",
+   "text": "체험 코드",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 20,
+   "y": 680,
+   "w": 320,
+   "h": 16
+  },
+  {
+   "tag": "input",
+   "cls": "input demo-input",
+   "text": "XXXXXXXX",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 20,
+   "y": 700,
+   "w": 232,
+   "h": 48
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-secondary demo-start",
+   "text": "체험 코드로 시작",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "700",
+   "x": 260,
+   "y": 700,
+   "w": 80,
+   "h": 48
+  },
+  {
+   "tag": "p",
+   "cls": "demo-error",
+   "text": "! 체험을 시작하지 못했어요. 잠시 뒤 다시 눌러 주세",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "500",
+   "x": 20,
+   "y": 752,
+   "w": 320,
+   "h": 16
+  }
+ ]
+}

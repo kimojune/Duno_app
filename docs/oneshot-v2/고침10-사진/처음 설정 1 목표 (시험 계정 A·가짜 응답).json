@@ -1,0 +1,96 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": [
+  {
+   "tag": "p",
+   "cls": "screen-head-step",
+   "text": "4단계 중 1단계",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 16,
+   "y": 26,
+   "w": 340,
+   "h": 16
+  },
+  {
+   "tag": "h1",
+   "cls": "onboarding-title",
+   "text": "목표",
+   "family": "system-ui",
+   "size": "24px",
+   "weight": "700",
+   "x": 16,
+   "y": 78,
+   "w": 328,
+   "h": 32
+  },
+  {
+   "tag": "label",
+   "cls": "input-label",
+   "text": "목표",
+   "family": "system-ui",
+   "size": "12px",
+   "weight": "400",
+   "x": 16,
+   "y": 126,
+   "w": 328,
+   "h": 16
+  },
+  {
+   "tag": "input",
+   "cls": "input goal-input",
+   "text": "글 한 편 끝내고 토익 800점 넘기기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 16,
+   "y": 146,
+   "w": 328,
+   "h": 48
+  },
+  {
+   "tag": "p",
+   "cls": "input-help",
+   "text": "예: 글 한 편 끝내고 토익 800점 넘기기",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "400",
+   "x": 16,
+   "y": 198,
+   "w": 328,
+   "h": 20
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-text text-tap",
+   "text": "건너뛰기",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "500",
+   "x": 16,
+   "y": 664,
+   "w": 328,
+   "h": 44
+  },
+  {
+   "tag": "button",
+   "cls": "btn btn-primary",
+   "text": "다음",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 16,
+   "y": 716,
+   "w": 328,
+   "h": 48
+  }
+ ]
+}

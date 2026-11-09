@@ -1,0 +1,60 @@
+{
+ "viewport": {
+  "w": 360,
+  "h": 800,
+  "dpr": 2
+ },
+ "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+ "notoSansKrAvailable": true,
+ "loadedFontFaces": [],
+ "items": [
+  {
+   "tag": "h1",
+   "cls": "",
+   "text": "두노",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 16,
+   "y": 16,
+   "w": 328,
+   "h": 24
+  },
+  {
+   "tag": "p",
+   "cls": "",
+   "text": "인터넷에 연결되지 않았어요.",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 84,
+   "w": 296,
+   "h": 24
+  },
+  {
+   "tag": "p",
+   "cls": "",
+   "text": "연결되면 할 일을 불러올게요.",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 108,
+   "w": 296,
+   "h": 24
+  },
+  {
+   "tag": "button",
+   "cls": "btn",
+   "text": "다시 연결해 보기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "700",
+   "x": 32,
+   "y": 148,
+   "w": 296,
+   "h": 48
+  }
+ ]
+}

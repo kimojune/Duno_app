@@ -1,0 +1,87 @@
+{
+ "gallery": "/dev/states?s=D2",
+ "baseline_D1": {
+  "input": {
+   "y": 700,
+   "h": 48,
+   "w": 232,
+   "size": "16px",
+   "weight": "400"
+  },
+  "google": {
+   "y": 612,
+   "h": 48,
+   "w": 320,
+   "size": "14px",
+   "weight": "500"
+  },
+  "error": null,
+  "slot": {
+   "y": 748,
+   "h": 20,
+   "w": 320,
+   "size": "16px",
+   "weight": "400"
+  },
+  "start": {
+   "y": 700,
+   "h": 48,
+   "w": 80,
+   "size": "14px",
+   "weight": "700"
+  },
+  "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+  "loadedFontFaces": [
+   "__nextjs-Geist:unloaded",
+   "__nextjs-Geist Mono:unloaded",
+   "__nextjs-Geist:unloaded",
+   "__nextjs-Geist Mono:unloaded"
+  ]
+ },
+ "wrong_D2": {
+  "input": {
+   "y": 700,
+   "h": 48,
+   "w": 232,
+   "size": "16px",
+   "weight": "400"
+  },
+  "google": {
+   "y": 612,
+   "h": 48,
+   "w": 320,
+   "size": "14px",
+   "weight": "500"
+  },
+  "error": {
+   "y": 752,
+   "h": 16,
+   "w": 320,
+   "size": "12px",
+   "weight": "500"
+  },
+  "slot": {
+   "y": 748,
+   "h": 20,
+   "w": 320,
+   "size": "16px",
+   "weight": "400"
+  },
+  "start": {
+   "y": 700,
+   "h": 48,
+   "w": 80,
+   "size": "14px",
+   "weight": "700"
+  },
+  "bodyFamily": "system-ui, -apple-system, \"Noto Sans KR\", sans-serif",
+  "loadedFontFaces": [
+   "__nextjs-Geist:unloaded",
+   "__nextjs-Geist Mono:unloaded",
+   "__nextjs-Geist:unloaded",
+   "__nextjs-Geist Mono:unloaded"
+  ]
+ },
+ "shiftOfInputY": 0,
+ "shiftOfGoogleY": 0
+}
