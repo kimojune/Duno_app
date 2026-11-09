@@ -6,7 +6,7 @@ import { photoDir } from "./photo-dir";
 /**
  * PM d-125: 상태보기 · 이번 주 목표 뷰 · 목표를 세우지 않은 주의 「예시」 막대. 예시 글(분야 이름·「목표 n시간」)은 흐리지 않고
  * 보조 글 색(--color-text-sub, 흰 바탕 5.88:1)이며, 흐림(불투명 40%)은 막대(채움·점선·눈금)에만 남는다. 360×800 사진을 docs/oneshot-v2/고침5/에 둔다.
- * 개발 갤러리(/dev/v2?s=growth-week)의 화면이다. 개발 서버(3200)에서 돈다: npm run screens
+ * 개발 갤러리(/dev/v2?s=growth-week)의 화면이다. 개발 서버에서 돈다(SCREENS_PORT·SCREENS_DIST_DIR를 꼭 준다): npm run screens
  */
 const OUT = photoDir("고침5"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
