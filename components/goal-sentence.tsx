@@ -5,12 +5,13 @@ import type { SettingsApi } from "../lib/onboarding-api";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
-import { GoalField, goalFieldCheck } from "./goal-field";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
+import { GOAL_FIELD_TEXT, GoalField, goalFieldCheck } from "./goal-field";
 import { Notice, PrimaryButton } from "./ui";
 
 /**
  * S8-b 「목표」(고침6 ③, Figma 102:314): 내 정보 첫 카드를 누르면 열리는 겹침 화면. 처음 설정 S1-1의 목표 칸(GoalField)을 다시 쓴다.
- * - 머리 왼쪽 위 「‹」(화면 읽기 「이전」) · 이름표 「목표」 · 칸(지금 목표로 미리 채움) · 칸 아래 예시 · 주 단추 「저장」. 단계 표시·「건너뛰기」·아래 탭 없음.
+ * - 머리 왼쪽 위 「‹」(화면 읽기 「이전」 — components/back-header.tsx, 처음 설정·오늘 기록 나누기·S8-a와 같은 부품) · 이름표 「목표」 · 칸(지금 목표로 미리 채움) · 칸 아래 예시 · 주 단추 「저장」. 단계 표시·「건너뛰기」·아래 탭 없음.
  * - 저장은 내 정보가 쓰던 길 그대로: api.saveSettings({ goal }) — 같은 검사(checkGoal: 앞뒤·겹친 띄어쓰기 정리, 길이 상한), 기기 먼저 저장이면 끊겨도 막지 않음.
  *   성공하면 onSaved(새 값, 비웠으면 null) 뒤 닫힌다. 실패하면 닫지 않고 「저장하지 못했어요. 다시 눌러 주세요.」.
  * - 바꾸고 저장하지 않은 채 「‹」·Esc·기기 뒤로 가기: 앱 공통 확인 「저장하지 않고 나갈까요?」(「계속 적기」 = 확인만 닫고 S8-b는 열린 채 · 「나가기」 = 저장 없이 닫힘,
@@ -19,10 +20,9 @@ import { Notice, PrimaryButton } from "./ui";
  */
 export const GOAL_SENTENCE_TEXT = {
   title: "목표",
-  back: "이전",
-  example: "예: 포트폴리오 끝내고 토익 800점 넘기기",
+  example: GOAL_FIELD_TEXT.example,
   save: "저장",
-  saving: "저장하는 중",
+  saving: BACK_HEADER_TEXT.saving, // 「저장 중」(O-7)
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
 } as const;
@@ -99,12 +99,8 @@ export function GoalSentenceEditor({
 
   return (
     <div ref={rootRef} className="detail goal-sentence" role="dialog" aria-modal="true" aria-labelledby="goal-sentence-title" onKeyDown={onKeyDown}>
-      <div className="detail-inner">
-        <div className="overlay-head">
-          <button type="button" className="overlay-back" aria-label={GOAL_SENTENCE_TEXT.back} onClick={requestClose}>
-            <span aria-hidden="true">‹</span>
-          </button>
-        </div>
+      <div className="detail-inner screen-fill">
+        <BackHeader onBack={requestClose} />
         <h2 id="goal-sentence-title" className="onboarding-title" tabIndex={-1} ref={titleRef}>
           {GOAL_SENTENCE_TEXT.title}
         </h2>
@@ -127,11 +123,11 @@ export function GoalSentenceEditor({
             {message}
           </Notice>
         )}
-        <div className="goal-sentence-actions">
+        <BottomActions>
           <PrimaryButton busy={busy} disabled={busy || over || !online} onClick={() => void save()}>
             {busy ? GOAL_SENTENCE_TEXT.saving : GOAL_SENTENCE_TEXT.save}
           </PrimaryButton>
-        </div>
+        </BottomActions>
       </div>
       {confirm && <CloseConfirm onKeep={() => setConfirm(false)} onClose={onClose} />}
     </div>

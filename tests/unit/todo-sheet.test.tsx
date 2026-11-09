@@ -86,7 +86,7 @@ const openButton = () => screen.getByRole("button", { name: /^(할 일 적기|�
 const todoInput = () => screen.getByRole("textbox", { name: "할 일 적기" }) as HTMLInputElement;
 const newCategoryInput = () => screen.getByRole("textbox", { name: "새 분야 이름" }) as HTMLInputElement;
 const chip = (name: string) => within(chipGroup()).getByRole("button", { name });
-const chipGroup = () => screen.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
+const chipGroup = () => screen.getByRole("group", { name: "분야" });
 const addCategoryChip = () => screen.getByRole("button", { name: "+ 분야" });
 const liveText = () => (document.querySelector(".sr-only[role=status]") as HTMLElement).textContent ?? "";
 const catNotice = () => (document.querySelector(".cat-notice") as HTMLElement).textContent ?? "";
@@ -158,7 +158,8 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     const close = screen.getByRole("button", { name: "적는 창 닫기" });
     expect(close.textContent).toBe("닫기");
     expect(chipGroup().getAttribute("aria-labelledby")).toBe("category-label");
-    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["취업 준비", "운동", "CS 공부", "+ 분야"]);
+    // 고침9 ④-2: 맨 앞 「기타」 칩(분야를 고르지 않아도 되는 줄)
+    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["기타", "취업 준비", "운동", "CS 공부", "+ 분야"]);
   });
 
   it("C5 창은 모달이 아니다: aria-modal·inert가 없고, 창을 연 채 목록 체크 칸을 누를 수 있다", async () => {
@@ -199,7 +200,7 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
       (el) => !(el as HTMLButtonElement).disabled && el.getAttribute("tabindex") !== "-1",
     );
     expect(focusables.every((el) => el.getAttribute("tabindex") === null), "tabindex로 순서를 바꾸지 않는다").toBe(true);
-    expect(focusables.map((el) => el.id || el.textContent)).toEqual(["sheet-close", "todo-input", "적기", "취업 준비", "운동", "CS 공부", "add-category-chip"]);
+    expect(focusables.map((el) => el.id || el.textContent)).toEqual(["sheet-close", "todo-input", "적기", "기타", "취업 준비", "운동", "CS 공부", "add-category-chip"]);
   });
 
   it("창 안 위에서 아래 구조: 머리(할 일 적기 라벨·닫기) → 글 칸 줄 → 도움말 → 분야 라벨 → 칩 줄 → 안내", () => {
@@ -220,7 +221,7 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     }
     // 글 칸의 라벨은 머리에 있고, 칩 묶음의 이름은 분야 라벨이다
     expect(form.querySelector(".sheet-head label[for=todo-input]")!.textContent).toBe("할 일 적기");
-    expect(document.getElementById("category-label")!.textContent).toBe("분야 (고르지 않으면 기타)");
+    expect(document.getElementById("category-label")!.textContent).toBe("분야");
     expect(chipGroup().getAttribute("aria-labelledby")).toBe("category-label");
   });
 
@@ -249,13 +250,19 @@ describe("C2·C3·C4 목록 상태와 칩 줄(C9·C10·C11)", () => {
     expect(addTodo.mock.calls[0][2]).toBeNull();
   });
 
-  it("C3 빈 목록의 둘째 줄이 창 닫힘·열림에 따라 바뀐다, 0개 중 0개", () => {
+  it("C3(고침9 ⑬ 9) 빈 목록은 이름표 「예시」 + 예시 할 일 줄 둘. 창을 열어도 그대로, 0개 중 0개(예시는 셈에 안 섞임)", () => {
     renderScreen(read([]));
     expect(screen.getByText("0개 중 0개 끝냄", { exact: false })).toBeTruthy();
-    expect(screen.getByText("아래 단추를 눌러 적어 보세요.")).toBeTruthy();
-    open();
-    expect(screen.getByText("아래 칸에 적어 보세요.")).toBeTruthy();
+    const example = screen.getByRole("region", { name: "예시" });
+    expect(within(example).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "예시: 토익 단어 50개분야 어학",
+      "예시: 포트폴리오 2장 고치기분야 포트폴리오",
+    ]);
     expect(screen.queryByText("아래 단추를 눌러 적어 보세요.")).toBeNull();
+    open();
+    expect(screen.getByRole("region", { name: "예시" })).toBeTruthy();
+    expect(screen.queryByText("아래 칸에 적어 보세요.")).toBeNull();
+    expect(screen.getByText("0개 중 0개 끝냄", { exact: false })).toBeTruthy();
   });
 
   it("C4 목록 실패(T9)에도 단추가 있고, 창의 칩 줄은 C10(「+ 분야」 없음, 「다시 불러오기」는 할 일과 분야를 함께)", async () => {
@@ -288,11 +295,12 @@ describe("C2·C3·C4 목록 상태와 칩 줄(C9·C10·C11)", () => {
     expect(alert.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("C11 분야가 하나도 없으면 칩 줄에 「+ 분야」 하나(예시 칩 없음, D-132)", () => {
+  it("C11 분야가 하나도 없으면 칩 줄에 「기타」(골라짐)와 「+ 분야」뿐(예시 칩 없음, D-132)", () => {
     renderScreen(read([], []));
     open();
-    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["+ 분야"]);
-    expect(screen.getByText("분야 (고르지 않으면 기타)")).toBeTruthy();
+    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["기타", "+ 분야"]);
+    expect(chip("기타").getAttribute("aria-pressed")).toBe("true");
+    expect(document.getElementById("category-label")!.textContent).toBe("분야");
   });
 });
 
@@ -309,17 +317,44 @@ describe("C6 분야 고름·C7 적은 뒤 (D-125 ①)", () => {
           expect(pressed).toBe(b.querySelector(".chip-check") !== null); // 보이는 상태(체크 그림) = aria-pressed
           return pressed;
         });
-    expect(pressedState().filter(Boolean)).toHaveLength(0);
+    // 고침9 ④-2: 처음에는 맨 앞 「기타」만 골라져 있다(골라진 칩은 늘 정확히 하나)
+    expect(pressedState()).toEqual([true, false, false, false]);
     fireEvent.click(chip("운동"));
-    expect(pressedState()).toEqual([false, true, false]);
+    expect(pressedState()).toEqual([false, false, true, false]);
     fireEvent.click(chip("취업 준비"));
-    expect(pressedState()).toEqual([true, false, false]);
+    expect(pressedState()).toEqual([false, true, false, false]);
     fireEvent.click(chip("취업 준비"));
-    expect(pressedState()).toEqual([false, false, false]);
+    expect(pressedState()).toEqual([true, false, false, false]); // 고른 칩을 다시 눌러 풀면 기타로 돌아간다
+    fireEvent.click(chip("운동"));
+    fireEvent.click(chip("기타"));
+    expect(pressedState()).toEqual([true, false, false, false]); // 「기타」를 누르면 고른 분야가 풀린다
+    fireEvent.click(chip("기타"));
+    expect(pressedState()).toEqual([true, false, false, false]); // 기타를 다시 눌러도 기타(풀리지 않는다)
     expect(addCategoryChip().hasAttribute("aria-pressed")).toBe(false); // 「+ 분야」는 고르는 칩이 아니다
   });
 
-  it("C7 적은 뒤에도 창은 열린 채, 할 일 칸은 비고 포커스는 칸, 모든 칩 aria-pressed=false, 새 줄에 분야 표시", async () => {
+  it("악용(고침9): 「기타」 칩을 거듭 눌러도 분야 행을 만들지 않고, 적으면 저장 인자 분야 없음(null)", async () => {
+    renderScreen();
+    open();
+    addTodo.mockReturnValue(new Promise(() => {}));
+    fireEvent.click(chip("운동"));
+    for (let i = 0; i < 5; i += 1) fireEvent.click(chip("기타"));
+    expect(chip("기타").getAttribute("aria-pressed")).toBe("true");
+    expect(chip("운동").getAttribute("aria-pressed")).toBe("false");
+    typeTodo("기타로 적기");
+    pressWrite();
+    expect(addTodo).toHaveBeenCalledTimes(1);
+    expect(addTodo.mock.calls[0][2]).toBeNull();
+    expect(addCategory).not.toHaveBeenCalled();
+    // 다른 칩을 고르면 그 분야 번호로 간다(정상 통과)
+    fireEvent.click(chip("운동"));
+    typeTodo("운동으로 적기");
+    pressWrite();
+    expect(addTodo.mock.calls[1][2]).toBe(CAT_GYM);
+    expect(addCategory).not.toHaveBeenCalled();
+  });
+
+  it("C7 적은 뒤에도 창은 열린 채, 할 일 칸은 비고 포커스는 칸, 고름은 「기타」로 돌아감(분야 칩은 모두 false), 새 줄에 분야 표시", async () => {
     renderScreen(read([item(ID_A, "있던 글")]));
     open();
     const d = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
@@ -331,9 +366,10 @@ describe("C6 분야 고름·C7 적은 뒤 (D-125 ①)", () => {
     expect(screen.getByRole("form", { name: "할 일 적기" })).toBeTruthy();
     expect(todoInput().value).toBe("");
     expect(document.activeElement).toBe(todoInput());
-    for (const b of within(chipGroup()).getAllByRole("button").filter((x) => x.hasAttribute("aria-pressed"))) {
-      expect(b.getAttribute("aria-pressed")).toBe("false");
-    }
+    const pressable = within(chipGroup()).getAllByRole("button").filter((x) => x.hasAttribute("aria-pressed"));
+    expect(pressable.length).toBe(4);
+    expect(pressable.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false", "false"]);
+    expect(pressable[0].textContent).toBe("기타");
     // C-D6: 저장 중 줄에도 분야 표시를 바로 그린다
     const newRow = screen.getByText("저녁에 30분 걷기").closest("li")!;
     expect(within(newRow).getByText("운동")).toBeTruthy();
@@ -485,7 +521,7 @@ describe("C12~C20 분야 더하기", () => {
 
   it("C12 「+ 분야」 → 칩 줄 자리가 새 분야 줄로, 포커스는 새 분야 칸, 할 일 칸 글 그대로, 엔터 = 「더하기」", () => {
     openNewCategory();
-    expect(screen.queryByRole("group", { name: "분야 (고르지 않으면 기타)" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "분야" })).toBeNull();
     expect(document.activeElement).toBe(newCategoryInput());
     expect(todoInput().value).toBe("할 일 칸 글");
     addCategory.mockReturnValue(new Promise(() => {}));
@@ -517,7 +553,7 @@ describe("C12~C20 분야 더하기", () => {
     pressAdd();
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "새 분야 이름" })).toBeNull());
     const names = within(chipGroup()).getAllByRole("button").map((b) => b.textContent);
-    expect(names).toEqual(["취업 준비", "운동", "CS 공부", "자격증", "+ 분야"]);
+    expect(names).toEqual(["기타", "취업 준비", "운동", "CS 공부", "자격증", "+ 분야"]);
     expect(chip("자격증").getAttribute("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(todoInput());
     expect(liveText()).toBe("분야를 더하고 골랐어요: 자격증");
@@ -826,7 +862,7 @@ describe("C21 오프라인·C22·C23 긴 글과 이름·C24 칩 줄", () => {
     });
     expect(screen.getByText("읽을 수 없는 분야")).toBeTruthy();
     open();
-    expect(within(chipGroup()).getAllByRole("button")).toHaveLength(4); // 셋 + 「+ 분야」
+    expect(within(chipGroup()).getAllByRole("button")).toHaveLength(5); // 「기타」 + 셋 + 「+ 분야」
   });
 });
 
@@ -1188,25 +1224,19 @@ describe("고침 5바퀴: 분야 칩 줄은 한 줄이고 넘치면 옆으로 �
     return "";
   };
 
-  it("CSS: 한 줄(nowrap), 가로로 넘김(overflow-x auto), 세로로는 밀지 않음(overflow-y hidden), 높이 상한 없음(칩 하나 높이), 띠 24px", () => {
+  it("CSS(고침9 칩 두 줄): 감쌈(wrap), 칩 사이·줄 사이 8, 가로 넘김·옅어지는 띠·「‹ ›」 규칙 없음, 칩 높이 36, 높이 상한 없음(줄 수는 부품이 둘로 접는다)", () => {
     const row = rule(".chip-row");
     expect(row, ".chip-row 규칙을 읽었다").toContain("display: flex");
-    expect(row).toMatch(/flex-wrap:\s*nowrap/);
-    expect(row, "두 줄 감싸기가 남지 않았다").not.toMatch(/flex-wrap:\s*wrap/);
-    expect(row).toMatch(/overflow-x:\s*auto/);
-    expect(row).toMatch(/overflow-y:\s*hidden/);
-    expect(row, "옛 두 줄 높이 상한이 남지 않았다").not.toMatch(/max-height/);
-    // 키보드로 옮긴 칩이 옅어지는 띠(24px) 밖으로 나오게
-    expect(row).toMatch(/scroll-padding-inline:\s*24px/);
-    // 넘친 쪽 끝 24px이 옅어진다(오른쪽만 · 왼쪽만 · 양쪽)
-    const fadeEnd = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/\.chip-scroller\[data-more-end\]\s*>\s*\.chip-row\s*\{([^}]*)\}/);
-    expect(fadeEnd, "오른쪽 띠 규칙이 있다").not.toBeNull();
-    expect(fadeEnd![1]).toMatch(/(^|[^-])mask-image:\s*linear-gradient\(to right, black calc\(100% - 24px\), transparent\)/);
-    // 「‹」「›」 누름 48 · 보이는 면 32
-    expect(rule(".chip-nav")).toMatch(/inline-size:\s*var\(--tap-min\)/);
-    expect(rule(".chip-nav")).toMatch(/block-size:\s*var\(--tap-min\)/);
-    expect(rule(".chip-nav-face")).toMatch(/inline-size:\s*32px/);
-    expect(rule(".chip-nav-face")).toMatch(/block-size:\s*32px/);
+    expect(row).toMatch(/flex-wrap:\s*wrap/);
+    expect(row).not.toMatch(/nowrap/);
+    expect(row).toMatch(/gap:\s*var\(--space-2\)/);
+    expect(row, "가로로 넘기지 않는다").not.toMatch(/overflow-x/);
+    expect(row, "높이 상한으로 자르지 않는다").not.toMatch(/max-height/);
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(stripped, "옅어지는 띠 규칙이 남지 않았다").not.toMatch(/data-more-(start|end)/);
+    expect(stripped, "「‹ ›」 규칙이 남지 않았다").not.toMatch(/\.chip-nav/);
+    expect(rule(".chip-row > .chip > .chip-face")).toMatch(/min-height:\s*36px/);
+    expect(rule(".chip-collapse")).toMatch(/border:\s*0/);
     // 칩은 줄 폭을 넘지 않고, 긴 이름은 칩 글에서 한 줄 말줄임(C23)
     expect(rule(".chip")).toMatch(/max-width:\s*100%/);
     expect(rule(".chip")).not.toContain("--chip-max-gap");
@@ -1220,7 +1250,7 @@ describe("고침 5바퀴: 분야 칩 줄은 한 줄이고 넘치면 옆으로 �
     expect(chipGroup().parentElement!.classList.contains("chip-scroller")).toBe(true);
     const kids = [...chipGroup().children];
     expect(kids.every((el) => el.tagName === "BUTTON" && el.classList.contains("chip"))).toBe(true);
-    expect(kids.map((el) => el.textContent)).toEqual(["취업 준비", "운동", "CS 공부", "+ 분야"]);
+    expect(kids.map((el) => el.textContent)).toEqual(["기타", "취업 준비", "운동", "CS 공부", "+ 분야"]);
     expect(kids[kids.length - 1].id).toBe("add-category-chip");
   });
 
@@ -1229,7 +1259,7 @@ describe("고침 5바퀴: 분야 칩 줄은 한 줄이고 넘치면 옆으로 �
     renderScreen(read([], many));
     open();
     const buttons = within(chipGroup()).getAllByRole("button");
-    expect(buttons).toHaveLength(51);
+    expect(buttons).toHaveLength(52); // 「기타」 + 50 + 「+ 분야」
     for (const el of buttons) {
       expect(el.getAttribute("tabindex")).toBeNull();
       expect((el as HTMLButtonElement).disabled).toBe(false);
@@ -1290,10 +1320,10 @@ describe("고침 4바퀴 시나리오 ① 처음 쓰는 사람: 분야가 하나
     renderScreen(read([], [cat(CAT_WORK, "취업 준비")]));
     open();
     expect(document.activeElement).toBe(todoInput());
-    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["취업 준비", "+ 분야"]);
+    expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["기타", "취업 준비", "+ 분야"]);
     const form = screen.getByRole("form", { name: "할 일 적기" });
     const ids = [...form.querySelectorAll<HTMLElement>("button, input")].map((el) => el.id || el.textContent);
-    expect(ids).toEqual(["sheet-close", "todo-input", "적기", "취업 준비", "add-category-chip"]);
+    expect(ids).toEqual(["sheet-close", "todo-input", "적기", "기타", "취업 준비", "add-category-chip"]);
     expect(chipGroup().classList.contains("chip-row")).toBe(true);
     // 고르고 적으면 그 분야가 붙는다(입력 방향은 그대로): 칩을 고르고 글을 쓰고 「적기」를 누르면 할 일 더하기 호출에 그 분야 번호가 실려 간다
     addTodo.mockReturnValue(new Promise(() => {}));

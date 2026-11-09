@@ -7,7 +7,9 @@ import type { NoteItem } from "../lib/notes/types";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOverlayWindow } from "../lib/use-overlay-window";
-import { ChipScroller } from "./chip-scroller";
+import { categoryColorValue } from "../lib/category-color";
+import { CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
+import { categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -21,7 +23,16 @@ export const DETAIL_TEXT = {
   title: "할 일 자세히",
   close: "닫기",
   editLabel: "할 일 글",
-  categoryLabel: "분야 (고르지 않으면 기타)",
+  // 고침9 PM 3(④-2, Figma 51:55 · 77:18): 칩 줄 대신 고른 분야 한 줄(색 원 + 이름 + 「›」). 누르면 분야 고르기 시트
+  categoryLabel: "분야",
+  categoryChange: "분야 바꾸기",
+  sheetTitle: "분야 고르기",
+  sheetClose: "닫기",
+  addCategory: "+ 분야",
+  newCategoryLabel: "새 분야 이름",
+  newCategoryAdd: "더하기",
+  newCategoryAdding: "더하는 중",
+  newCategoryCancel: "취소",
   save: "고치기",
   saving: "고치는 중",
   saved: "고쳤어요",
@@ -35,7 +46,6 @@ export const DETAIL_TEXT = {
   removeYes: "지우기",
   removeFailed: "지우지 못했어요. 다시 눌러 주세요.",
   notesTitle: "작업 기록",
-  notesEmpty: "남긴 기록이 없어요. 하는 중에, 끝낸 뒤에, 저녁에 몰아서 적어도 돼요.",
   notesLoading: "작업 기록을 불러오는 중",
   notesFailed: "작업 기록을 불러오지 못했어요.",
   noteLabel: "작업 기록 쓰기",
@@ -60,6 +70,11 @@ export type DetailTodo = {
 
 type Chip = { id: string; name: string };
 
+/** 시트 「+ 분야」의 결과. category가 null이면 기타(「기타」라는 이름을 적었을 때 — 분야 행을 만들지 않는다) */
+export type DetailCategoryAdd =
+  | { ok: true; category: Chip | null }
+  | { ok: false; reason: "empty" | "too_long" | "limit" | "offline" | "failed" };
+
 export type TodoDetailProps = {
   todo: DetailTodo;
   chips: Chip[];
@@ -70,17 +85,36 @@ export type TodoDetailProps = {
   onDeleted: (id: string) => void;
   /** 위(-1)·아래(1)로 한 칸. 성공하면 true */
   onMove: (id: string, direction: -1 | 1) => Promise<boolean>;
+  /** 분야 고르기 시트의 「+ 분야」: 할 일 화면의 분야 더하기 길(이름 검사·같은 이름·한도 50·기기 먼저 저장)을 그대로 탄다. 없으면 「+ 분야」를 그리지 않는다 */
+  onAddCategory?: (name: string) => Promise<DetailCategoryAdd>;
+  /** 분야가 이미 한도(50)만큼 있으면 true: 「+ 분야」를 누르면 칸을 열지 않고 한도 안내만(요청 없음) */
+  categoryLimitReached?: boolean;
+  /** 작업 기록이 있는지가 바뀌면(불러옴·남김·지움) 알린다 — 할 일 줄 아이콘(고침9 PM 2-B) */
+  onNotesChange?: (todoId: string, hasNotes: boolean) => void;
 };
 
 function composing(event: KeyboardEvent): boolean {
   return event.nativeEvent.isComposing || event.keyCode === 229;
 }
 
-export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDeleted, onMove }: TodoDetailProps) {
+export function TodoDetail({
+  todo,
+  chips,
+  api,
+  online,
+  onClose,
+  onEdited,
+  onDeleted,
+  onMove,
+  onAddCategory,
+  categoryLimitReached = false,
+  onNotesChange,
+}: TodoDetailProps) {
   const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const [text, setText] = useState(todo.text ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(todo.categoryId);
-  const [busy, setBusy] = useState<"save" | "remove" | "move" | null>(null);
+  const [busy, setBusy] = useState<"save" | "remove" | "move" | "category" | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [notes, setNotes] = useState<NoteItem[]>([]);
@@ -116,6 +150,12 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
       alive = false;
     };
   }, [api, todoId, applyNotes]);
+  // 고침9 PM 2-B: 기록이 있는지 할 일 줄에 알린다(읽은 뒤·남긴 뒤·지운 뒤)
+  const notesKnown = notesState === "ready";
+  const hasNotes = notes.length > 0;
+  useEffect(() => {
+    if (notesKnown) onNotesChange?.(todoId, hasNotes);
+  }, [notesKnown, hasNotes, todoId, onNotesChange]);
   function reloadNotes() {
     setNotesState("loading");
     void api.fetchNotes(todoId).then(applyNotes);
@@ -124,15 +164,12 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
   const checked = checkTodoText(text);
   const over = countTodoChars(text) > TODO_TEXT_MAX_LENGTH;
   const changedText = todo.text !== null && checked.ok && checked.text !== todo.text;
-  const changedCategory = categoryId !== todo.categoryId;
-  const canSave = online && busy === null && checked.ok && (changedText || changedCategory);
+  const canSave = online && busy === null && checked.ok && changedText;
 
   async function save(event?: FormEvent) {
     event?.preventDefault();
     if (!canSave || !checked.ok) return;
-    const patch: { text?: string; categoryId?: string | null } = {};
-    if (changedText) patch.text = checked.text;
-    if (changedCategory) patch.categoryId = categoryId;
+    const patch: { text?: string } = { text: checked.text };
     setBusy("save");
     setMessage(DETAIL_TEXT.saving);
     const res = await api.editTodo(todo.id, patch);
@@ -141,6 +178,28 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
       setMessage(DETAIL_TEXT.saved);
       onEdited(res.data.todo);
     } else {
+      setMessage(DETAIL_TEXT.saveFailed);
+    }
+  }
+
+  /**
+   * 고침9 PM 3: 시트에서 고르면 바로 저장하고 시트를 닫는다(저장 단추 없음). 저장 길은 지금 분야 바꾸기 그대로(api.editTodo — 기기 먼저 저장이면 기기에 먼저).
+   * 같은 것을 고르면 저장하지 않고 닫기만. 실패하면 앞 분야로 되돌리고 안내한다.
+   */
+  async function pickCategory(next: string | null) {
+    setSheetOpen(false);
+    if (next === categoryId || busy !== null || !online) return;
+    const before = categoryId;
+    setCategoryId(next);
+    setBusy("category");
+    setMessage(DETAIL_TEXT.saving);
+    const res = await api.editTodo(todo.id, { categoryId: next });
+    setBusy(null);
+    if (res.ok) {
+      setMessage(DETAIL_TEXT.saved);
+      onEdited(res.data.todo);
+    } else {
+      setCategoryId(before);
       setMessage(DETAIL_TEXT.saveFailed);
     }
   }
@@ -195,6 +254,11 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
     else setNoteMessage(DETAIL_TEXT.noteDeleteFailed);
   }
 
+  const currentChip = categoryId === null ? null : chips.find((c) => c.id === categoryId);
+  // 고른 분야가 칩 목록에 없으면(풀 수 없음·보관) 「읽을 수 없는 분야」, 기타면 「기타」
+  const currentName = categoryId === null ? DETAIL_TEXT.none : (currentChip?.name ?? TODO_TEXT.unreadableCategory);
+  const currentColor = colorOf(chips, currentChip ? currentChip.id : null);
+
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape" && !composing(event)) {
       event.preventDefault();
@@ -248,23 +312,6 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
           <p id="detail-help" className="input-help">
             {over ? `${TODO_TEXT_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${countTodoChars(text)}자예요.` : ""}
           </p>
-          <span id="detail-category-label" className="input-label">
-            {DETAIL_TEXT.categoryLabel}
-          </span>
-          <ChipScroller aria-labelledby="detail-category-label">
-            <button type="button" className="chip" aria-pressed={categoryId === null} onClick={() => setCategoryId(null)}>
-              <span className="chip-face">
-                <span className="chip-label">{DETAIL_TEXT.none}</span>
-              </span>
-            </button>
-            {chips.map((chip) => (
-              <button key={chip.id} type="button" className="chip" aria-pressed={categoryId === chip.id} onClick={() => setCategoryId(chip.id)}>
-                <span className="chip-face">
-                  <span className="chip-label">{chip.name}</span>
-                </span>
-              </button>
-            ))}
-          </ChipScroller>
           <div className="detail-actions">
             <PrimaryButton type="submit" busy={busy === "save"} disabled={!canSave}>
               {busy === "save" ? DETAIL_TEXT.saving : DETAIL_TEXT.save}
@@ -274,6 +321,34 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
             {message}
           </p>
         </form>
+
+        {/* 고침9 PM 3: 분야 = 고른 분야 한 줄(Figma 51:55 「분야 · ● 어학 ›」). 줄 전체가 단추(누름 48), 누르면 분야 고르기 시트 */}
+        <div className="detail-section detail-prop">
+          <span id="detail-category-label" className="detail-prop-label">
+            {DETAIL_TEXT.categoryLabel}
+          </span>
+          <button
+            type="button"
+            id="detail-category-line"
+            className="detail-prop-value detail-category-line"
+            aria-labelledby="detail-category-label detail-category-name"
+            aria-describedby="detail-category-hint"
+            aria-haspopup="dialog"
+            disabled={!online || busy !== null}
+            onClick={() => setSheetOpen(true)}
+          >
+            <span className="detail-category-dot" style={{ background: currentColor }} aria-hidden="true" />
+            <span id="detail-category-name" className="detail-category-name">
+              {currentName}
+            </span>
+            <span className="detail-category-go" aria-hidden="true">
+              ›
+            </span>
+            <span id="detail-category-hint" className="sr-only">
+              {DETAIL_TEXT.categoryChange}
+            </span>
+          </button>
+        </div>
 
         <div className="detail-section">
           <div className="detail-actions">
@@ -320,7 +395,6 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
               {DETAIL_TEXT.notesFailed}
             </Notice>
           )}
-          {notesState === "ready" && notes.length === 0 && <p className="todo-sub">{DETAIL_TEXT.notesEmpty}</p>}
           {notes.length > 0 && (
             <ul className="note-list">
               {notes.map((note) => (
@@ -362,6 +436,201 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
             </div>
           </form>
         </section>
+      </div>
+      {sheetOpen && (
+        <CategorySheet
+          chips={chips}
+          selectedId={categoryId}
+          onPick={(id) => void pickCategory(id)}
+          onClose={() => setSheetOpen(false)}
+          onAddCategory={onAddCategory}
+          limitReached={categoryLimitReached}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 분야 순서(0부터) → 색. 칩 목록은 이름을 읽을 수 있는 분야를 만든 순서로 담고 있다(상태보기·다이얼과 같은 순서). 기타는 기타 색 */
+function colorOf(chips: Chip[], id: string | null): string {
+  if (id === null) return categoryColorValue(null);
+  const index = chips.findIndex((c) => c.id === id);
+  return categoryColorValue(index < 0 ? null : index);
+}
+
+function CheckMark() {
+  return (
+    <svg className="category-sheet-check" width={16} height={12} viewBox="0 0 16 12" aria-hidden="true" focusable="false">
+      <path d="M1 6L6 11L15 1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const ADD_REASON_TEXT: Record<Exclude<DetailCategoryAdd, { ok: true }>["reason"], string> = {
+  empty: "",
+  too_long: "",
+  limit: TODO_TEXT.categoryLimit,
+  offline: TODO_TEXT.categoryAddOffline,
+  failed: TODO_TEXT.categoryAddFailed,
+};
+
+/**
+ * 고침9 PM 3 분야 고르기 시트(Figma 77:18, 명세 ⑩ PM 3 · ⑮ O-4). 분야 한 줄에 하나(색 원 12 + 이름, 고른 줄 체크) → 「기타」 → 끝 「+ 분야」.
+ * 누르면 바로 골라지고 닫힌다(저장 단추 없음). 「닫기」·Esc·안드로이드 뒤로 가기(useOverlayWindow)로 닫히고, 닫히면 분야 줄로 포커스가 돌아간다.
+ * 분야 이름은 React 텍스트로만 그린다.
+ */
+function CategorySheet({
+  chips,
+  selectedId,
+  onPick,
+  onClose,
+  onAddCategory,
+  limitReached,
+}: {
+  chips: Chip[];
+  selectedId: string | null;
+  onPick: (id: string | null) => void;
+  onClose: () => void;
+  onAddCategory?: (name: string) => Promise<DetailCategoryAdd>;
+  limitReached: boolean;
+}) {
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
+  const firstRef = useRef<HTMLButtonElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  // 열리면 고른 줄(없으면 첫 줄)로 포커스
+  useEffect(() => {
+    firstRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || composing(event)) return;
+    // 시트만 닫는다(뒤의 할 일 페이지까지 닫지 않는다)
+    event.preventDefault();
+    event.stopPropagation();
+    if (adding && (event.target as HTMLElement).id === "detail-newcat-input") {
+      setAdding(false);
+      setDraft("");
+      return;
+    }
+    onClose();
+  }
+
+  function openAdd() {
+    setNotice("");
+    if (limitReached) {
+      setNotice(TODO_TEXT.categoryLimit); // 한도: 칸을 열지 않고 요청도 보내지 않는다
+      return;
+    }
+    setAdding(true);
+  }
+
+  async function submitAdd(event?: FormEvent) {
+    event?.preventDefault();
+    if (!onAddCategory || busy) return;
+    setBusy(true);
+    setNotice("");
+    const res = await onAddCategory(draft);
+    setBusy(false);
+    if (res.ok) {
+      onPick(res.category ? res.category.id : null);
+      return;
+    }
+    if (res.reason === "too_long") setNotice(categoryOverLimitText(countCategoryChars(draft)));
+    else setNotice(ADD_REASON_TEXT[res.reason]);
+    inputRef.current?.focus();
+  }
+
+  const rows: { id: string | null; name: string }[] = [...chips, { id: null, name: DETAIL_TEXT.none }];
+  const firstIndex = Math.max(0, rows.findIndex((r) => r.id === selectedId));
+  const over = countCategoryChars(draft) > CATEGORY_NAME_MAX_LENGTH;
+
+  return (
+    <div ref={rootRef} className="category-sheet-layer" onKeyDown={onKeyDown}>
+      <div className="category-sheet-backdrop" aria-hidden="true" onClick={onClose} />
+      <div className="category-sheet" role="dialog" aria-modal="true" aria-labelledby="category-sheet-title">
+        <div className="category-sheet-head">
+          <h2 id="category-sheet-title" className="category-sheet-title">
+            {DETAIL_TEXT.sheetTitle}
+          </h2>
+          <TextButton className="btn-flush-end" onClick={onClose}>
+            {DETAIL_TEXT.sheetClose}
+          </TextButton>
+        </div>
+        <ul className="category-sheet-list">
+          {rows.map((row, index) => {
+            const picked = row.id === selectedId;
+            return (
+              <li key={row.id ?? "other"}>
+                <button
+                  type="button"
+                  ref={index === firstIndex ? firstRef : undefined}
+                  className={picked ? "category-sheet-row is-picked" : "category-sheet-row"}
+                  aria-pressed={picked}
+                  data-category-id={row.id ?? "other"}
+                  onClick={() => onPick(row.id)}
+                >
+                  <span className="detail-category-dot" style={{ background: colorOf(chips, row.id) }} aria-hidden="true" />
+                  <span className="category-sheet-name">{row.name}</span>
+                  {picked && <CheckMark />}
+                </button>
+              </li>
+            );
+          })}
+          {onAddCategory && !adding && (
+            <li>
+              <button type="button" id="category-sheet-add" className="category-sheet-row category-sheet-add" onClick={openAdd}>
+                <span className="category-sheet-name">{DETAIL_TEXT.addCategory}</span>
+              </button>
+            </li>
+          )}
+        </ul>
+        {adding && (
+          <form className="category-sheet-form" onSubmit={(e) => void submitAdd(e)} noValidate>
+            <label htmlFor="detail-newcat-input" className="input-label">
+              {DETAIL_TEXT.newCategoryLabel}
+            </label>
+            <input
+              id="detail-newcat-input"
+              ref={inputRef}
+              className="input"
+              type="text"
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setNotice("");
+              }}
+              aria-invalid={over ? true : undefined}
+              aria-describedby="detail-newcat-help"
+              autoComplete="off"
+              enterKeyHint="done"
+            />
+            <div className="detail-actions">
+              <SecondaryButton type="submit" busy={busy}>
+                {busy ? DETAIL_TEXT.newCategoryAdding : DETAIL_TEXT.newCategoryAdd}
+              </SecondaryButton>
+              <TextButton
+                onClick={() => {
+                  setAdding(false);
+                  setDraft("");
+                  setNotice("");
+                }}
+              >
+                {DETAIL_TEXT.newCategoryCancel}
+              </TextButton>
+            </div>
+          </form>
+        )}
+        <p id="detail-newcat-help" className="cat-notice" role="status">
+          {notice}
+        </p>
       </div>
     </div>
   );

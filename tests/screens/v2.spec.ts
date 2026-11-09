@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { TEXT200_CSS } from "./text200-css";
-import { assertChipOneLine, assertChipPaging } from "./chip-row";
+import { assertChipExpandCollapse, assertChipTwoLines } from "./chip-row";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
@@ -47,10 +47,11 @@ for (const size of ALL_SIZES) {
     await shot(page, `tabbar-bottom-${size}`);
 
     const bar = (await page.locator(".tabbar").boundingBox())!;
-    const save = (await page.getByRole("button", { name: "알림 설정 저장" }).boundingBox())!;
+    // 고침9 O-5: 「알림 설정 저장」 단추는 없어졌다(바로 저장). 알림 카드의 마지막 조작(아침 알림 시각)과 로그아웃을 본다
+    const save = (await page.getByLabel("아침 알림 시각").boundingBox())!;
     const logout = (await page.getByRole("button", { name: "로그아웃" }).boundingBox())!;
-    // B1: 맨 아래에서 저장 단추와 로그아웃의 아래 끝이 탭 줄의 위 끝보다 위에 있다
-    expect(save.y + save.height, "알림 설정 저장 단추가 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
+    // B1: 맨 아래에서 알림 카드 마지막 조작과 로그아웃의 아래 끝이 탭 줄의 위 끝보다 위에 있다
+    expect(save.y + save.height, "아침 알림 시각 칸이 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
     expect(logout.y + logout.height, "로그아웃이 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
 
     // B9: 탭 글이 자기 칸을 넘치지 않고(두 줄로 내려갈 수 있다), 가로 스크롤이 없다
@@ -70,8 +71,9 @@ test("tabbar: 내 정보 안 포커스가 탭 줄 밑으로 들어가지 않는�
   const padding = await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom);
   const bar = (await page.locator(".tabbar").boundingBox())!;
   expect(parseFloat(padding), "스크롤 여백이 탭 줄 높이보다 크다").toBeGreaterThan(bar.height);
-  await page.getByRole("button", { name: "알림 설정 저장" }).focus();
-  const save = (await page.getByRole("button", { name: "알림 설정 저장" }).boundingBox())!;
+  // 고침9 O-5: 「알림 설정 저장」 대신 맨 아래 누름 요소 「로그아웃」에 포커스
+  await page.getByRole("button", { name: "로그아웃" }).focus();
+  const save = (await page.getByRole("button", { name: "로그아웃" }).boundingBox())!;
   expect(save.y + save.height).toBeLessThanOrEqual(bar.y + 0.5);
 });
 
@@ -505,6 +507,19 @@ for (const w of WINDOWS) {
 // ---- 고침4 2단계: 원형 다이얼 (처음 정한 비율·내 정보 비율 고치기·저녁 기록 나누기) ----
 // 측정: 가로 넘침 없음(문서·비율 줄·다이얼), 손잡이 누르는 자리 48 이상, 합계 100%, 저녁 창에서 뒤로 가기는 창만 닫는다.
 
+/** 고침9: 「합계 100%」 줄은 없앴다(합은 늘 100). 보이는 비율 숫자 칸(하나 이상)의 합이 100인지 본다 */
+async function expectRatioSum100(page: Page) {
+  const values = await page.$$eval("input.ratio-field", (els) => els.map((e) => Number((e as HTMLInputElement).value)));
+  expect(values.length, "비율 숫자 칸이 있다").toBeGreaterThan(0);
+  expect(values.reduce((s, v) => s + v, 0), "숫자 칸 합 100").toBe(100);
+  await expect(page.getByText(/^합계 \d+%$/)).toHaveCount(0);
+}
+/** 고침9(PM 6): 내 정보 「목표 비율」 카드를 눌러 S8-a를 연다 */
+async function openRatioSettings(page: Page) {
+  await page.getByRole("button", { name: /^목표 비율, / }).click();
+  await expect(page.getByRole("dialog", { name: "목표 비율" })).toBeVisible();
+}
+
 /** 다이얼 둘레의 측정: 다이얼이 화면 안에 있고, 손잡이 누르는 자리(보이지 않는 원)가 48 이상 */
 async function measureDial(page: Page, dialId: string) {
   const svg = page.locator(`svg.dial`).first();
@@ -533,7 +548,7 @@ for (const many of [false, true]) {
       await open(page, `ratio-onboarding${tag}`, size);
       await page.getByRole("button", { name: "다음" }).click();
       await page.getByRole("button", { name: "다음" }).click();
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       await measureDial(page, "ratio-dial");
       await noRowOverflow(page);
       await shot(page, `ratio-onboarding${tag}-${size}`);
@@ -542,18 +557,19 @@ for (const many of [false, true]) {
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("Tab");
       await page.keyboard.press("PageUp");
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       if (many) {
         const fills = await page.$$eval(".dial-slice", (els) => els.map((e) => getComputedStyle(e).fill));
         expect(fills.length, "분야 9개 이상이 조각으로 그려진다").toBeGreaterThanOrEqual(9);
       }
     });
 
-    test(`me-ratio${tag} ${size}: 내 정보 비율 고치기 다이얼, 저장값 30·30이 합 100으로 열린다, 가로 넘침 없음`, async ({ page }) => {
+    test(`me-ratio${tag} ${size}: 내 정보 목표 비율 카드 → S8-a 다이얼, 저장값 30·30이 합 100으로 열린다, 가로 넘침 없음`, async ({ page }) => {
       await open(page, `me-ratio${tag}`, size);
+      await openRatioSettings(page);
       const dial = page.locator("svg.dial");
       await dial.scrollIntoViewIfNeeded();
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       await measureDial(page, "ratio-dial");
       await noRowOverflow(page);
       await shot(page, `me-ratio${tag}-${size}`);
@@ -590,16 +606,8 @@ for (const many of [false, true]) {
 // ---- 고침 5바퀴: 분야 칩 줄 한 줄 + 옆으로 넘김(명세 ⑦-1·④-2) — 타이머 · 할 일 자세히 · 처음 설정 ----
 // 분야 10개(긴 이름 하나)에서 줄 높이가 칩 하나 높이이고, 넘치면 「›」(칩 줄 밖 제 칸, 누름 48), 한 화면 폭씩 넘기고, 가로 넘침이 없다
 const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (page: Page) => Promise<void> }[] = [
-  { id: "timer", state: "timer-many", group: "분야 (고르지 않으면 기타)" },
-  {
-    id: "detail",
-    state: "detail-many",
-    group: "분야 (고르지 않으면 기타)",
-    prepare: async (page) => {
-      await page.locator("#dev-open-window").click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-    },
-  },
+  { id: "timer", state: "timer-many", group: "분야" },
+  // 고침9 PM 3: 할 일 자세히(S2-b)에는 칩 줄이 없다(고른 분야 한 줄 + 분야 고르기 시트) — tests/screens/fix9-j2.spec.ts가 본다
   {
     id: "onboarding",
     state: "ratio-onboarding-many",
@@ -624,7 +632,7 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
   {
     id: "evening-todo-sheet",
     state: "evening-todo-many",
-    group: "분야 (고르지 않으면 기타)",
+    group: "분야",
     prepare: async (page) => {
       await page.getByRole("button", { name: /^오늘 할 일 2\/4/ }).click();
       const sheet = page.getByRole("dialog", { name: "오늘 할 일" });
@@ -635,27 +643,24 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
 ];
 for (const c of CHIP_ROW_CASES) {
   for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-    test(`칩 줄 ${c.id} ${size}: 한 줄(줄 높이 = 칩 하나), 넘치면 「›」·한 화면 폭 넘김·「‹」, 가로 넘침 없음`, async ({ page }) => {
+    test(`칩 줄 ${c.id} ${size}: 두 줄까지 감쌈, 넘치면 둘째 줄 끝 「+n」(n = 숨은 칩 수) → 펼침·「접기」, 가로 넘침 없음(고침9)`, async ({ page }) => {
       await open(page, c.state, size);
       if (c.prepare) await c.prepare(page);
       const row = page.getByRole("group", { name: c.group, exact: true });
       await expect(row).toBeVisible();
       await row.scrollIntoViewIfNeeded();
       const vw = SIZES[size].width;
-      const m = await assertChipOneLine(page, row, vw);
-      expect(m.chips.length, "분야 10개(+기타)가 한 줄에 있다").toBeGreaterThanOrEqual(10);
-      expect(m.scrollWidth, "분야 10개는 360px 한 줄을 넘친다").toBeGreaterThan(m.clientWidth + 1);
-      expect(m.next, "「›」가 보인다").not.toBeNull();
+      // 칩 수 = 펼쳤을 때의 칩(「접기」 빼고). 접힌 줄에서는 보이는 칩 + 「+n」의 n
+      const total = await row.evaluate((el) => {
+        const shown = [...el.children].filter((k) => !k.hasAttribute("data-chip-more")).length;
+        const more = el.querySelector("[data-chip-more]");
+        return shown + (more ? Number((more.textContent ?? "").replace(/[^0-9]/g, "")) : 0);
+      });
+      expect(total, "분야 10개(+기타)").toBeGreaterThanOrEqual(10);
+      const m = await assertChipTwoLines(page, row, vw, total);
+      expect(m.more, "분야 10개는 360px 두 줄을 넘어 「+n」").not.toBeNull();
       await shot(page, `chip-row-${c.id}-${size}`);
-      await page.emulateMedia({ reducedMotion: "reduce" });
-      await assertChipPaging(row);
-      // 키보드: 줄 안 마지막 칩에 포커스하면 그 칩이 줄 안에 다 보인다
-      const last = row.locator(":scope > button").last();
-      await last.focus();
-      const after = await assertChipOneLine(page, row, vw);
-      const lastBox = after.chips[after.chips.length - 1];
-      expect(lastBox.left).toBeGreaterThanOrEqual(after.box.left - 0.5);
-      expect(lastBox.right).toBeLessThanOrEqual(after.box.right + 0.5);
+      await assertChipExpandCollapse(page, row, vw, total);
       const sw = await scrollSizes(page);
       expect(sw.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(sw.clientWidth);
     });

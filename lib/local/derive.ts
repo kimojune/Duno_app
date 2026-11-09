@@ -35,6 +35,18 @@ function todoItem(t: MirrorTodo): TodoItem {
     : { id: t.id, readable: true, text: t.text, done: t.done, createdAt: t.createdAt, categoryId: t.categoryId };
 }
 
+/** 고침9 PM 2-B: 작업 기록이 있는 할 일인가. 기기가 그 할 일의 기록 목록을 알면(열어 봤거나 이 기기에서 적음) 그것으로, 모르면 서버가 준 표시로 */
+export function todoHasNotes(m: Mirror, t: MirrorTodo): boolean {
+  const known = m.notes[t.id];
+  return known ? known.length > 0 : t.hasNotes === true;
+}
+
+/** 오늘 목록의 할 일(작업 기록 표시를 붙임) */
+function todayItem(m: Mirror, t: MirrorTodo): TodoItem {
+  const item = todoItem(t);
+  return todoHasNotes(m, t) ? { ...item, hasNotes: true } : item;
+}
+
 /** 그 날의 할 일: 만든 순서(createdAt, id), 순서를 정한 행(position)이 앞 — 서버 목록과 같은 규칙 */
 export function todosOfDay(m: Mirror, day: string): MirrorTodo[] {
   const rows = m.todos
@@ -56,7 +68,7 @@ export function deriveToday(m: Mirror, nowMs: number): TodayRead {
   if (isUnknown(m)) return { todos: UNAVAILABLE, categories: UNAVAILABLE };
   const day = todoDayFor(new Date(nowMs));
   return {
-    todos: { ok: true, data: { day: describeTodoDay(day), todos: todosOfDay(m, day).map(todoItem) } },
+    todos: { ok: true, data: { day: describeTodoDay(day), todos: todosOfDay(m, day).map((t) => todayItem(m, t)) } },
     categories: { ok: true, data: categoryList(m) },
   };
 }

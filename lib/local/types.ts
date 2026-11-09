@@ -29,6 +29,8 @@ export type MirrorTodo = {
   categoryId: string | null;
   /** 순서(위로/아래로로 정한 것). 안 정했으면 null */
   position: number | null;
+  /** 서버가 읽을 때 작업 기록이 있던 할 일이면 true(고침9 PM 2-B). 기기가 그 할 일의 기록 목록(notes)을 알면 그쪽이 이긴다 */
+  hasNotes?: boolean;
 };
 
 export type MirrorOffers = { card: Offer | null; timer_tab: Offer | null };

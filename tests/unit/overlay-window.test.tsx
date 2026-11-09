@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { StrictMode, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeHistory } from "./fake-history";
@@ -83,6 +83,57 @@ afterEach(() => {
   cleanup(); // 열려 있던 창이 닫히며 칸을 거둔다
   history.flush(); // 거둔 칸의 popstate를 모두 돌려 다음 시험에 남기지 않는다
   vi.restoreAllMocks();
+});
+
+describe("고침9 PM 3 할 일 페이지 위 분야 고르기 시트", () => {
+  const detail: Renderer = (onClose) => (
+    <TodoDetail
+      todo={{ id: "t1", text: "글", categoryId: null, canMoveUp: false, canMoveDown: false }}
+      chips={[{ id: "c1", name: "어학" }]}
+      api={manageApi as never}
+      online
+      onClose={onClose}
+      onEdited={() => {}}
+      onDeleted={() => {}}
+      onMove={async () => true}
+    />
+  );
+
+  it("뒤로 가기는 시트만 닫고(할 일 페이지 칸은 남음) 포커스는 분야 줄, 한 번 더 누르면 할 일 페이지가 닫힌다 — 칸 index까지", () => {
+    const onClosed = vi.fn();
+    render(<Harness renderWindow={detail} onClosed={onClosed} />);
+    fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    expect(history.index).toBe(1);
+    const line = screen.getByRole("button", { name: "분야 기타" });
+    line.focus();
+    fireEvent.click(line);
+    expect(screen.getByRole("dialog", { name: "분야 고르기" })).toBeTruthy();
+    expect(history.index).toBe(2); // 할 일 페이지 칸 + 시트 칸
+    history.userBack();
+    expect(screen.queryByRole("dialog", { name: "분야 고르기" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "할 일 자세히" })).toBeTruthy();
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(history.index).toBe(1);
+    expect(document.activeElement).toBe(line);
+    history.userBack();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog", { name: "할 일 자세히" })).toBeNull();
+    expect(history.index).toBe(0);
+    expect(history.leftApp).toBe(false);
+  });
+
+  it("고르면 시트가 닫히며 시트 칸 하나만 거둔다(back 한 번), 할 일 페이지 칸은 남는다", () => {
+    render(<Harness renderWindow={detail} />);
+    fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "분야 기타" }));
+    expect(history.index).toBe(2);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "분야 고르기" })).getByRole("button", { name: "기타" }));
+    expect(screen.queryByRole("dialog", { name: "분야 고르기" })).toBeNull();
+    expect(history.back).toHaveBeenCalledTimes(1);
+    history.flush();
+    expect(history.index).toBe(1);
+    expect(screen.getByRole("dialog", { name: "할 일 자세히" })).toBeTruthy();
+  });
 });
 
 describe.each(WINDOWS)("%s 창", (_name, renderWindow) => {

@@ -300,7 +300,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
 });
 
 describe("EveningEntry", () => {
-  it("저녁에는 질문을 앞세우고, 낮에는 조용한 단추", () => {
+  it("고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」는 저녁에도 낮에도 보인다", () => {
     const onOpen = vi.fn();
     const { rerender } = render(<EveningEntry evening onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
@@ -308,7 +308,7 @@ describe("EveningEntry", () => {
     expect(onOpen).toHaveBeenCalled();
     expect(screen.getByRole("region", { name: "오늘 기록" })).toBeTruthy();
     rerender(<EveningEntry evening={false} onOpen={onOpen} />);
-    expect(screen.queryByText("오늘 몇 시간 썼어요?")).toBeNull();
+    expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy(); // 옛판은 낮에 숨김 — Figma 50:28 · 50:52는 늘 보임
     expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글
     expect(document.body.textContent).not.toContain("저녁 기록");
   });

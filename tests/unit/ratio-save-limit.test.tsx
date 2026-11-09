@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeScreen } from "../../components/me-screen";
 import { entriesToRatios, OTHER_RATIO_ID, type RatioEntry } from "../../components/ratio-editor";
@@ -11,6 +11,15 @@ import type { PushApi } from "../../lib/push/subscribe";
 import type { NotifySettings, SettingsData } from "../../lib/settings/types";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
+
+/** 「합계」 줄은 없앴다(합은 늘 100, 정합 대조 B S1-3). 대신 보이는 숫자 칸 값의 합이 100인지 본다(칸이 하나 이상 있어야 한다) */
+function expectFieldSum100() {
+  const fields = [...document.querySelectorAll<HTMLInputElement>("input.ratio-field")];
+  expect(fields.length).toBeGreaterThan(0);
+  expect(fields.reduce((sum, f) => sum + Number(f.value), 0)).toBe(100);
+  expect(document.body.textContent).not.toContain("합계");
+}
+
 
 /**
  * 분야 50개 + 기타 몫일 때 처음 정한 비율 저장(고침4 합치기, 있던 결함): 0% 줄은 저장 목록에서 뺀다.
@@ -105,15 +114,16 @@ describe("다시 열 때 저장 목록에 없는 분야는 0%로 보인다", () 
     vi.restoreAllMocks();
   });
 
-  it("내 정보: 분야 50개 + 몫이 있는 넷으로 열면 나머지 분야 숫자 칸이 0이다(합 100)", () => {
+  it("내 정보: 분야 50개 + 몫이 있는 넷으로 열면 나머지 분야 숫자 칸이 0이다(합 100) — 고침9: S8-a에서", () => {
     const settings: SettingsData = { goal: null, goalReadable: true, onboardingDone: true, notify: NOTIFY_OFF, ratios: entriesToRatios(LIKE_USER) };
     const api: SettingsApi = { addCategory: vi.fn(), saveRatios: vi.fn(), saveSettings: vi.fn(), requestPermission: vi.fn() };
     const push = { permission: vi.fn(() => "default" as const), supported: vi.fn(() => true), hasKey: vi.fn(() => true), subscribed: vi.fn(async () => false), enable: vi.fn(), disable: vi.fn() } as unknown as PushApi;
     render(<MeScreen settings={settings} categories={IDS.map((id, i) => ({ id, name: `분야${i + 1}` }))} api={api} push={push} />);
+    fireEvent.click(screen.getByRole("button", { name: /^목표 비율, / }));
     const value = (name: string) => Number((screen.getByLabelText(`${name} 비율(%)`) as HTMLInputElement).value);
     expect([value("분야1"), value("분야2"), value("분야3"), value("기타")]).toEqual([40, 30, 10, 20]);
     expect(value("분야4")).toBe(0);
     expect(value("분야50")).toBe(0);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
   });
 });

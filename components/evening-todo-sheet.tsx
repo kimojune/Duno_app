@@ -13,7 +13,7 @@ import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
 import { ChipScroller } from "./chip-scroller";
-import { CategoryChip, CategoryTag, helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
+import { CategoryChip, CategoryTag, helpText, OtherChip, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -464,8 +464,10 @@ function EveningTodoSheet({
                 {TODO_TEXT.categoryLabel}
               </span>
               <ChipScroller aria-labelledby="evening-todo-category-label">
-                {chips.map((chip) => (
-                  <CategoryChip key={chip.id} chip={chip} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
+                {/* 고침9 ④-2: 맨 앞 「기타」가 골라진 채 시작(명세 ⑩ PM 11 「+ 할 일」 칩 줄) */}
+                <OtherChip pressed={selected === null} onSelect={() => setSelected(null)} />
+                {chips.map((chip, index) => (
+                  <CategoryChip key={chip.id} chip={chip} color={categoryColorValue(index)} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
                 ))}
               </ChipScroller>
             </form>

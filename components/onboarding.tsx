@@ -6,29 +6,35 @@ import { checkCategoryName, sameCategoryName } from "../lib/categories/validatio
 import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { evenRatios } from "../lib/settings/validation";
+import { NOTIFY_ITEMS } from "../lib/push/next";
 import { formatClock } from "../lib/time-format";
-import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
+import { entriesToRatios, RATIO_TEXT, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
 import { ChipScroller } from "./chip-scroller";
 import { GOAL_FIELD_TEXT, GoalField, goalFieldCheck } from "./goal-field";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
- * 처음 설정(PRD 7-1, ①). 네 단계: 목표 한 문장 → 분야 → 처음 정한 비율 → 알림.
+ * 처음 설정(PRD 7-1, ①). 네 단계: 목표 한 문장 → 분야 → 목표 비율 → 알림. 단계 제목은 모두 이름표(「목표」「분야」「목표 비율」「알림」, PM 7 · 명세 ③-O).
+ * - 머리(components/back-header.tsx, Figma 49:178·49:194·49:232·50:4): 2~4단계는 왼쪽 위 「‹」(화면 읽기 「이전」, 포커스 순서 첫째 — PM 1-A) + 「4단계 중 n단계」 + 진행 막대 넷.
+ *   아래 단추 줄에는 「이전」이 없고 주 단추 하나(1단계만 「건너뛰기」 글 단추가 그 위에), 화면 아래에 붙는다(정합 A2).
  * - 비율은 사용자가 직접 넣는다(AI가 채우지 않는다). 반드시 정한다(G4-2 가): 분야 하나 이상, 합이 0보다 커야 다음으로 간다.
  * - 분야는 적고 넓게. 예시 칩은 lib/app-config.ts 한 곳에서 읽는다(마감 있는 일 없음, D-132).
- * - 알림은 끝에서 허락을 묻는다(D-102⑤). 허락하면 둘 다 켜진 채 시작한다. 나중에 해도 앱을 쓴다.
+ * - 알림(S1-4): 줄 둘(켬이 기본) + 줄마다 시각과 실제 알림 글 미리 보기(⑬ 4·5·6, 글은 lib/push/next.ts NOTIFY_ITEMS 한 곳에서). 끝 단추는 「시작하기」 하나(PM 1).
+ *   누르면 켠 알림이 있을 때만 브라우저 허락을 묻고 구독한다(D-102⑤). 다 껐으면 허락을 묻지 않는다(requestPermission 호출 없음). 허락하지 않아도 앱으로 들어간다.
+ *   시각은 여기서 고르지 않는다(Figma 50:4에 고르기 칸이 없다 — 고르기는 내 정보). 처음 값(오후 7:30 · 오전 10:00)을 그대로 저장한다.
  * - AI 없이 돈다. 이 화면에 AI는 없다(AI 자리 ① 분야 초안은 다음 판).
  * 모든 글은 React 텍스트로만 그린다.
  */
 
 export const ONBOARDING_TEXT = {
   title: "시작하기",
-  step: (n: number, total: number) => `${total}단계 중 ${n}단계`,
-  goalHeading: "이루고 싶은 것을 한 문장으로 적어 주세요",
+  step: BACK_HEADER_TEXT.step,
+  goalHeading: "목표",
   goalLabel: GOAL_FIELD_TEXT.label, // 칸은 components/goal-field.tsx(S8-b와 같이 씀)
-  goalHint: "흐릿해도 괜찮아요. 건너뛰어도 돼요.",
-  categoryHeading: "시간을 나눠 쓸 분야를 골라 주세요",
-  categoryHint: "적고 넓게 시작해요. 쓰면서 나눌 수 있어요.",
+  goalHint: GOAL_FIELD_TEXT.example, // 칸 아래 예시(⑬ 1, 칸 안 흐린 글이 아님 — UI-06)
+  categoryHeading: "분야",
+  categorySub: "시간을 나눠 쓸 곳 · 여러 개", // 이름표 아래 보조 한 줄(⑬ 2)
   categoryGroup: "분야",
   exampleGroup: "예시",
   newCategoryLabel: "새 분야 이름",
@@ -38,20 +44,19 @@ export const ONBOARDING_TEXT = {
   categoryFailed: "분야를 더하지 못했어요. 다시 눌러 주세요.",
   categoryAlready: (name: string) => `이미 있는 분야라서 골랐어요: ${name}`,
   categoryReserved: "기타는 더하지 않아도 돼요. 분야를 고르지 않은 할 일은 기타로 들어가요.",
-  ratioHeading: "분야마다 시간을 얼마나 쓰고 싶은지 정해 주세요",
+  ratioHeading: "목표 비율",
   ratioNeed: "하나 이상은 0%보다 커야 해요.",
-  notifyHeading: "알림을 받을까요?",
-  notifyHint: "정한 시각에 알려 드려요. 시각은 나중에 바꿀 수 있어요.",
+  notifyHeading: "알림",
   eveningName: "오늘 기록 알림",
-  eveningDesc: "저녁에 오늘 쓴 시간을 남기도록 알려 드려요.",
   morningName: "아침 알림",
-  morningDesc: "아침에 앱을 열도록 알려 드려요.",
+  /** 줄 아래 미리 보기(⑬ 5·6): 시각 · “실제 알림 글”. 저녁 = 알림 본문, 아침 = 알림 제목 · 고른 첫 분야(없으면 「분야」 — 22 판단) */
+  eveningPreview: (minute: number) => `${formatClock(minute)} · “${NOTIFY_ITEMS.evening.body}”`,
+  morningPreview: (minute: number, firstCategory: string | null) =>
+    `${formatClock(minute)} · “${NOTIFY_ITEMS.morning.title} · ${firstCategory ?? "분야"}”`,
   next: "다음",
-  back: "이전",
   skipGoal: "건너뛰기",
-  startAllow: "허락하고 시작하기",
-  startLater: "나중에 하고 시작하기",
-  saving: "저장하는 중",
+  start: "시작하기",
+  saving: BACK_HEADER_TEXT.saving, // 「저장 중」(O-7)
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
   denied: "알림이 허락되지 않았어요. 브라우저 설정에서 바꿀 수 있어요.",
   pushUnsupported: "이 브라우저는 알림을 받을 수 없어요.",
@@ -69,7 +74,7 @@ export type OnboardingResult = {
   ratios: RatioItem[];
   categories: CategoryEntry[];
   notify: NotifySettings;
-  /** 「허락하고 시작하기」를 눌렀을 때 알림 켜기 결과. 누르지 않았으면 null(B4: 첫 화면이 이 결과를 알린다) */
+  /** 켠 알림이 있어 「시작하기」가 허락을 물었을 때 알림 켜기 결과. 묻지 않았으면 null(B4: 첫 화면이 이 결과를 알린다) */
   pushOutcome?: EnableOutcome | null;
 };
 
@@ -125,8 +130,8 @@ export function Onboarding({
   const [categoryMessage, setCategoryMessage] = useState("");
   const [eveningOn, setEveningOn] = useState(true);
   const [morningOn, setMorningOn] = useState(true);
-  const [eveningMinute, setEveningMinute] = useState(initialNotify.eveningMinute);
-  const [morningMinute, setMorningMinute] = useState(initialNotify.morningMinute);
+  const eveningMinute = initialNotify.eveningMinute;
+  const morningMinute = initialNotify.morningMinute;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -233,10 +238,12 @@ export function Onboarding({
     if (step > 1) setStep((step - 1) as Step);
   }
 
-  async function finish(allow: boolean) {
+  async function finish() {
     if (saving) return;
     setSaving(true);
     setMessage("");
+    // 켠 알림이 있을 때만 허락을 묻는다(D-102⑤). 다 껐으면 묻지도 구독하지도 않는다
+    const allow = eveningOn || morningOn;
     let notifyOn = false;
     let pushOutcome: EnableOutcome | null = null;
     if (allow) {
@@ -291,11 +298,13 @@ export function Onboarding({
   }
 
   const examples = APP_CONFIG.categoryExamples.filter((name) => !catalog.some((c) => sameCategoryName(c.name, name)));
+  // 아침 알림 미리 보기에 쓰는 「고른 첫 분야」(고른 차례의 첫째)
+  const firstCategory = selected.map((id) => catalog.find((c) => c.id === id)?.name).find((n): n is string => n !== undefined) ?? null;
 
   return (
-    <main className="onboarding" aria-labelledby="onboarding-heading">
-      <p className="onboarding-step">{ONBOARDING_TEXT.step(step, TOTAL_STEPS)}</p>
-      <form onSubmit={submit} noValidate>
+    <main className="onboarding screen-fill" aria-labelledby="onboarding-heading">
+      <BackHeader onBack={step > 1 ? goBack : undefined} backDisabled={saving} step={{ n: step, total: TOTAL_STEPS }} />
+      <form className="screen-fill-body" onSubmit={submit} noValidate>
         {step === 1 && (
           <section>
             <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
@@ -307,7 +316,6 @@ export function Onboarding({
               value={goal}
               onChange={setGoal}
               help={ONBOARDING_TEXT.goalHint}
-              placeholder={APP_CONFIG.goalPlaceholder}
               onKeyDown={onGoalKeyDown}
               enterKeyHint="next"
             />
@@ -319,7 +327,7 @@ export function Onboarding({
             <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
               {ONBOARDING_TEXT.categoryHeading}
             </h1>
-            <p className="todo-sub">{ONBOARDING_TEXT.categoryHint}</p>
+            <p className="onboarding-sub">{ONBOARDING_TEXT.categorySub}</p>
             <ChipScroller aria-label={ONBOARDING_TEXT.categoryGroup}>
               {catalog.map((c) => (
                 <button key={c.id} type="button" className="chip" aria-pressed={selected.includes(c.id)} onClick={() => toggleCategory(c.id)}>
@@ -369,10 +377,14 @@ export function Onboarding({
 
         {step === 3 && (
           <section>
-            <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
-              {ONBOARDING_TEXT.ratioHeading}
-            </h1>
+            <div className="onboarding-title-row">
+              <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
+                {ONBOARDING_TEXT.ratioHeading}
+              </h1>
+              <p className="ratio-caption">{RATIO_TEXT.caption}</p>
+            </div>
             <RatioEditor
+              showCaption={false}
               entries={entries}
               onChange={(next) => setPercents((prev) => ({ ...prev, ...Object.fromEntries(next.map((e) => [e.id, e.percent])) }))}
             />
@@ -384,25 +396,22 @@ export function Onboarding({
             <h1 id="onboarding-heading" className="onboarding-title" tabIndex={-1} ref={headingRef}>
               {ONBOARDING_TEXT.notifyHeading}
             </h1>
-            <p className="todo-sub">{ONBOARDING_TEXT.notifyHint}</p>
-            <NotifyRow
-              id="evening"
-              name={ONBOARDING_TEXT.eveningName}
-              desc={ONBOARDING_TEXT.eveningDesc}
-              on={eveningOn}
-              minute={eveningMinute}
-              onToggle={setEveningOn}
-              onMinute={setEveningMinute}
-            />
-            <NotifyRow
-              id="morning"
-              name={ONBOARDING_TEXT.morningName}
-              desc={ONBOARDING_TEXT.morningDesc}
-              on={morningOn}
-              minute={morningMinute}
-              onToggle={setMorningOn}
-              onMinute={setMorningMinute}
-            />
+            <div className="card-box notify-card">
+              <NotifyRow
+                id="evening"
+                name={ONBOARDING_TEXT.eveningName}
+                preview={ONBOARDING_TEXT.eveningPreview(eveningMinute)}
+                on={eveningOn}
+                onToggle={setEveningOn}
+              />
+              <NotifyRow
+                id="morning"
+                name={ONBOARDING_TEXT.morningName}
+                preview={ONBOARDING_TEXT.morningPreview(morningMinute, firstCategory)}
+                on={morningOn}
+                onToggle={setMorningOn}
+              />
+            </div>
           </section>
         )}
 
@@ -412,14 +421,10 @@ export function Onboarding({
           </Notice>
         )}
 
-        <div className="onboarding-actions">
-          {step > 1 && (
-            <TextButton disabled={saving} onClick={goBack}>
-              {ONBOARDING_TEXT.back}
-            </TextButton>
-          )}
+        <BottomActions>
           {step === 1 && (
             <TextButton
+              className="text-tap"
               onClick={() => {
                 setGoal("");
                 setStep(2);
@@ -434,61 +439,77 @@ export function Onboarding({
             </PrimaryButton>
           )}
           {step === 4 && (
-            <>
-              <SecondaryButton disabled={saving} onClick={() => void finish(false)}>
-                {ONBOARDING_TEXT.startLater}
-              </SecondaryButton>
-              <PrimaryButton busy={saving} disabled={saving} onClick={() => void finish(true)}>
-                {saving ? ONBOARDING_TEXT.saving : ONBOARDING_TEXT.startAllow}
-              </PrimaryButton>
-            </>
+            <PrimaryButton busy={saving} disabled={saving} onClick={() => void finish()}>
+              {saving ? ONBOARDING_TEXT.saving : ONBOARDING_TEXT.start}
+            </PrimaryButton>
           )}
-        </div>
+        </BottomActions>
       </form>
     </main>
   );
 }
 
-/** 알림 한 줄: 켜고 끄기 + 시각 고르기(30분 단위). 시각 글은 어미 없이 */
+/**
+ * 알림 한 줄(처음 설정 S1-4와 내 정보 S8이 같이 쓴다): 이름 + 오른쪽 켜고 끄기(스위치 모양의 체크 상자, 이름이 접근성 이름).
+ * - preview가 있으면 줄 아래에 시각 · 실제 알림 글 미리 보기(처음 설정, ⑬ 5·6).
+ * - onMinute가 있으면 줄 아래에 「시각」 고르기(30분 단위, 내 정보). 끈 알림은 시각을 못 고른다. 줄 설명 글은 없다(⑬ 25 뺀 채로).
+ */
 export function NotifyRow({
   id,
   name,
-  desc,
+  preview,
   on,
   minute,
   onToggle,
   onMinute,
+  disabled,
 }: {
   id: string;
   name: string;
-  desc: string;
+  preview?: string;
   on: boolean;
-  minute: number;
+  minute?: number;
   onToggle: (on: boolean) => void;
-  onMinute: (minute: number) => void;
+  onMinute?: (minute: number) => void;
+  /** 저장 중·오프라인이면 켜고 끄기·시각을 막는다(내 정보 바로 저장, O-5) */
+  disabled?: boolean;
 }) {
   const options = timeOptions();
   // 30분 단위가 아닌 값(옛 설정)도 고를 수 있게 목록에 끼워 둔다
-  const list = options.includes(minute) ? options : [...options, minute].sort((a, b) => a - b);
+  const list = minute === undefined || options.includes(minute) ? options : [...options, minute].sort((a, b) => a - b);
   return (
     <div className="notify-row">
       <label className="notify-toggle">
-        <input type="checkbox" checked={on} onChange={(e) => onToggle(e.target.checked)} aria-describedby={`${id}-desc`} />
         <span className="notify-name">{name}</span>
+        <input
+          type="checkbox"
+          className="notify-switch-input"
+          checked={on}
+          disabled={disabled}
+          onChange={(e) => onToggle(e.target.checked)}
+          aria-describedby={preview ? `${id}-preview` : undefined}
+        />
+        <span className="notify-switch" aria-hidden="true" />
       </label>
-      <p id={`${id}-desc`} className="todo-sub">
-        {desc}
-      </p>
-      <label htmlFor={`${id}-time`} className="input-label">
-        {name} 시각
-      </label>
-      <select id={`${id}-time`} className="input" value={minute} disabled={!on} onChange={(e) => onMinute(Number(e.target.value))}>
-        {list.map((m) => (
-          <option key={m} value={m}>
-            {formatClock(m)}
-          </option>
-        ))}
-      </select>
+      {preview && (
+        <p id={`${id}-preview`} className="notify-preview">
+          {preview}
+        </p>
+      )}
+      {onMinute && minute !== undefined && (
+        <div className="notify-time">
+          <label htmlFor={`${id}-time`} className="notify-time-label">
+            <span className="sr-only">{name} </span>시각
+          </label>
+          <select id={`${id}-time`} className="input notify-time-select" value={minute} disabled={!on || disabled} onChange={(e) => onMinute(Number(e.target.value))}>
+            {list.map((m) => (
+              <option key={m} value={m}>
+                {formatClock(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }

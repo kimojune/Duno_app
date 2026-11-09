@@ -75,6 +75,9 @@ describe("이번 주 목표 정하기 창", () => {
     const onClose = vi.fn();
     render(<GoalEditor api={api} categories={categories} goal={null} onClose={onClose} onSaved={onSaved} />);
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: "이번 주 목표" }));
+    // 고침9 ⑬ 14: 안내는 「1시간 단위 · 0시간은 목표에 안 넣음」 한 줄(옛 두 문장 없음)
+    expect(screen.getByText("1시간 단위 · 0시간은 목표에 안 넣음")).toBeTruthy();
+    expect(screen.queryByText(/쓰고 싶은 시간을 1시간 단위로 정해요/)).toBeNull();
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true); // 합 0
     fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
     fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
