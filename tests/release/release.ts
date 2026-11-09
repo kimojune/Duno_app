@@ -15,7 +15,11 @@ import { accountA, nodeClient, sessionCookies } from "../e2e/helpers";
  * 실제로 받은 뒤 필요한 칸만 바꿔 돌려준다(꼴 = 실제 응답 { ok, data: MirrorSnapshot } 그대로). 쓰기 길은 건드리지 않는다.
  */
 
-export const PHOTO_DIR = process.env.SAVE_PHOTOS === "1" ? "docs/oneshot-v2/발표판-화면" : "test-results/photos/발표판-화면";
+// 사진 폴더: SAVE_PHOTOS=1일 때만 docs에 쓴다(PHOTO_OUT으로 폴더를 바꾼다. 기본은 옛 발표판-화면). 아니면 test-results(git이 무시)
+const PHOTO_OUT = (process.env.PHOTO_OUT ?? "발표판-화면").replace(/[\/]+/g, "/");
+export const PHOTO_DIR = process.env.SAVE_PHOTOS === "1" ? `docs/oneshot-v2/${PHOTO_OUT}` : `test-results/photos/${PHOTO_OUT}`;
+/** 사진 배율(고침10 사진 묶음 = 2). 기본 1 */
+export const PHOTO_SCALE = Number(process.env.PHOTO_SCALE ?? "1") || 1;
 const LOG_DIR = "test-results/release";
 
 export type PhotoRow = { name: string; node: string; file: string | null; fake: boolean; note?: string };
@@ -33,12 +37,19 @@ export function fileName(name: string, fake: boolean): string {
 }
 
 /** 360×800 사진(나타남 애니메이션은 끝낸 뒤) + 사진 목록 줄 */
-export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string } = {}) {
+export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string; suffix?: string } = {}) {
   const fake = opts.fake ?? false;
-  const file = fileName(name, fake);
+  const file = fileName(name, fake).replace(/\.png$/, `${opts.suffix ?? ""}.png`);
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
+  // 불러오는 중이 사진에 남지 않게: 글이 사라질 때까지 기다린다(23이 기타 페이지 121:468을 이 까닭으로 못 봤다). 끝까지 남으면 그 사실을 줄에 적는다
+  let loadingLeft = false;
+  await page.waitForFunction(() => !document.body.innerText.includes("불러오는 중"), undefined, { timeout: 15_000 }).catch(() => {
+    loadingLeft = true;
+  });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.screenshot({ path: path.join(PHOTO_DIR, file), animations: "disabled" });
-  logRow("photos", { name, node, file, fake, note: opts.note } satisfies PhotoRow);
+  const note = [opts.note, loadingLeft ? "「불러오는 중」이 남은 채 찍힘" : ""].filter(Boolean).join(" · ") || undefined;
+  logRow("photos", { name, node, file, fake, note } satisfies PhotoRow);
 }
 
 /** 찍지 못한 화면 */
@@ -70,7 +81,7 @@ export async function openA(browser: Browser, fake?: (snap: MirrorSnapshot) => M
     if (!data.user) throw new Error("A 사용자 번호를 읽지 못했다");
     cached = { cookies: await sessionCookies(env, account), client, userId: data.user.id };
   }
-  const context = await browser.newContext({ viewport: { width: 360, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 360, height: 800 }, deviceScaleFactor: PHOTO_SCALE });
   await context.addCookies([
     ...cached.cookies,
     { name: DEVICE_HINT_COOKIE, value: encodeURIComponent(cached.userId), domain: "localhost", path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
