@@ -199,7 +199,7 @@ export function TodoScreen({
   const [loggingOut, setLoggingOut] = useState(false);
   /** 고침10: 로그아웃 요청이 실패했다(확인 창 안 한 줄 안내). 확인을 다시 열거나 다시 누르면 지운다 */
   const [logoutFailed, setLogoutFailed] = useState(false);
-  const loggingOutRef = useRef<Promise<void> | null>(null);
+  const loggingOutRef = useRef<Promise<boolean> | null>(null);
   const [live, announce] = useAnnouncer(first ? loadedText(first.todos.length) : TODO_TEXT.liveLoading);
   const online = useOnline();
   const router = useRouter(); // 다시 로그인: 서버가 세션을 다시 보고 로그인 화면을 그린다
@@ -1025,8 +1025,8 @@ export function TodoScreen({
     void load(list === "error" ? "first" : "silent");
   }
 
-  /** 로그아웃을 한 번만 건다(확인 창 「로그아웃」 연타·Enter 연타에도 한 번). 돌려준 Promise는 로그아웃 요청이 끝날 때 풀린다 */
-  function doSignOut(): Promise<void> {
+  /** 로그아웃을 한 번만 건다(확인 창 「로그아웃」 연타·Enter 연타에도 한 번). 돌려준 Promise는 로그아웃 요청이 끝날 때 풀린다 — 값은 성공 여부(확인 창이 실패를 알아본다) */
+  function doSignOut(): Promise<boolean> {
     if (loggingOutRef.current) return loggingOutRef.current;
     setLoggingOut(true);
     setLogoutFailed(false);
@@ -1043,6 +1043,7 @@ export function TodoScreen({
       loggingOutRef.current = null;
       setLoggingOut(false);
       if (!ok) setLogoutFailed(true);
+      return ok;
     });
     loggingOutRef.current = settled;
     return settled;

@@ -352,6 +352,21 @@ describe("체크 (T8, D5)", () => {
 });
 
 describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
+  it("고침10: 로그아웃 요청이 성공(redirect)하면 확인 창이 사라져도(화면이 떠남) history.back은 0번 — 떠나는 이동과 겹치지 않는다", async () => {
+    await renderLoaded([]);
+    write("적던 글");
+    const back = vi.spyOn(window.history, "back");
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const dialog = confirmDialog(LOGOUT.title);
+    signOut.mockResolvedValueOnce(undefined); // 서버 Action이 redirect로 끝남(클라이언트에서는 풀림)
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.top })));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(within(dialog).queryByRole("alert"), "성공이면 실패 안내 없음").toBeNull();
+    cleanup(); // 로그인 화면으로 떠나며 이 화면이 사라진다
+    expect(back).not.toHaveBeenCalled();
+    back.mockRestore();
+  });
+
   it("고침10: 로그아웃 요청이 실패하면 확인 창은 그대로 · 막힘이 풀리고 안내 한 줄 · 「계속 쓰기」면 확인이 쌓은 history 칸을 거둔다", async () => {
     await renderLoaded([]);
     write("적던 글");

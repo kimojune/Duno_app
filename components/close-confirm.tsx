@@ -25,7 +25,11 @@ import { PrimaryButton, SecondaryButton } from "./ui";
  * - onConfirm이 Promise를 돌려주면 그 Promise가 끝날 때까지 「막힘」이다: 누른 단추 글이 busyLabel로 바뀌고, 두 단추가 막힌다
  *   (disabled + aria-busy, 흐림 0.45 — components/ui.tsx). 막힌 동안 위 단추를 다시 눌러도(연타·Enter 연타) onConfirm을 다시 부르지 않는다.
  *   막힌 동안 Esc·막 누름·뒤로 가기는 아무것도 하지 않는다(이미 보낸 요청을 「취소」처럼 보이지 않게).
- * - Promise가 끝났는데 창이 아직 떠 있으면(실패 등) 막힘이 풀리고 「위 단추를 눌렀다」도 풀린다(ownHistory면 그 뒤 아래 단추가 쌓은 칸을 거둔다).
+ * - Promise가 끝나면 막힘이 풀린다(창이 아직 떠 있으면).
+ * - 실패 알리기: Promise가 false로 끝나거나 거부되면 「실패」다. 그때만 「위 단추를 눌렀다」를 푼다 — ownHistory면 그 뒤 아래 단추가
+ *   쌓은 history 칸을 거둔다. 그 밖의 값(undefined · true 등)으로 끝나면 「성공」이라 그대로 둔다: 성공한 떠나는 동작(로그아웃의
+ *   redirect)으로 창이 사라질 때 history.back()을 부르지 않는다(떠나는 이동과 back()이 겹치지 않게).
+ *   예: onConfirm={() => api.signOut().then((r) => r.ok)} — 실패면 false.
  *   실패 안내는 부르는 쪽이 error로 넘긴다: 제목·보조 글 아래 한 줄(role alert, 앱 공통 「…하지 못했어요. 다시 눌러 주세요.」 꼴).
  * - 페이지를 떠나는 동작(로그아웃)처럼 끝까지 막아 두려면 busy를 넘긴다: busy가 true면 Promise와 상관없이 막힌다.
  *
@@ -62,6 +66,7 @@ export function ConfirmDialog({
   busyLabel?: string;
   /** 아래 주 단추(안전한 쪽) 글 */
   cancelLabel: string;
+  /** 위 단추 동작. Promise면 끝날 때까지 막힘. false로 끝나거나 거부되면 실패(위 머리 주석) */
   onConfirm: () => void | Promise<unknown>;
   onCancel: () => void;
   /** 부르는 쪽이 막힘을 정한다(true면 늘 막힘) */
@@ -122,13 +127,16 @@ export function ConfirmDialog({
     setPending(true);
     // 막히면 단추가 disabled라 초점이 떨어진다 — 제목에 둔다(창 밖으로 새지 않게)
     titleRef.current?.focus();
-    const settle = () => {
+    const settle = (failed: boolean) => {
       pendingRef.current = false;
-      // 끝났는데 창이 아직 떠 있다 = 떠나는 동작이 이뤄지지 않았다(실패 등). 「눌렀다」를 풀어 아래 단추가 history 칸을 거두게 한다
-      confirmed.current = false;
+      // 실패일 때만 「눌렀다」를 풀어 아래 단추가 history 칸을 거두게 한다. 성공이면 그대로(떠나는 이동과 back()이 겹치지 않게)
+      if (failed) confirmed.current = false;
       if (mountedRef.current) setPending(false);
     };
-    (result as Promise<unknown>).then(settle, settle);
+    (result as Promise<unknown>).then(
+      (value) => settle(value === false),
+      () => settle(true),
+    );
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
