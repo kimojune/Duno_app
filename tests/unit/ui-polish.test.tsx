@@ -108,7 +108,7 @@ describe("「자세히」는 줄 오른쪽 작은 단추 (B16)", () => {
   });
 });
 
-describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", () => {
+describe("상태보기 빈 안내 아래 「오늘 기록 남기기」 (B17)", () => {
   const empty: GrowthData = {
     today: "2026-11-07",
     weekStart: "2026-11-02",
@@ -133,7 +133,7 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
       render(<GrowthScreen api={api(empty)} active activation={1} entry="self" onOpenCategory={() => {}} onOpenEvening={onOpenEvening} />);
     });
     expect(screen.getByText(/아직 이번 주 저녁 기록이 없어요/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "저녁 기록 남기기" }));
+    fireEvent.click(screen.getByRole("button", { name: "오늘 기록 남기기" }));
     expect(onOpenEvening).toHaveBeenCalledTimes(1);
   });
   it("기록이 있으면 단추가 없다", async () => {
@@ -149,7 +149,7 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
         />,
       );
     });
-    expect(screen.queryByRole("button", { name: "저녁 기록 남기기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "오늘 기록 남기기" })).toBeNull();
   });
 });
 
@@ -176,7 +176,7 @@ describe("내 정보 맨 아래 로그아웃 (B18)", () => {
 });
 
 describe("이름 통일 (B14)", () => {
-  it("저녁 기록 입구 단추는 「저녁 기록 남기기」다", async () => {
+  it("저녁 기록 입구 단추는 「오늘 기록 남기기」다", async () => {
     render(
       <AppShell
         home={home([item(A, "이력서")])}
@@ -184,7 +184,7 @@ describe("이름 통일 (B14)", () => {
       />,
     );
     await act(async () => {});
-    expect(screen.getByRole("button", { name: "저녁 기록 남기기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "오늘 기록하기" })).toBeNull();
   });
   it("내 정보의 목표 제목은 「이루고 싶은 것」이고 알림 이름 「오늘 기록 알림」은 그대로다", async () => {

@@ -76,7 +76,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await input.press("Escape");
 
     // 저녁 기록: 끊겨도 열리고(기기에서 읽는다) 저장되며 「바뀐 분야별 시간」이 보인다
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "나누지 않고 저장" })).toBeVisible({ timeout: 2_000 });
     // 그날 이미 남긴 기록이 있으면 그 값에서 시작하므로, 이번에 정한 시간을 직접 적는다(이번 실행마다 다른 값)
@@ -165,7 +165,7 @@ test("누르면 서버 응답 전에 화면이 바뀐다(서버 Action 요청을
     await input.press("Escape");
 
     // 저녁 기록 저장도 서버 답 없이 끝난다
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "나누지 않고 저장" })).toBeVisible({ timeout: 1_500 });
     const t2 = Date.now();
@@ -302,7 +302,7 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) �
     const page = await openApp(ctx);
     await ctx.setOffline(true);
 
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 2_000 });
     await dialog.getByLabel("시간", { exact: true }).fill(String(hours));

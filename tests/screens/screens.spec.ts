@@ -402,16 +402,16 @@ for (const state of C_STATES) {
           await shot(page, `${name}-scrolled-end`, false);
         }
         if (state.id === "C29") {
-          // 목록 위 카드는 한 줄 줄이다: 저녁 기록 입구는 단추 높이(48)+위아래 4 한 줄, 먼저 할 일 카드는 많아야 두 줄
+          // 목록 위 카드는 한 줄 줄이다: 오늘 기록 입구는 단추 높이(48)+위아래 4 한 줄, 먼저 할 일 카드는 많아야 두 줄
           const cards = await page.locator(".entry-card").evaluateAll((els) =>
             els.map((el) => ({ label: el.getAttribute("aria-label"), height: el.getBoundingClientRect().height })),
           );
           measurements[`${name}-cards`] = cards;
           expect(cards).toHaveLength(2);
           if (size === "360x640" || size === "360x800") {
-            const evening = cards.find((c) => c.label === "저녁 기록")!;
+            const evening = cards.find((c) => c.label === "오늘 기록")!;
             const offer = cards.find((c) => c.label === "오늘 먼저 할 일")!;
-            expect(evening.height, "저녁 기록 입구는 한 줄").toBeLessThanOrEqual(56 + 0.5);
+            expect(evening.height, "오늘 기록 입구는 한 줄").toBeLessThanOrEqual(56 + 0.5);
             expect(offer.height, "먼저 할 일 카드는 두 줄 안").toBeLessThanOrEqual(48 * 2 + 4 * 2 + 4 + 0.5);
           }
           await shot(page, `${name}-cards`, false);

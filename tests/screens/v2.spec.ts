@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
- * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「저녁 기록 남기기」(B17), 상태보기 기간 × 보기 방식(고침 4바퀴 C), 새 전체 화면 창 넷(B6·B7).
+ * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「오늘 기록 남기기」(B17), 상태보기 기간 × 보기 방식(고침 4바퀴 C), 새 전체 화면 창 넷(B6·B7).
  * 파일 이름: v2-<상태>-<크기>.png. 글자 200%는 screens.spec.ts와 같은 방법으로 흉내 낸다(토큰의 px를 두 배로).
  * 고침 1바퀴에서는 작성만 했고, 고침 2바퀴에서 돌려 실패를 가렸다(docs/oneshot-v2/보고.md 「고침 2바퀴」).
  */
@@ -83,11 +83,11 @@ test("tabbar: 내 정보 안 포커스가 탭 줄 밑으로 들어가지 않는�
 
 // ---- 상태보기 빈 안내 (B17) ----
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-  test(`growth-empty ${size}: 빈 안내 아래에 「저녁 기록 남기기」`, async ({ page }) => {
+  test(`growth-empty ${size}: 빈 안내 아래에 「오늘 기록 남기기」`, async ({ page }) => {
     await open(page, "growth-empty", size);
     await shot(page, `growth-empty-${size}`);
     const text = page.getByText(/아직 이번 주 저녁 기록이 없어요/);
-    const button = page.getByRole("button", { name: "저녁 기록 남기기" });
+    const button = page.getByRole("button", { name: "오늘 기록 남기기" });
     await expect(button).toBeVisible();
     const t = (await text.boundingBox())!;
     const b = (await button.boundingBox())!;
@@ -227,10 +227,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
 }
 
 // ---- 새 전체 화면 창 넷 (B6·B7) ----
-// title = 창 맨 위 제목(h2, 창의 이름). 저녁 기록 창의 h2는 질문이고 「저녁 기록」은 그 밑 작은 글이다(eyebrow).
+// title = 창 맨 위 제목(h2, 창의 이름). 오늘 기록 창의 h2는 질문이고 「오늘 기록」은 그 밑 작은 글이다(eyebrow).
 const WINDOWS: { id: string; title: string; eyebrow?: string }[] = [
   { id: "goal", title: "이번 주 목표" },
-  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "저녁 기록" },
+  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "오늘 기록" },
   { id: "category", title: "어학" },
   { id: "detail", title: "할 일 자세히" },
 ];

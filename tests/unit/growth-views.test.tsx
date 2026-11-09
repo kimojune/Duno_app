@@ -316,7 +316,7 @@ describe("놓친 분야 문장과 채울 시간", () => {
 });
 
 describe("처음 쓰는 사람(기록 0일, 분야 하나)", () => {
-  it("빈 안내와 「저녁 기록 남기기」, 그래프는 빈 줄, 큰 숫자·문장은 없다", async () => {
+  it("빈 안내와 「오늘 기록 남기기」, 그래프는 빈 줄, 큰 숫자·문장은 없다", async () => {
     const d = data({
       categories: [{ id: C1, name: "어학" }],
       ratios: [{ categoryId: C1, percent: 100 }],
@@ -327,7 +327,7 @@ describe("처음 쓰는 사람(기록 0일, 분야 하나)", () => {
     });
     const { container } = await mountBand(fakeApi(d));
     expect(screen.getByText(GROWTH_TEXT.empty)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "저녁 기록 남기기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy();
     expect(screen.getByText("저녁 기록 0일")).toBeTruthy();
     expect(graphLabel()).toBe("처음 정한 비율 어학 100%. 쓴 시간 없음");
     expect(container.querySelector(".growth-band.is-empty")).not.toBeNull();

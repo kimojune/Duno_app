@@ -53,7 +53,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("저녁 기록 (7-3, ②)", () => {
+describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
   it("질문 「오늘 몇 시간 썼어요?」로 열리고 제목에 포커스가 간다", async () => {
     await mount(fakeApi());
     const dialog = screen.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
@@ -97,27 +97,27 @@ describe("저녁 기록 (7-3, ②)", () => {
     expect(screen.getByText("기타 +3시간")).toBeTruthy(); // 모두 기타로 저장한 날에도 값이 있다
   });
 
-  it("분야마다 나누기: 끝낸 할 일의 분야와 타이머로 미리 채우고, 그대로 저장하면 prefilled", async () => {
+  it("분야마다 나누기: 타이머 분야는 그 시간, 끝낸 할 일의 분야는 칩이 골라진 채 기타에서 30분(남은 시간을 나눠 채우지 않는다 — d-115 나·d-116 가). 그대로 저장하면 prefilled", async () => {
     const api = fakeApi(state({ doneCategoryIds: [C2, null], timerByCategory: [{ categoryId: C1, minutes: 30 }] }));
     await mount(api);
     setNumber("시간", 2); // 타이머 30분이 처음 총시간이라 분은 30이다
-    setNumber("분", 0); // 120분: 타이머 30 + 나머지 90은 끝낸 할 일의 분야(포트폴리오)에
+    setNumber("분", 0); // 120분: 타이머 30 + 끝낸 할 일 분야(포트폴리오) 30 + 기타 60
     await press("분야마다 나누기");
     expect(screen.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeTruthy();
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("30");
-    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("90");
+    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("30");
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
       expect.objectContaining({
         totalMinutes: 120,
-        items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 90 }],
+        items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 30 }, { categoryId: null, minutes: 60 }],
         saveMode: "prefilled",
       }),
     );
-    expect(screen.getByText("어학 +30분 · 포트폴리오 +1시간 30분")).toBeTruthy();
+    expect(screen.getByText("어학 +30분 · 포트폴리오 +30분 · 기타 +1시간")).toBeTruthy();
   });
 
-  it("미리 채운 값을 고치면 edited, 남은 시간은 기타", async () => {
+  it("처음 값을 고치면 edited, 남은 시간은 기타", async () => {
     const api = fakeApi(state({ doneCategoryIds: [C2] }));
     await mount(api);
     setNumber("시간", 2);
@@ -125,7 +125,7 @@ describe("저녁 기록 (7-3, ②)", () => {
     fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5분 줄이기" }));
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
-      expect.objectContaining({ items: [{ categoryId: C2, minutes: 115 }, { categoryId: null, minutes: 5 }], saveMode: "edited" }),
+      expect.objectContaining({ items: [{ categoryId: C2, minutes: 25 }, { categoryId: null, minutes: 95 }], saveMode: "edited" }),
     );
   });
 
@@ -134,9 +134,12 @@ describe("저녁 기록 (7-3, ②)", () => {
     await mount(api);
     setNumber("시간", 1);
     await press("분야마다 나누기");
+    await press("어학, 다이얼에 넣기"); // 고침 5바퀴: 칩으로 넣은 분야만 줄이 있다
     setNumber("어학", 90);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("60");
     expect((screen.getByRole("button", { name: "어학 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분이라 0분 줄
+    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
     expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true); // 기타가 0분이라 다른 분야도 못 늘린다
     setNumber("포트폴리오", 30);
     expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
@@ -269,14 +272,29 @@ describe("저녁 기록 (7-3, ②)", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("분야 이름은 글자 그대로 보인다", async () => {
+  it("분야 이름은 글자 그대로 보인다(칩·줄)", async () => {
     const evil = '<img src=x onerror="window.__e=1">';
     const api = fakeApi(state({ categories: [{ id: C1, name: evil }] }));
     await mount(api);
     setNumber("시간", 1);
     await press("분야마다 나누기");
+    const chip = screen.getByRole("button", { name: `${evil}, 다이얼에 넣기` });
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+    expect(chip.textContent).toBe(evil);
+    await press(`${evil}, 다이얼에 넣기`);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText(evil)).toBeTruthy();
     expect(document.querySelector("img[src='x']")).toBeNull();
+    expect((window as unknown as { __e?: number }).__e).toBeUndefined();
+  });
+
+  it("화면 머리·입구 글은 「오늘 기록」(PM 4). 「저녁 기록」 글이 없다", async () => {
+    await mount(fakeApi());
+    expect(screen.getByText("오늘 기록")).toBeTruthy();
+    setNumber("시간", 1);
+    await press("분야마다 나누기");
+    expect(document.body.textContent).not.toContain("저녁 기록");
+    expect(document.body.innerHTML).not.toContain("저녁 기록");
   });
 });
 
@@ -285,10 +303,12 @@ describe("EveningEntry", () => {
     const onOpen = vi.fn();
     const { rerender } = render(<EveningEntry evening onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "저녁 기록 남기기" }));
+    fireEvent.click(screen.getByRole("button", { name: "오늘 기록 남기기" }));
     expect(onOpen).toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "오늘 기록" })).toBeTruthy();
     rerender(<EveningEntry evening={false} onOpen={onOpen} />);
     expect(screen.queryByText("오늘 몇 시간 썼어요?")).toBeNull();
-    expect(screen.getByRole("button", { name: "저녁 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글
+    expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글
+    expect(document.body.textContent).not.toContain("저녁 기록");
   });
 });

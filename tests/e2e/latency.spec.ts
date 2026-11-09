@@ -201,7 +201,7 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
     for (let i = 0; i < 3; i++) {
       const openMs = await clickUntil(
         page,
-        `() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent && x.textContent.trim() === '저녁 기록 남기기'); b.click(); }`,
+        `() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent && x.textContent.trim() === '오늘 기록 남기기'); b.click(); }`,
         `() => { const d = document.querySelector('[role=dialog]'); return !!d && /나누지 않고 저장/.test(d.textContent || ''); }`,
       );
       eveningOpen.push(openMs);
