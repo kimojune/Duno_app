@@ -2,6 +2,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { expectHeadButton } from "./confirm-helpers";
 import type { ManageApi } from "../../lib/manage-api";
 import type { TodayRead } from "../../lib/today-types";
 import { listTodosForPastDay } from "../../lib/todos/core";
@@ -79,7 +80,7 @@ describe("지난 날 보기 화면 (고침 3바퀴 PM 답 d-69 ⑦)", () => {
     await screen.findByText("11월 6일 금요일");
     expect(fetchDay.mock.calls.map((c) => c[0])).toEqual(["2026-11-06", "2026-11-05", "2026-11-06"]);
   });
-  it("읽지 못하면 안내와 「다시 불러오기」, 닫기와 Esc가 닫는다", async () => {
+  it("읽지 못하면 안내와 「다시 불러오기」, 머리 「‹」(이름 「이전」, 고침10 A)와 Esc가 닫는다", async () => {
     let fail = true;
     const fetchDay = vi.fn(async (date: string): Promise<TodoResult<TodayTodos>> =>
       fail ? { ok: false, error: "unavailable" } : { ok: true, data: { day: dayOf(date), todos: [todo(A, "글")] } },
@@ -90,7 +91,9 @@ describe("지난 날 보기 화면 (고침 3바퀴 PM 답 d-69 ⑦)", () => {
     fail = false;
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" })));
     expect(await screen.findByText("글")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("button", { name: "닫기" })).toBeNull();
+    expectHeadButton(screen.getByRole("dialog"), "back");
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
   it("글은 글자 그대로 보인다(꺾쇠가 요소가 되지 않는다)", async () => {

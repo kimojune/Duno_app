@@ -1003,12 +1003,13 @@ describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고
 });
 
 describe("오늘 기록 나누기 화면 꼴(고침9 Figma 87:2 · 87:96 · 49:26 · 49:83)", () => {
-  it("머리 「‹ 오늘 기록 닫기」(A1) · 제목 옆 「합계」 · 「오늘/어제」 알약 없음 · 흰 카드 하나에 이름표·칩 줄·다이얼·줄·안내 · 「이전」 글 단추 없음 · 「저장」은 아래 고정(A2)", async () => {
+  it("머리 「‹ 오늘 기록」(고침10 A — 오른쪽 위 글 「닫기」 없음) · 제목 옆 「합계」 · 「오늘/어제」 알약 없음 · 흰 카드 하나에 이름표·칩 줄·다이얼·줄·안내 · 「이전」 글 단추 없음 · 「저장」은 아래 고정(A2)", async () => {
     await openSplit120();
     const dialog = screen.getByRole("dialog", { name: "오늘 기록" });
     const back = within(dialog).getByRole("button", { name: "이전" });
-    expect(back.className).toBe("overlay-back");
+    expect(back.className).toBe("head-btn head-btn-back");
     expect(back.closest(".screen-head")).not.toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "닫기" })).toBeNull();
     expect(within(dialog).queryByRole("group", { name: "기록할 날" })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "오늘" })).toBeNull();
     expect(within(dialog).queryAllByRole("button", { name: "이전" })).toHaveLength(1); // 글 단추 「이전」 없음 — 「‹」 하나

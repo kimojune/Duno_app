@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { StrictMode, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeHistory } from "./fake-history";
+import { expectConfirmShape, expectHeadButton } from "./confirm-helpers";
 
 vi.mock("../../app/todos/actions", () => ({ addTodo: vi.fn(), setTodoDone: vi.fn(), addCategory: vi.fn() }));
 vi.mock("../../app/actions", () => ({ signOut: vi.fn() }));
@@ -91,23 +92,24 @@ describe("고침9 O-3 이번 주 목표 시트: 바꾼 뒤 닫기·Esc·뒤로 �
   );
   const confirm = () => screen.queryByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
 
-  it("안 바꿨으면 「닫기」로 바로 닫힌다(확인 없음)", () => {
+  it("안 바꿨으면 머리 「✕」(이름 「닫기」, 고침10 A — 시트 변형)로 바로 닫힌다(확인 없음)", () => {
     const onClosed = vi.fn();
     render(<Harness renderWindow={goal} onClosed={onClosed} />);
     fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    expectHeadButton(screen.getByRole("dialog", { name: "이번 주 목표" }), "close");
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(confirm()).toBeNull();
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
 
-  it("바꾼 뒤 「닫기」 → 확인(첫 포커스 「계속 적기」), 「계속 적기」는 값 그대로, Esc도 확인, 「나가기」는 저장 없이 닫힘", () => {
+  it("바꾼 뒤 머리 「✕」(이름 「닫기」) → 확인(첫 포커스 제목, 위 「나가기」·아래 「계속 적기」), 「계속 적기」는 값 그대로, Esc도 확인, 「나가기」는 저장 없이 닫힘", () => {
     const onClosed = vi.fn();
     render(<Harness renderWindow={goal} onClosed={onClosed} />);
     fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
     fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(confirm()).not.toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "계속 적기" }));
+    expectConfirmShape(confirm()!, "나가기", "계속 적기");
     fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
     expect(confirm()).toBeNull();
     expect(onClosed).not.toHaveBeenCalled();

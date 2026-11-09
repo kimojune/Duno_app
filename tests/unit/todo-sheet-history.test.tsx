@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodayRead } from "../../lib/today-types";
 import { FakeHistory } from "./fake-history";
+import { expectConfirmShape, LEAVE } from "./confirm-helpers";
 
 /**
  * C-D2 뒤로 가기로 창 닫기 — history 칸에 표시가 남는 경우(고침 1/2의 1번, 고침 2/2의 1·3번).
@@ -54,7 +55,7 @@ const confirm = () => screen.queryByRole("alertdialog", { name: "저장하지 �
 
 /** 고침9 O-3: 바꾼 것이 있는 창의 「닫기」 → 확인 → 「나가기」 */
 function closeWithConfirm() {
-  fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+  fireEvent.click(screen.getByRole("button", { name: "닫기" }));
   expect(confirm(), "바꾼 것이 있으면 「닫기」는 확인").not.toBeNull();
   expect(sheet(), "확인이 떠도 창은 열린 채").not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "나가기" }));
@@ -251,7 +252,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     expect(history.index).toBe(0);
     expect(document.activeElement).toBe(openButton());
     open();
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(confirm()).toBeNull();
     expect(sheet()).toBeNull();
     history.flush();
@@ -259,7 +260,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     expect(history.leftApp).toBe(false);
   });
 
-  it("고침9 O-3: 글이 있으면 뒤로 가기 → 확인(초점 「계속 적기」) → 「계속 적기」 → 열린 채·글 그대로 → 다시 뒤로 가기 → 확인 → 「나가기」 → 닫힘·글 남음·앱 안", () => {
+  it("고침9 O-3 · 고침10 B: 글이 있으면 뒤로 가기 → 확인(초점 제목, 위 「나가기」·아래 「계속 적기」) → 「계속 적기」 → 열린 채·글 그대로 → 확인이 뜬 채 뒤로 가기 = 「계속 적기」 → 다시 뒤로 가기 → 확인 → 「나가기」 → 닫힘·글 남음·앱 안", () => {
     const history = new FakeHistory(NEXT_STATE).install();
     mount();
     open();
@@ -268,10 +269,20 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     history.userBack();
     history.flush();
     expect(confirm()).not.toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "계속 적기" }));
+    expectConfirmShape(confirm()!, LEAVE.top, LEAVE.bottom);
     expect(history.index).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
     expect(todoInput().value).toBe("확인 볼 글");
+    // 고침10 B: 확인이 뜬 채 안드로이드 뒤로 가기 = 아래 「계속 적기」(확인만 닫히고 창·글·칸 그대로)
+    history.userBack();
+    history.flush();
+    expect(confirm()).not.toBeNull();
+    history.userBack();
+    history.flush();
+    expect(confirm(), "확인이 뜬 채 뒤로 가기는 확인만 닫는다").toBeNull();
+    expect(todoInput().value).toBe("확인 볼 글");
+    expect(history.index).toBe(1);
+    expect(history.leftApp).toBe(false);
     history.userBack();
     history.flush();
     expect(confirm()).not.toBeNull();
@@ -289,7 +300,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     const history = new FakeHistory(NEXT_STATE).install();
     mount();
     open();
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     history.flush();
     expect(history.index).toBe(0);
     expect(sheet()).toBeNull();

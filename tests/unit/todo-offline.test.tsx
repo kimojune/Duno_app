@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Outbox, OutboxItem } from "../../lib/outbox";
 import type { TodayRead } from "../../lib/today-types";
@@ -138,7 +138,8 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     expect(screen.queryByText("자정 넘어 적은 글")).toBeNull(); // 오늘 목록에 「저장됨」으로 남지 않는다
     expect(visibleTexts("어제 날짜로 저장했어요")).toHaveLength(1);
     expect(box.stored()).toEqual([]); // 올라갔으니 기기에서는 지운다
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    // 안내 줄의 글 단추 「닫기」(적는 창 머리 단추 「✕」 — 이름 「닫기」 — 와 다르다)
+    fireEvent.click(within(document.querySelector<HTMLElement>(".notice-top")!).getByRole("button", { name: "닫기" }));
     expect(visibleTexts("어제 날짜로 저장했어요")).toHaveLength(0);
   });
 

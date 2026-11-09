@@ -462,7 +462,7 @@ button, input { font: inherit; color: inherit; }
 .timer-choose .chip[aria-pressed="true"] .chip-face,
 .evening-todo-sheet .chip[aria-pressed="true"] .chip-face { background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-primary); padding: 0 calc(var(--space-3) - 1px); margin-block: -1px; }
 /* 적는 창 머리 「할 일 적기」 16 Bold(Figma 50:103) */
-.todo-sheet .sheet-head .sheet-label { font: var(--font-body); font-weight: 700; color: var(--color-text); }
+.todo-sheet .screen-head .sheet-label { font: var(--font-body); font-weight: 700; color: var(--color-text); } /* 적는 창 머리 「할 일」은 이름표가 아니라 창 제목(16 Bold) */
 /* 타이머 「오늘 시작한 타이머 0개」: 기록이 없으면 제목 옆 한 줄(Figma 50:390) */
 .timer-records.is-empty { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); }
 .timer-records.is-empty > .todo-sub { margin: 0; }
@@ -474,9 +474,6 @@ button, input { font: inherit; color: inherit; }
 .goal-total { margin-top: var(--space-4); text-align: end; font-weight: 700; }
 .goal-actions > .btn-text { justify-self: center; width: auto; }
 /* 목표 없애기 확인(Figma 51:48): 흰 카드 · 제목 14 Bold · 「없애기」(테두리 알약) 「그대로」(글 단추) 한 줄 */
-.goal-clear-confirm { display: grid; gap: var(--space-2); }
-.goal-clear-title { margin: 0; font: var(--font-sub); font-weight: 700; color: var(--color-text); overflow-wrap: anywhere; }
-.goal-clear-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 /* ---- 고침9 S2 목록 줄(Figma 50:52): 흰 카드 하나에 줄들(radius 16, 안 좌우 16), 줄 사이 1px 선 · 동그란 체크 · 분야 점 + 이름 12 보조 · 오른쪽 「›」 ---- */
 .todo-list { border-radius: var(--radius-card, 16px); background: var(--color-surface); padding: 0 var(--space-2); }
 .todo-list > .todo-row + .todo-row { border-top: 1px solid var(--color-divider); }
@@ -487,8 +484,6 @@ button, input { font: inherit; color: inherit; }
 .category-tag-dot { flex: none; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }
 .todo-list .row-detail-btn { font: 400 18px/1 var(--font-family); color: var(--color-text-sub); }
 /* ---- 고침9 S2-b 할 일 페이지(Figma 51:55 · 58:92 · 66:12 · 66:76): 머리 「‹ 할 일」 · 저장 상태 · 「⋯」 → 큰 제목 24 Bold → 속성 줄(끝냄·분야·하는 날) → 작업 기록 ---- */
-.detail-page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-inline-start: calc(-1 * var(--space-3)); margin-inline-end: calc(-1 * var(--space-3)); }
-.detail-back { font: var(--font-sub); font-weight: 500; color: var(--color-text); }
 .detail-page-tools { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .detail-status { font-size: 12px; line-height: 16px; color: var(--color-text-sub); white-space: nowrap; }
 .detail-status-retry { font-size: 12px; font-weight: 500; color: var(--color-text); }
@@ -513,9 +508,6 @@ button, input { font: inherit; color: inherit; }
 .detail-notes-title { margin: 0 0 var(--space-2); font-weight: 400; }
 .detail-note-input { inline-size: 100%; padding: var(--space-2) 0; border: 0; border-block-end: 1px solid var(--color-divider); background: none; color: var(--color-text); font: var(--font-body); resize: vertical; }
 .detail-note-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.detail-remove-title { margin: 0; font: var(--font-sub); color: var(--color-text); overflow-wrap: anywhere; }
-.detail-remove-actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-6); }
-.detail-remove-actions > .btn { flex: 1; }
 /* ---- 고침9 PM 3: 할 일 페이지 「분야」 한 줄(Figma 51:55 — 이름표 12 보조 · 색 원 12(1px 윤곽) + 이름 14 · 오른쪽 「›」, 위아래 1px 구분선, 누름 48) ---- */
 .detail-prop { display: flex; align-items: center; gap: var(--space-4); min-block-size: var(--tap-min); border-block: 1px solid var(--color-divider); }
 .detail-prop-label { flex: none; min-inline-size: 44px; font-size: 12px; line-height: 1.4; color: var(--color-text-sub); }
@@ -538,7 +530,6 @@ button, input { font: inherit; color: inherit; }
   padding: var(--space-2) 0 calc(var(--space-4) + env(safe-area-inset-bottom));
   border-radius: 24px 24px 0 0; background: var(--color-surface);
 }
-.category-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 0 var(--space-3) 0 24px; }
 .category-sheet-title { margin: 0; font: var(--font-body); font-weight: 700; color: var(--color-text); }
 .category-sheet-title:focus { outline: none; }
 .category-sheet-list { list-style: none; margin: 0; padding: 0; }
@@ -747,15 +738,25 @@ select.input { appearance: auto; }
 .evening-todo-grip { display: block; inline-size: 40px; block-size: 4px; margin: calc(-1 * var(--space-2)) auto var(--space-2); border-radius: 2px; background: var(--color-category-other); }
 .evening-todo-title { font: var(--font-body); font-weight: 700; }
 .evening-todo-sheet .btn-flush-end { margin-inline-end: calc(-1 * var(--space-3)); }
-/* 닫기 전 확인(PM d-126, components/close-confirm.tsx): 오늘 기록·시트 위 가운데 흰 카드. 「계속 적기」(주 단추) 위 · 「닫기」 아래, 둘 다 전체 폭 */
+/* B 공통 확인 창(고침10 — Figma 146:11 · 147:2 · 상태 150:58, components/close-confirm.tsx ConfirmDialog): 가운데 흰 창 폭 312 · 모서리 16 ·
+   안 여백 위 28 / 옆 24 / 아래 24 · 막 먹남색 45%. 제목 18 Bold(토큰에 18이 없어 글자 값으로) → 보조 글 14 보조색(있을 때만) → 단추 둘 세로(폭 가득 · 높이 48 · 사이 12 · 글 16 Bold).
+   위 = 떠나기·지우기(테두리 1.5 글색, 바탕 없음) · 아래 = 안전한 쪽 주 단추(글색 채움, 흰 글) */
 .close-confirm-layer { position: fixed; inset: 0; z-index: 7; display: flex; align-items: center; justify-content: center; padding: var(--space-4) var(--page-x); }
-.close-confirm-backdrop { position: absolute; inset: 0; background: var(--color-scrim, color-mix(in srgb, var(--color-text) 40%, transparent)); }
+.close-confirm-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--color-text) 45%, transparent); }
 .close-confirm {
-  position: relative; width: 100%; max-width: var(--page-max); max-height: 100%; overflow-y: auto;
-  padding: var(--space-6) var(--space-4) var(--space-4); border-radius: var(--radius-card, 16px); background: var(--color-surface);
+  position: relative; width: 100%; max-width: 312px; max-height: 100%; overflow-y: auto;
+  padding: 28px var(--space-6) var(--space-6); border-radius: var(--radius-card, 16px); background: var(--color-surface);
 }
-.close-confirm-title { margin: 0; font: var(--font-title); color: var(--color-text); overflow-wrap: anywhere; }
-.close-confirm-actions { display: grid; gap: var(--space-2); margin-top: var(--space-6); }
+.close-confirm-title { margin: 0; font: 700 1.125rem/1.375rem var(--font-family); color: var(--color-text); overflow-wrap: anywhere; }
+.close-confirm-title:focus { outline: none; }
+.close-confirm-title:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.close-confirm-desc { margin: var(--space-2) 0 0; font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.close-confirm-actions { display: grid; gap: var(--space-3); margin-top: 28px; }
+.close-confirm-actions > .btn { width: 100%; min-height: var(--tap-min); font: var(--font-body); font-weight: 700; }
+.close-confirm-actions > .btn-secondary { border-color: var(--color-text); color: var(--color-text); background: transparent; }
+.close-confirm-actions > .btn-secondary:active { background: var(--color-secondary-pressed); }
+.close-confirm-actions > .btn-primary { background: var(--color-text); border-color: var(--color-text); color: var(--color-on-primary); }
+.close-confirm-actions > .btn-primary:active { background: var(--color-primary-pressed); border-color: var(--color-primary-pressed); }
 .evening-todo-sheet > .notice { margin-top: var(--space-2); }
 /* 목록 = 흰 카드 하나(A4), 줄 사이 1px 선. 줄 높이 56 */
 .evening-todo-list { margin-top: var(--space-2); border-radius: var(--radius-card); background: var(--color-surface); overflow: hidden; }
@@ -835,14 +836,6 @@ select.input { appearance: auto; }
 .me-goal-text { font: var(--font-goal-line, 700 20px/28px var(--font-family)); color: var(--color-text); word-break: keep-all; overflow-wrap: anywhere; }
 .me-goal-empty { font: 500 16px/24px var(--font-family); color: var(--color-text); }
 .me-goal-chevron { flex: none; font: var(--font-title); color: var(--color-text-sub); }
-/* 겹침 화면 머리 왼쪽 위 「‹」(S8-b): 누름 48×48, 화면 읽기 이름 「이전」 */
-.overlay-head { display: flex; align-items: center; min-height: var(--tap-min); margin: calc(-1 * var(--space-3)) 0 var(--space-2) calc(-1 * var(--space-3)); }
-.overlay-back {
-  display: inline-flex; align-items: center; justify-content: center; inline-size: var(--tap-min); block-size: var(--tap-min);
-  padding: 0; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-text); cursor: pointer;
-  font: 400 32px/1 var(--font-family);
-}
-.overlay-back:active { background: var(--color-notice-bg); }
 .goal-sentence-actions { display: grid; margin-top: var(--space-6); }
 .growth-body { padding: 0 var(--page-x); }
 /* 상태보기 맨 위(고침9 A5, Figma 50:137): 워드마크(위 12) → 목표 한 줄(12 아래) → 탭. 보이는 큰 제목 없음(숨은 h1만) */
@@ -1104,20 +1097,38 @@ select.input { appearance: auto; }
 .category-day-todo .note-sublist > li { margin: 0; font: 400 12px/normal var(--font-family); color: var(--color-text-sub); }
 
 /* ---- 원샷 v2 고침9: 공통 부품(Figma 정합 A1~A4 · 확인 창 98:278). 값은 기존 토큰만 쓴다(새 토큰 없음) ---- */
-/* A1 화면 머리(components/back-header.tsx BackHeader): 한 줄 48 = 「‹」(누름 48) · 가운데 화면 이름 16 Bold · 오른쪽 「닫기」 14 보조(누름 48).
-   「‹」·「닫기」의 누름 틀이 화면 안쪽 여백(16) 밖으로 12 나가 보이는 아이콘·글이 안쪽 끝에 맞는다. 큰 제목(24 Bold)은 머리 밖(아래) */
-.screen-head { margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3); }
+/* A 머리 단추 · 화면 머리(고침10 A — Figma 146:10 · 상태 150:58, components/back-header.tsx): 판 왼쪽 4 · 위 10에 누름 48×48, 아이콘 24(선 2, 글색).
+   판의 안 여백이 기본(위 24 · 옆 16)과 다르면 판에 --panel-pad-top · --panel-pad-x를 둔다. 가운데 화면 이름 16 Bold. 큰 제목(24 Bold)은 머리 밖(아래) */
+.screen-head { margin: calc(10px - var(--panel-pad-top, var(--space-6))) calc(4px - var(--panel-pad-x, var(--page-x))) var(--space-3); }
 .screen-head-row { display: flex; align-items: center; min-height: var(--tap-min); }
-.screen-head-no-back .screen-head-row { padding-inline-start: var(--space-3); }
+.screen-head-no-back .screen-head-row { padding-inline-start: calc(var(--panel-pad-x, var(--page-x)) - 4px); }
 .screen-head-slot { flex: none; inline-size: var(--tap-min); }
 .screen-head-title { flex: 1 1 auto; min-width: 0; margin: 0; text-align: center; font: var(--font-body); font-weight: 700; color: var(--color-text); overflow-wrap: anywhere; }
-.screen-head-close { flex: none; min-width: var(--tap-min); font: var(--font-sub); color: var(--color-text-sub); }
+.screen-head-row-start { gap: var(--space-1); }
+.screen-head-row-start .screen-head-title { text-align: start; }
+.screen-head-end { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); min-width: 0; }
 .screen-head-step { flex: 1 1 auto; margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); } /* 12 보조 */
-.overlay-back + .screen-head-step { margin-inline-start: calc(-1 * var(--space-2)); } /* 「‹」 바로 옆(누름 틀 안쪽 여백만큼 당김) */
+.head-btn + .screen-head-step { margin-inline-start: calc(-1 * var(--space-2)); } /* 「‹」 바로 옆(누름 틀 안쪽 여백만큼 당김) */
 .screen-head-progress { display: flex; gap: var(--space-2); margin: var(--space-1) var(--space-3) 0; } /* 진행 막대 넷: 높이 4, 사이 8 */
 .screen-head-bar { flex: 1 1 0; block-size: 4px; border-radius: 2px; background: var(--color-divider); }
 .screen-head-bar.is-done { background: var(--color-primary); }
-.overlay-back:disabled { opacity: 0.4; cursor: default; }
+.head-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; inline-size: var(--tap-min); block-size: var(--tap-min);
+  padding: 0; border: 0; border-radius: 12px; background: transparent; color: var(--color-text); cursor: pointer;
+}
+.head-btn-icon { display: block; flex: none; }
+.head-btn:active { background: var(--color-secondary-pressed); } /* 눌림 #E7E1D6 */
+.head-btn:focus-visible { outline: 2px solid var(--color-text); outline-offset: 2px; } /* 초점: 틀 둘레 2px 링, 2px 틈, 모서리 12(틀의 모서리를 따른다) */
+.head-btn:disabled { opacity: 0.4; cursor: default; }
+.head-btn:disabled:active { background: transparent; }
+/* 판마다 안 여백(머리 단추 자리 계산용) */
+.todo-sheet { --panel-pad-top: var(--space-2); --panel-pad-x: var(--page-x); }
+.category-sheet { --panel-pad-top: var(--space-2); --panel-pad-x: 0px; }
+.evening-todo-sheet { --panel-pad-top: var(--space-4); --panel-pad-x: var(--page-x); }
+/* 손잡이 막대는 흐름 밖(판 위 8)에 둔다 — 머리 단추가 판 위 10에 오게 */
+.evening-todo-sheet .evening-todo-grip { position: absolute; inset-block-start: var(--space-2); inset-inline: 0; margin: 0 auto; }
+.category-sheet .screen-head { margin-block-end: 0; }
+.category-sheet .screen-head-row-start .screen-head-title { padding-inline-start: var(--space-1); }
 /* A2 아래 주 단추 자리(BottomActions): 폭 가득 · 높이 48 · 아래 여백 36 · 세로 쌓기. 부모(.screen-fill)가 세로 flex라 내용이 짧아도 화면 아래로 밀린다 */
 .screen-fill { display: flex; flex-direction: column; min-height: 100%; }
 .detail-inner.screen-fill { padding-bottom: 0; }
@@ -1163,9 +1174,6 @@ select.input { appearance: auto; }
 .ratio-row .chip-dot { inline-size: 12px; block-size: 12px; }
 .ratio-foot { justify-content: center; }
 .ratio-foot .btn-text { font: 500 0.875rem/1.25rem var(--font-family); color: var(--color-text); } /* 글 단추: 밑줄 없음, 14 Medium(④-2) */
-/* 확인 창 꼴(Figma 98:278): 종이색 바탕 · 폭 312 · 안 여백 위 28 / 옆 24 / 아래 24 · 제목 18 Bold(토큰에 18이 없어 글자 값으로 — 보고에 적음) */
-.close-confirm { max-width: 312px; padding: 28px var(--space-6) var(--space-6); background: var(--color-bg); }
-.close-confirm-title { font: 700 1.125rem/1.625rem var(--font-family); }
 /* 처음 설정·내 정보 고침9(Figma 49:178·49:194·49:232·50:4·50:641): 이름표 제목 24 Bold · 보조 한 줄 14 · 목표 비율 이름표 옆 작은 글 */
 .onboarding-title-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); margin-bottom: var(--space-3); }
 .onboarding-title-row .onboarding-title { margin: 0; }
@@ -1186,8 +1194,6 @@ select.input { appearance: auto; }
 .notify-time { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
 .notify-time-label { font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
 .me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 44px; font: 500 0.8125rem/1.25rem var(--font-family); }
-/* 확인 창 뒤 어두운 막(Figma 121:389·121:449): 먹남색 45%(새 토큰 없이 --color-text를 섞는다) */
-.close-confirm-backdrop { background: color-mix(in srgb, var(--color-text) 45%, transparent); }
 /* 내 정보(S8, Figma 50:641): 카드 사이 16. 목표 비율 카드 = 「목표 비율」 16 Bold + 「›」 + 작은 띠(높이 8, 칸마다 분야 색 + 1px 윤곽, 칸 사이 2, 숫자 없음). 카드 전체가 단추 하나 */
 .me .growth-body > .detail-section, .me-section { margin-top: var(--space-4); }
 .me-card-title { margin: 0 0 var(--space-2); font: var(--font-body); font-weight: 700; color: var(--color-text); }

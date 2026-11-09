@@ -8,12 +8,13 @@ import { MeScreen } from "../../components/me-screen";
 import { Onboarding, ONBOARDING_TEXT } from "../../components/onboarding";
 import { Stepper } from "../../components/stepper";
 import { PrimaryButton, SecondaryButton, TextButton } from "../../components/ui";
-import { SIZE_TOKENS } from "../../lib/design-tokens";
+import { COLOR_TOKENS, SIZE_TOKENS } from "../../lib/design-tokens";
 import type { SettingsApi } from "../../lib/onboarding-api";
 import { NOTIFY_ITEMS } from "../../lib/push/next";
 import type { PushApi } from "../../lib/push/subscribe";
 import type { NotifySettings, RatioItem, SettingsData } from "../../lib/settings/types";
 import { FakeHistory } from "./fake-history";
+import { expectConfirmShape, expectHeadButton } from "./confirm-helpers";
 
 /**
  * 고침9(J1): 처음 설정 · 내 정보 · 나누기 머리 — 발표 뒤 판 몫(PM 1·6, 명세 ⑩·⑬, Figma 정합 A1~A4).
@@ -60,28 +61,53 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("머리 부품 BackHeader · BottomActions (정합 A1·A2, PM 1-A)", () => {
-  it("onBack이 있으면 「‹」 단추 하나: 화면 읽기 이름 「이전」, 글자는 꾸밈(aria-hidden), 머리의 첫 누름 요소. 누르면 onBack", () => {
+describe("머리 부품 BackHeader · BottomActions (정합 A1·A2, PM 1-A) · 고침10 A 머리 단추(146:10)", () => {
+  it("onBack이 있으면 왼쪽 위 「‹」 단추 하나: 화면 읽기 이름 「이전」, 아이콘(선 2 svg 24)은 꾸밈(aria-hidden), 머리의 첫 누름 요소. 누르면 onBack. 글 「닫기」 단추는 없다", () => {
     const onBack = vi.fn();
-    const onClose = vi.fn();
-    const { container } = render(<BackHeader onBack={onBack} title="오늘 기록" onClose={onClose} />);
+    const { container } = render(<BackHeader onBack={onBack} title="오늘 기록" />);
     const back = screen.getByRole("button", { name: "이전" });
-    expect(back.textContent).toBe("‹");
-    expect(back.querySelector("[aria-hidden='true']")?.textContent).toBe("‹");
+    expect(back.textContent).toBe("");
+    const icon = back.querySelector("svg")!;
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+    expect([icon.getAttribute("width"), icon.getAttribute("height")]).toEqual(["24", "24"]);
+    expect(icon.querySelector("path")!.getAttribute("stroke-width")).toBe("2");
+    expect(icon.querySelector("path")!.getAttribute("stroke")).toBe("currentColor");
     expect(firstFocusable(container)).toBe(back);
     expect(container.querySelector(".screen-head-title")?.textContent).toBe("오늘 기록");
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "닫기" })).toBeNull();
     fireEvent.click(back);
     expect(onBack).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+  });
+
+  it("onClose(시트)면 왼쪽 위 「✕」 단추 하나: 이름 「닫기」, 아이콘만(글 없음), 머리의 첫 누름 요소. 누르면 onClose", () => {
+    const onClose = vi.fn();
+    const { container } = render(<BackHeader onClose={onClose} titleAlign="start" title={<h2>분야 고르기</h2>} />);
+    const close = screen.getByRole("button", { name: "닫기" });
+    expect(close.textContent).toBe("");
+    expect(close.getAttribute("data-head-button")).toBe("close");
+    expect(close.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    expect(firstFocusable(container)).toBe(close);
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(close.compareDocumentPosition(screen.getByRole("heading", { name: "분야 고르기" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector(".btn-text")).toBeNull();
+    fireEvent.click(close);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("누름 48: .overlay-back 규칙이 --tap-min(48px)을 가로·세로로 쓴다. 닫기도 최소 폭 48", () => {
+  it("CSS(146:10 · 150:58): 누름 48×48(--tap-min), 판 왼쪽 4 · 위 10, 초점 = 2px 글색 링 · 2px 틈 · 모서리 12, 눌림 = #E7E1D6", () => {
     expect(SIZE_TOKENS["--tap-min"]).toBe("48px");
-    const rule = CSS.match(/\.overlay-back \{([^}]*)\}/)?.[1] ?? "";
+    const rule = CSS.match(/\.head-btn \{([^}]*)\}/)?.[1] ?? "";
     expect(rule).toMatch(/inline-size:\s*var\(--tap-min\)/);
     expect(rule).toMatch(/block-size:\s*var\(--tap-min\)/);
-    expect(CSS).toMatch(/\.screen-head-close \{[^}]*min-width:\s*var\(--tap-min\)/);
+    expect(rule).toMatch(/border-radius:\s*12px/);
+    expect(rule).toMatch(/color:\s*var\(--color-text\)/);
+    expect(CSS).toMatch(/\.head-btn:focus-visible \{ outline: 2px solid var\(--color-text\); outline-offset: 2px; \}/);
+    expect(CSS).toMatch(/\.head-btn:active \{ background: var\(--color-secondary-pressed\); \}/);
+    expect(COLOR_TOKENS["--color-secondary-pressed"]).toBe("#E7E1D6");
+    expect(COLOR_TOKENS["--color-text"]).toBe("#1C2340");
+    expect(CSS).toMatch(/\.screen-head \{ margin: calc\(10px - var\(--panel-pad-top, var\(--space-6\)\)\) calc\(4px - var\(--panel-pad-x, var\(--page-x\)\)\)/);
+    expect(CSS).not.toMatch(/\.overlay-back|\.screen-head-close/);
   });
 
   it("onBack이 없으면 「‹」가 없다. step은 「4단계 중 n단계」 + 진행 막대 넷(지난 단계까지 is-done, 화면 읽기에서 숨김)", () => {
@@ -150,6 +176,7 @@ describe("처음 설정 머리 「‹」 (PM 1-A)", () => {
       expect(backs).toHaveLength(1); // 아래 단추 줄의 「이전」 글 단추는 없다
       expect(firstFocusable(main)).toBe(backs[0]);
       expect(backs[0].closest(".screen-head")).not.toBeNull();
+      expectHeadButton(main, "back"); // 고침10 A: 「‹」 머리 단추 하나, 글 「닫기」 없음
     }
     click("이전");
     expect(screen.getByText("4단계 중 3단계")).toBeTruthy();
@@ -334,6 +361,7 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     expect(dlg.getAttribute("aria-modal")).toBe("true");
     const back = within(dlg).getByRole("button", { name: "이전" });
     expect(firstFocusable(dlg)).toBe(back);
+    expect(expectHeadButton(dlg, "back")).toBe(back); // 고침10 A
     expect(document.activeElement).toBe(within(dlg).getByRole("heading", { name: "목표 비율" }));
     expect(dlg.querySelector("svg.dial")).not.toBeNull();
     expect(dlg.querySelector("ul.ratio-list.card-box")).not.toBeNull();
@@ -397,15 +425,14 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     expect(dialog()).toBeNull();
   });
 
-  it("바꾸고 「‹」 → 확인(d-135 글 「저장하지 않고 나갈까요? / 계속 적기 / 나가기」, 처음 포커스 「계속 적기」). 「계속 적기」면 값 그대로, 「나가기」면 저장 호출 0으로 닫히고 띠 그대로", async () => {
+  it("바꾸고 「‹」 → 확인(d-135 글 「저장하지 않고 나갈까요?」, 고침10 B: 위 「나가기」 · 아래 「계속 적기」, 처음 포커스 제목). 「계속 적기」면 값 그대로, 「나가기」면 저장 호출 0으로 닫히고 띠 그대로", async () => {
     const { api } = mountMe();
     await openS8a();
     fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" }));
     await inDialog("이전");
     const box = confirmBox()!;
     expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 나갈까요?");
-    expect(within(box).getAllByRole("button").map((b) => b.textContent)).toEqual(["계속 적기", "나가기"]);
-    expect(document.activeElement).toBe(within(box).getByRole("button", { name: "계속 적기" }));
+    expectConfirmShape(box, "나가기", "계속 적기"); // 고침10 B: 위 「나가기」 · 아래 「계속 적기」, 처음 포커스 제목
     await act(async () => fireEvent.click(within(box).getByRole("button", { name: "계속 적기" })));
     expect(confirmBox()).toBeNull();
     expect(fieldVal("어학")).toBe(55);
@@ -511,12 +538,12 @@ describe("스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-15
     expect(dialog()).toBeNull();
   });
 
-  it("O-1: −/+ 누름 틀 44×44(보이는 원 32 그대로), 목표 비율 줄 간격 48. O-2: 글 단추 누름 높이 44(.text-tap) — 머리 「닫기」·「균등 배분」·「건너뛰기」", async () => {
+  it("O-1: −/+ 누름 틀 44×44(보이는 원 32 그대로), 목표 비율 줄 간격 48. O-2: 글 단추 누름 높이 44(.text-tap) — 「균등 배분」·「건너뛰기」(머리 「닫기」는 고침10 A로 48 머리 단추)", async () => {
     expect(CSS).toMatch(/\.step-btn \{ inline-size: 44px; block-size: 44px; \}/);
     expect(CSS).toMatch(/\.ratio-row \{ min-height: 48px;/);
     expect(CSS).toMatch(/\.btn\.text-tap, \.text-tap \{[^}]*min-height:\s*44px/);
     render(<BackHeader title="오늘 기록" onClose={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "닫기" }).classList.contains("text-tap")).toBe(true);
+    expect(screen.getByRole("button", { name: "닫기" }).classList.contains("head-btn")).toBe(true);
     cleanup();
     mountOnboarding();
     expect(screen.getByRole("button", { name: "건너뛰기" }).classList.contains("text-tap")).toBe(true);

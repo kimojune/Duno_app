@@ -13,7 +13,9 @@ import { categoryColorValue } from "../lib/category-color";
 import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
+import { BackHeader } from "./back-header";
 import { ChipScroller } from "./chip-scroller";
+import { CONFIRM_TEXT, ConfirmDialog } from "./close-confirm";
 import { LiveRegion, Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 import { Wordmark } from "./wordmark";
 
@@ -60,10 +62,8 @@ export const TODO_TEXT = {
   sessionPlain: "로그인이 풀렸어요. 다시 로그인해 주세요.",
   copy: "저장 안 된 글 복사",
   relogin: "다시 로그인",
-  logoutConfirm: "아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.",
   // ---- 기기 먼저 저장(고침 3바퀴) ----
   offlineLocal: "인터넷 연결이 끊겼어요. 적고 끝낸 것은 이 기기에 두었다가 연결되면 보내요.",
-  logoutUnsent: "보내지 못한 기록이 있어요. 지금 로그아웃하면 이 기록은 사라져요.",
   signingOut: "기록을 서버에 보내는 중이에요",
   rejected: (n: number) => `서버가 받지 않은 기록 ${n}개를 되돌렸어요`,
   cancel: "취소",
@@ -75,8 +75,6 @@ export const TODO_TEXT = {
   // ---- 방향 C (12절) ----
   addButton: "할 일 적기", // AddTodoButton 기본
   addButtonResume: "적던 글 이어 적기", // 남은 글이 있을 때(12-5)
-  sheetClose: "닫기",
-  sheetCloseName: "적는 창 닫기", // 보이는 「닫기」를 품는 접근 이름(2.5.3)
   // 고침9 ⑬ 12(PM 7): 이름표만 「분야」. 「고르지 않으면 기타」는 글 대신 맨 앞 「기타」 칩이 골라진 모양으로(④-2)
   categoryLabel: "분야",
   other: "기타",
@@ -195,10 +193,12 @@ export type TodoViewProps = {
   sessionLost: boolean;
   /** 로그인 풀림 안내에서 「저장 안 된 글 복사」를 보일지(복사할 글이 있는가, 12-5) */
   hasUnsaved: boolean;
+  /** 로그아웃 확인 창(고침10 B)이 떠 있나 */
   logoutConfirm: boolean;
-  /** 기기 먼저 저장(고침 3바퀴)이면 끊김·로그아웃 확인 글이 다르다. 없으면 기본 글 */
+  /** 로그아웃을 걸었다(확인 창 「로그아웃 중」 막힘) */
+  loggingOut?: boolean;
+  /** 기기 먼저 저장(고침 3바퀴)이면 끊김 안내 글이 다르다. 없으면 기본 글 */
   offlineText?: string;
-  logoutConfirmText?: string;
   live: string;
 
   // 적는 창
@@ -233,7 +233,8 @@ export type TodoViewProps = {
   onRemove: (id: string) => void;
   onReload: () => void;
   onLogout: () => void;
-  onLogoutConfirm: () => void;
+  /** 확인 창 「로그아웃」. Promise면 끝날 때까지 확인 창이 막힌다 */
+  onLogoutConfirm: () => void | Promise<unknown>;
   onLogoutCancel: () => void;
   onCopy: () => void;
   onRelogin: () => void;
@@ -667,14 +668,17 @@ export function TodoSheet({ sheetRef, inputRef, newCategoryInputRef, ...props }:
       noValidate
     >
       {/* 순서(고침 4바퀴): 글 칸이 먼저, 분야 칩은 그 아래. 창을 열면 포커스는 글 칸이고, 탭은 닫기 → 글 칸 → 적기 → 칩 → + 분야 순이다 */}
-      <div className="sheet-head">
-        <label htmlFor="todo-input" className="sheet-label">
-          {TODO_TEXT.label}
-        </label>
-        <TextButton id="sheet-close" className="btn-flush-end" aria-label={TODO_TEXT.sheetCloseName} onClick={() => props.onCloseSheet("button")}>
-          {TODO_TEXT.sheetClose}
-        </TextButton>
-      </div>
+      {/* 고침10 A: 왼쪽 위 머리 단추 「✕」(화면 읽기 「닫기」) + 바로 옆 창 제목 「할 일」(글 칸의 이름표). 오른쪽 위 글 「닫기」는 없다 */}
+      <BackHeader
+        onClose={() => props.onCloseSheet("button")}
+        buttonId="sheet-close"
+        titleAlign="start"
+        title={
+          <label htmlFor="todo-input" className="sheet-label">
+            {TODO_TEXT.label}
+          </label>
+        }
+      />
       <div className="input-row">
         {/* maxLength를 걸지 않는다: 붙여 넣은 글을 몰래 자르지 않는다(T11) */}
         <input
@@ -774,22 +778,6 @@ export function TodoView(props: TodoViewProps) {
       </Notice>,
     );
   }
-  if (logoutConfirm) {
-    notices.push(
-      <Notice
-        key="logout"
-        role="alert"
-        actions={
-          <>
-            <SecondaryButton onClick={props.onLogoutConfirm}>{TODO_TEXT.logout}</SecondaryButton>
-            <TextButton onClick={props.onLogoutCancel}>{TODO_TEXT.cancel}</TextButton>
-          </>
-        }
-      >
-        {props.logoutConfirmText ?? TODO_TEXT.logoutConfirm}
-      </Notice>,
-    );
-  }
 
   return (
     <div className="todo-app">
@@ -827,6 +815,21 @@ export function TodoView(props: TodoViewProps) {
       {sheetOpen ? <TodoSheet {...props} sheetRef={sheetRef} /> : <AddTodoButton resume={props.resume} onOpen={props.onOpenSheet} />}
       <LiveRegion message={props.live} />
       {props.overlay}
+      {/* 고침10 B(147:2 다섯째): 아직 저장되지 않은 기록이 있을 때만 뜨는 로그아웃 확인. 위 「로그아웃」(누르면 「로그아웃 중」 막힘) · 아래 「계속 쓰기」.
+          Esc·막·뒤로 가기 = 「계속 쓰기」(로그아웃하지 않는다). 겹친 창 없이 뜨므로 스스로 history 한 칸을 쌓는다(ownHistory) */}
+      {logoutConfirm && (
+        <ConfirmDialog
+          title={CONFIRM_TEXT.logout.title}
+          description={CONFIRM_TEXT.logout.description}
+          confirmLabel={CONFIRM_TEXT.logout.confirm}
+          busyLabel={CONFIRM_TEXT.logout.busy}
+          cancelLabel={CONFIRM_TEXT.logout.cancel}
+          busy={props.loggingOut === true}
+          ownHistory
+          onConfirm={props.onLogoutConfirm}
+          onCancel={props.onLogoutCancel}
+        />
+      )}
     </div>
   );
 }

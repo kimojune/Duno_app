@@ -7,6 +7,7 @@ import type { SettingsApi } from "../../lib/onboarding-api";
 import type { PushApi } from "../../lib/push/subscribe";
 import type { NotifySettings, SettingsData } from "../../lib/settings/types";
 import { FakeHistory } from "./fake-history";
+import { expectConfirmShape, expectHeadButton } from "./confirm-helpers";
 
 /**
  * 고침6 ③: 내 정보 첫 카드(이름표 「목표」(PM d-136) · 목표 한 문장 20 Bold · 「›」, 카드 전체가 단추 하나)와 S8-b 「목표」 겹침 화면.
@@ -110,7 +111,9 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     const dlg = editor()!;
     expect(dlg.getAttribute("aria-modal")).toBe("true");
     const back = within(dlg).getByRole("button", { name: "이전" });
-    expect(back.textContent).toBe("‹");
+    expect(back.getAttribute("data-head-button")).toBe("back"); // 고침10 A 머리 단추(아이콘만)
+    expect(expectHeadButton(dlg, "back")).toBe(back);
+    expect(back.textContent).toBe("");
     const title = within(dlg).getByRole("heading", { name: "목표" });
     expect(document.activeElement).toBe(title);
     expect(field().value).toBe("토익 900점 넘기기");
@@ -227,9 +230,9 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(box.getAttribute("aria-modal")).toBe("true");
     const buttons = within(box).getAllByRole("button");
     expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 나갈까요?");
-    expect(buttons.map((b) => b.textContent)).toEqual(["계속 적기", "나가기"]);
-    expect(buttons[0].className).toContain("btn-primary");
-    expect(document.activeElement).toBe(buttons[0]);
+    expect(buttons.map((b) => b.textContent)).toEqual(["나가기", "계속 적기"]); // 고침10 B: 위 떠나기 · 아래 안전한 쪽
+    expect(buttons[1].className).toContain("btn-primary");
+    expectConfirmShape(box, "나가기", "계속 적기");
     await pressIn(box, "나가기");
     expect(api.saveSettings).not.toHaveBeenCalled();
     expect(editor()).toBeNull();

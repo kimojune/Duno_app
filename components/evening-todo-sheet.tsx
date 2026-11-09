@@ -12,7 +12,7 @@ import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todo
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
-import { BACK_HEADER_TEXT } from "./back-header";
+import { BACK_HEADER_TEXT, BackHeader } from "./back-header";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, helpText, OtherChip, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -39,7 +39,6 @@ export const EVENING_TODO_TEXT = {
   /** 줄의 접근 이름. 보이는 글 「오늘 할 일 2/3」로 시작한다(2.5.3) */
   lineName: (done: number, all: number) => `오늘 할 일 ${done}/${all}, ${all}개 중 ${done}개 끝냄`,
   title: "오늘 할 일",
-  close: "닫기",
   add: "+ 할 일",
   inputLabel: "할 일",
   write: "더하기",
@@ -383,14 +382,16 @@ function EveningTodoSheet({
       <div className="evening-todo-backdrop" aria-hidden="true" onClick={requestClose} />
       <div className="evening-todo-sheet" role="dialog" aria-modal="true" aria-labelledby="evening-todo-title">
         <span className="evening-todo-grip" aria-hidden="true" />
-        <div className="detail-head">
-          <h2 id="evening-todo-title" className="detail-title evening-todo-title" tabIndex={-1} ref={titleRef}>
-            {EVENING_TODO_TEXT.title}
-          </h2>
-          <TextButton className="btn-flush-end" onClick={requestClose}>
-            {EVENING_TODO_TEXT.close}
-          </TextButton>
-        </div>
+        {/* 고침10 A(146:10): 왼쪽 위 머리 단추 「✕」(닫기) + 바로 옆 시트 제목. 오른쪽 위 글 「닫기」는 없다 */}
+        <BackHeader
+          onClose={requestClose}
+          titleAlign="start"
+          title={
+            <h2 id="evening-todo-title" className="detail-title evening-todo-title" tabIndex={-1} ref={titleRef}>
+              {EVENING_TODO_TEXT.title}
+            </h2>
+          }
+        />
 
         {!online && <Notice role="status">{offlineText}</Notice>}
 

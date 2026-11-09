@@ -17,6 +17,7 @@ import type { AddedTodo, TodayTodos, TodoDay, TodoItem, TodoResult } from "../li
 import { checkTodoText, countTodoChars } from "../lib/todos/validation";
 import { useAnnouncer } from "../lib/use-announcer";
 import { useOnline } from "../lib/use-online";
+import { cancelConfirmOnBack } from "../lib/use-overlay-window";
 import {
   categoryAddedText,
   categoryDuplicateText,
@@ -194,6 +195,9 @@ export function TodoScreen({
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   /** 기기 먼저 저장: 로그아웃 확인이 「보내지 못한 기록」 때문인가, 보내는 중인가 */
   const [signingOut, setSigningOut] = useState(false);
+  /** 고침10 B: 로그아웃을 건 뒤(확인 창 「로그아웃 중」 막힘). 한 번 걸면 페이지를 떠날 때까지 그대로 */
+  const [loggingOut, setLoggingOut] = useState(false);
+  const loggingOutRef = useRef<Promise<void> | null>(null);
   const [live, announce] = useAnnouncer(first ? loadedText(first.todos.length) : TODO_TEXT.liveLoading);
   const online = useOnline();
   const router = useRouter(); // 다시 로그인: 서버가 세션을 다시 보고 로그인 화면을 그린다
@@ -545,6 +549,12 @@ export function TodoScreen({
       if (!sheetOpenRef.current) return;
       // 아직 이번에 연 창의 칸이면(앞으로 가기로 돌아옴 등) 그대로. 옛 표시가 붙은 칸은 이번 창의 칸이 아니다.
       if (currentHistoryState()[SHEET_HISTORY_MARK] === sheetMarkRef.current) return;
+      // 고침10 B: 확인(「저장하지 않고 나갈까요?」)이 떠 있으면 뒤로 가기 = 「계속 적기」(확인만 닫고 창의 칸으로 돌아간다)
+      if (cancelConfirmOnBack()) {
+        pendingForwardsRef.current += 1;
+        window.history.forward();
+        return;
+      }
       if (sheetHasDraftRef.current()) {
         setSheetConfirm(true);
         pendingForwardsRef.current += 1;
@@ -1013,24 +1023,43 @@ export function TodoScreen({
     void load(list === "error" ? "first" : "silent");
   }
 
-  function doSignOut() {
+  /** 로그아웃을 한 번만 건다(확인 창 「로그아웃」 연타·Enter 연타에도 한 번). 돌려준 Promise는 로그아웃 요청이 끝날 때 풀린다 */
+  function doSignOut(): Promise<void> {
+    if (loggingOutRef.current) return loggingOutRef.current;
+    setLoggingOut(true);
     outbox?.clear(); // 로그아웃하면 기기에 둔 못 올린 글도 지운다(남의 글이 남지 않게)
     // 기기 먼저 저장: 이 사용자의 기기 저장소(거울·보낼 줄)를 지운 뒤 로그아웃한다. 보낼 줄이 남았으면 onLogout이 먼저 사용자에게 물었다
-    if (!local) {
-      signOutAfterWipe();
-      return;
-    }
-    void local.discard().then(
-      () => signOutAfterWipe(),
-      () => signOutAfterWipe(),
-    );
+    const work = !local
+      ? signOutAfterWipe()
+      : local.discard().then(
+          () => signOutAfterWipe(),
+          () => signOutAfterWipe(),
+        );
+    // 로그아웃이 끝났는데 이 화면이 아직 있으면(요청 실패 등) 다시 누를 수 있게 막힘을 푼다. 성공하면 서버가 로그인 화면으로 보낸다
+    const settled = work.then(() => {
+      loggingOutRef.current = null;
+      setLoggingOut(false);
+    });
+    loggingOutRef.current = settled;
+    return settled;
   }
 
-  function signOutAfterWipe() {
+  /** 서버 로그아웃 한 번. 실패해도(연결 끊김 등) 풀린 Promise를 돌려준다 */
+  function callSignOut(): Promise<void> {
+    try {
+      return Promise.resolve(signOut()).then(
+        () => {},
+        () => {},
+      );
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  function signOutAfterWipe(): Promise<void> {
     const before = onBeforeSignOut;
     if (!before) {
-      void signOut();
-      return;
+      return callSignOut();
     }
     // 이 기기의 푸시 구독을 거둔 뒤 로그아웃한다(로그아웃한 기기로 알림이 가지 않게, A7). 세션이 살아 있어야 구독을 지울 수 있어 먼저 한다
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1043,9 +1072,9 @@ export function TodoScreen({
     } catch {
       work = Promise.resolve();
     }
-    void Promise.race([work, limit]).then(() => {
+    return Promise.race([work, limit]).then(() => {
       clearTimeout(timer);
-      void signOut();
+      return callSignOut();
     });
   }
 
@@ -1068,7 +1097,7 @@ export function TodoScreen({
         (left) => {
           setSigningOut(false);
           if (left > 0 || anyUnsaved()) setLogoutConfirm(true);
-          else doSignOut();
+          else void doSignOut();
         },
         () => {
           setSigningOut(false);
@@ -1078,7 +1107,7 @@ export function TodoScreen({
       return;
     }
     if (anyUnsaved()) setLogoutConfirm(true);
-    else doSignOut();
+    else void doSignOut();
   }
   // 다른 탭(내 정보)에서 건 로그아웃 요청: 값이 바뀔 때만 한 번 시작한다(처음 값은 건너뛴다)
   const onLogoutRef = useRef(onLogout);
@@ -1239,8 +1268,8 @@ export function TodoScreen({
       sessionLost={sessionLost}
       hasUnsaved={local ? false : copyable}
       offlineText={local ? TODO_TEXT.offlineLocal : undefined}
-      logoutConfirmText={local ? TODO_TEXT.logoutUnsent : undefined}
       logoutConfirm={confirmOpen}
+      loggingOut={loggingOut}
       live={live}
       sheetOpen={sheetOpen}
       draft={draft}

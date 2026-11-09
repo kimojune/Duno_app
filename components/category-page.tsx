@@ -11,7 +11,8 @@ import type { CategoryPageData } from "../lib/notes/types";
 import { formatMinutes } from "../lib/time-format";
 import { describeTodoDay } from "../lib/todos/day";
 import { useOverlayWindow } from "../lib/use-overlay-window";
-import { Notice, SecondaryButton, TextButton } from "./ui";
+import { BackHeader } from "./back-header";
+import { Notice, SecondaryButton } from "./ui";
 import { dayText } from "./todo-view";
 
 /**
@@ -26,7 +27,6 @@ import { dayText } from "./todo-view";
  */
 
 export const CATEGORY_PAGE_TEXT = {
-  close: "닫기",
   loading: "분야 페이지를 불러오는 중",
   loadFailed: "분야 페이지를 불러오지 못했어요.",
   reload: "다시 불러오기",
@@ -213,6 +213,8 @@ export function CategoryPage({
   return (
     <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="category-page-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
+        {/* 고침10 A(146:10): 왼쪽 위 머리 단추 「‹」(이전). 오른쪽 위 글 「닫기」는 없다 */}
+        <BackHeader onBack={onClose} />
         <div className="detail-head">
           <div className="category-head-name">
             <h2 id="category-page-title" className="detail-title" tabIndex={-1} ref={titleRef}>
@@ -221,9 +223,6 @@ export function CategoryPage({
             {/* 색 점(23 명세 1, Figma 50:620 — 12px 원): 분야 색 + 1px 윤곽. 이름 글이 같이 있어 그림은 읽지 않는다 */}
             <span className="growth-dot category-head-dot" aria-hidden="true" style={{ background: categorySummary(growth, categoryId).color }} />
           </div>
-          <TextButton className="btn-flush-end" onClick={onClose}>
-            {CATEGORY_PAGE_TEXT.close}
-          </TextButton>
         </div>
 
         {load.status === "loading" && (

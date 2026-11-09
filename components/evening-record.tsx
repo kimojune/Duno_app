@@ -56,7 +56,6 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 export const EVENING_TEXT = {
   title: "오늘 기록",
-  close: "닫기",
   dayGroup: "기록할 날",
   today: "오늘",
   yesterday: "어제",
@@ -500,13 +499,13 @@ export function EveningRecord({
   return (
     <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="detail-inner screen-fill evening-inner">
-        {/* A1 머리(공통 부품): 「오늘 기록」 + 「닫기」. 나누기 단계만 왼쪽 위 「‹」(이전 = 시간 단계로) */}
+        {/* 고침10 A(146:10): 왼쪽 위 머리 단추 「‹」(이전) + 가운데 「오늘 기록」. 나누기 단계면 시간 단계로, 그 밖(시간 단계·저장 뒤)이면 창을 닫는다(바꾼 것이 있으면 확인).
+            오른쪽 위 글 「닫기」는 없다 */}
         <BackHeader
-          onBack={state && phase === "split" ? () => setPhase("time") : undefined}
+          onBack={state && phase === "split" ? () => setPhase("time") : requestClose}
           backDisabled={saving}
           title={EVENING_TEXT.title}
           titleId="evening-title"
-          onClose={requestClose}
         />
         <div className="screen-fill-body">
           {load.status === "loading" && (

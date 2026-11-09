@@ -77,6 +77,69 @@ export function inertOutside(root: HTMLElement): HTMLElement[] {
   return changed;
 }
 
+/**
+ * 확인 창(components/close-confirm.tsx ConfirmDialog)의 뒤로 가기(고침10 B: 안드로이드 뒤로 가기 = 아래 주 단추).
+ * 떠 있는 확인 창의 「취소」를 쌓아 둔다(맨 위가 지금 확인). 겹친 창·적는 창의 뒤로 가기 길은 자기 칸이 빠졌을 때 이것을 먼저 본다:
+ * 확인이 떠 있으면 확인만 닫고(창은 그대로) history.forward()로 자기 칸에 돌아간다(holdBack과 같은 길).
+ */
+const confirmCancels: (() => void)[] = [];
+
+/** 떠 있는 확인 창이 있으면 맨 위 확인의 「취소」를 부르고 true. 없으면 false(창의 뒤로 가기 길이 원래대로 간다) */
+export function cancelConfirmOnBack(): boolean {
+  const top = confirmCancels[confirmCancels.length - 1];
+  if (!top) return false;
+  top();
+  return true;
+}
+
+/**
+ * 확인 창이 뒤로 가기를 받는 훅. wasConfirmed는 위 단추를 눌렀는지 돌려준다(닫힐 때 읽는다).
+ * - own = false(기본): 아래 겹친 창의 뒤로 가기 길이 이 확인을 먼저 닫는다(cancelConfirmOnBack). history는 건드리지 않는다.
+ * - own = true: 겹친 창 없이 뜨는 확인(로그아웃). 열릴 때 history에 한 칸을 쌓고, 사용자의 뒤로 가기에 onCancel을 부른다.
+ *   아래 단추·Esc로 닫히면 쌓은 칸을 history.back()으로 거둔다. 위 단추를 눌렀으면(페이지를 떠나는 동작) 거두지 않는다 —
+ *   떠나는 이동과 back()이 겹쳐 앞 화면으로 되돌아가지 않게.
+ */
+export function useConfirmBack(onCancel: () => void, own: boolean, wasConfirmed: () => boolean): void {
+  const cancelRef = useRef(onCancel);
+  const confirmedRef = useRef(wasConfirmed);
+  useEffect(() => {
+    cancelRef.current = onCancel;
+    confirmedRef.current = wasConfirmed;
+  });
+  useEffect(() => {
+    const handler = () => cancelRef.current();
+    if (!own) {
+      confirmCancels.push(handler);
+      return () => {
+        const at = confirmCancels.lastIndexOf(handler);
+        if (at >= 0) confirmCancels.splice(at, 1);
+      };
+    }
+    const mark = crypto.randomUUID();
+    let pushed = false;
+    let closedByPop = false;
+    try {
+      window.history.pushState({ ...currentHistoryState(), [OVERLAY_HISTORY_MARK]: mark }, "");
+      pushed = true;
+    } catch {
+      pushed = false;
+    }
+    const unsubscribe = subscribePop((kind) => {
+      if (kind !== "user" || !pushed || closedByPop) return;
+      if (currentHistoryState()[OVERLAY_HISTORY_MARK] === mark) return;
+      closedByPop = true;
+      cancelRef.current();
+    });
+    return () => {
+      unsubscribe();
+      if (pushed && !closedByPop && !confirmedRef.current()) {
+        pendingMoves.push("back");
+        window.history.back();
+      }
+    };
+  }, [own]);
+}
+
 export type OverlayWindowOptions = {
   /** 사용자의 뒤로 가기가 이 창의 칸을 뺐을 때 불린다. true면 창을 닫지 않고(창이 확인을 띄운다) 자기 칸으로 돌아간다 */
   holdBack?: () => boolean;
@@ -127,7 +190,8 @@ export function useOverlayWindow<T extends HTMLElement = HTMLDivElement>(onClose
       if (!pushed) return;
       // 아직 이 창의 칸이면(앞으로 가기로 돌아옴 등) 그대로 둔다
       if (currentHistoryState()[OVERLAY_HISTORY_MARK] === mark) return;
-      if (holdBackRef.current?.()) {
+      // 고침10 B: 이 창 위에 확인 창이 떠 있으면 뒤로 가기 = 확인의 아래 단추(확인만 닫는다). 창은 그대로, 자기 칸으로 돌아간다
+      if (cancelConfirmOnBack() || holdBackRef.current?.()) {
         // 창이 확인을 띄웠다: 방금 빠진 자기 칸으로 돌아간다(칸은 그대로 이 창의 것, 다음 뒤로 가기도 같은 길을 탄다)
         pendingMoves.push("forward");
         window.history.forward();

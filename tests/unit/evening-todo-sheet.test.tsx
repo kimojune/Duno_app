@@ -37,6 +37,7 @@ import { createLocalTodos, type LocalTodos } from "../../lib/local/todos";
 import type { Mirror, MirrorTodo, QueuedOp } from "../../lib/local/types";
 import type { TodayRead } from "../../lib/today-types";
 import { FakeHistory } from "./fake-history";
+import { expectConfirmShape, expectHeadButton } from "./confirm-helpers";
 import { typeWheel, wheelTotal, wheelValue } from "./time-wheel-helpers";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -655,7 +656,10 @@ describe("닫기 전 확인(PM d-126)", () => {
   const confirmBox = () => screen.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   const confirms = () => screen.queryAllByRole("alertdialog");
   const recordDialog = () => screen.queryByRole("dialog", { name: "오늘 기록" });
-  const headClose = () => within(recordDialog()!).getAllByRole("button", { name: "닫기" })[0];
+  /** 고침10 A: 오늘 기록 머리 = 왼쪽 위 「‹」(이름 「이전」). 시간 단계·저장 뒤에는 창을 닫고(바꾼 것이 있으면 확인), 나누기 단계에서는 시간 단계로 */
+  const headClose = () => within(recordDialog()!).getByRole("button", { name: "이전" });
+  /** 나누기 단계에서 창을 닫으려는 길: Esc(머리 「‹」는 시간 단계로 돌아간다) */
+  const escRecord = () => act(async () => fireEvent.keyDown(recordDialog()!, { key: "Escape" }));
   /** 휠 「시간」 열을 위 화살표로 한 칸(1시간) — 사용자가 쓴 시간을 바꾼 것 */
   const plusHour = () => act(async () => fireEvent.keyDown(screen.getByRole("spinbutton", { name: "시간" }), { key: "ArrowUp" }));
   const keep = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "계속 적기" })));
@@ -692,15 +696,18 @@ describe("닫기 전 확인(PM d-126)", () => {
     return within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement;
   }
 
-  it("오늘 기록: 바꾼 것이 없으면 「닫기」는 확인 없이 바로 닫는다", async () => {
+  it("오늘 기록: 바꾼 것이 없으면 머리 「‹」는 확인 없이 바로 닫는다. 오른쪽 위 글 「닫기」는 없다(고침10 A)", async () => {
     const { onClosed } = await mountHost();
+    expect(within(recordDialog()!).queryByRole("button", { name: "닫기" })).toBeNull();
+    expect(headClose().getAttribute("data-head-button")).toBe("back");
+    expect(expectHeadButton(recordDialog()!, "back")).toBe(headClose());
     await act(async () => fireEvent.click(headClose()));
     expect(confirms()).toHaveLength(0);
     expect(onClosed).toHaveBeenCalledTimes(1);
     expect(recordDialog()).toBeNull();
   });
 
-  it("오늘 기록: 쓴 시간을 바꾸면 「닫기」가 확인을 띄운다 — alertdialog·제목 이름·처음 포커스 「계속 적기」. 「계속 적기」면 값 그대로 열린 채, 포커스는 「닫기」로", async () => {
+  it("오늘 기록: 쓴 시간을 바꾸면 머리 「‹」가 확인을 띄운다 — alertdialog·제목 이름·처음 포커스 제목·위 「나가기」 아래 「계속 적기」(고침10 B). 「계속 적기」면 값 그대로 열린 채, 포커스는 「‹」로", async () => {
     const { onClosed, api } = await mountHost();
     await plusHour();
     expect(wheelTotal()).toBe(60);
@@ -711,9 +718,8 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(box.getAttribute("aria-modal")).toBe("true");
     expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 나갈까요?"); // PM d-135
     const keepButton = within(box).getByRole("button", { name: "계속 적기" });
-    expect(keepButton.className).toContain("btn-primary"); // 주 단추(먹남색)
-    expect(document.activeElement).toBe(keepButton);
-    expect(within(box).getAllByRole("button").map((b) => b.textContent)).toEqual(["계속 적기", "나가기"]);
+    expect(keepButton.className).toContain("btn-primary"); // 아래 = 안전한 쪽 주 단추(먹남색)
+    expectConfirmShape(box, "나가기", "계속 적기");
     // 확인 밖(오늘 기록의 나머지)은 inert
     expect(close.closest("[inert]")).not.toBeNull();
     expect(onClosed).not.toHaveBeenCalled();
@@ -757,7 +763,14 @@ describe("닫기 전 확인(PM d-126)", () => {
     const { onClosed } = await mountHost(eveningApi(eveningState({ timerByCategory: [{ categoryId: C1, minutes: 90 }] })));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
     await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
+    // 나누기 단계의 머리 「‹」는 시간 단계로(닫지 않는다)
     await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(0);
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "분야마다 나누기" })).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
+    await escRecord();
     expect(confirms()).toHaveLength(0);
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
@@ -770,11 +783,11 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(chip().getAttribute("aria-pressed")).toBe("false");
     await act(async () => fireEvent.click(chip()));
     expect(chip().getAttribute("aria-pressed")).toBe("true");
-    await act(async () => fireEvent.click(headClose()));
+    await escRecord();
     expect(confirms()).toHaveLength(1);
     await keep();
     expect(chip().getAttribute("aria-pressed")).toBe("true");
-    await act(async () => fireEvent.click(headClose()));
+    await escRecord();
     await closeInConfirm();
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
@@ -784,12 +797,12 @@ describe("닫기 전 확인(PM d-126)", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
     await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "어학 5분 줄이기" })));
-    await act(async () => fireEvent.click(headClose()));
+    await escRecord();
     expect(confirms()).toHaveLength(1);
     expect(onClosed).not.toHaveBeenCalled();
   });
 
-  it("오늘 기록: 저장한 뒤의 「닫기」는 묻지 않는다", async () => {
+  it("오늘 기록: 저장한 뒤의 머리 「‹」(닫기)는 묻지 않는다", async () => {
     const api = eveningApi();
     vi.mocked(api.save).mockImplementation(async () => ({ ok: true as const, data: { log: {} as SavedEvening["log"], delta: [] } }));
     const { onClosed } = await mountHost(api);
@@ -824,6 +837,17 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(confirms()).toHaveLength(1);
     history.flush();
     expect(history.index).toBe(1);
+    // 고침10 B: 확인이 뜬 채 뒤로 가기 = 「계속 적기」(확인만 닫히고 창·값·칸 그대로)
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(0);
+    history.flush();
+    expect(history.index).toBe(1);
+    expect(recordDialog()).not.toBeNull();
+    expect(wheelTotal()).toBe(60);
+    expect(onClosed).not.toHaveBeenCalled();
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    history.flush();
     await closeInConfirm();
     expect(onClosed).toHaveBeenCalledTimes(1);
     history.flush(); // 닫으며 거둔 칸
@@ -868,11 +892,15 @@ describe("닫기 전 확인(PM d-126)", () => {
     const { onClosed } = await mountHost(eveningApi(), { local });
     const input = await openForm();
     await act(async () => fireEvent.change(input, { target: { value: "발음 연습" } }));
+    // 고침10 A: 시트 머리 = 왼쪽 위 「✕」(이름 「닫기」, 아이콘만)
     const close = within(sheet()).getByRole("button", { name: "닫기" });
+    expect(expectHeadButton(sheet(), "close")).toBe(close);
+    expect(close.getAttribute("data-head-button")).toBe("close");
+    expect(close.textContent).toBe("");
     close.focus();
     await act(async () => fireEvent.click(close));
     expect(confirms()).toHaveLength(1);
-    expect(document.activeElement).toBe(within(confirmBox()).getByRole("button", { name: "계속 적기" }));
+    expectConfirmShape(confirmBox(), "나가기", "계속 적기");
     await keep();
     expect(input.value).toBe("발음 연습");
     expect(document.activeElement).toBe(close);

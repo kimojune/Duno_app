@@ -19,6 +19,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 
 import { addCategory, setTodoDone } from "../../app/todos/actions";
 import { TodoScreen } from "../../components/todo-screen";
+import { confirmTitle, expectConfirmShape, expectHeadButton } from "./confirm-helpers";
 
 const DAY: TodoDay = { date: "2026-11-07", year: 2026, month: 11, dayOfMonth: 7, weekday: 6 };
 const A = "11111111-1111-4111-8111-111111111111";
@@ -75,15 +76,22 @@ function openMenu(dialog: HTMLElement) {
 }
 
 describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 58:92 · 66:12 · 66:76)", () => {
-  it("줄의 「자세히」가 대화상자를 열고, 머리 「‹ 할 일」로 닫으면 그 줄의 「자세히」로 포커스가 돌아온다", async () => {
+  it("줄의 「자세히」가 대화상자를 열고, 머리 단추 「‹」(고침10 A, 이름 「이전」)로 닫으면 그 줄의 「자세히」로 포커스가 돌아온다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(api.fetchNotes).toHaveBeenCalledWith(A);
-    const back = within(dialog).getByRole("button", { name: "할 일로 돌아가기" });
-    expect(back.textContent).toBe("‹ 할 일"); // 보이는 글 「할 일」이 이름 안에(2.5.3)
+    const back = within(dialog).getByRole("button", { name: "이전" });
+    expect(expectHeadButton(dialog, "back")).toBe(back);
+    expect(back.getAttribute("data-head-button")).toBe("back");
+    expect(back.textContent).toBe(""); // 아이콘(꾸밈)만 — 「‹ 할 일」 글 단추와 머리의 「할 일」 글은 없다
+    const head = dialog.querySelector(".screen-head")!;
+    expect(head.querySelector("button")).toBe(back); // 머리의 첫 단추(왼쪽 위)
+    expect(head.textContent).not.toContain("할 일");
+    expect(within(dialog).queryByRole("button", { name: "할 일로 돌아가기" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "닫기" })).toBeNull();
     // 큰 제목 = 할 일 글, 속성 줄 끝냄·분야·하는 날
     expect((within(dialog).getByLabelText("할 일 글") as HTMLInputElement).value).toBe("이력서");
     expect(within(dialog).getByRole("checkbox", { name: "끝냄" })).toBeTruthy();
@@ -110,7 +118,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     expect(dialog.querySelector(".sr-only[role=status]")!.textContent).toBe("저장됨"); // O-8 알림 한 곳
     await act(async () => fireEvent.blur(title)); // 이미 저장한 글이면 다시 보내지 않는다
     expect(api.editTodo).toHaveBeenCalledTimes(1);
-    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "이전" }));
     expect(screen.getByRole("checkbox", { name: "이력서 고치기" })).toBeTruthy();
   });
 
@@ -129,7 +137,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     expect(editTodo.mock.calls[1]).toEqual([A, { text: "새 글" }]);
   });
 
-  it("「⋯」 → 지우기는 확인 창(Figma 66:12, 초점 「취소」)을 띄우고, 확인 창의 「지우기」로 지우면 줄이 없어진다", async () => {
+  it("「⋯」 → 지우기는 공통 확인 창(고침10 B 147:2 — 제목 초점, 위 「지우기」·아래 「그대로 두기」)을 띄우고, Esc·「그대로 두기」는 지우지 않으며, 「지우기」 연타에도 한 번만 지운다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "이력서"), item(B, "면접 준비")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
@@ -137,14 +145,30 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     expect(within(dialog).queryByRole("button", { name: "지우기" }), "지우기는 메뉴 안에만").toBeNull();
     fireEvent.click(within(openMenu(dialog)).getByRole("menuitem", { name: "지우기" }));
     expect(api.deleteTodo).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("alertdialog", { name: "이 할 일을 지울까요? 작업 기록도 함께 지워져요." });
-    expect(document.activeElement).toBe(within(confirm).getByRole("button", { name: "취소" }));
-    fireEvent.click(within(confirm).getByRole("button", { name: "취소" }));
+    const confirm = screen.getByRole("alertdialog", { name: "이 할 일을 지울까요?" });
+    expectConfirmShape(confirm, "지우기", "그대로 두기");
+    expect(document.getElementById(confirm.getAttribute("aria-describedby")!)!.textContent).toBe("작업 기록도 함께 지워져요.");
+    fireEvent.click(within(confirm).getByRole("button", { name: "그대로 두기" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(api.deleteTodo).not.toHaveBeenCalled();
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+    });
+    expect(document.activeElement, "연 메뉴 항목은 없으니 초점은 「더 보기」").toBe(within(dialog).getByRole("button", { name: "더 보기" }));
+    // Esc = 「그대로 두기」
     fireEvent.click(within(openMenu(dialog)).getByRole("menuitem", { name: "지우기" }));
-    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "지우기" })));
+    fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "할 일 자세히" }), "Esc는 확인만 닫는다").toBeTruthy();
+    expect(api.deleteTodo).not.toHaveBeenCalled();
+    fireEvent.click(within(openMenu(dialog)).getByRole("menuitem", { name: "지우기" }));
+    const yes = within(screen.getByRole("alertdialog")).getByRole("button", { name: "지우기" });
+    await act(async () => {
+      fireEvent.click(yes);
+      fireEvent.click(yes);
+    });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.deleteTodo).toHaveBeenCalledTimes(1);
     expect(api.deleteTodo).toHaveBeenCalledWith(A);
     expect(screen.queryByRole("checkbox", { name: "이력서" })).toBeNull();
     expect(screen.getByRole("checkbox", { name: "면접 준비" })).toBeTruthy();
@@ -161,7 +185,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "아래로" })));
     expect(api.reorderTodos).toHaveBeenCalledWith([B, A]);
     expect((within(openMenu(dialog)).getByRole("menuitem", { name: "아래로" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "이전" }));
     const boxes = screen.getAllByRole("checkbox").map((el) => el.getAttribute("aria-labelledby"));
     expect(boxes).toEqual([`todo-text-${B}`, `todo-text-${A}`]);
   });
@@ -175,7 +199,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "아래로" })));
     expect(dialog.querySelector(".detail-message")!.textContent).toBe("순서를 바꾸지 못했어요.");
     expect(dialog.querySelector(".sr-only[role=status]")!.textContent).toBe("순서를 바꾸지 못했어요."); // O-8 알림 한 곳
-    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "이전" }));
     expect(screen.getAllByRole("checkbox").map((el) => el.getAttribute("aria-labelledby"))).toEqual([`todo-text-${A}`, `todo-text-${B}`]);
   });
 
@@ -215,7 +239,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     expect(done.checked).toBe(false);
     await act(async () => fireEvent.click(done));
     expect((within(dialog).getByRole("checkbox", { name: "끝냄" }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "이전" }));
     expect((screen.getByRole("checkbox", { name: "첫째" }) as HTMLInputElement).checked).toBe(true);
     expect(setTodoDone).toHaveBeenCalledWith(A, true);
   });
@@ -261,16 +285,69 @@ describe("작업 기록 (0-1번)", () => {
     expect(addNote.mock.calls[0][0]).toBe(addNote.mock.calls[1][0]);
   });
 
-  it("빈 글은 단추가 막혀 있고, 기록을 지울 수 있다", async () => {
+  it("빈 글은 단추가 막혀 있고, 기록 「지우기」는 확인 창(고침10 B 147:95)을 거친다 — Esc·「그대로 두기」는 지우지 않고, 「지우기」면 그 카드만 사라진다", async () => {
     const existing: NoteItem = { id: "n1", todoId: A, day: "2026-11-06", createdAt: "x", readable: true, text: "지울 기록" };
     const api = fakeApi({ fetchNotes: vi.fn(async () => ({ ok: true as const, data: { notes: [existing] } })) });
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     await screen.findByText("지울 기록");
     expect((screen.getByRole("button", { name: "작업 기록 남기기" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: /지우기: 2026-11-06 기록/ })));
+    const remove = screen.getByRole("button", { name: /지우기: 2026-11-06 기록/ });
+    remove.focus();
+    fireEvent.click(remove);
+    const confirm = screen.getByRole("alertdialog", { name: "이 작업 기록을 지울까요?" });
+    expectConfirmShape(confirm, "지우기", "그대로 두기");
+    expect(confirm.getAttribute("aria-describedby")).toBeNull(); // 보조 글 없음
+    expect(api.deleteNote, "확인 없이 바로 지우지 않는다(PM 11)").not.toHaveBeenCalled();
+    fireEvent.keyDown(confirm, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(document.activeElement, "닫히면 초점은 연 「지우기」").toBe(remove);
+    fireEvent.click(remove);
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "그대로 두기" }));
+    expect(api.deleteNote).not.toHaveBeenCalled();
+    expect(screen.getByText("지울 기록")).toBeTruthy();
+    fireEvent.click(remove);
+    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "지우기" })));
+    expect(api.deleteNote).toHaveBeenCalledTimes(1);
     expect(api.deleteNote).toHaveBeenCalledWith("n1");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.queryByText("지울 기록")).toBeNull();
+  });
+
+  it("악용: 작업 기록 지우기 확인 「지우기」 연타·Enter 연타 → 첫 누름 뒤 「지우는 중」 + 두 단추 막힘(aria-busy), 지우기 호출 1번, 응답 뒤 창 닫힘·그 카드만 사라짐", async () => {
+    const notes: NoteItem[] = [
+      { id: "n1", todoId: A, day: "2026-11-06", createdAt: "x", readable: true, text: "지울 기록" },
+      { id: "n2", todoId: A, day: "2026-11-07", createdAt: "y", readable: true, text: "남을 기록" },
+    ];
+    type Done = { ok: true; data: { id: string } };
+    const waiting: ((v: Done) => void)[] = [];
+    const deleteNote = vi.fn(() => new Promise<Done>((resolve) => waiting.push(resolve)));
+    const api = fakeApi({ fetchNotes: vi.fn(async () => ({ ok: true as const, data: { notes } })), deleteNote });
+    render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
+    fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
+    await screen.findByText("지울 기록");
+    fireEvent.click(screen.getByRole("button", { name: /지우기: 2026-11-06 기록/ }));
+    const confirm = screen.getByRole("alertdialog", { name: "이 작업 기록을 지울까요?" });
+    const [yes, keep] = within(confirm).getAllByRole("button") as HTMLButtonElement[];
+    await act(async () => {
+      fireEvent.click(yes);
+      fireEvent.click(yes);
+      fireEvent.keyDown(yes, { key: "Enter" });
+      fireEvent.click(yes);
+    });
+    expect(deleteNote).toHaveBeenCalledTimes(1);
+    expect(yes.textContent).toBe("지우는 중");
+    expect(yes.disabled && keep.disabled).toBe(true);
+    expect(yes.getAttribute("aria-busy")).toBe("true");
+    expect(confirm.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement, "막히면 초점은 제목(창 밖으로 새지 않음)").toBe(confirmTitle(confirm));
+    fireEvent.keyDown(confirm, { key: "Escape" }); // 막힌 동안 Esc는 아무것도 하지 않는다
+    expect(screen.getByRole("alertdialog")).toBe(confirm);
+    await act(async () => waiting[0]({ ok: true, data: { id: "n1" } }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText("지울 기록")).toBeNull();
+    expect(screen.getByText("남을 기록")).toBeTruthy();
+    expect(deleteNote).toHaveBeenCalledTimes(1);
   });
 
   it("글자 모양 그대로 보인다(꺾쇠·스크립트가 요소가 되지 않는다)", async () => {
@@ -314,6 +391,9 @@ describe("고침9 PM 3 분야 고르기 시트(Figma 77:18)", () => {
 
   it("분야 한 줄에 하나(색 원 + 이름) → 기타 → 「+ 분야」, 고른 줄만 체크·aria-pressed, 포커스는 고른 줄", () => {
     const { sheet } = openSheet();
+    // 고침10 A: 분야 고르기 시트 머리 = 왼쪽 위 「✕」(이름 「닫기」) 하나, 바로 옆 제목
+    const close = expectHeadButton(sheet()!, "close");
+    expect(close.compareDocumentPosition(within(sheet()!).getByRole("heading", { name: "분야 고르기" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const rows = within(within(sheet()!).getByRole("list")).getAllByRole("button");
     expect(rows.map((b) => b.textContent)).toEqual(["어학", "기타", "+ 분야"]);
     expect(rows.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", null]);
@@ -446,7 +526,8 @@ describe("고침9 PM 2-B 할 일 줄 작업 기록 아이콘", () => {
     fireEvent.change(await screen.findByLabelText("작업 기록 쓰기"), { target: { value: "첫 장 고침" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "작업 기록 남기기" })));
     await waitFor(() => expect(document.getElementById(`row-${A}`)!.querySelector(".todo-note-icon")).not.toBeNull());
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: /^지우기: / })));
+    fireEvent.click(screen.getByRole("button", { name: /^지우기: / }));
+    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog", { name: "이 작업 기록을 지울까요?" })).getByRole("button", { name: "지우기" })));
     await waitFor(() => expect(document.getElementById(`row-${A}`)!.querySelector(".todo-note-icon")).toBeNull());
   });
 });
