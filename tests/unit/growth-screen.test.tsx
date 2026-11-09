@@ -136,7 +136,8 @@ describe("상태보기 (7-4, ③)", () => {
     expect(document.querySelector(".growth-card-title")?.textContent).toBe("목표 2시간 중 0시간");
     const items = Array.from(document.querySelectorAll(".growth-item"));
     expect(items.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["어학", "포트폴리오", "기타"]);
-    expect(items.map((li) => li.querySelector(".growth-row-value")?.textContent)).toEqual(["30분", "0분 · 2시간 더", "2시간 30분"]);
+    // 고침9(Figma 51:107): 쓴 시간 0은 「0시간」(머리 「목표 2시간 중 0시간」과 같은 규칙)
+    expect(items.map((li) => li.querySelector(".growth-row-value")?.textContent)).toEqual(["30분", "0시간 · 2시간 더", "2시간 30분"]);
     expect(items.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 없음", "목표 2시간", "목표 없음"]);
   });
 

@@ -10,7 +10,7 @@ vi.mock("../../app/views/actions", () => ({ recordView: vi.fn(async () => ({ ok:
 vi.mock("../../app/evening/actions", () => ({ saveEveningLog: vi.fn() }));
 
 import { GROWTH_TEXT, GrowthScreen } from "../../components/growth-screen";
-import { TabBar } from "../../components/tab-bar";
+import { PHOSPHOR_PATHS, TabBar } from "../../components/tab-bar";
 
 /**
  * 원샷 v2 고침9 — 상태보기·아래 탭 Figma 정합(A5 · A6 · S6 공통 · S6-1 목표 없는 주 · S6 빈 상태).
@@ -120,8 +120,48 @@ describe("A6 아래 탭: 켜진 탭 위 굵은 선 없음, 켜진 탭 = Bold + �
       ["타이머", null],
       ["내 정보", null],
     ]);
-    // 글만(아이콘은 다음 판)
-    expect(buttons.every((b) => b.querySelector("svg, img") === null)).toBe(true);
+    // 스킬 검토 O-6(PM d-150): 아이콘 24 + 글. 아이콘은 장식(aria-hidden)이라 탭 이름은 글 그대로
+    for (const b of buttons) {
+      const icon = b.querySelector<HTMLElement | SVGElement>(".tabbar-icon")!;
+      expect(icon).not.toBeNull();
+      expect(icon.getAttribute("aria-hidden")).toBe("true");
+      expect(b.firstElementChild).toBe(icon); // 아이콘 위, 글 아래
+      expect(b.querySelector(".tabbar-label")?.textContent).toBe(b.textContent);
+    }
+    expect(buttons.map((b) => screen.getByRole("button", { name: b.textContent! }))).toEqual(buttons);
+    // 상태보기 = 브랜드 고리 SVG(선 1.5, currentColor — 켜짐 색을 따른다). 나머지 셋 = Phosphor Regular 경로(PM d-151 나 — 패키지 없음)
+    const ring = buttons[0].querySelector("svg.tabbar-icon")!;
+    expect(ring.getAttribute("data-icon")).toBe("ring");
+    expect([ring.getAttribute("width"), ring.getAttribute("height"), ring.getAttribute("stroke"), ring.getAttribute("stroke-width")]).toEqual(["24", "24", "currentColor", "1.5"]);
+    expect(ring.querySelectorAll("path")).toHaveLength(2); // 고리 + 나온 조각
+    const expected = [
+      ["list-checks", PHOSPHOR_PATHS["list-checks"]],
+      ["timer", PHOSPHOR_PATHS.timer],
+      ["user", PHOSPHOR_PATHS.user],
+    ];
+    buttons.slice(1).forEach((b, i) => {
+      const svg = b.querySelector("svg.tabbar-icon")!;
+      expect([svg.getAttribute("data-icon"), svg.getAttribute("width"), svg.getAttribute("viewBox"), svg.getAttribute("fill")]).toEqual([expected[i][0], "24", "0 0 256 256", "currentColor"]);
+      expect(svg.querySelector("path")?.getAttribute("d")).toBe(expected[i][1]);
+    });
+    // 경로는 Phosphor 저장소 Regular 원본 그대로(앞머리로 대조 — 지어낸 경로가 아니다)
+    expect(PHOSPHOR_PATHS["list-checks"].startsWith("M224,128a8,8,0,0,1-8,8H128")).toBe(true);
+    expect(PHOSPHOR_PATHS.timer.startsWith("M128,40a96,96,0,1,0,96,96")).toBe(true);
+    expect(PHOSPHOR_PATHS.user.startsWith("M230.92,212c-15.23-26.33")).toBe(true);
+    // 파일 머리 MIT 고지
+    const src = readFileSync(join(process.cwd(), "components/tab-bar.tsx"), "utf8");
+    expect(src).toContain("MIT License");
+    expect(src).toContain("Copyright (c) 2023 Phosphor Icons");
+    expect(src).toContain("https://github.com/phosphor-icons/core");
+  });
+
+  it("CSS: 아이콘 24 · 글 12, 아이콘 → 글 세로 쌓기(탭 위 8 · 사이 4)", () => {
+    const base = rule(".tabbar-btn");
+    expect(base).toContain("flex-direction: column");
+    expect(base).toContain("gap: var(--space-1)");
+    expect(base).toContain("font: 400 12px/16px var(--font-family)");
+    expect(base).toContain("padding: var(--space-2) var(--space-1)");
+    expect(rule(".tabbar-icon")).toContain("inline-size: 24px; block-size: 24px");
   });
 
   it("CSS 출처: .tabbar-btn·켜진 탭 규칙에 위 선(border-top)이 없고, 켜진 탭은 --color-text + 700, 꺼진 탭은 --color-text-sub", () => {
@@ -136,6 +176,36 @@ describe("A6 아래 탭: 켜진 탭 위 굵은 선 없음, 켜진 탭 = Bold + �
     expect(on).not.toMatch(/border|box-shadow|--color-primary/);
     // 문서 어디에도 탭 단추 위 선 규칙이 남지 않는다
     expect(css).not.toMatch(/\.tabbar-btn[^{]*\{[^}]*border-top/);
+  });
+});
+
+describe("스킬 검토 O-12 · O-10(PM d-150)", () => {
+  it("O-12: 그래프(띠·원·막대·범례·예시·연속 기록 고리·워드마크 그림)는 화면 읽기에서 숨기고, 아래 목록 줄은 읽힌다(숨은 요약 하나는 그대로)", async () => {
+    const hiddenOk = (el: Element) => el.closest("[aria-hidden='true']") !== null;
+    const graphics = (c: HTMLElement) => Array.from(c.querySelectorAll(".growth-graph, .growth-band, svg, .growth-goal-bar, .growth-legend, .growth-chevron"));
+    const check = (c: HTMLElement) => {
+      const g = graphics(c);
+      expect(g.length).toBeGreaterThan(3);
+      for (const el of g) expect(hiddenOk(el), el.getAttribute("class") ?? el.tagName).toBe(true);
+      const rows = Array.from(c.querySelectorAll<HTMLElement>(".growth-item > button"));
+      expect(rows.length).toBeGreaterThan(0);
+      for (const r of rows) expect(hiddenOk(r)).toBe(false);
+      expect(c.querySelectorAll(".growth-body > p.sr-only")).toHaveLength(1);
+    };
+    const { container } = await mount(data());
+    check(container); // 이번 주 목표 뷰(막대)
+    ratioTab();
+    check(container); // 목표 비율 뷰(띠)
+    fireEvent.click(screen.getByRole("button", { name: "원그래프로 보기" }));
+    check(container); // 원
+  });
+
+  it("O-10: 상태보기의 시간과 %가 놓이는 자리는 모두 고정폭 숫자(CSS 출처 — 실제 계산값은 screens fix9)", () => {
+    // 「\n.growth-row-value」: 줄 머리에서 시작하는 규칙(「.growth-row .growth-row-value」 규칙과 가르려고)
+    for (const sel of [".growth-card-title", ".growth-card-total", "\n.growth-row-value", ".growth-seg-label", ".growth-pie-text"]) expect(rule(sel)).toContain("font-variant-numeric: tabular-nums");
+    const group = css.match(/\n([^\n{]*\.growth-goal-of[^{]*)\{ font-variant-numeric: tabular-nums; \}/);
+    expect(group).not.toBeNull();
+    for (const sel of [".growth-goal-of", ".growth-week-zero", ".growth-streak", ".growth-dl dd", ".growth-compare .todo-sub"]) expect(group![1]).toContain(sel);
   });
 });
 

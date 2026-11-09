@@ -634,15 +634,18 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 }
 .tabbar-list { list-style: none; margin: 0 auto; padding: 0; max-width: var(--page-max); display: flex; }
 .tabbar-item { flex: 1; min-width: 0; }
-/* 아래 탭(고침9 A6, Figma 모든 탭 화면 50:185~50:190): 높이 64, 켜진 탭 위 굵은 선 없음. 켜진 탭 = 글 Bold + --color-text, 꺼진 탭 = 보조색.
-   글만(아이콘은 다음 판). Figma 글 13px는 토큰에 없어 가장 가까운 --font-sub(14) */
+/* 아래 탭(고침9 A6 · 스킬 검토 O-6, Figma 50:185~50:190): 높이 64, 켜진 탭 위 굵은 선 없음. 켜진 탭 = 글 Bold + --color-text(아이콘도), 꺼진 탭 = 보조색.
+   글 12(O-6 — Figma 50:187의 12px; 12 Regular는 이 파일의 다른 보조 글과 같은 값) */
 .tabbar-btn {
-  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 64px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: var(--space-1); width: 100%; min-height: 64px;
   border: 0; background: transparent; cursor: pointer;
-  font: var(--font-sub); color: var(--color-text-sub);
+  font: 400 12px/16px var(--font-family); color: var(--color-text-sub);
   /* 글자가 커져 한 줄에 안 들어가면 두 줄로 내려간다(B9). 칸이 글에 밀려 넘치지 않게 .tabbar-item에 min-width: 0 */
-  padding: var(--space-1) var(--space-1); text-align: center; overflow-wrap: anywhere;
+  padding: var(--space-2) var(--space-1); text-align: center; overflow-wrap: anywhere;
 }
+/* 아이콘 24 위 + 글 12 아래(스킬 검토 O-6, Figma 132:1215 — 탭 위 8 · 아이콘 → 글 4). 아이콘 색은 글과 같이(currentColor) */
+.tabbar-icon { display: block; flex: none; inline-size: 24px; block-size: 24px; }
+.tabbar-label { display: block; max-inline-size: 100%; }
 .tabbar-btn[aria-current="page"] { color: var(--color-text); font-weight: 700; }
 .tabbar-btn:active { background: var(--color-notice-bg); }
 .growth, .me { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
@@ -846,6 +849,8 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-3); }
 .growth-dl dt { font: var(--font-sub); color: var(--color-text-sub); }
 .growth-dl dd { margin: 0; font: var(--font-body); }
+/* 상태보기의 시간과 %는 고정폭 숫자(스킬 검토 O-10, PM d-150). 합계·머리·줄 값·띠 칸·원 글은 각 규칙에 이미 있고, 나머지 숫자 자리를 여기서 묶는다 */
+.growth-goal-of, .growth-week-zero, .growth-streak, .growth-dl dd, .growth-compare .todo-sub { font-variant-numeric: tabular-nums; }
 .done-tag { margin-left: var(--space-2); }
 .note-sublist { list-style: none; margin: var(--space-1) 0 0; padding: 0 0 0 var(--space-3); border-left: 2px solid var(--color-divider); }
 .note-sublist > li { margin: 0 0 var(--space-1); }

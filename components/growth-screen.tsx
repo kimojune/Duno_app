@@ -70,7 +70,8 @@ export const GROWTH_TEXT = {
   ratioValue: (spent: number, ratio: number | null) => (ratio === null ? `${spent}%` : `${spent}% / 목표 ${ratio}%`),
   // 이번 주 목표 뷰
   goalHead: (target: number, done: number) => ({ before: "목표 ", target: goalHours(target), middle: " 중 ", done: goalHours(done) }),
-  goalValue: (spent: number, remaining: number) => (remaining > 0 ? `${formatMinutes(spent)} · ${formatMinutes(remaining)} 더` : formatMinutes(spent)),
+  // 0은 「0시간」(고침9, Figma 51:107 「0시간 · 6시간 더」 — 머리 「목표 15시간 중 0시간」과 같은 규칙)
+  goalValue: (spent: number, remaining: number) => (remaining > 0 ? `${goalHours(spent)} · ${formatMinutes(remaining)} 더` : goalHours(spent)),
   goalOf: (goal: number | null) => (goal === null ? "목표 없음" : `목표 ${formatMinutes(goal)}`),
   legendGoal: "목표",
   legendGap: "빈 자리",
@@ -86,7 +87,7 @@ export const GROWTH_TEXT = {
       : goal === null
         ? `${name} ${formatMinutes(spent)}, 목표 없음.`
         : remaining > 0
-          ? `${name} ${formatMinutes(spent)}, 목표 ${formatMinutes(goal)}, ${formatMinutes(remaining)} 더.`
+          ? `${name} ${goalHours(spent)}, 목표 ${formatMinutes(goal)}, ${formatMinutes(remaining)} 더.`
           : `${name} ${formatMinutes(spent)}, 목표 ${formatMinutes(goal)}.`,
   ratioSummaryHead: (period: string, total: number) => `목표 비율과 견준 ${period}. ${goalHours(total)}.`,
   ratioSummaryWeekZero: "이번 주 0시간.",
