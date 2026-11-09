@@ -217,6 +217,8 @@ const GOAL_GROWTH: GrowthData = {
   },
   goalText: "토익 900점 넘기고 포트폴리오 사이트 열기",
 };
+/** 목표 최대 길이(100자) 글: 띄어쓰기 없는 긴 낱말과 꺾쇠 모양 글을 섞는다(가로 넘침·글자 그대로 보기) */
+export const LONG_GOAL = ("<img src=x onerror=alert(1)> " + "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허".repeat(3)).slice(0, 100);
 const RATIO_PREF = (view: "band" | "pie") => ({ period: "week", view, tab: "ratio", tabWeek: "2026-11-02" });
 
 /** 분야 50개(꺾쇠·긴 이름 포함): 화면이 가로로 넘치지 않는지 본다. 이름은 모두 지어낸 예시 */
@@ -328,6 +330,14 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "growth-goal-long") {
+    return (
+      <Shell>
+        <GrowthScreen api={growthApi({ ...GOAL_GROWTH, goalText: LONG_GOAL })} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
   if (id === "growth-goal" || id === "growth-ratio" || id === "growth-pie") {
     const pref = id === "growth-ratio" ? RATIO_PREF("band") : id === "growth-pie" ? RATIO_PREF("pie") : undefined;
     return (
@@ -374,6 +384,7 @@ export function V2Gallery({ id }: { id: string }) {
           "growth-week",
           "growth-many",
           "growth-goal",
+          "growth-goal-long",
           "growth-ratio",
           "growth-pie",
           "goal",

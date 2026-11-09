@@ -292,6 +292,24 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   });
 }
 
+// 악용 시나리오: 목표 최대 길이(100자, 띄어쓰기 없는 긴 낱말 + 꺾쇠 모양 글) — 줄바꿈하고 가로로 넘치지 않으며 글자 그대로 보인다
+for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
+  test(`growth-goal-long ${size}: 목표 100자 글이 감싸지고 말줄임·가로 넘침 없이 다 보이며 img 요소가 생기지 않는다`, async ({ page }) => {
+    await open(page, "growth-goal-long", size);
+    const line = page.locator(".growth-goal-line");
+    await expect(line).toBeVisible();
+    const text = (await line.textContent()) ?? "";
+    expect(text.startsWith("목표, <img src=x onerror=alert(1)> 가나다")).toBe(true);
+    expect([...text.replace("목표, ", "")].length).toBe(100);
+    expect(await page.locator(".growth-goal-line img, img[src='x']").count()).toBe(0);
+    const m = await line.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, h: el.clientHeight, lh: parseFloat(getComputedStyle(el).lineHeight) }));
+    expect(m.sw).toBeLessThanOrEqual(m.cw + 0.5);
+    expect(m.h).toBeGreaterThan(2 * m.lh); // 여러 줄로 감쌌다(자르지 않았다)
+    await shot(page, `growth-goal-long-${size}`);
+    await noHorizontalScroll(page, "목표 100자");
+  });
+}
+
 // 비교 보기(D-093, 남겨 둔 보기): 분야 줄마다 이번 주·지난주·지난달·총 시간 나란히. 분야 50개·긴 이름에서도 가로로 넘치지 않는다
 for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   for (const state of ["growth-week", "growth-many"]) {
