@@ -130,7 +130,9 @@ describe("머리 부품 BackHeader · BottomActions (정합 A1·A2, PM 1-A) · �
     expect([...container.querySelectorAll(".bottom-actions > button")].map((b) => b.textContent)).toEqual(["주", "보조"]);
     const rule = CSS.match(/\.bottom-actions \{([^}]*)\}/)?.[1] ?? "";
     expect(rule).toMatch(/position:\s*sticky/);
-    expect(rule).toMatch(/calc\(36px \+ env\(safe-area-inset-bottom\)\)/);
+    // 아래 여백 36은 토큰(--bottom-actions-pad-bottom)으로 둔다 — .ratio-foot(균등 배분 붙박이)가 같은 값을 쓴다(고침10 QA2 ③)
+    expect(rule).toMatch(/calc\(var\(--bottom-actions-pad-bottom\) \+ env\(safe-area-inset-bottom\)\)/);
+    expect(CSS).toMatch(/--bottom-actions-pad-bottom:\s*36px;/);
     expect(CSS).toMatch(/\.bottom-actions > \.btn \{[^}]*width:\s*100%/);
   });
 

@@ -979,7 +979,8 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(document.activeElement).toBe(cancel);
     d.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "저장 중인 글") }));
     await waitFor(() => expect(confirmBox()).toBeNull());
-    expect(document.activeElement).toBe(logoutButton);
+    // 확인이 닫힌 직후 초점이 연 단추로 돌아온다(저장 완료가 입력 칸 초점을 같은 틱에 건드려도 마지막 자리는 연 단추) — 한 틱 늦을 수 있어 기다린다
+    await waitFor(() => expect(document.activeElement).toBe(logoutButton));
   });
 
   it("입력 칸을 비우면 확인이 닫히고, 다시 글을 적어도 확인이 저절로 되살아나지 않는다", async () => {
