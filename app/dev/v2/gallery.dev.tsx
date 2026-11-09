@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
+import { EveningTodoGallery } from "./evening-todo-gallery.dev";
 import { GoalEditor } from "../../../components/goal";
 import { GrowthScreen } from "../../../components/growth-screen";
 import { MeScreen } from "../../../components/me-screen";
@@ -225,6 +226,7 @@ function Opener({ render }: { render: (close: () => void) => ReactNode }) {
 }
 
 export function V2Gallery({ id }: { id: string }) {
+  if (id === "evening-todo") return <EveningTodoGallery />; // 고침 5바퀴: 오늘 기록의 「오늘 할 일」 줄·시트
   if (id === "tabbar") {
     return (
       <Shell>

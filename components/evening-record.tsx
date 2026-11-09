@@ -12,6 +12,7 @@ import { useOverlayWindow } from "../lib/use-overlay-window";
 import { rescaleSplit } from "../lib/ratio-dial-calc";
 import { categoryColorValue } from "../lib/category-color";
 import { RatioDial, type DialSlice } from "./ratio-dial";
+import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -42,6 +43,8 @@ export const EVENING_TEXT = {
   minutes: "분",
   total: (m: number) => `합계 ${formatMinutes(m)}`,
   timerFilled: (m: number) => `타이머로 ${formatMinutes(m)} 미리 채웠어요.`,
+  /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시 */
+  timerChip: (m: number) => `타이머 ${formatMinutes(m)}`,
   existing: "이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.",
   skipSplit: "나누지 않고 저장",
   split: "분야마다 나누기",
@@ -89,8 +92,11 @@ export function EveningRecord({
   onSaved,
   onOpenGrowth,
   renderAfterSave,
+  todos,
 }: {
   api: EveningApi;
+  /** 시간 단계의 「오늘 할 일 n/m ›」 줄과 시트(할 일 탭과 같은 데이터, 고침 5바퀴). 없으면 줄을 그리지 않는다 */
+  todos?: EveningTodos;
   now?: () => Date;
   onClose: () => void;
   onSaved?: (saved: SavedEvening) => void;
@@ -327,6 +333,14 @@ export function EveningRecord({
             <p className="ratio-total" role="status">
               {EVENING_TEXT.total(total)}
             </p>
+            {!state.existing && timerSum > 0 && <p className="evening-timer-chip">{EVENING_TEXT.timerChip(timerSum)}</p>}
+            {/* 오늘을 고른 때만(어제 할 일은 시트에서 다루지 않는다). 시트에서 체크·되돌림·더하기 → 끝낸 할 일 분야 목록이 바로 바뀐다 */}
+            {todos && offsetDays === 0 && (
+              <EveningTodoLine
+                todos={todos}
+                onDoneCategoriesChange={(ids) => setLoad((l) => (l.status === "ready" ? { status: "ready", state: { ...l.state, doneCategoryIds: ids } } : l))}
+              />
+            )}
             {message && (
               <Notice role="alert" className="onboarding-notice">
                 {message}

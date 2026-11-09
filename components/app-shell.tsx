@@ -275,6 +275,8 @@ function MainShell({
   const [meActivation, setMeActivation] = useState(0);
   // 내 정보 맨 아래 「로그아웃」(B18)은 할 일 탭의 로그아웃 흐름(저장 안 된 글 확인)을 부른다
   const [logoutRequest, setLogoutRequest] = useState(0);
+  // 예전 방식(기기 먼저 저장이 꺼짐): 오늘 기록의 「오늘 할 일」 시트가 서버에 쓴 뒤 할 일 탭이 다시 읽게 한다(고침 5바퀴)
+  const [todoRefresh, setTodoRefresh] = useState(0);
   const [meCategories, setMeCategories] = useState<Entry[] | null>(null);
   const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
   // 오늘 먼저 할 일 카드(⑤): 앱을 열 때 한 번 건네받는다. 반응이 없는(new) 것만 보인다
@@ -464,6 +466,7 @@ function MainShell({
           outbox={outbox}
           onBeforeSignOut={() => apis.push.disable()}
           logoutRequest={logoutRequest}
+          refreshKey={todoRefresh}
           topSlot={
             <>
               {rejectedCount > 0 && (
@@ -532,6 +535,7 @@ function MainShell({
       {eveningOpen && (
         <EveningRecord
           api={local ? local.apis.evening : defaultEveningApi}
+          todos={localTodos ? { local: localTodos } : { onChanged: () => setTodoRefresh((n) => n + 1) }}
           onClose={() => setEveningOpen(false)}
           onSaved={() => setGoalVersion((n) => n + 1)}
           onOpenGrowth={() => {
