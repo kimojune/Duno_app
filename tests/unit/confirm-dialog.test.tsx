@@ -239,6 +239,38 @@ describe("키보드 · 막 · 뒤로 가기 = 아래 단추(아무것도 버리�
     expect(history.leftApp).toBe(false);
   });
 
+  it("ownHistory에서 위 단추 동작(Promise)이 끝났는데 창이 그대로면(실패) 「눌렀다」가 풀려, 그 뒤 아래 단추로 닫으면 칸을 거둔다 · error 한 줄은 role alert", async () => {
+    let fail: () => void = () => {};
+    function Own() {
+      const [open, setOpen] = useState(true);
+      const [error, setError] = useState(false);
+      return open ? (
+        <ConfirmDialog
+          title="로그아웃할까요?"
+          confirmLabel="로그아웃"
+          busyLabel="로그아웃 중"
+          cancelLabel="계속 쓰기"
+          ownHistory
+          error={error ? "로그아웃하지 못했어요. 다시 눌러 주세요." : undefined}
+          onConfirm={() => new Promise<void>((resolve) => (fail = () => { setError(true); resolve(); }))}
+          onCancel={() => setOpen(false)}
+        />
+      ) : null;
+    }
+    render(<Own />);
+    expect(history.index).toBe(1);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    expect(screen.getByRole("button", { name: "로그아웃 중" })).toBeTruthy();
+    await act(async () => fail());
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByRole("alert").textContent).toBe("로그아웃하지 못했어요. 다시 눌러 주세요.");
+    fireEvent.click(screen.getByRole("button", { name: "계속 쓰기" }));
+    expect(history.back).toHaveBeenCalledTimes(1);
+    history.flush();
+    expect(history.index).toBe(0);
+    expect(history.leftApp).toBe(false);
+  });
+
   it("ownHistory에서 위 단추(페이지를 떠나는 동작)를 누르면 닫혀도 칸을 거두지 않는다(떠나는 이동과 back()이 겹치지 않게)", () => {
     function Own() {
       const [open, setOpen] = useState(true);

@@ -752,6 +752,7 @@ select.input { appearance: auto; }
 .close-confirm-title:focus { outline: none; }
 .close-confirm-title:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .close-confirm-desc { margin: var(--space-2) 0 0; font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.close-confirm-error { margin: var(--space-2) 0 0; font: var(--font-sub); font-weight: 500; color: var(--color-text); overflow-wrap: anywhere; } /* 위 단추 동작 실패 한 줄(체험 코드 오류 글과 같은 14 Medium 글색) */
 .close-confirm-actions { display: grid; gap: var(--space-3); margin-top: 28px; }
 .close-confirm-actions > .btn { width: 100%; min-height: var(--tap-min); font: var(--font-body); font-weight: 700; }
 .close-confirm-actions > .btn-secondary { box-shadow: inset 0 0 0 1.5px var(--color-text); color: var(--color-text); background: transparent; }

@@ -65,6 +65,7 @@ export const TODO_TEXT = {
   // ---- 기기 먼저 저장(고침 3바퀴) ----
   offlineLocal: "인터넷 연결이 끊겼어요. 적고 끝낸 것은 이 기기에 두었다가 연결되면 보내요.",
   signingOut: "기록을 서버에 보내는 중이에요",
+  logoutFailed: "로그아웃하지 못했어요. 다시 눌러 주세요.", // 고침10: 확인 창 안 실패 안내(앱 공통 실패 글 꼴)
   rejected: (n: number) => `서버가 받지 않은 기록 ${n}개를 되돌렸어요`,
   cancel: "취소",
   liveLoading: "할 일을 불러오는 중",
@@ -197,6 +198,8 @@ export type TodoViewProps = {
   logoutConfirm: boolean;
   /** 로그아웃을 걸었다(확인 창 「로그아웃 중」 막힘) */
   loggingOut?: boolean;
+  /** 로그아웃 요청이 실패했다(확인 창 안 안내 한 줄) */
+  logoutFailed?: boolean;
   /** 기기 먼저 저장(고침 3바퀴)이면 끊김 안내 글이 다르다. 없으면 기본 글 */
   offlineText?: string;
   live: string;
@@ -825,6 +828,7 @@ export function TodoView(props: TodoViewProps) {
           busyLabel={CONFIRM_TEXT.logout.busy}
           cancelLabel={CONFIRM_TEXT.logout.cancel}
           busy={props.loggingOut === true}
+          error={props.logoutFailed ? TODO_TEXT.logoutFailed : undefined}
           ownHistory
           onConfirm={props.onLogoutConfirm}
           onCancel={props.onLogoutCancel}

@@ -197,6 +197,8 @@ export function TodoScreen({
   const [signingOut, setSigningOut] = useState(false);
   /** 고침10 B: 로그아웃을 건 뒤(확인 창 「로그아웃 중」 막힘). 한 번 걸면 페이지를 떠날 때까지 그대로 */
   const [loggingOut, setLoggingOut] = useState(false);
+  /** 고침10: 로그아웃 요청이 실패했다(확인 창 안 한 줄 안내). 확인을 다시 열거나 다시 누르면 지운다 */
+  const [logoutFailed, setLogoutFailed] = useState(false);
   const loggingOutRef = useRef<Promise<void> | null>(null);
   const [live, announce] = useAnnouncer(first ? loadedText(first.todos.length) : TODO_TEXT.liveLoading);
   const online = useOnline();
@@ -1027,6 +1029,7 @@ export function TodoScreen({
   function doSignOut(): Promise<void> {
     if (loggingOutRef.current) return loggingOutRef.current;
     setLoggingOut(true);
+    setLogoutFailed(false);
     outbox?.clear(); // 로그아웃하면 기기에 둔 못 올린 글도 지운다(남의 글이 남지 않게)
     // 기기 먼저 저장: 이 사용자의 기기 저장소(거울·보낼 줄)를 지운 뒤 로그아웃한다. 보낼 줄이 남았으면 onLogout이 먼저 사용자에게 물었다
     const work = !local
@@ -1036,27 +1039,28 @@ export function TodoScreen({
           () => signOutAfterWipe(),
         );
     // 로그아웃이 끝났는데 이 화면이 아직 있으면(요청 실패 등) 다시 누를 수 있게 막힘을 푼다. 성공하면 서버가 로그인 화면으로 보낸다
-    const settled = work.then(() => {
+    const settled = work.then((ok) => {
       loggingOutRef.current = null;
       setLoggingOut(false);
+      if (!ok) setLogoutFailed(true);
     });
     loggingOutRef.current = settled;
     return settled;
   }
 
-  /** 서버 로그아웃 한 번. 실패해도(연결 끊김 등) 풀린 Promise를 돌려준다 */
-  function callSignOut(): Promise<void> {
+  /** 서버 로그아웃 한 번. 실패해도(연결 끊김 등) 풀린 Promise를 돌려준다 — 값은 요청이 됐는가(실패면 false) */
+  function callSignOut(): Promise<boolean> {
     try {
       return Promise.resolve(signOut()).then(
-        () => {},
-        () => {},
+        () => true,
+        () => false,
       );
     } catch {
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
   }
 
-  function signOutAfterWipe(): Promise<void> {
+  function signOutAfterWipe(): Promise<boolean> {
     const before = onBeforeSignOut;
     if (!before) {
       return callSignOut();
@@ -1088,6 +1092,7 @@ export function TodoScreen({
   }
 
   function onLogout() {
+    setLogoutFailed(false);
     if (local) {
       // 기기 먼저 저장: 먼저 보낼 줄을 서버에 보내 본다. 다 보냈으면 로그아웃, 못 보낸 것이 있으면 「보내지 못한 기록이 있어요」를 알리고 사용자가 고른다
       if (signingOut) return;
@@ -1299,7 +1304,11 @@ export function TodoScreen({
       onReload={reload}
       onLogout={onLogout}
       onLogoutConfirm={doSignOut}
-      onLogoutCancel={() => setLogoutConfirm(false)}
+      logoutFailed={logoutFailed}
+      onLogoutCancel={() => {
+        setLogoutConfirm(false);
+        setLogoutFailed(false);
+      }}
       onCopy={() => void copyUnsaved()}
       onRelogin={() => router.refresh()}
       onOpenDetail={manage ? (id) => setDetailId(id) : undefined}

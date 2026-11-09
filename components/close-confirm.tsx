@@ -25,7 +25,8 @@ import { PrimaryButton, SecondaryButton } from "./ui";
  * - onConfirm이 Promise를 돌려주면 그 Promise가 끝날 때까지 「막힘」이다: 누른 단추 글이 busyLabel로 바뀌고, 두 단추가 막힌다
  *   (disabled + aria-busy, 흐림 0.45 — components/ui.tsx). 막힌 동안 위 단추를 다시 눌러도(연타·Enter 연타) onConfirm을 다시 부르지 않는다.
  *   막힌 동안 Esc·막 누름·뒤로 가기는 아무것도 하지 않는다(이미 보낸 요청을 「취소」처럼 보이지 않게).
- * - Promise가 끝났는데 창이 아직 떠 있으면(실패 등) 막힘이 풀린다. 실패 안내는 부르는 쪽 몫이다.
+ * - Promise가 끝났는데 창이 아직 떠 있으면(실패 등) 막힘이 풀리고 「위 단추를 눌렀다」도 풀린다(ownHistory면 그 뒤 아래 단추가 쌓은 칸을 거둔다).
+ *   실패 안내는 부르는 쪽이 error로 넘긴다: 제목·보조 글 아래 한 줄(role alert, 앱 공통 「…하지 못했어요. 다시 눌러 주세요.」 꼴).
  * - 페이지를 떠나는 동작(로그아웃)처럼 끝까지 막아 두려면 busy를 넘긴다: busy가 true면 Promise와 상관없이 막힌다.
  *
  * ── 키보드·화면 읽기 ─────────────────────────────────────
@@ -42,6 +43,7 @@ import { PrimaryButton, SecondaryButton } from "./ui";
 export function ConfirmDialog({
   title,
   description,
+  error,
   confirmLabel,
   busyLabel,
   cancelLabel,
@@ -52,6 +54,8 @@ export function ConfirmDialog({
 }: {
   title: ReactNode;
   description?: ReactNode;
+  /** 위 단추 동작이 실패했을 때 안내 한 줄(있을 때만) */
+  error?: ReactNode;
   /** 위 단추(떠나기·지우기) 글 */
   confirmLabel: string;
   /** 위 단추를 누른 뒤 응답 전 글(예: 「지우는 중」 · 「로그아웃 중」). 없으면 confirmLabel 그대로 */
@@ -120,6 +124,8 @@ export function ConfirmDialog({
     titleRef.current?.focus();
     const settle = () => {
       pendingRef.current = false;
+      // 끝났는데 창이 아직 떠 있다 = 떠나는 동작이 이뤄지지 않았다(실패 등). 「눌렀다」를 풀어 아래 단추가 history 칸을 거두게 한다
+      confirmed.current = false;
       if (mountedRef.current) setPending(false);
     };
     (result as Promise<unknown>).then(settle, settle);
@@ -163,6 +169,11 @@ export function ConfirmDialog({
         {description ? (
           <p id={descId} className="close-confirm-desc">
             {description}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="close-confirm-error" role="alert">
+            {error}
           </p>
         ) : null}
         <div className="close-confirm-actions">

@@ -352,6 +352,34 @@ describe("체크 (T8, D5)", () => {
 });
 
 describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
+  it("고침10: 로그아웃 요청이 실패하면 확인 창은 그대로 · 막힘이 풀리고 안내 한 줄 · 「계속 쓰기」면 확인이 쌓은 history 칸을 거둔다", async () => {
+    await renderLoaded([]);
+    write("적던 글");
+    const back = vi.spyOn(window.history, "back");
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const dialog = confirmDialog(LOGOUT.title);
+    signOut.mockRejectedValueOnce(new Error("network"));
+    const top = within(dialog).getByRole("button", { name: LOGOUT.top }) as HTMLButtonElement;
+    await act(async () => fireEvent.click(top));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(confirmDialog(LOGOUT.title), "창 그대로").toBe(dialog);
+    expect(within(dialog).getByRole("alert").textContent).toBe("로그아웃하지 못했어요. 다시 눌러 주세요.");
+    expect(top.disabled, "막힘이 풀린다").toBe(false);
+    expect(top.textContent).toBe(LOGOUT.top);
+    expect(back).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.bottom }));
+    expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
+    expect(back, "확인이 쌓은 칸을 거둔다(「눌렀다」가 풀렸다)").toHaveBeenCalledTimes(1);
+    // 다시 열면 안내는 없다. 다시 누르면 이번에는 로그아웃(실패 뒤 다시 누를 수 있다)
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const again = confirmDialog(LOGOUT.title);
+    expect(within(again).queryByRole("alert")).toBeNull();
+    await act(async () => fireEvent.click(within(again).getByRole("button", { name: LOGOUT.top })));
+    expect(signOut).toHaveBeenCalledTimes(2);
+    expect(within(again).queryByRole("alert")).toBeNull();
+    back.mockRestore();
+  });
+
   it("T13 저장 중 401: 로그인 화면으로 넘기지 않고, 글이 보이며, 복사 단추가 클립보드에 넣는다", async () => {
     await renderLoaded([]);
     addTodo.mockResolvedValue(fail("unauthenticated"));
