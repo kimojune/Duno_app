@@ -460,6 +460,36 @@ button, input { font: inherit; color: inherit; }
 .goal-clear-confirm { display: grid; gap: var(--space-2); }
 .goal-clear-title { margin: 0; font: var(--font-sub); font-weight: 700; color: var(--color-text); overflow-wrap: anywhere; }
 .goal-clear-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+/* ---- 고침9 S2-b 할 일 페이지(Figma 51:55 · 58:92 · 66:12 · 66:76): 머리 「‹ 할 일」 · 저장 상태 · 「⋯」 → 큰 제목 24 Bold → 속성 줄(끝냄·분야·하는 날) → 작업 기록 ---- */
+.detail-page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-inline-start: calc(-1 * var(--space-3)); margin-inline-end: calc(-1 * var(--space-3)); }
+.detail-back { font: var(--font-sub); font-weight: 500; color: var(--color-text); }
+.detail-page-tools { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.detail-status { font-size: 12px; line-height: 16px; color: var(--color-text-sub); white-space: nowrap; }
+.detail-status-retry { font-size: 12px; font-weight: 500; color: var(--color-text); }
+.detail-menu-wrap { position: relative; }
+.detail-more { display: inline-flex; align-items: center; justify-content: center; inline-size: var(--tap-min); block-size: var(--tap-min); padding: 0; border: 0; background: none; color: var(--color-text); font: 700 20px/1 var(--font-family); cursor: pointer; }
+.detail-more:focus-visible { outline: var(--focus-ring); outline-offset: calc(-1 * var(--focus-offset, 2px)); }
+.detail-menu { position: absolute; z-index: 2; inset-inline-end: var(--space-1); top: calc(100% + 4px); min-inline-size: 192px; margin: 0; padding: var(--space-1) 0; list-style: none; border-radius: var(--radius-card, 16px); background: var(--color-surface); box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 18%, transparent); }
+.detail-menu li + li { border-top: 1px solid var(--color-divider); margin-inline: var(--space-4); }
+.detail-menu li:first-child { margin-inline: var(--space-4); }
+.detail-menu [role=menuitem] { display: flex; align-items: center; inline-size: 100%; min-block-size: 44px; padding: 0; border: 0; background: none; color: var(--color-text); font: var(--font-sub); font-weight: 500; text-align: start; cursor: pointer; }
+.detail-menu [role=menuitem]:disabled { color: var(--color-text-sub); cursor: default; }
+.detail-menu .detail-menu-danger { font-weight: 700; }
+.detail-big-title { display: block; inline-size: 100%; margin: var(--space-4) 0 0; padding: 0; border: 0; background: none; color: var(--color-text); font: 700 24px/1.4 var(--font-family); overflow-wrap: anywhere; }
+.detail-title-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.detail-message { margin: 0; }
+.detail-props { margin-top: var(--space-4); }
+.detail-props > .detail-prop { margin-top: 0; border-block-start: 0; border-block-end: 1px solid var(--color-divider); }
+.detail-done { margin-inline-start: auto; }
+.detail-done .check-box { border-radius: 50%; border-color: var(--color-text); }
+.detail-day { text-align: end; font: var(--font-sub); color: var(--color-text); }
+.detail-notes { margin-top: var(--space-4); }
+.detail-notes-title { margin: 0 0 var(--space-2); font-weight: 400; }
+.detail-note-input { inline-size: 100%; padding: var(--space-2) 0; border: 0; border-block-end: 1px solid var(--color-divider); background: none; color: var(--color-text); font: var(--font-body); resize: vertical; }
+.detail-note-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.detail-remove-title { margin: 0; font: var(--font-sub); color: var(--color-text); overflow-wrap: anywhere; }
+.detail-remove-actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-6); }
+.detail-remove-actions > .btn { flex: 1; }
 /* ---- 고침9 PM 3: 할 일 페이지 「분야」 한 줄(Figma 51:55 — 이름표 12 보조 · 색 원 12(1px 윤곽) + 이름 14 · 오른쪽 「›」, 위아래 1px 구분선, 누름 48) ---- */
 .detail-prop { display: flex; align-items: center; gap: var(--space-4); min-block-size: var(--tap-min); border-block: 1px solid var(--color-divider); }
 .detail-prop-label { flex: none; min-inline-size: 44px; font-size: 12px; line-height: 1.4; color: var(--color-text-sub); }

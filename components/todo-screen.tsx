@@ -21,6 +21,7 @@ import {
   categoryAddedText,
   categoryDuplicateText,
   categoryOverLimitText,
+  dayText,
   loadedText,
   overLimitText,
   savedOtherDayText,
@@ -1308,6 +1309,9 @@ export function TodoScreen({
             onAddCategory={addCategoryFromDetail}
             categoryLimitReached={categories.length >= CATEGORY_LIMIT}
             onNotesChange={onNotesChange}
+            done={detailRow.done}
+            onToggleDone={() => toggle(detailRow.id)}
+            dayLabel={day ? dayText(day) : undefined}
           />
         ) : undefined
       }
