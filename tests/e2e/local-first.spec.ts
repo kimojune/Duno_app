@@ -369,7 +369,10 @@ test("끊긴 채 내 정보 「비율 고치기」 저장 → 연결 → 서버�
     const page = await openApp(ctx);
     // 내 정보 탭을 연결된 채 열어 분야 목록을 받아 둔다
     await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "내 정보" }).click();
-    const fields = page.locator("input.ratio-field");
+    // 고침9(PM 6): 내 정보 「목표 비율」 카드 → S8-a 겹침 화면에서 고치고 「저장」
+    await page.getByRole("button", { name: /^목표 비율, / }).click({ timeout: 30_000 });
+    const ratioDialog = page.getByRole("dialog", { name: "목표 비율" });
+    const fields = ratioDialog.locator("input.ratio-field");
     await expect(fields.first()).toBeVisible({ timeout: 30_000 });
     const readFields = async () => (await fields.evaluateAll((els) => els.map((e) => Number((e as HTMLInputElement).value)))) as number[];
     const initial = await readFields();
@@ -384,7 +387,8 @@ test("끊긴 채 내 정보 「비율 고치기」 저장 → 연결 → 서버�
     const shown = await readFields();
     expect(shown[0]).toBe(next);
     expect(shown.reduce((s, v) => s + v, 0), "고친 뒤에도 합 100").toBe(100);
-    await page.getByRole("button", { name: "비율 저장" }).click();
+    await ratioDialog.getByRole("button", { name: "저장" }).click();
+    await expect(ratioDialog).toHaveCount(0);
     await expect(page.getByText("저장했어요", { exact: true })).toBeVisible({ timeout: 2_000 });
 
     // 끊긴 동안 서버 값은 그대로

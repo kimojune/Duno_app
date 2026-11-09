@@ -51,7 +51,7 @@ export function BackHeader({
   const centered = !step && (title !== undefined || onClose !== undefined);
   return (
     <div className={onBack ? "screen-head" : "screen-head screen-head-no-back"}>
-      <div className="screen-head-row">
+      <div className={step ? "screen-head-row" : "screen-head-row screen-head-row-center"}>
         {onBack ? (
           <button type="button" className="overlay-back" aria-label={BACK_HEADER_TEXT.back} disabled={backDisabled} onClick={onBack}>
             <span aria-hidden="true">‹</span>

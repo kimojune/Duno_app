@@ -933,3 +933,14 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .me-ratio-cell { flex-basis: 0; min-width: 2px; border: 1px solid var(--color-chart-outline, var(--color-text)); border-radius: 2px; }
 .me .notify-row { margin-top: var(--space-2); }
 .me .notify-name { font: 500 0.875rem/1.25rem var(--font-family); } /* 내 정보 알림 줄 이름 14 Medium */
+/* 머리 가운데 제목: 양옆 칸을 같은 폭(1fr, 최소 48)으로 두어 「‹」(48)와 「닫기」(글 폭)가 달라도 제목이 화면 가운데에 온다 */
+.screen-head-row-center { display: grid; grid-template-columns: minmax(var(--tap-min), 1fr) minmax(0, auto) minmax(var(--tap-min), 1fr); }
+.screen-head-row-center > :first-child { justify-self: start; }
+.screen-head-row-center > :last-child:not(:first-child) { justify-self: end; }
+/* 내 정보 머리(Figma 50:641, A5): 워드마크 한 줄 → 그 아래 「내 정보」 제목(왼쪽). 할 일 머리처럼 양끝으로 벌리지 않는다 */
+.me .today-header { display: block; }
+/* 「시각」 고르기 칸은 글 폭만큼(Figma 84 · 32 높이). 내 정보의 글 칸 100% 규칙보다 한 단계 구체적으로 */
+.me .notify-time .input.notify-time-select { width: auto; flex: none; }
+/* 처음 설정 이름표 → 내용 사이(Figma 49:178·50:4: 제목 아래 약 20) */
+.onboarding .onboarding-title { margin-bottom: var(--space-4); }
+.onboarding .onboarding-title-row { margin-bottom: var(--space-4); }
