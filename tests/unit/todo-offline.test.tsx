@@ -58,6 +58,14 @@ async function write(text: string) {
   fireEvent.change(screen.getByRole("textbox", { name: "할 일 적기" }), { target: { value: text } });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "적기" })));
 }
+/**
+ * 화면에 보이는 글만 센다(화면 읽기용 안내 영역 .sr-only는 뺀다).
+ * 실패·「어제 날짜로 저장했어요」는 보이는 줄과 안내 영역이 같은 글을 담는데, 안내 영역은 announce(…, { again: true })가 비운 뒤
+ * 100ms 뒤에 채운다. 그래서 시험이 빠르면 한 곳, 느리면(전체 시험이 몰려 도는 때) 두 곳에서 잡혀 getByText가 「여러 개」로 실패했다(11-09 04:1x).
+ */
+function visibleTexts(text: string): HTMLElement[] {
+  return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
+}
 async function mount(outbox: Outbox | undefined, initial: TodayRead = INITIAL) {
   render(<TodoScreen initial={initial} outbox={outbox} />);
   await act(async () => {});
@@ -117,10 +125,10 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     await goOnline();
     expect(addTodo).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("자정 넘어 적은 글")).toBeNull(); // 오늘 목록에 「저장됨」으로 남지 않는다
-    expect(screen.getByText("어제 날짜로 저장했어요")).toBeTruthy();
+    expect(visibleTexts("어제 날짜로 저장했어요")).toHaveLength(1);
     expect(box.stored()).toEqual([]); // 올라갔으니 기기에서는 지운다
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
-    expect(screen.queryByText("어제 날짜로 저장했어요")).toBeNull();
+    expect(visibleTexts("어제 날짜로 저장했어요")).toHaveLength(0);
   });
 
   it("오늘 날짜로 저장된 글은 그대로 오늘 목록에 남는다 (A4)", async () => {
@@ -161,7 +169,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     const queued = box.stored()[0];
     addTodo.mockResolvedValueOnce({ ok: false, error: "unavailable" });
     await goOnline();
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     expect(box.stored()).toHaveLength(1);
     addTodo.mockImplementation(async (id: string, text: string) => ok(item(id, text)));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "다시" })));
@@ -174,7 +182,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     addTodo.mockResolvedValueOnce({ ok: false, error: "unavailable" });
     await mount(box);
     await write("연결은 있었는데 실패");
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     expect(box.stored().map((i) => i.text)).toEqual(["연결은 있었는데 실패"]);
     // 온라인 첫 시도에는 적은 때를 싣지 않는다(옛 호출 꼴 그대로)
     expect(addTodo.mock.calls[0]).toHaveLength(3);
