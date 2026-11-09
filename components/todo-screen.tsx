@@ -161,6 +161,7 @@ export function TodoScreen({
   outbox,
   onBeforeSignOut,
   logoutRequest = 0,
+  onLogoutConfirmChange,
   local,
   refreshKey = 0,
 }: {
@@ -180,6 +181,8 @@ export function TodoScreen({
   onBeforeSignOut?: () => Promise<void>;
   /** 원샷 v2(선택, B18): 1 이상으로 커질 때마다 로그아웃 흐름을 시작한다(내 정보 맨 아래 단추가 건다. 고침10: 머리 「로그아웃」은 없다) */
   logoutRequest?: number;
+  /** 로그아웃 확인 창이 뜨고 닫힐 때 알린다(다른 탭 위에 창만 보이게 하려고, 고침10 QA1 확인 2) */
+  onLogoutConfirmChange?: (open: boolean) => void;
 }) {
   const initialTodos = initial?.todos;
   const first = initialTodos?.ok ? initialTodos.data : null;
@@ -1248,6 +1251,13 @@ export function TodoScreen({
   const copyable = unsavedRows || hasDraft || (categoryAuthLost && hasCategoryDraft);
   // 확인이 떠 있는 동안 저장되지 않은 글이 없어지면(빼기·저장 끝·칸 비움) 확인을 닫는다
   const confirmOpen = logoutConfirm && (hasUnsaved || local !== undefined);
+  const confirmChangeRef = useRef(onLogoutConfirmChange);
+  useLayoutEffect(() => {
+    confirmChangeRef.current = onLogoutConfirmChange;
+  });
+  useEffect(() => {
+    confirmChangeRef.current?.(confirmOpen);
+  }, [confirmOpen]);
   if (logoutConfirm && !hasUnsaved && !local) setLogoutConfirm(false);
 
   // 포커스가 있던 요소가 사라져도 body로 떨어뜨리지 않는다.
@@ -1344,7 +1354,15 @@ export function TodoScreen({
             }}
           />
         ) : manage && pastOpen && day ? (
-          <PastDays api={manage} today={day.date} onClose={() => setPastOpen(false)} />
+          <PastDays
+            api={manage}
+            today={day.date}
+            onClose={() => setPastOpen(false)}
+            categoryOf={(id) => {
+              const name = categoryText(id);
+              return name ? { name, color: categoryColorOf(id) } : null;
+            }}
+          />
         ) : manage && detailRow ? (
           <TodoDetail
             key={detailRow.id}

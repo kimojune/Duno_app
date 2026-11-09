@@ -167,7 +167,8 @@ describe("내 정보 맨 아래 로그아웃 (B18)", () => {
     expect(signOut).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(document.getElementById("me-logout-button")!));
     expect(signOut).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "할 일" }).getAttribute("aria-current")).toBe("page");
+    // 고침10 QA1 확인 2: 탭을 옮기지 않는다 — 로그아웃은 「내 정보」에서 일어난다
+    expect(screen.getByRole("button", { name: "내 정보" }).getAttribute("aria-current")).toBe("page");
   });
   it("적던 글이 있으면 할 일 탭에서 확인을 거친다(바로 로그아웃하지 않는다)", async () => {
     render(<AppShell home={home()} />);
@@ -178,6 +179,8 @@ describe("내 정보 맨 아래 로그아웃 (B18)", () => {
     await act(async () => fireEvent.click(document.getElementById("me-logout-button")!));
     expect(signOut).not.toHaveBeenCalled();
     expect(screen.getByRole("alertdialog", { name: "로그아웃할까요?" })).toBeTruthy();
+    // 고침10 QA1 확인 2: 확인 창은 「내 정보」 위에 뜬다(탭이 「할 일」로 옮겨지지 않는다)
+    expect(screen.getByRole("button", { name: "내 정보" }).getAttribute("aria-current")).toBe("page");
   });
 });
 

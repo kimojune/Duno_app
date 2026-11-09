@@ -277,6 +277,8 @@ function MainShell({
   const [meActivation, setMeActivation] = useState(0);
   // 내 정보 맨 아래 「로그아웃」(B18)은 할 일 탭의 로그아웃 흐름(저장 안 된 글 확인)을 부른다
   const [logoutRequest, setLogoutRequest] = useState(0);
+  /** 로그아웃 확인 창이 떠 있나(고침10 QA1 확인 2): 「내 정보」에서 건 요청의 확인 창은 「내 정보」 위에 뜬다 — 할 일 화면은 창만 남기고 가려 둔다 */
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   // 예전 방식(기기 먼저 저장이 꺼짐): 오늘 기록의 「오늘 할 일」 시트가 서버에 쓴 뒤 할 일 탭이 다시 읽게 한다(고침 5바퀴)
   const [todoRefresh, setTodoRefresh] = useState(0);
   const [meCategories, setMeCategories] = useState<Entry[] | null>(null);
@@ -463,7 +465,7 @@ function MainShell({
           refreshKey={goalVersion}
         />
       </div>
-      <div hidden={tab !== "todo"}>
+      <div hidden={tab !== "todo" && !logoutConfirmOpen} className={tab !== "todo" ? "tab-ghost" : undefined}>
         <TodoScreen
           initial={initial}
           manage={local ? local.apis.manage : defaultManageApi}
@@ -471,6 +473,7 @@ function MainShell({
           outbox={outbox}
           onBeforeSignOut={() => apis.push.disable()}
           logoutRequest={logoutRequest}
+          onLogoutConfirmChange={setLogoutConfirmOpen}
           refreshKey={todoRefresh}
           topSlot={
             <>
@@ -531,7 +534,7 @@ function MainShell({
       <div hidden={tab !== "me"}>
         <MeScreen settings={settings} categories={meCategoriesNow} api={local ? local.apis.settings : defaultSettingsApi} push={apis.push}
           onLogout={() => {
-            openTab("todo");
+            // 탭을 옮기지 않는다: 확인 창은 「내 정보」 위에 뜬다(고침10 QA1 확인 2)
             setLogoutRequest((n) => n + 1);
           }}
         />
