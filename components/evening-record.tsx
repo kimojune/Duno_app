@@ -59,8 +59,7 @@ export const EVENING_TEXT = {
   hours: "시간",
   minutes: "분",
   total: (m: number) => `합계 ${formatMinutes(m)}`,
-  timerFilled: (m: number) => `타이머로 ${formatMinutes(m)} 미리 채웠어요.`,
-  /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시 */
+  /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시. 고침6 PM d-129 ④: 옛 알림 글 「타이머로 n 미리 채웠어요.」는 빼고 이 띠만 남긴다 */
   timerChip: (m: number) => `타이머 ${formatMinutes(m)}`,
   existing: "이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.",
   skipSplit: "나누지 않고 저장",
@@ -541,7 +540,6 @@ export function EveningRecord({
         {state && phase === "time" && (
           <div className="detail-section">
             {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
-            {!state.existing && timerSum > 0 && <p className="todo-sub">{EVENING_TEXT.timerFilled(timerSum)}</p>}
             <div className="evening-time">
               <Stepper id="evening-hours" label={EVENING_TEXT.hours} unit={EVENING_TEXT.hours} value={hours} max={24} step={1} onChange={(h) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, h * 60 + minutes))} />
               <Stepper id="evening-minutes" label={EVENING_TEXT.minutes} unit={EVENING_TEXT.minutes} value={minutes} max={59} step={APP_CONFIG.minuteStep} onChange={(m) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, hours * 60 + m))} />
