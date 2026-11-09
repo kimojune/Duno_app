@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { COLOR_TOKENS } from "../../lib/design-tokens";
+import { fillWheel } from "../e2e/wheel";
 
 /**
  * 고침9 J1(발표 뒤 판: PM 1·6, ⑬, Figma 정합 A1~A4): 360×800 사진을 docs/oneshot-v2/고침9-J1/에 두고(이름 = 23 최종 폰 목록의 화면 이름),
@@ -128,7 +129,7 @@ test("S5-2 나누기 · 들어간 처음: 머리 한 줄 「‹」 · 가운데 
   await open(page, "evening-split-blank");
   await page.locator("#dev-open-window").click();
   const dlg = page.getByRole("dialog");
-  await page.getByLabel("시간", { exact: true }).fill("3");
+  await fillWheel(page, "시간", 3); // 고침9 J3: 쓴 시간 = 두 줄 휠(숫자 바로 쓰기)
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   const heading = page.getByRole("heading", { name: "분야마다 나눠 주세요" });
   await expect(heading).toBeVisible();

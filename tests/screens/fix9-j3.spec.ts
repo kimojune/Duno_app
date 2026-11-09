@@ -323,3 +323,17 @@ test("확인 창 「저장하지 않고 나갈까요?」 계속 적기 / 나가�
   await noOverflow(page);
   await photo(page, "확인 창 · 저장하지 않고 나갈까요");
 });
+
+test("S5-2 나누기 · 저장 중 — 133:48(O-7: 주 단추 busy · 「저장 중」 · 흐림)", async ({ page }) => {
+  await open(page, "evening-todo"); // 이 갤러리의 저장은 끝나지 않는다(응답 전 상태를 본다)
+  const dialog = page.getByRole("dialog", { name: "오늘 기록" });
+  await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
+  await dialog.getByRole("button", { name: "저장", exact: true }).click();
+  const busy = page.locator(".bottom-actions").getByRole("button", { name: "저장 중" });
+  await expect(busy).toBeDisabled();
+  await expect(busy).toHaveAttribute("aria-busy", "true");
+  expect(Number((await style(busy, ["opacity"])).opacity)).toBeCloseTo(0.45, 2);
+  await expect(dialog.getByRole("button", { name: "이전" })).toBeDisabled();
+  await noOverflow(page);
+  await photo(page, "S5-2 나누기 · 저장 중");
+});
