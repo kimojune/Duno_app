@@ -307,7 +307,7 @@ describe("네 화면의 칩 줄이 ChipScroller다(감싸는 .detail-chips가 �
     } as unknown as FocusApi;
     render(<TimerScreen api={api} fetchToday={async () => read} active activation={1} now={() => 0} onActiveChange={() => {}} />);
     await act(async () => {});
-    const row = screen.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
+    const row = screen.getByRole("group", { name: "분야" });
     expectScroller(row);
     expect([...row.children].map((c) => c.textContent)).toEqual(["기타", "어학"]);
   });
@@ -329,7 +329,7 @@ describe("네 화면의 칩 줄이 ChipScroller다(감싸는 .detail-chips가 �
     expectScroller(screen.getByRole("group", { name: "예시" }));
   });
 
-  it("할 일 자세히: 분야 칩 줄", () => {
+  it("할 일 자세히(고침9 PM 3): 칩 줄 대신 고른 분야 한 줄, 누르면 시트(칩 줄 아님 — 분야 한 줄에 하나)", () => {
     const never = () => new Promise<never>(() => {});
     const api = { fetchNotes: never, addNote: vi.fn(), deleteNote: vi.fn(), editTodo: vi.fn(), deleteTodo: vi.fn() };
     render(
@@ -344,8 +344,11 @@ describe("네 화면의 칩 줄이 ChipScroller다(감싸는 .detail-chips가 �
         onMove={async () => true}
       />,
     );
-    const row = screen.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
-    expectScroller(row);
-    expect([...row.children].map((c) => c.textContent)).toEqual(["기타", "어학"]);
+    expect(screen.queryByRole("group", { name: "분야" })).toBeNull();
+    expect(document.querySelector(".chip-scroller")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "분야 기타" }));
+    const sheet = screen.getByRole("dialog", { name: "분야 고르기" });
+    expect(sheet.querySelector(".chip-scroller")).toBeNull();
+    expect(within(within(sheet).getByRole("list")).getAllByRole("button").map((c) => c.textContent)).toEqual(["어학", "기타"]);
   });
 });

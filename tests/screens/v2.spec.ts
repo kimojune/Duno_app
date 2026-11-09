@@ -590,11 +590,11 @@ for (const many of [false, true]) {
 // ---- 고침 5바퀴: 분야 칩 줄 한 줄 + 옆으로 넘김(명세 ⑦-1·④-2) — 타이머 · 할 일 자세히 · 처음 설정 ----
 // 분야 10개(긴 이름 하나)에서 줄 높이가 칩 하나 높이이고, 넘치면 「›」(칩 줄 밖 제 칸, 누름 48), 한 화면 폭씩 넘기고, 가로 넘침이 없다
 const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (page: Page) => Promise<void> }[] = [
-  { id: "timer", state: "timer-many", group: "분야 (고르지 않으면 기타)" },
+  { id: "timer", state: "timer-many", group: "분야" },
   {
     id: "detail",
     state: "detail-many",
-    group: "분야 (고르지 않으면 기타)",
+    group: "분야",
     prepare: async (page) => {
       await page.locator("#dev-open-window").click();
       await expect(page.getByRole("dialog")).toBeVisible();
@@ -624,7 +624,7 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
   {
     id: "evening-todo-sheet",
     state: "evening-todo-many",
-    group: "분야 (고르지 않으면 기타)",
+    group: "분야",
     prepare: async (page) => {
       await page.getByRole("button", { name: /^오늘 할 일 2\/4/ }).click();
       const sheet = page.getByRole("dialog", { name: "오늘 할 일" });

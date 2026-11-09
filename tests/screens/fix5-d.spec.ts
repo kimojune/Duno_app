@@ -82,7 +82,7 @@ test("처음 설정 목표 비율 · 할 일(적는 창 칩 줄) · 내 정보",
   await expect(page.getByText("합계 100%")).toBeVisible();
   await photo(page, "처음설정-목표비율");
   await open(page, "/dev/states?s=C24&sheet=open");
-  const row = page.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
+  const row = page.getByRole("group", { name: "분야" });
   await expect(row).toBeVisible();
   await noOverflow(page);
   await photo(page, "할일-적는창-칩줄");

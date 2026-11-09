@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { CATEGORY_LIMIT, CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
+import { categoryColorValue } from "../lib/category-color";
 import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
@@ -31,9 +32,16 @@ export const TODO_TEXT = {
   label: "할 일 적기",
   add: "적기",
   unreadable: "읽을 수 없는 할 일", // (임시)
-  empty1: "오늘 적은 할 일이 없어요.",
-  emptyClosed: "아래 단추를 눌러 적어 보세요.", // C3 창 닫힘
-  emptyOpen: "아래 칸에 적어 보세요.", // C3 창 열림
+  empty1: "오늘 적은 할 일이 없어요.", // 고침9: 화면 읽기용으로만(보이는 빈 목록은 아래 예시 — 명세 ⑬ 9, Figma 50:28)
+  // 고침9 ⑬ 9: 빈 목록 = 이름표 「예시」 + 흐린 예시 할 일 줄 둘(옛 「아래 단추를 눌러 적어 보세요.」 대신). 누를 수 없고 목록·개수에 안 섞인다
+  exampleLabel: "예시",
+  examples: [
+    // colorOrder: 분야 색 순서(0부터) — Figma 50:28의 점 색(어학 = 분야 색 2, 포트폴리오 = 분야 색 1)
+    { text: "토익 단어 50개", category: "어학", colorOrder: 1 },
+    { text: "포트폴리오 2장 고치기", category: "포트폴리오", colorOrder: 0 },
+  ],
+  /** 고침9 PM 2-B: 할 일 글 바로 뒤 종이 아이콘의 화면 읽기 이름(옛 글 「기록 있음」) */
+  hasNotes: "작업 기록 있음",
   saving: "저장하는 중",
   saveFailed: "저장하지 못했어요.",
   queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절)
@@ -67,7 +75,9 @@ export const TODO_TEXT = {
   addButtonResume: "적던 글 이어 적기", // 남은 글이 있을 때(12-5)
   sheetClose: "닫기",
   sheetCloseName: "적는 창 닫기", // 보이는 「닫기」를 품는 접근 이름(2.5.3)
-  categoryLabel: "분야 (고르지 않으면 기타)",
+  // 고침9 ⑬ 12(PM 7): 이름표만 「분야」. 「고르지 않으면 기타」는 글 대신 맨 앞 「기타」 칩이 골라진 모양으로(④-2)
+  categoryLabel: "분야",
+  other: "기타",
   addCategoryChip: "+ 분야",
   newCategoryLabel: "새 분야 이름",
   addCategory: "더하기",
@@ -161,6 +171,8 @@ export type RowView = {
   checkFailed: boolean;
   /** 분야 표시 글(CategoryTag). null이면 기타라 붙이지 않는다. 풀 수 없는 분야는 TODO_TEXT.unreadableCategory */
   category?: string | null;
+  /** 작업 기록이 하나라도 있으면 true: 할 일 글 바로 뒤에 종이 아이콘(고침9 PM 2-B) */
+  hasNotes?: boolean;
 };
 
 /** 칩 하나(풀 수 있는 이름만. 풀 수 없는 분야는 칩에 보이지 않는다, 12-7) */
@@ -267,6 +279,60 @@ function CheckIcon() {
   );
 }
 
+/**
+ * 고침9 PM 2-B: 작업 기록이 있는 할 일의 종이 아이콘(16, 먹남색 1.5px 선 — Figma 76:430 그대로). 할 일 글 바로 뒤 6px(CSS .todo-note-icon).
+ * 그림만이라 화면 읽기 이름을 단다(1.1.1). 체크 칸의 이름(할 일 글)에는 섞지 않고 설명(aria-describedby)으로 잇는다.
+ */
+export function NoteIcon({ id }: { id: string }) {
+  return (
+    <svg id={id} className="todo-note-icon" width={16} height={16} viewBox="0 0 16 16" role="img" aria-label={TODO_TEXT.hasNotes} focusable="false">
+      <path
+        d="M13.25 5L9.75 1.5H2.75V14.5H13.25V5ZM9.75 1.5V5H13.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * 고침9 ⑬ 9: 빈 목록의 예시(Figma 50:28 · 91:664). 이름표 「예시」 + 흐린 예시 할 일 줄 둘.
+ * 흐림(40%)은 모양(체크 점선·분야 점·줄 바탕·구분선)에만, 글은 보조 글 색(d-125). 누를 것이 없고(체크 칸은 그림),
+ * 화면 읽기에서는 「예시」 묶음으로 읽힌다. 실제 목록(.todo-list의 줄)·「n개 중 n개」 셈에 들어가지 않는다.
+ */
+export function TodoExamples() {
+  return (
+    <section className="todo-example" aria-labelledby="todo-example-label">
+      <p id="todo-example-label" className="todo-example-label">
+        {TODO_TEXT.exampleLabel}
+      </p>
+      <ul className="todo-example-list">
+        {TODO_TEXT.examples.map((example) => (
+          <li key={example.text} className="todo-example-row">
+            <span className="todo-example-check" aria-hidden="true" />
+            <div className="todo-body">
+              <p className="todo-example-text">
+                <span className="sr-only">{`${TODO_TEXT.exampleLabel}: `}</span>
+                {example.text}
+              </p>
+              <div className="category-tag-line todo-example-tag">
+                <span className="todo-example-dot" style={{ background: categoryColorValue(example.colorOrder) }} aria-hidden="true" />
+                <span className="category-tag">
+                  <span className="sr-only">{TODO_TEXT.categoryPrefix}</span>
+                  {example.category}
+                </span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** 목록 줄의 분야 표시. 기타(분야 없음)는 붙이지 않는다. 화면 읽기용으로 앞에 「분야 」 */
 export function CategoryTag({ id, name }: { id: string; name: string }) {
   return (
@@ -289,9 +355,10 @@ function Row({
   const textId = `todo-text-${row.id}`;
   const statusId = `todo-status-${row.id}`;
   const tagId = `todo-tag-${row.id}`;
+  const noteId = `todo-note-${row.id}`;
   // 저장 중·저장 못 한 줄은 서버에 아직 없다: 체크 칸은 보이되 눌러도 바뀌지 않고, 그 줄의 안내에 잇는다
   const notSaved = row.saving || row.failed || row.queued === true;
-  const describedBy = [row.category ? tagId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
+  const describedBy = [row.category ? tagId : null, row.hasNotes ? noteId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
   return (
     <li className="todo-row" id={`row-${row.id}`}>
       <label className="check-hit">
@@ -306,8 +373,10 @@ function Row({
         <span className="check-box" aria-hidden="true" />
       </label>
       <div className="todo-body">
-        <p id={textId} className={row.done ? "todo-text is-done" : "todo-text"}>
-          {row.text ?? TODO_TEXT.unreadable}
+        {/* 고침9 PM 2-B: 아이콘은 글과 같은 줄 흐름 안(글이 줄을 넘기면 마지막 줄 끝에 붙는다). 체크 칸 이름은 글 span만 */}
+        <p className={row.done ? "todo-text is-done" : "todo-text"}>
+          <span id={textId}>{row.text ?? TODO_TEXT.unreadable}</span>
+          {row.hasNotes && <NoteIcon id={noteId} />}
         </p>
         {/* C-D6: 저장 중 줄에도 분야 표시를 바로 그린다 */}
         {row.category && <CategoryTag id={tagId} name={row.category} />}
@@ -387,6 +456,28 @@ export function CategoryChip({ chip, pressed, onToggle }: { chip: ChipView; pres
   );
 }
 
+/**
+ * 고침9 ⑬ 12·13(④-2): 분야를 고르지 않아도 되는 칩 줄 맨 앞 「기타」. 아무것도 안 고르면 골라진 모양으로 시작한다.
+ * 누르면 고른 분야가 풀려 기타(분야 없음 = 저장 값 null)로 돌아간다. 분야 행을 만들지 않는다(「+ 분야」와 다르다).
+ */
+export function OtherChip({ pressed, onSelect }: { pressed: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      className="chip"
+      aria-pressed={pressed}
+      onClick={onSelect}
+      onFocus={(e) => e.currentTarget.scrollIntoView?.({ inline: "nearest", block: "nearest" })}
+      data-chip-id="other"
+    >
+      <span className="chip-face">
+        {pressed && <CheckIcon />}
+        <span className="chip-label">{TODO_TEXT.other}</span>
+      </span>
+    </button>
+  );
+}
+
 /** 칩 줄 맨 끝 「+ 분야」. 고르는 칩이 아니라 단추라 aria-pressed가 없다 */
 export function AddCategoryChip({ onOpen }: { onOpen: () => void }) {
   return (
@@ -429,6 +520,13 @@ export function CategoryChipRow(
   }
   return (
     <ChipScroller aria-labelledby="category-label">
+      {/* 「기타」를 누르면 고른 칩을 한 번 더 누른 것과 같다(고른 것이 풀려 기타). 이미 기타면 그대로 */}
+      <OtherChip
+        pressed={props.selectedCategoryId === null}
+        onSelect={() => {
+          if (props.selectedCategoryId !== null) props.onToggleChip(props.selectedCategoryId);
+        }}
+      />
       {props.chips.map((chip) => (
         <CategoryChip key={chip.id} chip={chip} pressed={chip.id === props.selectedCategoryId} onToggle={props.onToggleChip} />
       ))}
@@ -673,8 +771,8 @@ export function TodoView(props: TodoViewProps) {
         )}
         {list === "ready" && rows.length === 0 && (
           <div className="todo-empty">
-            <p>{TODO_TEXT.empty1}</p>
-            <p>{sheetOpen ? TODO_TEXT.emptyOpen : TODO_TEXT.emptyClosed}</p>
+            <p className="sr-only">{TODO_TEXT.empty1}</p>
+            <TodoExamples />
           </div>
         )}
         {rows.length > 0 && (

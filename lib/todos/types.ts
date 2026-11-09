@@ -22,10 +22,11 @@ export type TodoResult<T> = { ok: true; data: T } | { ok: false; error: TodoErro
 /**
  * 화면에 넘기는 할 일 하나. 풀 수 없는 행은 readable=false, text=null. createdAt은 ISO 문자열.
  * categoryId는 분야 번호(categories.id). null이면 「기타」(D-135).
+ * hasNotes는 작업 기록이 하나라도 있으면 true(고침9 PM 2-B 할 일 줄 아이콘). 없거나 모르면 싣지 않는다.
  */
 export type TodoItem =
-  | { id: string; readable: true; text: string; done: boolean; createdAt: string; categoryId: string | null }
-  | { id: string; readable: false; text: null; done: boolean; createdAt: string; categoryId: string | null };
+  | { id: string; readable: true; text: string; done: boolean; createdAt: string; categoryId: string | null; hasNotes?: boolean }
+  | { id: string; readable: false; text: null; done: boolean; createdAt: string; categoryId: string | null; hasNotes?: boolean };
 
 /** 두노 하루(서울 새벽 4시 경계)와 화면 날짜 글을 만들 재료. 예: 11월 5일 목요일 */
 export type TodoDay = {

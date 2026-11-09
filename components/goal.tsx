@@ -25,7 +25,7 @@ export const GOAL_TEXT = {
   set: "이번 주 목표 정하기",
   line: (target: number, done: number) => `이번 주 목표 ${formatMinutes(target)} 중 ${formatMinutes(done)}`,
   title: "이번 주 목표",
-  hint: "이번 주에 분야마다 쓰고 싶은 시간을 1시간 단위로 정해요. 0시간은 목표에 넣지 않아요.",
+  hint: "1시간 단위 · 0시간은 목표에 안 넣음", // 고침9 ⑬ 14(Figma 91:668)
   hours: "시간",
   total: (h: number) => `합계 ${h}시간`,
   over: (max: number) => `한 주는 ${max}시간까지예요.`,

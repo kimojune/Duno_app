@@ -114,9 +114,11 @@ export async function listTodosWindow(deps: TodoDeps, fromDay: string, toDay: st
       .order("id", { ascending: true })
       .limit(MIRROR_TODO_LIMIT);
     if (error) return fail(mapDbError(error));
-    const todos = ((data ?? []) as TodoRow[]).map((row): MirrorTodo => {
+    const rows = (data ?? []) as TodoRow[];
+    const withNotes = await todoIdsWithNotes(deps, user.data, rows.map((row) => row.id));
+    const todos = rows.map((row): MirrorTodo => {
       const opened = decryptTodoText(row.text_encrypted, user.data, key);
-      return {
+      const todo: MirrorTodo = {
         id: row.id,
         day: row.day,
         text: opened.ok ? opened.text : null,
@@ -125,10 +127,38 @@ export async function listTodosWindow(deps: TodoDeps, fromDay: string, toDay: st
         categoryId: row.category_id ?? null,
         position: row.position ?? null,
       };
+      return withNotes?.has(row.id) ? { ...todo, hasNotes: true } : todo;
     });
     return { ok: true, data: todos };
   } catch {
     return fail("unavailable");
+  }
+}
+
+/** 작업 기록이 있는지 묻는 할 일 번호 한 번의 개수(요청 주소 길이를 넘기지 않게 나눈다) */
+const NOTE_LOOKUP_CHUNK = 100;
+
+/**
+ * 고침9 PM 2-B(할 일 줄 작업 기록 아이콘): 받은 할 일 가운데 작업 기록(todo_notes)이 하나라도 있는 할 일 번호.
+ * 내 것만 읽는다(user_id = 세션 사용자, RLS도 같은 규칙). 기록 글은 읽지 않고 번호만. 새 입구·새 표 없음.
+ * 못 읽으면 null — 아이콘을 그리지 않을 뿐 목록 읽기는 그대로 성공한다.
+ */
+async function todoIdsWithNotes(deps: TodoDeps, userId: string, todoIds: string[]): Promise<Set<string> | null> {
+  if (todoIds.length === 0) return new Set();
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < todoIds.length; i += NOTE_LOOKUP_CHUNK) chunks.push(todoIds.slice(i, i + NOTE_LOOKUP_CHUNK));
+    const results = await Promise.all(
+      chunks.map((ids) => deps.supabase.from("todo_notes").select("todo_id").eq("user_id", userId).in("todo_id", ids)),
+    );
+    const found = new Set<string>();
+    for (const { data, error } of results) {
+      if (error) return null;
+      for (const row of (data ?? []) as { todo_id: string }[]) found.add(row.todo_id);
+    }
+    return found;
+  } catch {
+    return null;
   }
 }
 
@@ -144,7 +174,12 @@ async function readTodosOfDay(deps: TodoDeps, userId: string, key: TodoKey, day:
     if (error) return fail(mapDbError(error));
 
     // 읽는 쿼리는 created_at·id 순 그대로 두고, 순서를 정한 행(position)만 앞으로 안정 정렬한다
-    const todos = sortByPosition((data ?? []) as TodoRow[]).map((row) => toItem(row, userId, key));
+    const rows = sortByPosition((data ?? []) as TodoRow[]);
+    const withNotes = await todoIdsWithNotes(deps, userId, rows.map((row) => row.id));
+    const todos = rows.map((row) => {
+      const item = toItem(row, userId, key);
+      return withNotes?.has(row.id) ? { ...item, hasNotes: true } : item;
+    });
     return { ok: true, data: { day: describeTodoDay(day), todos } };
   } catch {
     return fail("unavailable");

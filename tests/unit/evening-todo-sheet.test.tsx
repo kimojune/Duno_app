@@ -361,8 +361,10 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     expect(label.textContent).toBe("할 일");
     expect(label.className).not.toContain("sr-only");
     expect(input.getAttribute("placeholder")).toBeNull();
-    const chips = within(sheet()).getByRole("group", { name: "분야 (고르지 않으면 기타)" });
-    expect(within(chips).getAllByRole("button").map((b) => b.textContent)).toEqual(["어학", "포트폴리오"]);
+    const chips = within(sheet()).getByRole("group", { name: "분야" });
+    // 고침9 ④-2: 맨 앞 「기타」가 골라진 채 시작
+    expect(within(chips).getAllByRole("button").map((b) => b.textContent)).toEqual(["기타", "어학", "포트폴리오"]);
+    expect(within(chips).getAllByRole("button").map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
 
     fireEvent.change(input, { target: { value: "  면접 준비  " } });
     fireEvent.click(within(chips).getByRole("button", { name: "포트폴리오" }));
