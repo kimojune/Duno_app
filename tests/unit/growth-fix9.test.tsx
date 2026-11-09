@@ -453,7 +453,7 @@ describe("S6 빈 상태(Figma 50:598 · 111:79 · 121:240): 카드 밖 안내 �
     const zero = rule(".growth-band.is-zero");
     expect(zero).toContain("background: var(--color-notice-bg)");
     expect(zero).toContain("border: 1px dashed var(--color-border-input)");
-    expect(rule(".growth-zero-label")).toContain("color: var(--color-text-sub)");
+    expect(rule(".growth-seg-label.growth-zero-label")).toContain("color: var(--color-text-sub)"); // 실제 칠해진 색은 screens fix9에서
     expect(rule(".growth-seg-label")).toContain("font: 500 12px/16px var(--font-family)");
     expect(rule(".growth-band")).toContain("block-size: 36px");
     expect(rule(".growth-graph.is-empty .growth-band")).toContain("block-size: 28px");

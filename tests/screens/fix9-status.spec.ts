@@ -292,7 +292,7 @@ test("S6-2 목표 비율 뷰 · 띠그래프(처음 보기) (Figma 50:193) — �
   await expect(menu).toHaveCount(0);
   await expect(chip).toBeFocused();
   await expect(page.getByRole("button", { name: "기간, 총 시간" })).toHaveText("총 시간 ▾");
-  await expect(page.locator(".growth-card-total")).toHaveText("60시간");
+  await expect(page.locator(".growth-card-total")).toHaveText("79시간"); // 화면 모음 GOAL_GROWTH 쌓인 시간 4,740분
 
   // 키보드: Enter로 열고 ↓·Enter로 고르기, Esc는 고르지 않고 닫기
   await page.keyboard.press("Enter");

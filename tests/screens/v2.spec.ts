@@ -471,7 +471,7 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
     await noHorizontalScroll(page, "분야 50개 원그래프");
     await insideViewport(page, "svg.growth-pie", "원");
-    await page.getByRole("button", { name: "총 시간" }).click();
+    await pickPeriod(page, "총 시간");
     await noHorizontalScroll(page, "분야 50개 총 시간");
     // 꺾쇠 이름은 글자로 보인다(요소가 되지 않는다)
     expect(await page.locator("img[src='x']").count()).toBe(0);
