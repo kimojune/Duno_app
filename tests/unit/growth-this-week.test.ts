@@ -6,7 +6,7 @@ import { buildStatusChart } from "../../lib/growth/status-chart";
 import { deriveGrowth } from "../../lib/local/derive";
 import { emptyMirror } from "../../lib/local/reduce";
 import type { Mirror } from "../../lib/local/types";
-import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
+import { encryptCategoryName, encryptTodoText, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
 
 /**
@@ -144,5 +144,67 @@ describe("서버 경로와 기기 먼저 저장 경로가 같은 이번 주 값�
     expect(lastMinute.ok && lastMinute.data.thisWeek.find((t) => t.categoryId === C1)?.minutes).toBe(90); // 11-09(다음 주)는 빠짐
     expect(firstMinute.ok && firstMinute.data.thisWeek).toEqual([{ categoryId: C1, minutes: 20 }]); // 새 주: 11-09만
     expect(firstMinute.ok && firstMinute.data.loggedDaysThisWeek).toBe(1);
+  });
+});
+
+// ---- 상태보기 맨 위 목표 한 줄(원샷 v2 고침5, PM 8): 새 서버 입구 없이 지금 세션의 설정 읽기(readSettingsForUser)에서 온다 ----
+describe("목표 한 줄(goalText): 서버 경로와 기기 먼저 저장 경로가 같은 값을 낸다", () => {
+  const GOAL = "올해 안에 토익 900점 넘기기";
+  const AT = new Date("2026-11-07T03:00:00.000Z");
+  const OTHER_USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const withGoal = (owner: string, text: string, key = KEY!) => {
+    const store = serverStore();
+    store.seed("user_settings", {
+      user_id: owner,
+      goal_encrypted: encryptTodoText(text, owner, key, "goal_text"),
+      onboarding_done_at: "2026-11-01T00:00:00.000Z",
+      notify_evening_enabled: false,
+      notify_evening_minute: 1170,
+      notify_morning_enabled: false,
+      notify_morning_minute: 600,
+    });
+    return store;
+  };
+
+  it("내 설정의 목표 한 문장을 복호화해 그대로 준다(서버) · 기기에 둔 설정의 같은 값(기기)", async () => {
+    const server = await readGrowthForUser({ supabase: fakeTablesClient(withGoal(ME, GOAL), { sub: ME }), key: KEY, now: () => AT });
+    expect(server.ok && server.data.goalText).toBe(GOAL);
+    const m = deviceMirror();
+    const device = deriveGrowth({ ...m, settings: { ...m.settings!, goal: GOAL } }, AT.getTime());
+    expect(device.ok && device.data.goalText).toBe(GOAL);
+  });
+
+  it("목표가 없으면(설정 행 없음·기기 설정 goal null) 둘 다 null", async () => {
+    const server = await readGrowthForUser({ supabase: fakeTablesClient(serverStore(), { sub: ME }), key: KEY, now: () => AT });
+    expect(server.ok).toBe(true);
+    expect(server.ok && server.data.goalText).toBeNull();
+    const device = deriveGrowth(deviceMirror(), AT.getTime());
+    expect(device.ok && device.data.goalText).toBeNull();
+    expect(computeGrowth({ today: "2026-11-07", logs: [], categories: [], ratios: [], goalItems: null }).goalText).toBeNull();
+  });
+
+  it("다른 사용자의 세션으로 읽으면 내 목표 글이 나오지 않는다(세션 user id로만 읽는다)", async () => {
+    const store = withGoal(ME, GOAL);
+    const asOther = await readGrowthForUser({ supabase: fakeTablesClient(store, { sub: OTHER_USER }), key: KEY, now: () => AT });
+    expect(asOther.ok).toBe(true);
+    expect(asOther.ok && asOther.data.goalText).toBeNull();
+    // 같은 저장소를 내 세션으로 읽으면 나온다(대비)
+    const asMe = await readGrowthForUser({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY, now: () => AT });
+    expect(asMe.ok && asMe.data.goalText).toBe(GOAL);
+  });
+
+  it("남의 user id에 묶어 암호화한 글을 내 행에 옮겨 넣어도 풀리지 않는다(AAD = 사용자 + 용도) → null", async () => {
+    const store = serverStore();
+    store.seed("user_settings", {
+      user_id: ME,
+      goal_encrypted: encryptTodoText(GOAL, OTHER_USER, KEY!, "goal_text"),
+      onboarding_done_at: null,
+      notify_evening_enabled: false,
+      notify_evening_minute: 1170,
+      notify_morning_enabled: false,
+      notify_morning_minute: 600,
+    });
+    const res = await readGrowthForUser({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY, now: () => AT });
+    expect(res.ok && res.data.goalText).toBeNull();
   });
 });

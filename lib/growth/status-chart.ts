@@ -1,4 +1,5 @@
 import type { RatioItem } from "../settings/types";
+import { goalProgress } from "../goals/validation";
 import { barPercents, shortfallByGoal, shortfallByRatio, type CategoryMinutes, type ShortfallBasis } from "./logic";
 
 /**
@@ -230,4 +231,116 @@ export function pieSlices(line: { categoryId: ChartCategoryId; percent: number }
     const to = acc / 100;
     return { categoryId: p.categoryId, percent: p.percent, from, to, d: arcPath(from, to, radius) };
   });
+}
+
+/** 조각 % 글을 조각 안에 둘 가장 작은 % (이보다 작으면 가는 이끌 선으로 원 밖에, 명세 ③-S ② 5 「약 8% 미만」) */
+export const PIE_LABEL_INSIDE_MIN = 8;
+
+export type PieLabel = {
+  categoryId: ChartCategoryId;
+  percent: number;
+  /** 글 자리(가운데 (0,0) 기준) */
+  x: number;
+  y: number;
+  inside: boolean;
+  /** 원 밖 글의 이끌 선(원 둘레 → 글 앞). 조각 안 글이면 null */
+  leader: { x1: number; y1: number; x2: number; y2: number } | null;
+  /** 글 맞춤: 조각 안은 가운데, 원 밖은 오른쪽 반이면 start, 왼쪽 반이면 end */
+  anchor: "start" | "middle" | "end";
+};
+
+/**
+ * 원그래프 조각마다 % 글 자리(원샷 v2 고침5, 명세 ③-S ② 5). 0% 조각은 글이 없다.
+ * 넓은 조각(PIE_LABEL_INSIDE_MIN 이상)은 조각 가운데 각도의 반지름 0.62 자리에, 작은 조각은 원 밖(반지름 1.2)에 두고 둘레에서 이끌 선을 긋는다.
+ */
+export function pieLabels(slices: PieSlice[], radius = 100): PieLabel[] {
+  return slices
+    .filter((s) => s.percent > 0)
+    .map((s) => {
+      const mid = (s.from + s.to) / 2;
+      const inside = s.percent >= PIE_LABEL_INSIDE_MIN;
+      const fixed = (n: number) => Number(n.toFixed(2));
+      if (inside) {
+        const [x, y] = polarPoint(mid, radius * 0.62);
+        return { categoryId: s.categoryId, percent: s.percent, x: fixed(x), y: fixed(y), inside, leader: null, anchor: "middle" as const };
+      }
+      const [x1, y1] = polarPoint(mid, radius);
+      const [x2, y2] = polarPoint(mid, radius * 1.12);
+      const [x, y] = polarPoint(mid, radius * 1.2);
+      return {
+        categoryId: s.categoryId,
+        percent: s.percent,
+        x: fixed(x),
+        y: fixed(y),
+        inside,
+        leader: { x1: fixed(x1), y1: fixed(y1), x2: fixed(x2), y2: fixed(y2) },
+        anchor: x >= 0 ? ("start" as const) : ("end" as const),
+      };
+    });
+}
+
+// ── 이번 주 목표 뷰(분야별 막대) ─────────────────────────────────────────────
+
+export type GoalRow = {
+  categoryId: ChartCategoryId;
+  /** 이번 주 쓴 시간(분) */
+  spentMinutes: number;
+  /** 그 분야 목표(분). 목표가 없으면(기타 포함) null */
+  goalMinutes: number | null;
+  /** 목표까지 남은 시간(분). 목표가 없거나 닿았으면 0 */
+  remainingMinutes: number;
+  /** 채움 길이(0~100, 축 = axisMinutes) */
+  fillPercent: number;
+  /** 목표 눈금 자리(0~100). 목표가 없으면 null */
+  tickPercent: number | null;
+};
+
+export type GoalChart = {
+  /** 「목표 {target} 중 {done}」 — lib/goals goalProgress와 같은 계산(분야마다 min(쓴 시간, 목표)의 합) */
+  targetMinutes: number;
+  doneMinutes: number;
+  /** 축: 이 화면 분야 줄 가운데 가장 큰 값(목표·쓴 시간 중). 줄이 없거나 모두 0이면 0 */
+  axisMinutes: number;
+  /** 분야 줄. 순서 = 분야를 만든 순서(categoryIds 순서), 기타 맨 끝(PM 8·d-110) */
+  rows: GoalRow[];
+};
+
+/**
+ * 이번 주 목표 뷰의 계산(원샷 v2 고침5, 명세 ③-S ①). 화면 글은 짓지 않는다.
+ * - 줄: 보이는 분야 가운데 목표가 있거나(0분이어도) 이번 주에 쓴 시간이 있는 분야, 만든 순서. 기타는 쓴 시간이 있을 때만 맨 끝(기타는 목표에 넣지 않는다).
+ * - 「목표 n 중 n」은 goalProgress(lib/goals/validation.ts) 그대로 — 할 일 탭의 이번 주 목표 한 줄과 같은 값이다.
+ * - 이상한 값(음수·NaN·무한·소수)은 0 이상의 정수 분으로 고쳐 읽는다.
+ */
+export function buildGoalChart(args: { categoryIds: string[]; goalItems: CategoryMinutes[]; totals: CategoryMinutes[] }): GoalChart {
+  const ids: string[] = [];
+  for (const id of args.categoryIds) if (typeof id === "string" && !ids.includes(id)) ids.push(id);
+  const goal = new Map<ChartCategoryId, number>();
+  for (const g of args.goalItems) if (g.categoryId !== null) goal.set(g.categoryId, (goal.get(g.categoryId) ?? 0) + clean(g.minutes));
+  const spent = new Map<ChartCategoryId, number>();
+  for (const t of args.totals) spent.set(t.categoryId, (spent.get(t.categoryId) ?? 0) + clean(t.minutes));
+
+  const picked: { categoryId: ChartCategoryId; spentMinutes: number; goalMinutes: number | null }[] = [];
+  for (const id of ids) {
+    const g = goal.get(id) ?? 0;
+    const s = spent.get(id) ?? 0;
+    if (g > 0 || s > 0) picked.push({ categoryId: id, spentMinutes: s, goalMinutes: g > 0 ? g : null });
+  }
+  const other = spent.get(null) ?? 0;
+  if (other > 0) picked.push({ categoryId: null, spentMinutes: other, goalMinutes: null });
+
+  const axisMinutes = Math.max(0, ...picked.map((r) => Math.max(r.spentMinutes, r.goalMinutes ?? 0)));
+  const pct = (v: number) => (axisMinutes > 0 ? Number(((v / axisMinutes) * 100).toFixed(3)) : 0);
+  // 할 일 탭의 이번 주 목표 한 줄(components/goal.tsx GoalLine)과 같은 함수·같은 입력: 값이 갈리지 않게 그대로 넘긴다
+  const progress = goalProgress(args.goalItems, args.totals);
+  return {
+    targetMinutes: progress.targetMinutes,
+    doneMinutes: progress.doneMinutes,
+    axisMinutes,
+    rows: picked.map((r) => ({
+      ...r,
+      remainingMinutes: r.goalMinutes === null ? 0 : Math.max(0, r.goalMinutes - r.spentMinutes),
+      fillPercent: pct(r.spentMinutes),
+      tickPercent: r.goalMinutes === null ? null : pct(r.goalMinutes),
+    })),
+  };
 }

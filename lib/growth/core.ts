@@ -47,6 +47,8 @@ export async function readGrowthForUser(deps: GrowthDeps): Promise<RecordResult<
         categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
         ratios: settings.data.ratios,
         goalItems: goal.data,
+        // 목표 한 문장: 위에서 읽은 설정(지금 세션 사용자, readSettingsForUser가 복호화)을 그대로 쓴다. 새 읽기 길을 만들지 않는다
+        goalText: settings.data.goal,
       }),
     };
   } catch {

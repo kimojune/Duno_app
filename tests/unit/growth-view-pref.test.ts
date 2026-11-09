@@ -2,52 +2,93 @@ import { describe, expect, it, vi } from "vitest";
 import { createLocalApis } from "../../lib/local/apis";
 import { createMemoryKv, kvKeys, wipeOtherUsers, wipeUser, type KvStore } from "../../lib/local/kv";
 import { createRuntime } from "../../lib/local/runtime";
-import { DEFAULT_STATUS_PREF, parseStatusPref, STATUS_PREF_NAME } from "../../lib/growth/status-view-pref";
+import { DEFAULT_STATUS_PREF, initialStatusTab, parseStatusPref, STATUS_PREF_NAME, STATUS_TABS } from "../../lib/growth/status-view-pref";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const VIEWS = ["band", "pie", "rows"];
+/** 목표 비율 뷰의 보기 목록(고침5: 띠그래프·원그래프. 분야별 막대는 이번 주 목표 뷰로 옮겼다) */
+const VIEWS = ["band", "pie"];
+const NO_TAB = { tab: null, tabWeek: null };
+const WEEK = "2026-11-02";
 
 describe("parseStatusPref: 기기 저장소의 값은 믿지 않는다", () => {
-  it("처음 값은 이번 주 · 분야별 줄 막대(PM 확정 11-09)", () => {
-    expect(DEFAULT_STATUS_PREF).toEqual({ period: "week", view: "rows" });
+  it("처음 값은 이번 주 · 띠그래프(목표 비율 뷰의 처음 보기, PM d-102) · 고른 탭 없음", () => {
+    expect(DEFAULT_STATUS_PREF).toEqual({ period: "week", view: "band", tab: null, tabWeek: null });
     expect(parseStatusPref(undefined, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
   });
-  it("이미 기억된 보기는 그대로 존중한다: 이전 판에서 고른 띠그래프·원그래프는 처음 값(줄 막대)으로 바뀌지 않는다", () => {
-    expect(parseStatusPref({ period: "week", view: "band" }, VIEWS)).toEqual({ period: "week", view: "band" });
-    expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie" });
+  it("이미 기억된 보기는 그대로 존중한다: 이전 판에서 고른 원그래프는 처음 값(띠)으로 바뀌지 않는다", () => {
+    expect(parseStatusPref({ period: "week", view: "band" }, VIEWS)).toEqual({ period: "week", view: "band", ...NO_TAB });
+    expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie", ...NO_TAB });
+  });
+  it("이전 판의 「분야별 줄 막대」(rows)는 목표 비율 뷰에서 띠그래프로 읽는다(목록에 rows가 다시 생기면 rows 그대로)", () => {
+    expect(parseStatusPref({ period: "total", view: "rows" }, VIEWS)).toEqual({ period: "total", view: "band", ...NO_TAB });
+    expect(parseStatusPref({ period: "total", view: "rows" }, ["pie"])).toEqual({ period: "total", view: "pie", ...NO_TAB }); // 띠가 목록에 없으면 첫 보기
+    expect(parseStatusPref({ period: "total", view: "rows" }, ["band", "pie", "rows"]).view).toBe("rows");
   });
   it("옛 기간 값 「recent」(최근 1주에 해당하던 값)는 「이번 주」로 읽는다. 보기 방식은 그대로 살린다", () => {
-    expect(parseStatusPref({ period: "recent", view: "band" }, VIEWS)).toEqual({ period: "week", view: "band" });
-    expect(parseStatusPref({ period: "recent", view: "rows" }, VIEWS)).toEqual({ period: "week", view: "rows" });
-    expect(parseStatusPref({ period: "recent", view: "nope" }, VIEWS)).toEqual({ period: "week", view: "rows" });
+    expect(parseStatusPref({ period: "recent", view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie", ...NO_TAB });
+    expect(parseStatusPref({ period: "recent", view: "rows" }, VIEWS)).toEqual({ period: "week", view: "band", ...NO_TAB });
+    expect(parseStatusPref({ period: "recent", view: "nope" }, VIEWS)).toEqual({ period: "week", view: "band", ...NO_TAB });
   });
-  it("옛 기간 이름의 모양만 받는다: 객체 기본 속성 이름(toString·__proto__ 등)은 옛 값으로 읽지 않는다", () => {
-    for (const period of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
-      expect(parseStatusPref({ period, view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie" });
+  it("옛 이름의 모양만 받는다: 객체 기본 속성 이름(toString·__proto__ 등)은 옛 기간·보기 값으로 읽지 않는다", () => {
+    for (const name of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+      expect(parseStatusPref({ period: name, view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie", ...NO_TAB });
+      expect(parseStatusPref({ period: "total", view: name }, VIEWS)).toEqual({ period: "total", view: "band", ...NO_TAB });
+      expect(parseStatusPref({ period: "total", view: "pie", tab: name, tabWeek: WEEK }, VIEWS)).toEqual({ period: "total", view: "pie", ...NO_TAB });
     }
   });
-  it("알아볼 수 있는 값은 그대로 읽는다", () => {
-    expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie" });
-    expect(parseStatusPref({ period: "compare", view: "rows" }, VIEWS)).toEqual({ period: "compare", view: "rows" });
+  it("알아볼 수 있는 값은 그대로 읽는다(고른 탭과 그 주 포함)", () => {
+    expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie", ...NO_TAB });
+    expect(parseStatusPref({ period: "compare", view: "band", tab: "goal", tabWeek: WEEK }, VIEWS)).toEqual({ period: "compare", view: "band", tab: "goal", tabWeek: WEEK });
+    expect(parseStatusPref({ period: "week", view: "pie", tab: "ratio", tabWeek: WEEK }, VIEWS)).toEqual({ period: "week", view: "pie", tab: "ratio", tabWeek: WEEK });
+  });
+  it("탭은 탭 이름과 날짜 모양의 주가 함께 있을 때만 읽는다(하나라도 이상하면 둘 다 버린다)", () => {
+    for (const bad of [
+      { tab: "goal" },
+      { tab: "goal", tabWeek: "11월 2일" },
+      { tab: "goal", tabWeek: 20261102 },
+      { tab: "rows", tabWeek: WEEK },
+      { tab: ["goal"], tabWeek: WEEK },
+      { tabWeek: WEEK },
+    ]) {
+      expect(parseStatusPref({ period: "total", view: "pie", ...bad }, VIEWS)).toEqual({ period: "total", view: "pie", ...NO_TAB });
+    }
   });
   it("모양이 다르면(null·글·숫자·배열) 처음 값", () => {
     for (const raw of [null, "recent", 7, [], [{ period: "total" }], true]) expect(parseStatusPref(raw, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
   });
   it("모르는 기간·보기 번호는 그 칸만 처음 값으로 돌리고 알아본 칸은 살린다", () => {
-    expect(parseStatusPref({ period: "year", view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie" });
-    expect(parseStatusPref({ period: "total", view: "sunburst" }, VIEWS)).toEqual({ period: "total", view: "rows" });
+    expect(parseStatusPref({ period: "year", view: "pie" }, VIEWS)).toEqual({ period: "week", view: "pie", ...NO_TAB });
+    expect(parseStatusPref({ period: "total", view: "sunburst" }, VIEWS)).toEqual({ period: "total", view: "band", ...NO_TAB });
     expect(parseStatusPref({ period: 1, view: { id: "pie" } }, VIEWS)).toEqual(DEFAULT_STATUS_PREF);
   });
   it("보기 목록에 새 보기를 더하면 그 번호도 읽히고, 목록에서 빠진 보기는 처음 값으로 돌아온다", () => {
     expect(parseStatusPref({ period: "week", view: "stack" }, [...VIEWS, "stack"]).view).toBe("stack");
-    expect(parseStatusPref({ period: "week", view: "rows" }, ["band", "pie"]).view).toBe("band"); // 목록에 줄 막대가 없으면 첫 보기
-    expect(parseStatusPref({ period: "week", view: "x" }, ["pie", "rows"]).view).toBe("rows"); // 목록에 처음 보기(줄 막대)가 있으면 그것
+    expect(parseStatusPref({ period: "week", view: "pie" }, ["band"]).view).toBe("band");
+    expect(parseStatusPref({ period: "week", view: "x" }, ["pie", "stack"]).view).toBe("pie"); // 목록에 처음 보기(띠)가 없으면 첫 보기
   });
-  it("별난 객체(__proto__·여분 칸)가 와도 두 칸만 읽는다", () => {
-    const raw = JSON.parse('{"__proto__":{"polluted":1},"period":"total","view":"rows","extra":"x"}');
-    expect(parseStatusPref(raw, VIEWS)).toEqual({ period: "total", view: "rows" });
+  it("별난 객체(__proto__·여분 칸)가 와도 네 칸만 읽는다", () => {
+    const raw = JSON.parse('{"__proto__":{"polluted":1},"period":"total","view":"pie","tab":"ratio","tabWeek":"2026-11-02","extra":"x"}');
+    expect(parseStatusPref(raw, VIEWS)).toEqual({ period: "total", view: "pie", tab: "ratio", tabWeek: WEEK });
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+describe("initialStatusTab: 처음 탭 규칙(명세 ③-S)", () => {
+  it("탭 순서는 이번 주 목표 → 목표 비율", () => {
+    expect(STATUS_TABS).toEqual(["goal", "ratio"]);
+  });
+  it("고른 탭이 없으면: 이번 주 목표를 세운 주 → goal, 세우지 않은 주 → ratio", () => {
+    expect(initialStatusTab(NO_TAB, WEEK, true)).toBe("goal");
+    expect(initialStatusTab(NO_TAB, WEEK, false)).toBe("ratio");
+  });
+  it("이 주에 고른 탭은 규칙보다 이긴다(목표가 있어도 ratio, 없어도 goal)", () => {
+    expect(initialStatusTab({ tab: "ratio", tabWeek: WEEK }, WEEK, true)).toBe("ratio");
+    expect(initialStatusTab({ tab: "goal", tabWeek: WEEK }, WEEK, false)).toBe("goal");
+  });
+  it("다른 주에 고른 탭은 쓰지 않는다(주가 바뀌면 규칙대로)", () => {
+    expect(initialStatusTab({ tab: "ratio", tabWeek: "2026-10-26" }, WEEK, true)).toBe("goal");
+    expect(initialStatusTab({ tab: "goal", tabWeek: "2026-10-26" }, WEEK, false)).toBe("ratio");
   });
 });
 

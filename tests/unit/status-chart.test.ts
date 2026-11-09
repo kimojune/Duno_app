@@ -4,12 +4,16 @@ import {
   apportionPercents,
   arcPath,
   bandSegments,
+  buildGoalChart,
   buildStatusChart,
   drawablePieces,
   fillTimeFor,
+  PIE_LABEL_INSIDE_MIN,
+  pieLabels,
   pieSlices,
   polarPoint,
 } from "../../lib/growth/status-chart";
+import { goalProgress } from "../../lib/goals/validation";
 
 const A = "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0";
 const B = "b0b0b0b0-b0b0-4b0b-8b0b-b0b0b0b0b0b0";
@@ -485,5 +489,124 @@ describe("원그래프 조각 경로", () => {
     const whole = pieSlices([{ categoryId: A, percent: 100 }]);
     expect(whole[0].d).toBe(arcPath(0, 1));
     expect(pieSlices([{ categoryId: A, percent: 0 }])[0].d).toBeNull();
+  });
+});
+
+// ── 원샷 v2 고침5: 이번 주 목표 뷰 계산 · 원 조각 % 자리 ─────────────────────────
+
+describe("buildGoalChart(이번 주 목표 뷰, 명세 ③-S ①)", () => {
+  const goalItems = [
+    { categoryId: A, minutes: 300 },
+    { categoryId: B, minutes: 360 },
+    { categoryId: C, minutes: 180 },
+  ];
+  const totals = [
+    { categoryId: B, minutes: 720 },
+    { categoryId: A, minutes: 120 },
+    { categoryId: null, minutes: 60 },
+  ];
+
+  it("「목표 n 중 n」은 goalProgress(lib/goals)와 같은 값: 분야마다 min(쓴 시간, 목표)의 합", () => {
+    const chart = buildGoalChart({ categoryIds: [A, B, C], goalItems, totals });
+    expect(chart.targetMinutes).toBe(840);
+    expect(chart.doneMinutes).toBe(120 + 360 + 0);
+    expect({ targetMinutes: chart.targetMinutes, doneMinutes: chart.doneMinutes }).toEqual(goalProgress(goalItems, totals));
+  });
+
+  it("줄 순서 = 받은 분야 순서(만든 순서), 기타 맨 끝. 받은 순서를 바꾸면 줄 순서도 따라 바뀐다(남은 시간 순이 아니다)", () => {
+    expect(buildGoalChart({ categoryIds: [A, B, C], goalItems, totals }).rows.map((r) => r.categoryId)).toEqual([A, B, C, null]);
+    expect(buildGoalChart({ categoryIds: [C, B, A], goalItems, totals }).rows.map((r) => r.categoryId)).toEqual([C, B, A, null]);
+  });
+
+  it("줄 값: 남은 시간 = max(0, 목표 − 쓴 시간), 목표 없는 분야·기타는 goalMinutes null·눈금 없음", () => {
+    const rows = buildGoalChart({ categoryIds: [A, B, C], goalItems, totals }).rows;
+    expect(rows.map((r) => [r.spentMinutes, r.goalMinutes, r.remainingMinutes])).toEqual([
+      [120, 300, 180],
+      [720, 360, 0],
+      [0, 180, 180],
+      [60, null, 0],
+    ]);
+    expect(rows[3].tickPercent).toBeNull();
+  });
+
+  it("축 = 이 화면 분야 가운데 가장 큰 값(목표·쓴 시간 중): 채움·눈금 %가 그 축 위", () => {
+    const chart = buildGoalChart({ categoryIds: [A, B, C], goalItems, totals });
+    expect(chart.axisMinutes).toBe(720);
+    expect(chart.rows.map((r) => r.fillPercent)).toEqual([16.667, 100, 0, 8.333]);
+    expect(chart.rows.map((r) => r.tickPercent)).toEqual([41.667, 50, 25, null]);
+    // 목표가 쓴 시간보다 크면 목표가 축이 된다
+    const big = buildGoalChart({ categoryIds: [A], goalItems: [{ categoryId: A, minutes: 600 }], totals: [{ categoryId: A, minutes: 60 }] });
+    expect(big.axisMinutes).toBe(600);
+    expect(big.rows[0].fillPercent).toBe(10);
+    expect(big.rows[0].tickPercent).toBe(100);
+  });
+
+  it("목표도 쓴 시간도 없는 분야는 줄이 없고, 0분이라도 목표가 있으면 줄이 있다. 기타는 쓴 시간이 있을 때만", () => {
+    const chart = buildGoalChart({ categoryIds: [A, B, C], goalItems: [{ categoryId: C, minutes: 60 }], totals: [{ categoryId: A, minutes: 30 }] });
+    expect(chart.rows.map((r) => r.categoryId)).toEqual([A, C]);
+    expect(chart.rows[1]).toMatchObject({ spentMinutes: 0, goalMinutes: 60, fillPercent: 0 });
+  });
+
+  it("보이지 않는 분야(보관·이름 못 품)의 목표는 줄에는 없지만 「목표 n 중 n」에는 든다(할 일 탭 목표 한 줄과 같은 값)", () => {
+    const chart = buildGoalChart({ categoryIds: [A], goalItems: [{ categoryId: A, minutes: 60 }, { categoryId: GONE, minutes: 120 }], totals: [{ categoryId: GONE, minutes: 120 }] });
+    expect(chart.rows.map((r) => r.categoryId)).toEqual([A]);
+    expect(chart.targetMinutes).toBe(180);
+    expect(chart.doneMinutes).toBe(120);
+  });
+
+  it("빈 입력: 줄 없음, 축 0, 「목표 0 중 0」. 이상한 값(음수·NaN·무한)에도 예외 없이 0 이상", () => {
+    const empty = buildGoalChart({ categoryIds: [], goalItems: [], totals: [] });
+    expect(empty).toEqual({ targetMinutes: 0, doneMinutes: 0, axisMinutes: 0, rows: [] });
+    const odd = buildGoalChart({
+      categoryIds: [A, B],
+      goalItems: [{ categoryId: A, minutes: Number.NaN }, { categoryId: B, minutes: 120 }],
+      totals: [{ categoryId: A, minutes: -50 }, { categoryId: B, minutes: Number.POSITIVE_INFINITY }],
+    });
+    expect(odd.rows.map((r) => r.categoryId)).toEqual([B]);
+    expect(odd.rows[0]).toMatchObject({ spentMinutes: 0, goalMinutes: 120, remainingMinutes: 120 });
+    expect(odd.rows.every((r) => r.fillPercent >= 0 && r.fillPercent <= 100)).toBe(true);
+  });
+});
+
+describe("pieLabels(원 조각마다 %, 명세 ③-S ② 5)", () => {
+  it("0% 조각은 글이 없고, 8% 이상은 조각 안(가운데 맞춤·이끌 선 없음), 8% 미만은 원 밖 + 이끌 선", () => {
+    const slices = pieSlices([
+      { categoryId: A, percent: 60 },
+      { categoryId: B, percent: 0 },
+      { categoryId: C, percent: 8 },
+      { categoryId: null, percent: 7 },
+      { categoryId: GONE, percent: 25 },
+    ]);
+    const labels = pieLabels(slices, 100);
+    expect(labels.map((l) => l.categoryId)).toEqual([A, C, null, GONE]);
+    expect(labels.map((l) => l.inside)).toEqual([true, true, false, true]);
+    expect(PIE_LABEL_INSIDE_MIN).toBe(8);
+    const inside = labels[0];
+    expect(inside.anchor).toBe("middle");
+    expect(inside.leader).toBeNull();
+    expect(Math.hypot(inside.x, inside.y)).toBeCloseTo(62, 0);
+    const outside = labels[2];
+    expect(outside.leader).not.toBeNull();
+    expect(Math.hypot(outside.x, outside.y)).toBeCloseTo(120, 0);
+    expect(Math.hypot(outside.leader!.x1, outside.leader!.y1)).toBeCloseTo(100, 0); // 둘레에서 시작
+    expect(Math.hypot(outside.leader!.x2, outside.leader!.y2)).toBeCloseTo(112, 0);
+  });
+
+  it("원 밖 글은 원의 오른쪽 반이면 start, 왼쪽 반이면 end로 맞춘다(원과 겹치지 않게)", () => {
+    const right = pieLabels(pieSlices([{ categoryId: A, percent: 5 }, { categoryId: B, percent: 95 }]))[0];
+    expect(right.inside).toBe(false);
+    expect(right.x).toBeGreaterThan(0);
+    expect(right.anchor).toBe("start");
+    const left = pieLabels(pieSlices([{ categoryId: B, percent: 95 }, { categoryId: A, percent: 5 }]))[1];
+    expect(left.inside).toBe(false);
+    expect(left.x).toBeLessThan(0);
+    expect(left.anchor).toBe("end");
+  });
+
+  it("글 자리는 조각 가운데 각도: 12시에서 시작한 25% 조각의 글은 1시 반 방향", () => {
+    const [l] = pieLabels(pieSlices([{ categoryId: A, percent: 25 }, { categoryId: B, percent: 75 }]), 100);
+    expect(l.x).toBeGreaterThan(0);
+    expect(l.y).toBeLessThan(0);
+    expect(l.x).toBeCloseTo(-l.y, 1);
   });
 });
