@@ -14,7 +14,7 @@ import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
 import { BACK_HEADER_TEXT } from "./back-header";
 import { ChipScroller } from "./chip-scroller";
-import { helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
+import { CategoryChip, helpText, OtherChip, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -44,7 +44,6 @@ export const EVENING_TODO_TEXT = {
   inputLabel: "할 일",
   write: "더하기",
   categoryLabel: "분야",
-  other: "기타",
   empty: "오늘 적은 할 일이 없어요.",
   loading: "할 일을 불러오는 중",
   /** O-7: 적는 동안 「더하기」 busy + 「저장 중」(공통 글) */
@@ -180,34 +179,6 @@ export function EveningTodoLine({
 }
 
 type TodayState = ReturnType<typeof useTodayRead>;
-
-function SheetCheck() {
-  return (
-    <svg className="chip-check" width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
-/** 시트 「+ 할 일」의 분야 칩(색 점 + 이름, 고르면 체크 + 2px 테두리 — 나누기 칩 줄과 같은 꼴). id null = 기타 */
-function SheetChip({ id, name, color, pressed, onPress }: { id: string | null; name: string; color: string; pressed: boolean; onPress: () => void }) {
-  return (
-    <button
-      type="button"
-      className="chip"
-      aria-pressed={pressed}
-      data-chip-id={id ?? "other"}
-      onClick={onPress}
-      onFocus={(e) => e.currentTarget.scrollIntoView?.({ inline: "nearest", block: "nearest" })}
-    >
-      <span className="chip-face">
-        {pressed && <SheetCheck />}
-        <span className="chip-dot" style={{ background: color }} aria-hidden="true" />
-        <span className="chip-label">{name}</span>
-      </span>
-    </button>
-  );
-}
 
 function EveningTodoSheet({
   todos,
@@ -508,17 +479,10 @@ function EveningTodoSheet({
                 {EVENING_TODO_TEXT.categoryLabel}
               </span>
               <ChipScroller className="evening-chips" aria-labelledby="evening-todo-category-label">
-                {/* 맨 앞 「기타」 = 분야를 고르지 않음(저장 값 null). 처음에 골라져 있다 */}
-                <SheetChip id={null} name={EVENING_TODO_TEXT.other} color={categoryColorValue(null)} pressed={selected === null} onPress={() => setSelected(null)} />
-                {chips.map((chip) => (
-                  <SheetChip
-                    key={chip.id}
-                    id={chip.id}
-                    name={chip.name}
-                    color={categoryColorValue(order.get(chip.id) ?? 0)}
-                    pressed={chip.id === selected}
-                    onPress={() => setSelected((prev) => (prev === chip.id ? null : chip.id))}
-                  />
+                {/* 고침9 ④-2 · Figma 88:73: 맨 앞 「기타」(공용 OtherChip, 분야 없음 = 저장 값 null)가 골라진 채 시작 */}
+                <OtherChip pressed={selected === null} onSelect={() => setSelected(null)} />
+                {chips.map((chip, index) => (
+                  <CategoryChip key={chip.id} chip={chip} color={categoryColorValue(index)} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
                 ))}
               </ChipScroller>
               <PrimaryButton type="submit" className="evening-todo-submit" busy={adding}>

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { TEXT200_CSS } from "./text200-css";
-import { assertChipOneLine, assertChipPaging } from "./chip-row";
+import { assertChipExpandCollapse, assertChipTwoLines } from "./chip-row";
 import { fillWheel } from "../e2e/wheel";
 
 /**
@@ -605,16 +605,8 @@ for (const many of [false, true]) {
 // ---- 고침 5바퀴: 분야 칩 줄 한 줄 + 옆으로 넘김(명세 ⑦-1·④-2) — 타이머 · 할 일 자세히 · 처음 설정 ----
 // 분야 10개(긴 이름 하나)에서 줄 높이가 칩 하나 높이이고, 넘치면 「›」(칩 줄 밖 제 칸, 누름 48), 한 화면 폭씩 넘기고, 가로 넘침이 없다
 const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (page: Page) => Promise<void> }[] = [
-  { id: "timer", state: "timer-many", group: "분야 (고르지 않으면 기타)" },
-  {
-    id: "detail",
-    state: "detail-many",
-    group: "분야 (고르지 않으면 기타)",
-    prepare: async (page) => {
-      await page.locator("#dev-open-window").click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-    },
-  },
+  { id: "timer", state: "timer-many", group: "분야" },
+  // 고침9 PM 3: 할 일 자세히(S2-b)에는 칩 줄이 없다(고른 분야 한 줄 + 분야 고르기 시트) — tests/screens/fix9-j2.spec.ts가 본다
   {
     id: "onboarding",
     state: "ratio-onboarding-many",
@@ -650,27 +642,24 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
 ];
 for (const c of CHIP_ROW_CASES) {
   for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-    test(`칩 줄 ${c.id} ${size}: 한 줄(줄 높이 = 칩 하나), 넘치면 「›」·한 화면 폭 넘김·「‹」, 가로 넘침 없음`, async ({ page }) => {
+    test(`칩 줄 ${c.id} ${size}: 두 줄까지 감쌈, 넘치면 둘째 줄 끝 「+n」(n = 숨은 칩 수) → 펼침·「접기」, 가로 넘침 없음(고침9)`, async ({ page }) => {
       await open(page, c.state, size);
       if (c.prepare) await c.prepare(page);
       const row = page.getByRole("group", { name: c.group, exact: true });
       await expect(row).toBeVisible();
       await row.scrollIntoViewIfNeeded();
       const vw = SIZES[size].width;
-      const m = await assertChipOneLine(page, row, vw);
-      expect(m.chips.length, "분야 10개(+기타)가 한 줄에 있다").toBeGreaterThanOrEqual(10);
-      expect(m.scrollWidth, "분야 10개는 360px 한 줄을 넘친다").toBeGreaterThan(m.clientWidth + 1);
-      expect(m.next, "「›」가 보인다").not.toBeNull();
+      // 칩 수 = 펼쳤을 때의 칩(「접기」 빼고). 접힌 줄에서는 보이는 칩 + 「+n」의 n
+      const total = await row.evaluate((el) => {
+        const shown = [...el.children].filter((k) => !k.hasAttribute("data-chip-more")).length;
+        const more = el.querySelector("[data-chip-more]");
+        return shown + (more ? Number((more.textContent ?? "").replace(/[^0-9]/g, "")) : 0);
+      });
+      expect(total, "분야 10개(+기타)").toBeGreaterThanOrEqual(10);
+      const m = await assertChipTwoLines(page, row, vw, total);
+      expect(m.more, "분야 10개는 360px 두 줄을 넘어 「+n」").not.toBeNull();
       await shot(page, `chip-row-${c.id}-${size}`);
-      await page.emulateMedia({ reducedMotion: "reduce" });
-      await assertChipPaging(row);
-      // 키보드: 줄 안 마지막 칩에 포커스하면 그 칩이 줄 안에 다 보인다
-      const last = row.locator(":scope > button").last();
-      await last.focus();
-      const after = await assertChipOneLine(page, row, vw);
-      const lastBox = after.chips[after.chips.length - 1];
-      expect(lastBox.left).toBeGreaterThanOrEqual(after.box.left - 0.5);
-      expect(lastBox.right).toBeLessThanOrEqual(after.box.right + 0.5);
+      await assertChipExpandCollapse(page, row, vw, total);
       const sw = await scrollSizes(page);
       expect(sw.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(sw.clientWidth);
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
 import type { AddCategoryResult } from "../lib/categories/types";
@@ -245,9 +245,12 @@ export function EveningRecord({
   // 저장 뒤 판(O-8): 저장 상태는 포커스를 옮겨 읽히지 않고 상태 알림 한 곳(「이번 주」 카드의 role=status)이 한 문장으로 알린다.
   // 누른 단추가 사라지므로 포커스는 창 자체에 둔다(창 밖으로 빠지지 않게). 읽는 동안도 창 자체
   const ready = load.status === "ready";
-  useEffect(() => {
+  // 제목은 그린 직후(layout) — 읽기를 마친 그 그림에서 바로. 창 자체 포커스는 겹친 창 효과(연 단추 기억)가 돈 뒤(effect)
+  useLayoutEffect(() => {
     if (ready && phase !== "saved") titleRef.current?.focus();
-    else rootRef.current?.focus();
+  }, [phase, ready]);
+  useEffect(() => {
+    if (!ready || phase === "saved") rootRef.current?.focus();
   }, [phase, ready, rootRef]);
 
   function chooseDay(next: 0 | 1) {
@@ -753,11 +756,14 @@ export function EveningRecord({
 export const EVENING_ENTRY_LABEL = `${EVENING_TEXT.title} 남기기`;
 
 /** 할 일 화면 위에 얹는 오늘 기록 입구. 저녁(오후 6시~새벽 4시 전)에는 질문 글을 앞세운다 */
-export function EveningEntry({ evening, onOpen }: { evening: boolean; onOpen: () => void }) {
+export function EveningEntry({ onOpen }: { evening?: boolean; onOpen: () => void }) {
   return (
     <section className="entry-card" aria-label={EVENING_TEXT.title}>
-      <p className="entry-title">{EVENING_TEXT.title}</p>
-      {evening && <p className="todo-sub">{EVENING_TEXT.askToday}</p>}
+      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만). 두 줄 글은 한 묶음, 단추는 오른쪽 한 줄 */}
+      <div className="entry-text">
+        <p className="entry-title">{EVENING_TEXT.title}</p>
+        <p className="todo-sub entry-ask">{EVENING_TEXT.askToday}</p>
+      </div>
       <SecondaryButton onClick={onOpen}>{EVENING_ENTRY_LABEL}</SecondaryButton>
     </section>
   );

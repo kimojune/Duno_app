@@ -94,12 +94,22 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
     expect(screen.getAllByRole("status").some((el) => el.textContent === "할 일 1개를 불러왔어요")).toBe(true);
   });
 
-  it("T2 빈 목록은 0개 중 0개 끝냄과 안내 두 줄, 이메일은 어디에도 없다", async () => {
+  it("T2 빈 목록은 0개 중 0개 끝냄과 예시(고침9 ⑬ 9), 이메일은 어디에도 없다", async () => {
     await renderLoaded([]);
     expect(screen.getByText(/0개 중 0개 끝냄/)).toBeTruthy();
     expect(screen.getByText("오늘 적은 할 일이 없어요.")).toBeTruthy();
-    // 방향 C(C3): 창이 닫혀 있으면 둘째 줄은 단추를 가리킨다(창이 열린 모습은 todo-sheet 시험)
-    expect(screen.getByText("아래 단추를 눌러 적어 보세요.")).toBeTruthy();
+    // 고침9 ⑬ 9: 「아래 단추를 눌러 적어 보세요.」 대신 이름표 「예시」 + 예시 할 일 줄 둘(누를 것 없음, 목록·개수에 안 섞임)
+    expect(screen.queryByText("아래 단추를 눌러 적어 보세요.")).toBeNull();
+    const example = screen.getByRole("region", { name: "예시" });
+    expect(example.querySelectorAll("li")).toHaveLength(2);
+    expect(example.textContent).toContain("토익 단어 50개");
+    expect(example.textContent).toContain("포트폴리오 2장 고치기");
+    expect(example.querySelectorAll("button, input, a, [tabindex]")).toHaveLength(0);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    // 흐림은 모양에만: 예시 글은 보조 글 색 클래스, 흐린 점은 opacity 규칙을 받는 클래스
+    expect(example.querySelector(".todo-example-text")).not.toBeNull();
+    expect(example.querySelectorAll(".todo-example-dot")).toHaveLength(2);
+    expect(example.querySelectorAll(".todo-example-check")).toHaveLength(2);
     expect(document.body.textContent).not.toContain("@");
   });
 

@@ -9,6 +9,8 @@ import type { CategoryMinutes } from "../lib/growth/logic";
 import { formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
+import { categoryColorValue } from "../lib/category-color";
+import { BottomActions } from "./back-header";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, TextButton } from "./ui";
 
@@ -25,7 +27,7 @@ export const GOAL_TEXT = {
   set: "이번 주 목표 정하기",
   line: (target: number, done: number) => `이번 주 목표 ${formatMinutes(target)} 중 ${formatMinutes(done)}`,
   title: "이번 주 목표",
-  hint: "이번 주에 분야마다 쓰고 싶은 시간을 1시간 단위로 정해요. 0시간은 목표에 넣지 않아요.",
+  hint: "1시간 단위 · 0시간은 목표에 안 넣음", // 고침9 ⑬ 14(Figma 91:668)
   hours: "시간",
   total: (h: number) => `합계 ${h}시간`,
   over: (max: number) => `한 주는 ${max}시간까지예요.`,
@@ -149,7 +151,8 @@ export function GoalEditor({
 
   return (
     <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="goal-title" onKeyDown={onKeyDown}>
-      <div className="detail-inner">
+      {/* 고침9 Figma 50:332: 제목 24 + 「닫기」 → 12 보조 한 줄 → 흰 카드(색 점 · 이름 · −/칸/+) → 「합계」 오른쪽 Bold → 폭 가득 「저장」 · 가운데 「목표 없애기」 */}
+      <div className="detail-inner screen-fill">
         <div className="detail-head">
           <h2 id="goal-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {GOAL_TEXT.title}
@@ -158,14 +161,15 @@ export function GoalEditor({
             {GOAL_TEXT.close}
           </TextButton>
         </div>
-        <p className="todo-sub">{GOAL_TEXT.hint}</p>
+        <p className="ratio-caption goal-hint">{GOAL_TEXT.hint}</p>
         {!online && <Notice role="status">{GOAL_TEXT.offline}</Notice>}
         {categories.length === 0 ? (
           <p className="todo-sub">{GOAL_TEXT.empty}</p>
         ) : (
-          <ul className="ratio-list">
-            {categories.map((c) => (
+          <ul className="ratio-list card-box goal-list">
+            {categories.map((c, index) => (
               <li key={c.id} className="ratio-row">
+                <span className="chip-dot" style={{ background: categoryColorValue(index) }} aria-hidden="true" />
                 <Stepper
                   id={`goal-${c.id}`}
                   label={c.name}
@@ -182,7 +186,7 @@ export function GoalEditor({
             ))}
           </ul>
         )}
-        <p className="ratio-total" role="status">
+        <p className="ratio-total goal-total" role="status">
           {GOAL_TEXT.total(total)}
         </p>
         {over && <p className="todo-sub">{GOAL_TEXT.over(APP_CONFIG.maxWeekGoalHours)}</p>}
@@ -191,7 +195,7 @@ export function GoalEditor({
             {message}
           </Notice>
         )}
-        <div className="detail-actions">
+        <BottomActions className="goal-actions">
           <PrimaryButton busy={busy === "save"} disabled={!canSave} onClick={() => void save()}>
             {busy === "save" ? GOAL_TEXT.saving : GOAL_TEXT.save}
           </PrimaryButton>
@@ -200,7 +204,7 @@ export function GoalEditor({
               {GOAL_TEXT.clear}
             </TextButton>
           )}
-        </div>
+        </BottomActions>
       </div>
     </div>
   );

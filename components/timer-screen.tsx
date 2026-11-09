@@ -9,6 +9,8 @@ import type { TodayRead } from "../lib/today-types";
 import { formatMinutes, formatTimer } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { ChipScroller } from "./chip-scroller";
+import { CategoryChip, OtherChip } from "./todo-view";
+import { categoryColorValue } from "../lib/category-color";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
 
 /**
@@ -26,7 +28,7 @@ export const TIMER_TEXT = {
   chooseHeading: "무엇을 할까요?",
   todoGroup: "오늘 할 일",
   noTodo: "할 일 없이 시작",
-  categoryGroup: "분야 (고르지 않으면 기타)",
+  categoryGroup: "분야", // 고침9 ⑬ 13: 「(고르지 않으면 기타)」 대신 맨 앞 「기타」 칩이 골라진 모양
   other: "기타",
   start: (m: number) => `${m}분 시작`,
   starting: "시작하는 중",
@@ -41,7 +43,7 @@ export const TIMER_TEXT = {
   offline: "인터넷에 연결되면 시작할 수 있어요.",
   todosFailed: "오늘 할 일을 불러오지 못했어요. 할 일 없이 시작할 수 있어요.",
   recordsHeading: "오늘 시작한 타이머",
-  noRecords: "아직 없어요",
+  noRecords: "0개", // 고침9 ⑬ 15: 숫자 먼저(옛 「아직 없어요」)
   loadFailed: "타이머를 불러오지 못했어요.",
   reload: "다시 불러오기",
   unreadable: "읽을 수 없는 할 일",
@@ -310,20 +312,18 @@ export function TimerScreen({
               </label>
             </fieldset>
             {effectiveChoice.kind === "none" && (
-              <ChipScroller aria-label={TIMER_TEXT.categoryGroup}>
-                <button type="button" className="chip" aria-pressed={noneCategory === null} onClick={() => setNoneCategory(null)}>
-                  <span className="chip-face">
-                    <span className="chip-label">{TIMER_TEXT.other}</span>
-                  </span>
-                </button>
-                {categories.map((c) => (
-                  <button key={c.id} type="button" className="chip" aria-pressed={noneCategory === c.id} onClick={() => setNoneCategory(c.id)}>
-                    <span className="chip-face">
-                      <span className="chip-label">{c.name}</span>
-                    </span>
-                  </button>
-                ))}
-              </ChipScroller>
+              <>
+                {/* 고침9 ⑬ 13(④-2): 이름표 「분야」 + 맨 앞 「기타」(아무것도 안 고르면 골라진 모양). 고른 칩을 다시 누르면 풀려 기타로 */}
+                <span id="timer-category-label" className="sheet-label sheet-category-label">
+                  {TIMER_TEXT.categoryGroup}
+                </span>
+                <ChipScroller aria-labelledby="timer-category-label">
+                  <OtherChip pressed={noneCategory === null} onSelect={() => setNoneCategory(null)} />
+                  {categories.map((c, index) => (
+                    <CategoryChip key={c.id} chip={c} color={categoryColorValue(index)} pressed={noneCategory === c.id} onToggle={(id) => setNoneCategory(noneCategory === id ? null : id)} />
+                  ))}
+                </ChipScroller>
+              </>
             )}
             <div className="detail-actions">
               <PrimaryButton busy={busy === "start"} disabled={busy !== null} onClick={() => void start()}>
@@ -338,7 +338,7 @@ export function TimerScreen({
         </p>
 
         {load === "ready" && (
-          <section aria-labelledby="timer-records-title">
+          <section aria-labelledby="timer-records-title" className={ended.length === 0 ? "timer-records is-empty" : "timer-records"}>
             <h2 id="timer-records-title" className="growth-sub-title">
               {TIMER_TEXT.recordsHeading}
             </h2>

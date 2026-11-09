@@ -105,6 +105,7 @@ describe("적기·끝냄: 누르면 서버 응답 없이 바로 바뀐다", () =
     expect(todoInput().value).toBe("");
     expect(screen.queryByText("저장하는 중")).toBeNull();
     expect(screen.queryByText("연결되면 저장해요")).toBeNull();
+    expect(screen.queryByText("저장 대기")).toBeNull();
     expect(screen.getByText("2개 중 0개 끝냄", { exact: false })).toBeTruthy();
     expect(addTodo).not.toHaveBeenCalled(); // 화면이 서버 Action을 직접 부르지 않는다
     expect(runtime.pendingOps().map((o) => o.op)).toEqual([expect.objectContaining({ kind: "todo.add", text: "새로 적은 글", categoryId: null })]);
@@ -117,7 +118,7 @@ describe("적기·끝냄: 누르면 서버 응답 없이 바로 바뀐다", () =
     typeTodo("   ");
     pressWrite();
     expect(runtime.pendingCount()).toBe(0);
-    fireEvent.click(within(screen.getByRole("group", { name: "분야 (고르지 않으면 기타)" })).getByRole("button", { name: "어학" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "분야" })).getByRole("button", { name: "어학" }));
     typeTodo("분야 있는 글");
     pressWrite();
     expect(runtime.pendingOps()[0].op).toMatchObject({ kind: "todo.add", text: "분야 있는 글", categoryId: C1 });
@@ -176,7 +177,7 @@ describe("적기·끝냄: 누르면 서버 응답 없이 바로 바뀐다", () =
     fireEvent.click(screen.getByRole("button", { name: "+ 분야" }));
     fireEvent.change(screen.getByRole("textbox", { name: "새 분야 이름" }), { target: { value: "글쓰기" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: /^(더하기|더하는 중)$/ })));
-    const group = () => screen.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
+    const group = () => screen.getByRole("group", { name: "분야" });
     expect(within(group()).getByRole("button", { name: "글쓰기" }).getAttribute("aria-pressed")).toBe("true");
     expect(addCategoryAction).not.toHaveBeenCalled();
     expect(runtime.pendingOps()[0].op).toMatchObject({ kind: "category.add", name: "글쓰기" });
