@@ -283,7 +283,7 @@ test("S6-2 목표 비율 뷰 · 띠그래프(처음 보기) (Figma 50:193) — �
   const menu = page.getByRole("menu", { name: "기간" });
   await expect(menu).toBeVisible();
   await expect(chip).toHaveAttribute("aria-expanded", "true");
-  await expect(menu.getByRole("menuitemradio")).toHaveText(["이번 주", "총 시간", "비교"]);
+  await expect(menu.getByRole("menuitemradio")).toHaveText(["이번 주", "총 시간"]); // 고침10 d-171: 「비교」 없음
   await expect(menu.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused();
   const mb = (await menu.boundingBox())!;
   expect(mb.x + mb.width).toBeLessThanOrEqual(360);
@@ -299,24 +299,26 @@ test("S6-2 목표 비율 뷰 · 띠그래프(처음 보기) (Figma 50:193) — �
   await page.keyboard.press("Enter");
   await expect(page.getByRole("menuitemradio", { name: "총 시간" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitemradio", { name: "비교" })).toBeFocused();
+  await expect(page.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused(); // 끝에서 돌아감(둘뿐)
   await page.keyboard.press("Enter");
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "기간, 비교" })).toBeFocused();
-  await expect(page.locator(".growth-list.is-compare")).toBeVisible();
+  await expect(page.getByRole("button", { name: "기간, 이번 주" })).toBeFocused();
+  await expect(page.locator(".growth-list.is-compare")).toHaveCount(0);
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitemradio", { name: "비교" })).toBeFocused();
+  await expect(page.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("menuitemradio", { name: "총 시간" })).toBeFocused();
   await page.keyboard.press("Home");
   await expect(page.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "기간, 비교" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "기간, 이번 주" })).toBeFocused();
   // 바깥을 누르면 닫힌다(고르지 않음)
-  await page.getByRole("button", { name: "기간, 비교" }).click();
+  await page.getByRole("button", { name: "기간, 이번 주" }).click();
   await expect(page.getByRole("menu")).toBeVisible();
   await page.locator(".growth-goal-line").click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "기간, 비교" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "기간, 이번 주" })).toBeVisible();
 });
 
 test("S6-2 목표 비율 뷰 · 원그래프 (Figma 50:260)", async ({ page }) => {

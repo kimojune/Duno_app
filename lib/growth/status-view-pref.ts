@@ -6,16 +6,16 @@
  * 원샷 v2 고침5(PM d-99·d-101·d-102, 의견 8): 상태보기는 뷰 둘 — 「이번 주 목표」(goal, 시간·분야별 막대) / 「목표 비율」(ratio, %·띠/원).
  * - 처음 탭: 이번 주 목표를 세운 주 → goal, 세우지 않은 주 → ratio(initialStatusTab).
  * - 사용자가 고른 탭은 그 주 동안만 기억한다(tabWeek = 고른 주의 월요일). 주가 바뀌면 다시 처음 탭 규칙을 따른다.
- * - 기간(이번 주 / 총 시간 / 비교)과 보기 방식(띠그래프 / 원그래프)은 목표 비율 뷰의 것이다.
+ * - 기간(이번 주 / 총 시간)과 보기 방식(띠그래프 / 원그래프)은 목표 비율 뷰의 것이다.
  * - 고침7(PM 15:1x, S6 빈 상태): 처음 기간은 이번 주 0시간이고 쌓인 시간이 있으면 「총 시간」, 그 밖은 「이번 주」(initialStatusPeriod).
  *   사용자가 칩에서 고른 기간은 그 주 동안만 기억한다(periodWeek = 고른 주의 월요일). 자동으로 고른 기간은 적지 않는다 — 그래서 이번 주 첫 기록이 생기면 다음에 열 때 「이번 주」로 돌아온다.
  */
 
 /**
- * 기간: 이번 주(처음, 달력 주 월~일) / 총 시간. 「비교」는 D-093의 옛 보기(이번 주·지난주·지난달·총 시간 나란히)를 지우지 않고 남긴 것(결정 대기).
+ * 기간: 이번 주(처음, 달력 주 월~일) / 총 시간. 고침10(PM d-171): 옛 「비교」(이번 주·지난주·지난달·총 시간 나란히)는 뺐다.
  * PM 확정 11-09: 기간 이름은 「이번 주」(「최근 1주」는 뺐다).
  */
-export const STATUS_PERIODS = ["week", "total", "compare"] as const;
+export const STATUS_PERIODS = ["week", "total"] as const;
 export type StatusPeriod = (typeof STATUS_PERIODS)[number];
 
 /** 뷰 탭: 이번 주 목표 / 목표 비율(이 순서가 탭 순서) */
@@ -38,8 +38,8 @@ export type StatusPref = {
 /** 처음 값: 이번 주 · 띠그래프(목표 비율 뷰의 처음 보기, PM d-102) · 고른 탭 없음. 기억한 값이 없을 때만 쓴다 */
 export const DEFAULT_STATUS_PREF: StatusPref = { period: "week", periodWeek: null, view: "band", tab: null, tabWeek: null };
 
-/** 이전 판이 적어 둔 기간 값 → 지금 값. 「최근 1주」(recent)였던 값은 「이번 주」로 읽는다 */
-const LEGACY_PERIODS: Readonly<Record<string, StatusPeriod>> = { recent: "week" };
+/** 이전 판이 적어 둔 기간 값 → 지금 값. 「최근 1주」(recent)와 고침10에서 뺀 「비교」(compare)였던 값은 「이번 주」로 읽는다(compare는 사용자가 고른 것이라 고른 주도 믿는다) */
+const LEGACY_PERIODS: Readonly<Record<string, StatusPeriod>> = { recent: "week", compare: "week" };
 /** 이전 판이 적어 둔 보기 방식 → 지금 값. 「분야별 줄 막대」(rows)는 이번 주 목표 뷰로 옮겨 가 목표 비율 뷰에서는 처음 보기(띠그래프)로 읽는다 */
 const LEGACY_VIEWS: Readonly<Record<string, string>> = { rows: "band" };
 
@@ -63,7 +63,7 @@ export function parseStatusPref(raw: unknown, viewIds: readonly string[]): Statu
         ? LEGACY_PERIODS[period]
         : DEFAULT_STATUS_PREF.period,
     // 고른 주는 기간이 지금 값일 때만 믿는다(모르는 기간·옛 이름이면 고른 적 없는 것으로)
-    periodWeek: periodOk && typeof periodWeek === "string" && DAY.test(periodWeek) ? periodWeek : null,
+    periodWeek: (periodOk || period === "compare") && typeof periodWeek === "string" && DAY.test(periodWeek) ? periodWeek : null,
     view: typeof view === "string" && viewIds.includes(view) ? view : legacyView !== null && viewIds.includes(legacyView) ? legacyView : fallbackView,
     tab: tabOk ? (tab as StatusTab) : null,
     tabWeek: tabOk ? (tabWeek as string) : null,

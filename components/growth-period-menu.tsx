@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 /**
  * 상태보기 목표 비율 뷰의 기간 칩 하나(원샷 v2 고침9, Figma 50:193·50:598·111:79 「칩 이번 주 ▾」 — 명세 ③-S ② 3).
- * 카드 머리 합계 옆의 작은 칩(보이는 면 높이 24, 11px, --radius-pill, 누름 영역 48). 누르면 기간 목록(이번 주 / 총 시간 / 비교)이 열린다.
+ * 카드 머리 합계 옆의 작은 칩(보이는 면 높이 24, 11px, --radius-pill, 누름 영역 48). 누르면 기간 목록(이번 주 / 총 시간)이 열린다.
  *
  * 메뉴 단추 꼴(WAI-ARIA APG Menu Button):
  * - 칩: aria-haspopup="menu" · aria-expanded · aria-controls(열렸을 때). 이름 = 「기간, {지금 기간}」(aria-label — 보이는 글 「이번 주」를 이름 안에 담는다, ▾는 숨김)

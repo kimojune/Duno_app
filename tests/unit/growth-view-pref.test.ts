@@ -40,7 +40,7 @@ describe("parseStatusPref: 기기 저장소의 값은 믿지 않는다", () => {
   });
   it("알아볼 수 있는 값은 그대로 읽는다(고른 탭과 그 주 포함)", () => {
     expect(parseStatusPref({ period: "total", view: "pie" }, VIEWS)).toEqual({ period: "total", view: "pie", ...NO_TAB });
-    expect(parseStatusPref({ period: "compare", view: "band", tab: "goal", tabWeek: WEEK }, VIEWS)).toEqual({ period: "compare", periodWeek: null, view: "band", tab: "goal", tabWeek: WEEK });
+    expect(parseStatusPref({ period: "week", view: "band", tab: "goal", tabWeek: WEEK }, VIEWS)).toEqual({ period: "week", periodWeek: null, view: "band", tab: "goal", tabWeek: WEEK });
     expect(parseStatusPref({ period: "week", view: "pie", tab: "ratio", tabWeek: WEEK }, VIEWS)).toEqual({ period: "week", periodWeek: null, view: "pie", tab: "ratio", tabWeek: WEEK });
     expect(parseStatusPref({ period: "total", periodWeek: WEEK, view: "pie" }, VIEWS)).toEqual({ period: "total", periodWeek: WEEK, view: "pie", tab: null, tabWeek: null });
   });
@@ -100,10 +100,17 @@ describe("initialStatusPeriod: 목표 비율 뷰의 처음 기간(고침7, PM 15
   it("모두 0(처음 쓰는 사람) → 이번 주", () => {
     expect(initialStatusPeriod(AUTO, WEEK, { week: 0, total: 0 })).toBe("week");
   });
-  it("이 주에 칩에서 고른 기간은 규칙보다 이긴다(이번 주 0이어도 「이번 주」, 기록이 있어도 「총 시간」·「비교」)", () => {
+  it("이 주에 칩에서 고른 기간은 규칙보다 이긴다(이번 주 0이어도 「이번 주」, 기록이 있어도 「총 시간」)", () => {
     expect(initialStatusPeriod({ period: "week", periodWeek: WEEK }, WEEK, { week: 0, total: 2880 })).toBe("week");
     expect(initialStatusPeriod({ period: "total", periodWeek: WEEK }, WEEK, { week: 30, total: 2880 })).toBe("total");
-    expect(initialStatusPeriod({ period: "compare", periodWeek: WEEK }, WEEK, { week: 0, total: 0 })).toBe("compare");
+  });
+  it("고침10 H(d-171): 저장된 기간이 「비교」였던 사용자는 「이번 주」로 열린다(고른 주도 믿어 총 시간 자동 규칙을 타지 않는다)", () => {
+    const pref = parseStatusPref({ period: "compare", periodWeek: WEEK, view: "band" }, VIEWS);
+    expect(pref).toEqual({ period: "week", periodWeek: WEEK, view: "band", tab: null, tabWeek: null });
+    // 이번 주 0시간이고 쌓인 시간이 있어도 「이번 주」(자동 「총 시간」이 아니다)
+    expect(initialStatusPeriod(pref, WEEK, { week: 0, total: 2880 })).toBe("week");
+    // 고른 주가 없는 「비교」도 「이번 주」 값으로 읽는다
+    expect(parseStatusPref({ period: "compare", view: "band" }, VIEWS).period).toBe("week");
   });
   it("다른 주에 고른 기간·고른 주가 없는 기간(옛 판·자동)은 쓰지 않는다 — 규칙대로", () => {
     expect(initialStatusPeriod({ period: "total", periodWeek: "2026-10-26" }, WEEK, { week: 30, total: 2880 })).toBe("week");

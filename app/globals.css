@@ -931,9 +931,7 @@ select.input { appearance: auto; }
 .growth-goal-bar.growth-example-bar { block-size: 12px; }
 /* 분야 줄: 윗줄 이름 · 오른쪽 값(넘치면 다음 줄로, 말줄임 없음), 아래 막대·글은 전체 폭 */
 .growth-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
-/* 줄 사이 선 없음(고침9, Figma 50:137·50:193). 옛 「비교」 보기만 선을 둔다. 목표 비율 뷰는 범례 아래 1px 선 하나(Figma 50:236) */
-.growth-list.is-compare .growth-item { border-bottom: 1px solid var(--color-divider); }
-.growth-list.is-compare .growth-item:last-child { border-bottom: 0; }
+/* 줄 사이 선 없음(고침9, Figma 50:137·50:193). 목표 비율 뷰는 범례 아래 1px 선 하나(Figma 50:236) */
 .growth-graph + .growth-list { margin-top: 0; padding-top: var(--space-1); border-top: 1px solid var(--color-divider); }
 /* 목록 줄 글 14(Figma 50:238·50:160). 오른쪽 「›」는 카드 안 여백 자리(값 끝에서 12 띄움) */
 .growth-row {
@@ -951,8 +949,7 @@ select.input { appearance: auto; }
 .growth-goal-row { padding: var(--space-1) 0; }
 .growth-goal-row .growth-name { font-weight: 500; }
 .growth-goal-row .growth-chevron { inset-block-start: 1px; transform: none; }
-.growth-compare { position: relative; }
-.growth-row:active, .growth-compare:active { background: var(--color-notice-bg); }
+.growth-row:active { background: var(--color-notice-bg); }
 .growth-name { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
 .growth-row-value { margin-inline-start: auto; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .growth-row-value.is-left { font-weight: 700; }
@@ -1001,17 +998,8 @@ select.input { appearance: auto; }
 .growth-pie-ring { fill: none; stroke: var(--color-border-input); stroke-width: 1; }
 .growth-pie-text { font: 400 22px var(--font-family); fill: var(--color-text); font-variant-numeric: tabular-nums; }
 .growth-pie-leader { stroke-width: 1; }
-/* 비교(옛 보기, 꼴 그대로) */
-.growth-compare {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1) var(--space-3); align-items: center;
-  width: 100%; min-height: var(--tap-min); padding: var(--space-2) 0; border: 0; background: transparent; text-align: left; cursor: pointer;
-  font: var(--font-body); color: var(--color-text);
-}
-.growth-dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-3); }
-.growth-dl dt { font: var(--font-sub); color: var(--color-text-sub); }
-.growth-dl dd { margin: 0; font: var(--font-body); }
 /* 상태보기의 시간과 %는 고정폭 숫자(스킬 검토 O-10, PM d-150). 합계·머리·줄 값·띠 칸·원 글은 각 규칙에 이미 있고, 나머지 숫자 자리를 여기서 묶는다 */
-.growth-goal-of, .growth-week-zero, .growth-streak, .growth-dl dd, .growth-compare .todo-sub { font-variant-numeric: tabular-nums; }
+.growth-goal-of, .growth-week-zero, .growth-streak { font-variant-numeric: tabular-nums; }
 .done-tag { margin-left: var(--space-2); }
 .note-sublist { list-style: none; margin: var(--space-1) 0 0; padding: 0 0 0 var(--space-3); border-left: 2px solid var(--color-divider); }
 .note-sublist > li { margin: 0 0 var(--space-1); }

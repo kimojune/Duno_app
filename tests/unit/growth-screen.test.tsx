@@ -154,7 +154,7 @@ describe("상태보기 (7-4, ③)", () => {
     const chip = screen.getByRole("button", { name: "기간, 이번 주" });
     expect(chip.getAttribute("aria-haspopup")).toBe("menu");
     fireEvent.click(chip);
-    expect(screen.getAllByRole("menuitemradio").map((b) => b.textContent)).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(screen.getAllByRole("menuitemradio").map((b) => b.textContent)).toEqual(["이번 주", "총 시간"]);
     expect(screen.getByRole("button", { name: "원그래프로 보기" })).toBeTruthy();
     expect(Array.from(document.querySelectorAll(".growth-band-cell")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
     expect(document.body.textContent).not.toContain("채울");
@@ -176,21 +176,13 @@ describe("상태보기 (7-4, ③)", () => {
     expect(document.body.textContent).not.toMatch(/더|넘음/);
   });
 
-  it("비교: 분야마다 이번 주·지난주·지난달·총 시간을 나란히(옛 「쌓인 것」), 지난주 대비 바뀐 시간", async () => {
+  it("고침10 H(d-171): 기간 칩에 「비교」가 없다 — 이번 주 · 총 시간 둘, 비교 목록 꼴(.is-compare)도 없다", async () => {
     await mount(fakeApi());
-    pickPeriod("비교");
-    // 고침9: 카드 위 머리 줄 「분야마다 나란히」는 없앴다. 칩이 지금 기간을 말한다
-    expect(screen.queryByRole("heading", { name: "분야마다 나란히" })).toBeNull();
-    expect(screen.getByRole("button", { name: "기간, 비교" })).toBeTruthy();
-    expect(document.querySelectorAll(".growth-list.is-compare .growth-item")).toHaveLength(3);
-    const language = screen.getByRole("button", { name: /^어학/ });
-    expect(within(language).getByText("이번 주").nextSibling?.textContent).toBe("30분");
-    expect(within(language).getByText("지난주").nextSibling?.textContent).toBe("1시간");
-    expect(within(language).getByText("총 시간").nextSibling?.textContent).toBe("15시간");
-    expect(document.body.textContent).not.toContain("쌓인 것");
-    expect(within(language).getByText("지난주보다 −30분")).toBeTruthy();
-    const portfolio = screen.getByRole("button", { name: /^포트폴리오/ });
-    expect(within(portfolio).getByText("지난달").nextSibling?.textContent).toBe("10시간");
+    fireEvent.click(screen.getByRole("button", { name: /^기간, / }));
+    expect(screen.getAllByRole("menuitemradio").map((b) => b.textContent)).toEqual(["이번 주", "총 시간"]);
+    expect(screen.queryByRole("menuitemradio", { name: "비교" })).toBeNull();
+    expect(document.querySelector(".growth-list.is-compare")).toBeNull();
+    expect(document.querySelector(".growth-compare")).toBeNull();
   });
 
   it("분야 줄을 누르면 그 분야 페이지로(onOpenCategory), 기타는 null", async () => {

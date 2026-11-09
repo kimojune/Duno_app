@@ -399,9 +399,12 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
   });
   await reopen(browser);
   await home();
-  await step(S, "(다) ② 기간 칩 「이번 주 ▾」 → 「총 시간」 → 「비교」", "8-4 AC4", async () => {
+  await step(S, "(다) ② 기간 칩 「이번 주 ▾」 → 「총 시간」 → 「이번 주」(고침10 d-171: 「비교」 없음)", "8-4 AC4", async () => {
     await growth();
-    for (const p of ["총 시간", "비교", "이번 주"]) {
+    await page.getByRole("button", { name: /^기간, / }).click();
+    await expect(page.getByRole("menuitemradio", { name: "비교" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    for (const p of ["총 시간", "이번 주"]) {
       await page.getByRole("button", { name: /^기간, / }).click();
       await page.getByRole("menuitemradio", { name: p }).click();
       await expect(page.getByRole("button", { name: new RegExp(`^기간, ${p}`) })).toBeVisible();

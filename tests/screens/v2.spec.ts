@@ -129,9 +129,9 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await shot(page, `growth-empty-${size}`);
     await expect(page.locator(".growth-band")).toHaveCount(2);
     await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
-    // 고침7 ②: 빈 상태에도 머리에 합계 「0시간」 · 칩 셋 · 보기 바꾸기 글 단추(데이터 있는 판과 같은 자리)
+    // 고침7 ②: 빈 상태에도 머리에 합계 「0시간」 · 칩 둘 · 보기 바꾸기 글 단추(데이터 있는 판과 같은 자리)
     await expect(page.locator(".growth-card-total")).toHaveText("0시간");
-    expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(await periodOptions(page)).toEqual(["이번 주", "총 시간"]);
     await expect(page.locator(".growth-card > .growth-card-head > .growth-switch")).toHaveText("원그래프로 보기");
     // 고침9(⑬ 20, PM d-143 가): 카드 밖 안내 글은 없앴다. 「오늘 기록」은 카드 안 끝(그림 아래)
     await expect(page.getByText(/아직 이번 주 오늘 기록이 없어요/)).toHaveCount(0);
@@ -404,18 +404,18 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   });
 }
 
-// 비교 보기(D-093, 남겨 둔 보기): 분야 줄마다 이번 주·지난주·지난달·총 시간 나란히. 분야 50개·긴 이름에서도 가로로 넘치지 않는다
+// 고침10 d-171: 「비교」 보기는 없어졌다. 기간 칩은 이번 주 · 총 시간 둘이고, 분야 50개·긴 이름에서도 총 시간이 가로로 넘치지 않는다
 for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   for (const state of ["growth-week", "growth-many"]) {
-    test(`${state} ${size}: 비교 보기가 가로로 넘치지 않는다`, async ({ page }) => {
+    test(`${state} ${size}: 「비교」 없음 · 총 시간 보기가 가로로 넘치지 않는다`, async ({ page }) => {
       await open(page, state, size);
-      await pickPeriod(page, "비교");
-      await expect(page.locator(".growth-list.is-compare")).toBeVisible(); // 고침9: 카드 위 머리 줄 「분야마다 나란히」 없앰
-      await expect(page.locator(".growth-compare")).toHaveCount(state === "growth-many" ? 51 : 4);
+      expect(await periodOptions(page)).toEqual(["이번 주", "총 시간"]);
+      await pickPeriod(page, "총 시간");
+      await expect(page.locator(".growth-list.is-compare")).toHaveCount(0);
+      await expect(page.locator(".growth-compare")).toHaveCount(0);
       await expect(page.getByText("쌓인 것")).toHaveCount(0);
-      await shot(page, `${state}-compare-${size}`);
-      await noHorizontalScroll(page, "비교");
-      await insideViewport(page, ".growth-compare", "비교 줄");
+      await shot(page, `${state}-total-${size}`);
+      await noHorizontalScroll(page, "총 시간");
     });
   }
 }
@@ -452,16 +452,15 @@ test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간 칩·보기 
   await expect(tab("목표 비율")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(name("기간, 이번 주")).toBeFocused();
-  // 칩: Enter로 열면 지금 기간에 포커스, ↓↓ 비교, Space로 고르면 닫히고 칩으로 돌아온다
+  // 칩: Enter로 열면 지금 기간에 포커스, ↓ 총 시간, Space로 고르면 닫히고 칩으로 돌아온다
   await page.keyboard.press("Enter");
   await expect(page.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitemradio", { name: "비교" })).toBeFocused();
+  await expect(page.getByRole("menuitemradio", { name: "총 시간" })).toBeFocused();
   await page.keyboard.press("Space");
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await expect(name("기간, 비교")).toBeFocused();
-  await expect(page.locator(".growth-list.is-compare")).toBeVisible();
+  await expect(name("기간, 총 시간")).toBeFocused();
+  await expect(page.locator(".growth-list.is-compare")).toHaveCount(0);
 });
 
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
