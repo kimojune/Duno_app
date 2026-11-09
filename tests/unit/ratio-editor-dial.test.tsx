@@ -4,6 +4,15 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { RatioEditor, type RatioEntry } from "../../components/ratio-editor";
 
+/** 「합계」 줄은 없앴다(합은 늘 100, 정합 대조 B S1-3). 대신 보이는 숫자 칸 값의 합이 100인지 본다(칸이 하나 이상 있어야 한다) */
+function expectFieldSum100() {
+  const fields = [...document.querySelectorAll<HTMLInputElement>("input.ratio-field")];
+  expect(fields.length).toBeGreaterThan(0);
+  expect(fields.reduce((sum, f) => sum + Number(f.value), 0)).toBe(100);
+  expect(document.body.textContent).not.toContain("합계");
+}
+
+
 afterEach(cleanup);
 
 const E = (id: string, name: string, percent: number): RatioEntry => ({ id, name, percent });
@@ -39,12 +48,12 @@ function type(name: string, text: string, how: "blur" | "enter" = "blur") {
 }
 
 describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08)", () => {
-  it("−/+ 목록 위쪽에 다이얼이 있고, 합계는 100%다", () => {
+  it("−/+ 목록 위쪽에 다이얼이 있고, 숫자 칸 합은 100%다(「합계」 줄 없음)", () => {
     render(<Host initial={[E("a", "어학", 50), E("b", "코딩", 50), E("other", "기타", 0)]} />);
     const dial = document.querySelector("svg.dial")!;
     const list = document.querySelector("ul.ratio-list")!;
     expect(dial.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     expect(screen.getByRole("button", { name: "균등 배분" })).toBeTruthy();
     expect(screen.getByText("분야마다 쓰고 싶은 몫 · 합 100%").className).toBe("ratio-caption");
     expect(screen.getByRole("button", { name: "어학 5% 줄이기" })).toBeTruthy();
@@ -65,7 +74,7 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
     expect(slider("end").getAttribute("aria-valuenow")).toBe("70");
     fireEvent.keyDown(slider("end"), { key: "ArrowLeft" });
     expect(values("어학", "코딩", "기타")).toEqual([69, 26, 5]);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     for (const next of seen) {
       expect(sum(next.map((e) => e.percent))).toBe(100);
       expect(next.every((e) => Number.isInteger(e.percent) && e.percent >= 0 && e.percent <= 100)).toBe(true);
@@ -77,7 +86,7 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
     render(<Host initial={[E("a", "어학", 30), E("b", "코딩", 30), E("other", "기타", 0)]} seen={seen} />);
     expect(seen.at(-1)!.map((e) => e.percent)).toEqual([50, 50, 0]);
     expect(values("어학", "코딩", "기타")).toEqual([50, 50, 0]);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     expect(slider("end").getAttribute("aria-valuenow")).toBe("50");
   });
 
@@ -189,7 +198,7 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
   it("분야 50개도 합 100으로 열리고(균등 배분) 다이얼이 깨지지 않는다", () => {
     const many = Array.from({ length: 50 }, (_, i) => E(`c${i}`, `분야${i + 1}`, 0));
     render(<Host initial={[...many, E("other", "기타", 0)]} />);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     const all = values(...many.map((e) => e.name), "기타");
     expect(sum(all)).toBe(100);
     expect(document.querySelectorAll(".dial-slice").length).toBe(all.filter((v) => v > 0).length);
