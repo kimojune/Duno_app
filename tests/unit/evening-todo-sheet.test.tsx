@@ -502,17 +502,17 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
-    // 오늘 기록 나누기(E1) 규칙: 체크한 할 일의 분야 = 기타에서 30분. 60분에서 어학 30분, 남은 기타 30분(합 60)
+    // 오늘 기록 나누기(PM d-180 규칙 4): 체크한 할 일의 분야가 칩으로 골라진 채 쓴 시간을 똑같이 나눈다. 60분에서 어학 하나가 60분 전부, 기타 0분
     const stepperValue = (name: string) => Number((screen.getByRole("spinbutton", { name }) as HTMLInputElement).value);
     const otherValue = () => document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent;
-    expect(stepperValue("어학")).toBe(30);
+    expect(stepperValue("어학")).toBe(60);
     expect(screen.queryByRole("spinbutton", { name: "포트폴리오" }), "고르지 않은 분야는 줄이 없다(E1: 칩으로 고른 분야만 다이얼·줄에)").toBeNull();
-    expect(otherValue()).toBe("30분");
+    expect(otherValue()).toBe("0분");
     expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: /^포트폴리오, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("오늘 기록에 이어진다: 기타가 30분보다 적으면 남은 만큼만 들어간다(쓴 시간 15분 → 어학 15분, 기타 0분)", async () => {
+  it("오늘 기록에 이어진다: 쓴 시간이 적어도 남은 시간 전부가 들어간다(쓴 시간 15분 → 어학 15분, 기타 0분)", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
     typeWheel("시간", 0);
