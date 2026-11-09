@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { COLOR_TOKENS } from "../../lib/design-tokens";
 import { fillWheel } from "../e2e/wheel";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침9 J1(발표 뒤 판: PM 1·6, ⑬, Figma 정합 A1~A4): 360×800 사진을 docs/oneshot-v2/고침9-J1/에 두고(이름 = 23 최종 폰 목록의 화면 이름),
@@ -11,7 +12,7 @@ import { fillWheel } from "../e2e/wheel";
  * - S5-2(87:2): 나누기 머리 「‹ 오늘 기록 닫기」 한 줄
  * - S8(50:641) · S8-a(81:380) · S8-b(102:314) · 바꾼 뒤 「‹」 → 확인 창(121:389·121:449 = 98:278 꼴: 종이색·폭 312·제목 18 Bold·뒤 막 먹남색 45%)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침9-J1");
+const OUT = photoDir("고침9-J1"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 const rgb = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;

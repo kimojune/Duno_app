@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침7(23 「발표 판 고침7 S6 빈 상태」, PM 15:1x): 상태보기 목표 비율 뷰의 빈 상태 셋. 360×800 사진을 docs/oneshot-v2/고침7/에 두고,
@@ -11,7 +12,7 @@ import path from "node:path";
  * 고침9(J4): 기간은 칩 하나 「이번 주 ▾」(메뉴 단추 — 열면 이번 주 / 총 시간 / 비교), 보기 바꾸기는 같은 머리 줄 오른쪽 끝, 카드 밖 안내 글 없음.
  * 이 시험의 사진 자리(docs/oneshot-v2/고침7)는 고침7 기록이라 고침9 사진은 fix9-status(고침9-J4)에 둔다
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침7");
+const OUT = photoDir("고침7"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, s: string) {
   await page.setViewportSize({ width: 360, height: 800 });

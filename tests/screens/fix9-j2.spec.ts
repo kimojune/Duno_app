@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침9 워커 J2(할 일·할 일 페이지·타이머, 23 최종 폰 목록): 360×800 사진을 docs/oneshot-v2/고침9-J2/에 두고,
@@ -8,7 +9,7 @@ import path from "node:path";
  * 개발 갤러리(/dev/states · /dev/v2)의 화면이다(컴포넌트는 앱과 같은 것, 데이터만 가짜). npm run screens(SCREENS_PORT로 포트를 바꿀 수 있다)
  * 사진 이름 = 23 최종 폰 목록의 화면 · 상태(괄호 안 Figma 노드)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침9-J2");
+const OUT = photoDir("고침9-J2"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, url: string) {
   await page.setViewportSize({ width: 360, height: 800 });

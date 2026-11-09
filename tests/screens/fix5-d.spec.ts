@@ -2,13 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fillWheel } from "../e2e/wheel";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침 5바퀴 D(합치기·이음매): PM이 보는 화면 사진 열 장, 360×800. docs/oneshot-v2/고침5/ 에 화면 이름으로 둔다.
  * 개발 갤러리(/dev/v2, /dev/states)의 화면이다(진짜 로그인 앱 화면 아님 — 그 길은 e2e의 todo-flow). 개발 서버(3200)에서 돈다: npm run screens
  * 사진을 찍는 김에 「가로로 넘치지 않는다」·「칩 줄이 한 줄」 같은 치수를 같이 단언한다(사진만 남는 시험이 되지 않게).
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침5");
+const OUT = photoDir("고침5"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, url: string) {
   await page.setViewportSize({ width: 360, height: 800 });

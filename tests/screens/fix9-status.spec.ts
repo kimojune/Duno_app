@@ -1,13 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침9(워커 J4): 상태보기·아래 탭 Figma 정합. 360×800 사진을 docs/oneshot-v2/고침9-J4/에 「최종 폰 목록」의 화면·상태 이름으로 두고,
  * 사진만 남는 시험이 되지 않게 순서·자리·실제 칠해진 값(계산된 스타일)을 같이 단언한다.
  * 개발 갤러리(/dev/v2) 화면이다(진짜 로그인 앱 화면 아님 — 부품은 앱과 같고 데이터만 가짜). 개발 서버에서 돈다: npm run screens(SCREENS_PORT)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침9-J4");
+const OUT = photoDir("고침9-J4"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, s: string) {
   await page.setViewportSize({ width: 360, height: 800 });

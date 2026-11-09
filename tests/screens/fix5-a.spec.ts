@@ -2,12 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { CATEGORY_COLOR_TOKENS, COLOR_TOKENS, RADIUS_TOKENS } from "../../lib/design-tokens";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침 5바퀴 A: 디자인 값이 실제 화면에 칠해졌는지 360px에서 본다(「CSS 값 = 출처 값」은 unit 시험, 여기는 「실제 요소가 그 값으로 칠해짐」).
  * 사진: docs/oneshot-v2/고침5-A/ (할 일 · 처음 설정 목표 비율 단계 · 내 정보). 개발 서버(3200)에서 돈다: npm run screens
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침5-A");
+const OUT = photoDir("고침5-A"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 const rgb = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;

@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fillWheel } from "../e2e/wheel";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침9 워커 J3: 오늘 기록 전체 Figma 정합(S5-1 시간 49:5 · 숫자 바로 쓰기 66:170 · 오늘 할 일 시트 88:12 · S5-2 87:2 · 87:96 · 49:26 · 49:83 ·
@@ -9,7 +10,7 @@ import { fillWheel } from "../e2e/wheel";
  * 사진만 남는 시험이 되지 않게 치수·글·순서를 Figma 값과 같이 단언한다(하한·상한 둘 다).
  * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). npm run screens(SCREENS_PORT로 포트를 바꿔 돈다)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침9-J3");
+const OUT = photoDir("고침9-J3"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, s: string) {
   await page.setViewportSize({ width: 360, height: 800 });

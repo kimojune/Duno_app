@@ -1,13 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { fillWheel } from "../e2e/wheel";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침6 G2(PM d-129 ②·③·④): 오늘 기록 나누기 기타 0분 손잡이 · 안내 글 한 줄 · 시간 단계 「타이머 n」 띠. 360×800 사진은 docs/oneshot-v2/고침6-G2/에 둔다.
  * 개발 서버의 /dev/v2(가짜 데이터, env 없이 그려짐)에서만 돈다: npm run screens -- fix6-g2
  */
 
-const OUT = "docs/oneshot-v2/고침6-G2";
+const OUT = photoDir("고침6-G2"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, state: string) {
   fs.mkdirSync(OUT, { recursive: true });

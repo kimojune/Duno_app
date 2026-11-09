@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { photoDir } from "./photo-dir";
 
 /**
  * PM d-126: 오늘 기록 · 오늘 할 일 시트의 「닫기」로 입력 잃음 막기 — 진짜 브라우저의 뒤로 가기(page.goBack)로 겹친 창 규칙을 한 번 본다.
@@ -8,7 +9,7 @@ import path from "node:path";
  * (history 칸이 어긋나 앱 밖으로 나가거나 뒤로 가기가 먹히지 않으면 안 된다). 사진 360×800은 docs/oneshot-v2/고침5/.
  * 개발 갤러리(/dev/v2?s=evening-todo)의 화면이다. 개발 서버(3200)에서 돈다: npm run screens
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침5");
+const OUT = photoDir("고침5"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });

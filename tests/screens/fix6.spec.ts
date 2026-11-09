@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fillWheel } from "../e2e/wheel";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침6(23 「발표 판 고침6」 ①·②·③·④-①): 360×800 사진을 docs/oneshot-v2/고침6/에 두고, 사진만 남는 시험이 되지 않게 치수·글·순서를 같이 단언한다.
@@ -10,7 +11,7 @@ import { fillWheel } from "../e2e/wheel";
  * - ④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n시간 더」, 「채울」 없음
  * - ③ 내 정보 첫 카드(이름표 「목표」, PM d-136 — 목표 있음·없음) · S8-b · 나가기 확인(PM d-135 글) · 진짜 브라우저 뒤로 가기(page.goBack)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침6");
+const OUT = photoDir("고침6"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function open(page: Page, s: string) {
   await page.setViewportSize({ width: 360, height: 800 });

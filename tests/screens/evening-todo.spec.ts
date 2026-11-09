@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침 5바퀴 E2: 오늘 기록 시간 단계의 「오늘 할 일 n/m ›」 줄과 「오늘 할 일」 시트(명세 ⑩ PM 11) 사진·치수. /dev/v2?s=evening-todo
  * 사진은 docs/oneshot-v2/고침5-E2/에 둔다(360px).
  */
 
-const OUT = "docs/oneshot-v2/고침5-E2";
+const OUT = photoDir("고침5-E2"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 test("evening-todo 360x800: 줄 누름 48 이상·가로 넘침 없음, 시트 사진(목록 · 「+ 할 일」 펼침), 뒤로 가기는 시트만 닫는다", async ({ page }) => {
   fs.mkdirSync(OUT, { recursive: true });

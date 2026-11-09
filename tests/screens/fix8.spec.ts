@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { photoDir } from "./photo-dir";
 
 /**
  * 고침8(23 「발표 판 고침8 분야 페이지」 안 A, PM 「141 나」 · Figma 50:616): 분야 페이지 요약 카드(고리) + 날짜별 시간 막대.
@@ -9,7 +10,7 @@ import path from "node:path";
  * - category: 어학(누적 40시간 중 67% · 이번 주 7시간 · 목표 비율 50%), 날짜 넷(1시간 30분 · 2시간(가장 긴 날) · 45분 시간만 · 0분 할 일만)
  * - category-other: 기타(Figma 121:468 — 목표 비율 줄 없음, 기타 색), category-empty: 빈 분야(Figma 121:527 — 0% · 「할 일 0개」)
  */
-const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침8");
+const OUT = photoDir("고침8"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 
 async function openWindow(page: Page, s: string) {
   await page.setViewportSize({ width: 360, height: 800 });
