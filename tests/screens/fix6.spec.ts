@@ -57,8 +57,12 @@ test("① 목표 없는 주 처음 = 「목표 비율」 탭 · ② 「이번 �
       order: after(label, items[0]) && after(items[items.length - 1], hint) && after(hint, button) && root.lastElementChild === button,
       buttons: root.querySelectorAll("button").length,
       cardTopToLabel: box(label).top - box(root).top,
-      labelToBars: box(items[0]).top - box(label).bottom,
-      barsToHint: box(hint).top - box(items[items.length - 1]).bottom,
+      // 보이는 요소 가장자리로 잰다(li 상자가 아니라 글·막대 요소): 이름표 아래 → 첫 줄 이름 글 위, 마지막 줄의 마지막 보이는 요소(막대 아래 「목표 n시간」) 아래 → 보조 줄 위
+      labelToBars: box(items[0].querySelector(".growth-name")!).top - box(label).bottom,
+      barsToHint: box(hint).top - Math.max(...Array.from(items[items.length - 1].querySelectorAll(".growth-name, .growth-goal-bar, .growth-goal-of")).map((el) => box(el).bottom)),
+      lastBarToHint: box(hint).top - box(items[items.length - 1].querySelector(".growth-goal-bar")!).bottom,
+      rowGap: box(items[1].querySelector(".growth-name")!).top - box(items[0].querySelector(".growth-goal-of")!).bottom,
+      liPadding: items.map((li) => getComputedStyle(li).paddingTop + "/" + getComputedStyle(li).paddingBottom),
       hintToButton: box(button).top - box(hint).bottom,
       buttonToCardBottom: box(root).bottom - box(button).bottom,
       buttonWidth: box(button).width,
@@ -76,6 +80,9 @@ test("① 목표 없는 주 처음 = 「목표 비율」 탭 · ② 「이번 �
   expect(m.cardTopToLabel).toBeCloseTo(16, 0);
   expect(m.labelToBars).toBeCloseTo(6, 0);
   expect(m.barsToHint).toBeCloseTo(12, 0);
+  expect(m.lastBarToHint, "막대 아래 끝 → 보조 줄(사이에 「목표 n시간」 한 줄)").toBeCloseTo(12 + 4 + 16, 0);
+  expect(m.rowGap, "예시 줄 둘 사이(전과 같음)").toBeCloseTo(16, 0);
+  expect(m.liPadding).toEqual(["0px/0px", "0px/0px"]);
   expect(m.hintToButton).toBeCloseTo(16, 0);
   expect(m.buttonToCardBottom).toBeCloseTo(16, 0);
   expect(m.innerWidth).toBeGreaterThan(200);
