@@ -23,6 +23,8 @@ async function open(page: Page, s: string) {
 }
 async function photo(page: Page, name: string) {
   fs.mkdirSync(OUT, { recursive: true });
+  // O-11: 겹친 창·확인 창이 서서히 나타나는 중(불투명도)에 찍지 않게, 도는 애니메이션이 끝날 때까지 기다린다
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: false });
 }
 async function noOverflow(page: Page) {
@@ -229,6 +231,10 @@ test("S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창(같은 꼴), 
   await expect(dlg).toBeVisible();
   await checkBack(page, dlg);
   await checkBottomPrimary(page, "저장", dlg);
+  // 목표 칸은 한 줄 칸 높이(세로 flex에 늘어나지 않음 — Figma 102:314 칸 56)
+  const fieldH = (await dlg.getByRole("textbox", { name: "목표" }).boundingBox())!.height;
+  expect(fieldH, "목표 칸 높이 48~56").toBeGreaterThanOrEqual(48);
+  expect(fieldH).toBeLessThanOrEqual(56);
   await noOverflow(page);
   await photo(page, "S8-b 목표 고치기");
   await dlg.getByRole("textbox", { name: "목표" }).fill("포트폴리오 끝내기");

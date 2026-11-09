@@ -988,3 +988,5 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .notify-time .input.notify-time-select { width: auto; flex: none; min-height: 32px; padding: 0 var(--space-2); font: 500 0.8125rem/1.25rem var(--font-family); border-radius: var(--radius-control); background: var(--color-surface); }
 .notify-card .notify-time { margin-top: var(--space-1); }
 .notify-card .notify-preview { margin-top: var(--space-2); }
+/* .screen-fill(세로 flex) 바로 안의 글 칸이 .input의 flex: 1로 세로로 늘어나지 않게(S8-b 목표 칸 — 고침9 아래 단추 자리에서 생긴 결함) */
+.screen-fill > .input, .screen-fill-body > .input { flex: none; }
