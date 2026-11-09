@@ -7,6 +7,7 @@ import { BackHeader, BottomActions } from "../../components/back-header";
 import { MeScreen } from "../../components/me-screen";
 import { Onboarding, ONBOARDING_TEXT } from "../../components/onboarding";
 import { Stepper } from "../../components/stepper";
+import { PrimaryButton, SecondaryButton, TextButton } from "../../components/ui";
 import { SIZE_TOKENS } from "../../lib/design-tokens";
 import type { SettingsApi } from "../../lib/onboarding-api";
 import { NOTIFY_ITEMS } from "../../lib/push/next";
@@ -457,5 +458,68 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     const goal = screen.getByRole("dialog", { name: "목표" });
     expect(within(goal).getByRole("button", { name: "이전" }).closest(".screen-head")).not.toBeNull();
     expect(within(goal).getByRole("button", { name: "저장" }).closest(".bottom-actions")).not.toBeNull();
+  });
+});
+
+describe("스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-150)", () => {
+  it("O-7: busy면 단추가 막히고(disabled) aria-busy, 흐림 0.45 규칙. busy가 아니면 막히지 않는다", () => {
+    const onClick = vi.fn();
+    render(
+      <>
+        <PrimaryButton busy onClick={onClick}>
+          저장 중
+        </PrimaryButton>
+        <SecondaryButton busy>보조</SecondaryButton>
+        <TextButton busy>글</TextButton>
+        <PrimaryButton>저장</PrimaryButton>
+      </>,
+    );
+    for (const name of ["저장 중", "보조", "글"]) {
+      const b = screen.getByRole("button", { name }) as HTMLButtonElement;
+      expect(b.disabled).toBe(true);
+      expect(b.getAttribute("aria-busy")).toBe("true");
+    }
+    fireEvent.click(screen.getByRole("button", { name: "저장 중" }));
+    expect(onClick).not.toHaveBeenCalled();
+    const idle = screen.getByRole("button", { name: "저장" }) as HTMLButtonElement;
+    expect(idle.disabled).toBe(false);
+    expect(idle.getAttribute("aria-busy")).toBeNull();
+    expect(CSS).toMatch(/\.btn\[aria-busy="true"\] \{[^}]*opacity:\s*0\.45/);
+  });
+
+  it("O-7: S8-a 저장 응답 전까지 주 단추가 「저장 중」 + 막힘, 두 번 눌러도 저장 호출은 한 번", async () => {
+    let resolve: (v: { ok: true; data: { ratios: RatioItem[] } }) => void = () => {};
+    const api = fakeApi({ saveRatios: vi.fn(() => new Promise((r) => (resolve = r))) });
+    mountMe(api);
+    await openS8a();
+    const save = within(dialog()!).getByRole("button", { name: "저장" });
+    await act(async () => fireEvent.click(save));
+    const busy = within(dialog()!).getByRole("button", { name: "저장 중" }) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    await act(async () => fireEvent.click(busy));
+    expect(api.saveRatios).toHaveBeenCalledTimes(1);
+    await act(async () => resolve({ ok: true, data: { ratios: [] } }));
+    expect(dialog()).toBeNull();
+  });
+
+  it("O-1: −/+ 누름 틀 44×44(보이는 원 32 그대로), 목표 비율 줄 간격 48. O-2: 글 단추 누름 높이 44(.text-tap) — 머리 「닫기」·「균등 배분」·「건너뛰기」", async () => {
+    expect(CSS).toMatch(/\.step-btn \{ inline-size: 44px; block-size: 44px; \}/);
+    expect(CSS).toMatch(/\.ratio-row \{ min-height: 48px;/);
+    expect(CSS).toMatch(/\.btn\.text-tap, \.text-tap \{[^}]*min-height:\s*44px/);
+    render(<BackHeader title="오늘 기록" onClose={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "닫기" }).classList.contains("text-tap")).toBe(true);
+    cleanup();
+    mountOnboarding();
+    expect(screen.getByRole("button", { name: "건너뛰기" }).classList.contains("text-tap")).toBe(true);
+    click("다음");
+    click("다음");
+    expect(screen.getByRole("button", { name: "균등 배분" }).classList.contains("text-tap")).toBe(true);
+  });
+
+  it("O-11: 겹친 창·시트·확인 창은 불투명도로 서서히 나타난다(자리 움직임 없음 — 동작 줄이기에도 같다)", () => {
+    expect(CSS).toMatch(/@keyframes duno-fade-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/);
+    expect(CSS).toMatch(/\.detail, \.evening-todo-sheet, \.close-confirm, \.close-confirm-backdrop, \.evening-todo-backdrop \{ animation: duno-fade-in 160ms ease-out; \}/);
+    expect(CSS).not.toMatch(/@keyframes duno-overlay-in/); // 자리를 옮기는 나타남은 두지 않는다
   });
 });

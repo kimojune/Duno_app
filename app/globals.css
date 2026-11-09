@@ -944,3 +944,16 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 /* 처음 설정 이름표 → 내용 사이(Figma 49:178·50:4: 제목 아래 약 20) */
 .onboarding .onboarding-title { margin-bottom: var(--space-4); }
 .onboarding .onboarding-title-row { margin-bottom: var(--space-4); }
+
+/* ---- 고침9 스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-150) ---- */
+/* O-1 −/+ : 보이는 원 32 그대로, 투명 누름 틀 44×44. 줄 간격 48(위아래 틀이 겹치지 않게) — Stepper·목표 비율 줄 한 곳 */
+.step-btn { inline-size: 44px; block-size: 44px; }
+.ratio-row { min-height: 48px; padding-block: 2px; }
+/* O-2 글 단추 누름 틀 높이 44(보이는 글 그대로). 화면마다 글 단추에 .text-tap을 단다(머리 「닫기」·「균등 배분」·「건너뛰기」·「로그아웃」 등) */
+.btn.text-tap, .text-tap { min-height: 44px; min-block-size: 44px; display: inline-flex; align-items: center; justify-content: center; padding-block: 0; }
+/* O-7 저장 중: 응답 전까지 단추를 막고(disabled — components/ui.tsx) 흐리게 */
+.btn[aria-busy="true"] { opacity: 0.45; cursor: progress; }
+/* O-11 겹친 창·시트·확인 창은 서서히 나타난다(불투명도만 160ms — 자리는 움직이지 않는다). 「동작 줄이기」여도 움직임이 없어 같다(명세 O-11 「시트는 서서히 나타남으로」).
+   다이얼 조각 나옴·빛은 components/ratio-dial.tsx가 이미 「동작 줄이기」면 바로 보인다 */
+@keyframes duno-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.detail, .evening-todo-sheet, .close-confirm, .close-confirm-backdrop, .evening-todo-backdrop { animation: duno-fade-in 160ms ease-out; }

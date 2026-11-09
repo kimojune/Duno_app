@@ -5,7 +5,7 @@ import type { SettingsApi } from "../lib/onboarding-api";
 import type { RatioItem } from "../lib/settings/types";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
-import { BackHeader, BottomActions } from "./back-header";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
 import { CloseConfirm } from "./close-confirm";
 import { entriesToRatios, normalizedPercents, RatioEditor, type RatioEntry } from "./ratio-editor";
 import { Notice, PrimaryButton } from "./ui";
@@ -24,7 +24,7 @@ import { Notice, PrimaryButton } from "./ui";
 export const RATIO_SETTINGS_TEXT = {
   title: "목표 비율",
   save: "저장",
-  saving: "저장하는 중",
+  saving: BACK_HEADER_TEXT.saving, // 「저장 중」(O-7)
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
   ratioNeed: "하나 이상은 0%보다 커야 해요.",

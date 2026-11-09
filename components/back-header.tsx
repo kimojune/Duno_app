@@ -16,6 +16,7 @@ import { TextButton } from "./ui";
  * BottomActions(A2): 주 단추 자리. 폭 가득(좌우 = 화면 안쪽 16), 화면 아래에 붙고(아래 여백 36), 내용이 짧아도 아래로 밀린다(부모가 .screen-fill).
  * 단추는 위에서 아래로 쌓인다(주 단추 위 · 보조 단추 아래 등). 내용이 길면 화면 끝 내용이 단추에 가리지 않는다(흐름 안에 있는 sticky).
  * 아래 탭이 있는 화면은 --bottom-actions-offset(탭 높이)만큼 위에 붙는다.
+ * 저장 중(O-7)은 주 단추의 busy(components/ui.tsx — 막힘 + aria-busy + 흐림 0.45)와 글 「저장 중」(BACK_HEADER_TEXT.saving)으로 보인다.
  *
  * 글은 React 텍스트로만 그린다.
  */
@@ -23,6 +24,8 @@ export const BACK_HEADER_TEXT = {
   back: "이전",
   close: "닫기",
   step: (n: number, total: number) => `${total}단계 중 ${n}단계`,
+  /** 저장 중 주 단추 글(명세 ⑭ O-7) */
+  saving: "저장 중",
 } as const;
 
 export function BackHeader({
@@ -67,7 +70,7 @@ export function BackHeader({
           </p>
         )}
         {onClose ? (
-          <TextButton className="screen-head-close" disabled={closeDisabled} onClick={onClose}>
+          <TextButton className="screen-head-close text-tap" disabled={closeDisabled} onClick={onClose}>
             {closeLabel}
           </TextButton>
         ) : (

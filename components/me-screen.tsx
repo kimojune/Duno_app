@@ -77,7 +77,7 @@ export function MeScreen({
 }) {
   const logout = onLogout ? (
     <div className="me-logout">
-      <TextButton id="me-logout-button" onClick={onLogout}>
+      <TextButton id="me-logout-button" className="text-tap" onClick={onLogout}>
         {ME_TEXT.logout}
       </TextButton>
     </div>
