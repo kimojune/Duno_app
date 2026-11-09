@@ -385,6 +385,7 @@ export function v2Rules(): Record<string, TableRule> {
     category_ratio_history: {
       insertColumns: ["user_id", "ratios"],
       defaults: (_row, store) => ({ recorded_at: store.nextTimestamp() }),
+      limit: { count: 1000, hint: "category_ratio_history_limit" },
     },
     todos: {
       allowDelete: true,

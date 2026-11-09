@@ -14,6 +14,9 @@ import { loadIntegrationEnv } from "./load-env";
  * - 쌓기만 하는 표라 앱 키로는 지울 수 없다. 시험 행은 사람이 SQL 편집기에서 지운다(시험 계정 둘의 행만, 번호는 시험 계정 A·B의 auth.users id):
  *     delete from public.category_ratio_history where user_id in ('<시험 계정 A id>', '<시험 계정 B id>');
  * - 양성 대조(A는 자기 기록이 보인다)를 먼저 단언하고, 그 뒤에 「B에게 안 보임·거절」을 통과로 삼는다.
+ * - 행 수 상한(트리거 private.category_ratio_history_enforce_limit, 임시 1000): B 계정을 상한까지 채운 뒤 한 줄 더 넣어 P0001을 본다.
+ *   채우기는 한 요청에 여러 줄(묶음 insert)이라 가볍다. 지울 수 없어 B는 상한에 머문다: 다시 돌리면 채울 것이 없고 같은 단언이 다시 성립한다.
+ *   B는 이 표에서 상한 시험 전용이다(다른 단언은 B의 쓰기 성공에 기대지 않는다). B의 앱 기록이 필요하면 위 지우기 SQL로 비운다.
  *   흉내가 실제로 그 사용자로 도는지: 각 클라이언트의 getUser() id가 A·B 번호와 같고 서로 다름을 먼저 본다.
  */
 
@@ -45,10 +48,11 @@ async function baseCategory(client: SupabaseClient, label: string): Promise<stri
   return first.id;
 }
 
+/** 자기 기록 수(행을 받지 않고 개수만: API 최대 행 수에 잘리지 않게) */
 async function countMine(client: SupabaseClient, userId: string): Promise<number> {
-  const res = await client.from(HISTORY).select("id").eq("user_id", userId);
-  if (res.error) throw new Error(`기록 세기 실패 (code=${res.error.code ?? "?"})`);
-  return (res.data ?? []).length;
+  const res = await client.from(HISTORY).select("id", { count: "exact", head: true }).eq("user_id", userId);
+  if (res.error || res.count === null) throw new Error(`기록 세기 실패 (code=${res.error?.code ?? "?"})`);
+  return res.count;
 }
 
 async function latestOf(client: SupabaseClient, userId: string) {
@@ -116,15 +120,17 @@ describe("category_ratio_history (목표 비율이 바뀐 기록, 쌓기만)", (
     expect(byId.data ?? []).toHaveLength(0);
   });
 
-  it("B가 user_id = A로 넣으면 거절되고 A의 기록 수는 그대로다. B가 자기 것은 넣을 수 있다(정상 통과)", async () => {
+  it("B가 user_id = A로 넣으면 거절되고 A의 기록 수는 그대로다. A가 자기 것은 직접 넣을 수 있다(정상 통과)", async () => {
     const countA = await countMine(a, aId);
     const forged = await b.from(HISTORY).insert({ user_id: aId, ratios: [{ category_id: null, percent: 100 }] }).select("id");
     expect(forged.error?.code).toBe("42501"); // WITH CHECK
     expect(await countMine(a, aId)).toBe(countA);
 
-    const own = await b.from(HISTORY).insert({ user_id: bId, ratios: [{ category_id: null, percent: 100 }] }).select("id, user_id");
+    // 정상 통과는 A로 본다(B는 아래 상한 시험이 상한까지 채워 두므로 자기 insert가 상한에 걸릴 수 있다)
+    const own = await a.from(HISTORY).insert({ user_id: aId, ratios: [{ category_id: null, percent: 100 }] }).select("id, user_id");
     expect(own.error).toBeNull();
-    expect((own.data as { user_id: string }[])[0].user_id).toBe(bId);
+    expect((own.data as { user_id: string }[])[0].user_id).toBe(aId);
+    expect(await countMine(a, aId)).toBe(countA + 1);
   });
 
   it("시각(recorded_at)·번호(id)는 넣지 못하고(insert 권한 없음), 배열이 아닌 ratios는 check가 막는다", async () => {
@@ -155,6 +161,32 @@ describe("category_ratio_history (목표 비율이 바뀐 기록, 쌓기만)", (
     const after = await latestOf(a, aId);
     expect(after.id).toBe(mine.id);
     expect(after.ratios).toEqual(mine.ratios);
+  });
+
+  it("행 수 상한(임시 1000): B를 상한까지 채우면 한 줄 더는 P0001(category_ratio_history_limit)로 거절되고 수는 그대로다", async () => {
+    const LIMIT = 1000; // 마이그레이션의 임시 값과 같다
+    const row = () => ({ user_id: bId, ratios: [{ category_id: null, percent: 100 }] });
+    const before = await countMine(b, bId);
+    expect(before).toBeLessThanOrEqual(LIMIT);
+    for (let left = LIMIT - before; left > 0; ) {
+      const n = Math.min(left, 250);
+      const fill = await b.from(HISTORY).insert(Array.from({ length: n }, row));
+      expect(fill.error).toBeNull(); // 상한 전까지는 들어간다(정상 통과)
+      left -= n;
+    }
+    expect(await countMine(b, bId)).toBe(LIMIT);
+
+    const over = await b.from(HISTORY).insert(row()).select("id");
+    expect(over.error?.code).toBe("P0001");
+    expect(over.error?.hint).toBe("category_ratio_history_limit");
+    expect(await countMine(b, bId)).toBe(LIMIT);
+
+    // 상한은 사용자마다: A는 그대로 넣을 수 있다
+    const countA = await countMine(a, aId);
+    expect(countA).toBeLessThan(LIMIT);
+    const aOk = await a.from(HISTORY).insert({ user_id: aId, ratios: [{ category_id: null, percent: 100 }] }).select("id");
+    expect(aOk.error).toBeNull();
+    expect(await countMine(a, aId)).toBe(countA + 1);
   });
 
   it("anon(로그인 없음)은 아무것도 못 보고 못 넣는다", async () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
@@ -221,6 +223,54 @@ describe("saveRatiosForUser → 바뀐 기록", () => {
     expect(store.table("category_ratios")).toHaveLength(2);
     expect(historyCalls(store)).toEqual([]);
     expect(warn.mock.calls.map((c) => c[0])).toEqual(["[ratio_history] skipped_invalid"]);
+  });
+
+  it("사용자 행 수 상한(1000)에 닿으면 기록만 실패하고(로그 code=P0001) 비율 저장은 성공한다", async () => {
+    const store = setup();
+    for (let i = 0; i < 1000; i += 1) {
+      store.seed(HISTORY, { user_id: ME, recorded_at: `2026-11-01T00:00:00.${String(i).padStart(3, "0")}Z`, ratios: [{ category_id: C1, percent: i % 2 === 0 ? 60 : 40 }, { category_id: C2, percent: i % 2 === 0 ? 40 : 60 }] });
+    }
+    // 남의 행은 내 상한에 세지 않는다
+    store.seed(HISTORY, { user_id: OTHER, recorded_at: "2026-11-01T00:00:00.000Z", ratios: [{ category_id: null, percent: 100 }] });
+    const ratios = [{ categoryId: C1, percent: 75 }, { categoryId: null, percent: 25 }];
+    expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
+    expect(store.table("category_ratios").map((r) => [r.category_id, r.percent])).toEqual([[C1, 75]]);
+    expect(store.table("user_settings")[0]).toMatchObject({ ratio_other_percent: 25 });
+    expect(historyInserts(store)).toHaveLength(1); // 넣으려 했고
+    expect(store.table(HISTORY).filter((r) => r.user_id === ME)).toHaveLength(1000); // 늘지 않았다
+    expect(warn.mock.calls.map((c) => c[0])).toEqual(["[ratio_history] write_failed code=P0001"]);
+  });
+});
+
+describe("마이그레이션 SQL의 행 수 상한 트리거(정적 — 적용 뒤 행동은 tests/integration/ratio-history-rls.test.ts)", () => {
+  const sql = readFileSync(path.resolve(__dirname, "../../supabase/migrations/20261109150000_category_ratio_history.sql"), "utf8");
+  const fn = /create function private\.category_ratio_history_enforce_limit\(\)([\s\S]*?)\r?\n\$\$;/.exec(sql)?.[1] ?? "";
+
+  it("상한 함수가 있고, 다른 쌓기 표와 같은 꼴이다(search_path 고정·사용자별 잠금·자기 행 세기·1000·P0001·hint)", () => {
+    expect(fn.length).toBeGreaterThan(0);
+    expect(fn).toContain("returns trigger");
+    expect(fn).toContain("set search_path = ''");
+    expect(fn).not.toMatch(/security definer/i); // evening_logs 등과 같이 부른 사람 권한(RLS 아래에서 자기 행만 센다)
+    expect(fn).toMatch(/history_limit constant integer := 1000;/);
+    expect(fn).toContain("pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('category_ratio_history:' || new.user_id::text, 0))");
+    expect(fn).toContain("from public.category_ratio_history h where h.user_id = new.user_id");
+    expect(fn).toContain("if existing >= history_limit then");
+    expect(fn).toContain("errcode = 'P0001', hint = 'category_ratio_history_limit'");
+  });
+  it("함수 실행 권한은 public·anon·authenticated에서 모두 거두고, before insert 행 트리거로 단다", () => {
+    for (const role of ["public", "anon", "authenticated"]) {
+      expect(sql).toContain(`revoke all on function private.category_ratio_history_enforce_limit() from ${role};`);
+    }
+    expect(sql).toMatch(
+      /create trigger category_ratio_history_enforce_limit\s+before insert on public\.category_ratio_history\s+for each row execute function private\.category_ratio_history_enforce_limit\(\);/,
+    );
+  });
+  it("되돌림 파일은 표 다음에 상한 함수도 지운다", () => {
+    const down = readFileSync(path.resolve(__dirname, "../../supabase/rollback/20261109150000_category_ratio_history.down.sql"), "utf8");
+    const table = down.indexOf("drop table if exists public.category_ratio_history;");
+    const func = down.indexOf("drop function if exists private.category_ratio_history_enforce_limit();");
+    expect(table).toBeGreaterThan(-1);
+    expect(func).toBeGreaterThan(table);
   });
 });
 
