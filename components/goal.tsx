@@ -176,7 +176,18 @@ export function GoalEditor({
   }
 
   return (
-    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="goal-title" onKeyDown={onKeyDown}>
+    // 고침10 J(50:332): 이번 주 목표도 시트 — 아래에서 올라온 판(위 모서리 16 · 손잡이 40×4) + 막(45%). 막을 누르면 「✕」와 같다(바꾼 것이 있으면 확인)
+    <div
+      ref={rootRef}
+      className="detail goal-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="goal-title"
+      onKeyDown={onKeyDown}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
+    >
       {/* 고침9 Figma 50:332: 제목 24 → 12 보조 한 줄 → 흰 카드(색 점 · 이름 · −/칸/+) → 「합계」 오른쪽 Bold → 폭 가득 「저장」 · 가운데 「목표 없애기」.
           고침10 A: 머리 = 왼쪽 위 머리 단추 「✕」(닫기, 시트 변형). 오른쪽 위 글 「닫기」는 없다 */}
       <div className="detail-inner screen-fill">

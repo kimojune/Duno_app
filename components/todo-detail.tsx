@@ -655,8 +655,9 @@ function colorOf(chips: Chip[], id: string | null): string {
 
 function CheckMark() {
   return (
-    <svg className="category-sheet-check" width={16} height={12} viewBox="0 0 16 12" aria-hidden="true" focusable="false">
-      <path d="M1 6L6 11L15 1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    // 고침10 J(77:18): 체크 24 선 아이콘(선 2, 끝 둥글게)
+    <svg className="category-sheet-check" width={24} height={24} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 12.5L10 17.5L19 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

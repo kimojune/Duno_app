@@ -822,6 +822,8 @@ export function TodoView(props: TodoViewProps) {
           </ul>
         )}
       </main>
+      {/* 고침10 J: 적는 창 = 위 모서리 16 + 손잡이 줄 40×4 + 뒤의 막(먹남색 45%). 적는 창은 모달이 아니므로(C-D1) 막은 보이기만 한다 — 누름은 막을 지나 목록에 닿는다 */}
+      {sheetOpen && <div className="todo-sheet-scrim" aria-hidden="true" />}
       {sheetOpen ? <TodoSheet {...props} sheetRef={sheetRef} /> : <AddTodoButton resume={props.resume} onOpen={props.onOpenSheet} />}
       <LiveRegion message={props.live} />
       {props.overlay}

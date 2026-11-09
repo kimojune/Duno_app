@@ -100,3 +100,18 @@ describe("S2 할 일 몸 (고침10 E)", () => {
     expect(document.body.textContent).toContain("글 한 편 초고 쓰기");
   });
 });
+
+describe("적는 창 막 · 분야 고르기 시트 체크 (고침10 J)", () => {
+  it("적는 창을 열면 뒤에 막이 깔리지만(보이기만) 목록은 그대로 누를 수 있다(비모달 C-D1). 닫으면 막도 없다", () => {
+    render(<TodoScreen initial={initial([{ id: "t1", readable: true, text: "목록 글", done: false, createdAt: "x", categoryId: null }])} manage={api()} />);
+    expect(document.querySelector(".todo-sheet-scrim")).toBeNull();
+    fireEvent.click(document.getElementById("add-todo-button")!);
+    const scrim = document.querySelector(".todo-sheet-scrim")!;
+    expect(scrim).toBeTruthy();
+    expect(scrim.getAttribute("aria-hidden")).toBe("true");
+    expect(css).toMatch(/\.todo-sheet-scrim \{[^}]*pointer-events: none/);
+    expect(document.querySelector("[aria-modal]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(document.querySelector(".todo-sheet-scrim")).toBeNull();
+  });
+});
