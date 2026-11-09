@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -25,7 +26,7 @@ import { EveningRecord } from "../../components/evening-record";
 import { doneCategoryIdsOf, EveningTodoLine, type EveningTodos } from "../../components/evening-todo-sheet";
 import { TodoScreen } from "../../components/todo-screen";
 import type { EveningApi } from "../../lib/evening-api";
-import type { EveningState } from "../../lib/evening/types";
+import type { EveningState, SavedEvening } from "../../lib/evening/types";
 import { createLocalApis } from "../../lib/local/apis";
 import { createMemoryKv, kvKeys } from "../../lib/local/kv";
 import { emptyMirror } from "../../lib/local/reduce";
@@ -629,5 +630,284 @@ describe("예전 방식(기기 먼저 저장 꺼짐): 할 일 탭과 같은 GET�
     expect(addTodo).not.toHaveBeenCalled();
     expect(within(sheet()).getByText("인터넷에 연결되면 적을 수 있어요. 적은 글은 그대로 있어요.")).toBeTruthy();
     expect((within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement).value).toBe("나중에");
+  });
+});
+
+// ── PM d-126: 「닫기」로 입력 잃음 막기(오늘 기록 · 오늘 할 일 시트가 같은 확인 부품을 쓴다) ──
+describe("닫기 전 확인(PM d-126)", () => {
+  const confirmBox = () => screen.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
+  const confirms = () => screen.queryAllByRole("alertdialog");
+  const recordDialog = () => screen.queryByRole("dialog", { name: /몇 시간 썼어요\?|분야마다 나눠 주세요|저장했어요/ });
+  const headClose = () => within(recordDialog()!).getAllByRole("button", { name: "닫기" })[0];
+  const plusHour = () => act(async () => fireEvent.click(screen.getByRole("button", { name: "시간 1시간 늘리기" })));
+  const keep = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "계속 적기" })));
+  const closeInConfirm = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "닫기" })));
+
+  /** 오늘 기록을 열고 닫는 바깥(진짜 앱처럼 onClose가 창을 내린다) */
+  function Host({ api, todos, onClosed }: { api: EveningApi; todos?: EveningTodos; onClosed: () => void }) {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <button type="button">바깥</button>
+        {open && (
+          <EveningRecord
+            api={api}
+            todos={todos}
+            onClose={() => {
+              onClosed();
+              setOpen(false);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+  async function mountHost(api: EveningApi = eveningApi(), todos?: EveningTodos) {
+    const onClosed = vi.fn();
+    render(<Host api={api} todos={todos} onClosed={onClosed} />);
+    await screen.findByRole("button", { name: "분야마다 나누기" });
+    return { onClosed, api };
+  }
+  async function openForm() {
+    await openSheet();
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
+    return within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement;
+  }
+
+  it("오늘 기록: 바꾼 것이 없으면 「닫기」는 확인 없이 바로 닫는다", async () => {
+    const { onClosed } = await mountHost();
+    await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(0);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(recordDialog()).toBeNull();
+  });
+
+  it("오늘 기록: 쓴 시간을 바꾸면 「닫기」가 확인을 띄운다 — alertdialog·제목 이름·처음 포커스 「계속 적기」. 「계속 적기」면 값 그대로 열린 채, 포커스는 「닫기」로", async () => {
+    const { onClosed, api } = await mountHost();
+    await plusHour();
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    const close = headClose();
+    close.focus();
+    await act(async () => fireEvent.click(close));
+    const box = confirmBox();
+    expect(box.getAttribute("aria-modal")).toBe("true");
+    expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 닫을까요?");
+    const keepButton = within(box).getByRole("button", { name: "계속 적기" });
+    expect(keepButton.className).toContain("btn-primary"); // 주 단추(먹남색)
+    expect(document.activeElement).toBe(keepButton);
+    expect(within(box).getAllByRole("button").map((b) => b.textContent)).toEqual(["계속 적기", "닫기"]);
+    // 확인 밖(오늘 기록의 나머지)은 inert
+    expect(close.closest("[inert]")).not.toBeNull();
+    expect(onClosed).not.toHaveBeenCalled();
+
+    await keep();
+    expect(confirms()).toHaveLength(0);
+    expect(recordDialog()).not.toBeNull();
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(document.activeElement).toBe(close);
+    expect(close.closest("[inert]")).toBeNull();
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it("오늘 기록: 확인에서 「닫기」면 닫힌다 — 저장 호출 0", async () => {
+    const { onClosed, api } = await mountHost();
+    await plusHour();
+    await act(async () => fireEvent.click(headClose()));
+    await closeInConfirm();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(recordDialog()).toBeNull();
+    expect(confirms()).toHaveLength(0);
+    expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it("오늘 기록: Esc도 같은 확인을 탄다. 확인에서 Esc = 계속 적기(값 그대로)", async () => {
+    const { onClosed } = await mountHost();
+    await plusHour();
+    await act(async () => fireEvent.keyDown(screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" }), { key: "Escape" }));
+    expect(confirms()).toHaveLength(1);
+    await act(async () => fireEvent.keyDown(confirmBox(), { key: "Escape" }));
+    expect(confirms()).toHaveLength(0);
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(onClosed).not.toHaveBeenCalled();
+    await act(async () => fireEvent.keyDown(screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" }), { key: "Escape" }));
+    await closeInConfirm();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("오늘 기록: 처음 값(타이머로 미리 채움 · 나누기 처음 값)은 바꾼 것이 아니다 — 나누기 단계에서도 바로 닫힌다", async () => {
+    const { onClosed } = await mountHost(eveningApi(eveningState({ timerByCategory: [{ categoryId: C1, minutes: 90 }] })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
+    await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(0);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("오늘 기록: 나누기에서 칩을 고르면 확인한다. 「계속 적기」면 고른 칩 그대로", async () => {
+    const { onClosed } = await mountHost(eveningApi(eveningState({ timerByCategory: [{ categoryId: C1, minutes: 90 }] })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
+    const chip = () => document.querySelector<HTMLButtonElement>(`[data-chip-id="${C2}"]`)!;
+    expect(chip().getAttribute("aria-pressed")).toBe("false");
+    await act(async () => fireEvent.click(chip()));
+    expect(chip().getAttribute("aria-pressed")).toBe("true");
+    await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(1);
+    await keep();
+    expect(chip().getAttribute("aria-pressed")).toBe("true");
+    await act(async () => fireEvent.click(headClose()));
+    await closeInConfirm();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("오늘 기록: 나누기 줄 값(−/+)만 바꿔도 확인한다", async () => {
+    const { onClosed } = await mountHost(eveningApi(eveningState({ timerByCategory: [{ categoryId: C1, minutes: 90 }] })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    await screen.findByRole("heading", { name: "분야마다 나눠 주세요" });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "어학 5분 줄이기" })));
+    await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(1);
+    expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  it("오늘 기록: 저장한 뒤의 「닫기」는 묻지 않는다", async () => {
+    const api = eveningApi();
+    vi.mocked(api.save).mockImplementation(async () => ({ ok: true as const, data: { log: {} as SavedEvening["log"], delta: [] } }));
+    const { onClosed } = await mountHost(api);
+    await plusHour();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나누지 않고 저장" })));
+    await screen.findByRole("heading", { name: "저장했어요" });
+    expect(api.save).toHaveBeenCalledTimes(1);
+    await act(async () => fireEvent.click(headClose()));
+    expect(confirms()).toHaveLength(0);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("오늘 기록 + 뒤로 가기(FakeHistory): 바꾼 것이 있으면 같은 확인을 타고 자기 칸으로 돌아간다. 「계속 적기」 뒤 뒤로 가기를 다시 누르면 다시 확인, 「닫기」면 닫히고 앱은 나가지 않는다", async () => {
+    const { onClosed, api } = await mountHost();
+    expect(history.entries).toHaveLength(2);
+    expect(history.index).toBe(1);
+    await plusHour();
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(history.forward).toHaveBeenCalledTimes(1); // 새 칸을 쌓지 않고 자기 칸으로 돌아간다
+    history.flush();
+    expect(history.index).toBe(1);
+    expect(history.pushState).toHaveBeenCalledTimes(1); // 처음 열 때 한 번뿐
+    expect(confirms()).toHaveLength(1); // 돌아온 popstate는 확인을 닫거나 겹치지 않는다
+    await keep();
+    expect(recordDialog()).not.toBeNull();
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+
+    // 다시 뒤로 가기 → 다시 확인(먹히지 않는다)
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    history.flush();
+    expect(history.index).toBe(1);
+    await closeInConfirm();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    history.flush(); // 닫으며 거둔 칸
+    expect(history.index).toBe(0);
+    expect(history.leftApp).toBe(false);
+    expect(recordDialog()).toBeNull();
+    expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it("오늘 기록 + 뒤로 가기: 바꾼 것이 없으면 확인 없이 닫힌다(예전 그대로)", async () => {
+    const { onClosed } = await mountHost();
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(0);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(history.forward).not.toHaveBeenCalled();
+    expect(history.leftApp).toBe(false);
+  });
+
+  it("시트: 「+ 할 일」 칸이 비었으면(띄어쓰기만 포함) 「닫기」는 확인 없이 시트만 닫는다", async () => {
+    const local = await makeLocal();
+    const { onClosed } = await mountHost(eveningApi(), { local });
+    const input = await openForm();
+    await act(async () => fireEvent.change(input, { target: { value: "   " } }));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
+    expect(confirms()).toHaveLength(0);
+    expect(screen.queryByRole("dialog", { name: "오늘 할 일" })).toBeNull();
+    expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  it("시트: 체크만 했으면(바로 저장됨) 묻지 않는다", async () => {
+    const local = await makeLocal();
+    await mountHost(eveningApi(), { local });
+    await openSheet();
+    await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
+    expect(confirms()).toHaveLength(0);
+    expect(screen.queryByRole("dialog", { name: "오늘 할 일" })).toBeNull();
+  });
+
+  it("시트: 글을 썼으면 「닫기」·Esc·바깥 누름이 같은 확인. 「계속 적기」면 글 그대로, 「닫기」면 시트만 닫히고 적기 호출 0", async () => {
+    const local = await makeLocal();
+    const { onClosed } = await mountHost(eveningApi(), { local });
+    const input = await openForm();
+    await act(async () => fireEvent.change(input, { target: { value: "발음 연습" } }));
+    const close = within(sheet()).getByRole("button", { name: "닫기" });
+    close.focus();
+    await act(async () => fireEvent.click(close));
+    expect(confirms()).toHaveLength(1);
+    expect(document.activeElement).toBe(within(confirmBox()).getByRole("button", { name: "계속 적기" }));
+    await keep();
+    expect(input.value).toBe("발음 연습");
+    expect(document.activeElement).toBe(close);
+    // Esc(시트 안)
+    input.focus();
+    await act(async () => fireEvent.keyDown(input, { key: "Escape" }));
+    expect(confirms()).toHaveLength(1);
+    await keep();
+    expect(document.activeElement).toBe(input);
+    // 바깥(어두운 바탕) 누름
+    await act(async () => fireEvent.click(document.querySelector(".evening-todo-backdrop")!));
+    expect(confirms()).toHaveLength(1);
+    await closeInConfirm();
+    expect(screen.queryByRole("dialog", { name: "오늘 할 일" })).toBeNull();
+    expect(recordDialog()).not.toBeNull(); // 오늘 기록은 그대로
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(local.addTodo).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+  });
+
+  it("시트 + 뒤로 가기(FakeHistory): 시트 확인만 뜬다(오늘 기록 확인과 겹치지 않음). 「계속 적기」 뒤 다시 뒤로 가기 → 다시 시트 확인, 「닫기」면 시트만 닫힌다", async () => {
+    const local = await makeLocal();
+    const { onClosed } = await mountHost(eveningApi(), { local });
+    await plusHour(); // 오늘 기록에도 바꾼 것이 있다
+    line().focus();
+    const input = await openForm();
+    expect(history.entries).toHaveLength(3);
+    await act(async () => fireEvent.change(input, { target: { value: "발음 연습" } }));
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    expect(screen.getByRole("dialog", { name: "오늘 할 일", hidden: true }).parentElement!.contains(confirmBox())).toBe(true); // 시트 층의 확인
+    history.flush();
+    expect(history.index).toBe(2);
+    expect(confirms()).toHaveLength(1);
+    await keep();
+    expect(input.value).toBe("발음 연습");
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    history.flush();
+    expect(history.index).toBe(2);
+    await closeInConfirm();
+    expect(screen.queryByRole("dialog", { name: "오늘 할 일" })).toBeNull();
+    history.flush();
+    expect(history.index).toBe(1);
+    expect(recordDialog()).not.toBeNull();
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(confirms()).toHaveLength(0);
+    // 이제 뒤로 가기는 오늘 기록의 확인(바꾼 시간이 있다)
+    await act(async () => history.userBack());
+    expect(confirms()).toHaveLength(1);
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    history.flush();
+    expect(history.index).toBe(1);
+    expect(history.leftApp).toBe(false);
   });
 });

@@ -569,8 +569,11 @@ for (const many of [false, true]) {
       await page.keyboard.press("Tab");
       await page.keyboard.press("ArrowRight");
       await expect(page.locator("#evening-dial-handle-end")).toHaveAttribute("aria-valuenow", "35");
-      // 안드로이드 뒤로 가기(브라우저 뒤로): 다이얼이 든 창만 닫히고 문서를 떠나지 않는다
+      // 안드로이드 뒤로 가기(브라우저 뒤로): 값을 바꿨으니 닫기 전 확인(PM d-126) → 「닫기」면 다이얼이 든 창만 닫히고 문서를 떠나지 않는다
       await page.goBack();
+      const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
+      await expect(confirm).toBeVisible();
+      await confirm.getByRole("button", { name: "닫기" }).click();
       await expect(dialog).toHaveCount(0);
       expect(page.url()).toBe(startUrl);
     });

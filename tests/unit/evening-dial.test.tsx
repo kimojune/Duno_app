@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -261,7 +261,7 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(results).toEqual([true]);
   });
 
-  it("키보드만으로: 다이얼에서 조각을 고르고 손잡이로 바꾼다. 다이얼·손잡이에서 Esc를 누르면 창이 닫힌다(창 닫기 규칙 그대로)", async () => {
+  it("키보드만으로: 다이얼에서 조각을 고르고 손잡이로 바꾼다. 다이얼·손잡이에서 Esc를 누르면 창 닫기 규칙을 탄다(값을 바꿨으니 닫기 전 확인, PM d-126)", async () => {
     const { onClose } = await openSplit120();
     const svg = dial()!;
     act(() => svg.focus());
@@ -271,10 +271,17 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(stepper("어학")).toBe(0);
     expect(stepper("포트폴리오")).toBe(60);
     expect(onClose).not.toHaveBeenCalled();
+    // 손잡이에서 Esc: 바꾼 값이 있으니 확인이 뜬다(창은 아직 닫히지 않는다). 확인에서 Esc = 계속 적기
     fireEvent.keyDown(handle("start"), { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    const confirm = screen.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(confirm, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(stepper("포트폴리오")).toBe(60);
+    // 다이얼에서 Esc: 다시 같은 확인 → 「닫기」면 창이 닫힌다
     fireEvent.keyDown(svg, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(2);
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "닫기" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("분야 9개 이상·긴 이름·꺾쇠도 다이얼이 깨지지 않고 글로 나온다", async () => {

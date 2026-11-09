@@ -11,6 +11,7 @@ import type { AddedTodo, TodoDoneState, TodoItem, TodoResult } from "../lib/todo
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
+import { CloseConfirm } from "./close-confirm";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, CategoryTag, helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -179,7 +180,20 @@ function EveningTodoSheet({
   onClose: () => void;
   onDoneCategoriesChange: (ids: string[]) => void;
 }) {
-  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
+  /* PM d-126: 「+ 할 일」 칸에 쓴 글이 있을 때만 닫기 전에 확인한다(빈칸·띄어쓰기만이면 그냥 닫는다. 체크는 바로 저장되므로 묻지 않는다) */
+  const [confirmClose, setConfirmClose] = useState(false);
+  const hasDraft = () => draftRef.current.trim() !== "";
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose, {
+    holdBack: () => {
+      if (!hasDraft()) return false;
+      setConfirmClose(true);
+      return true;
+    },
+  });
+  function requestClose() {
+    if (hasDraft()) setConfirmClose(true);
+    else onClose();
+  }
   const { local, onChanged } = todos;
   const { read, setRead, reload } = today;
   const online = useOnline();
@@ -346,7 +360,7 @@ function EveningTodoSheet({
     if (event.key !== "Escape" || composing(event)) return;
     event.preventDefault();
     event.stopPropagation(); // 시트만 닫는다(아래 오늘 기록 창은 그대로)
-    onClose();
+    requestClose();
   }
 
   const offlineText = local ? TODO_TEXT.offlineLocal : TODO_TEXT.offline;
@@ -355,13 +369,13 @@ function EveningTodoSheet({
 
   return (
     <div ref={rootRef} className="evening-todo-layer" onKeyDown={onKeyDown}>
-      <div className="evening-todo-backdrop" aria-hidden="true" onClick={onClose} />
+      <div className="evening-todo-backdrop" aria-hidden="true" onClick={requestClose} />
       <div className="evening-todo-sheet" role="dialog" aria-modal="true" aria-labelledby="evening-todo-title">
         <div className="detail-head">
           <h2 id="evening-todo-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {EVENING_TODO_TEXT.title}
           </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
+          <TextButton className="btn-flush-end" onClick={requestClose}>
             {EVENING_TODO_TEXT.close}
           </TextButton>
         </div>
@@ -465,6 +479,7 @@ function EveningTodoSheet({
           {message}
         </p>
       </div>
+      {confirmClose && <CloseConfirm onKeep={() => setConfirmClose(false)} onClose={onClose} />}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { RatioDial, type DialSlice } from "./ratio-dial";
 import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { ChipScroller } from "./chip-scroller";
 import { Stepper } from "./stepper";
+import { CloseConfirm } from "./close-confirm";
 import { categoryDuplicateText, categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -144,7 +145,24 @@ export function EveningRecord({
   /** 저장 직후 한 줄 아래에 얹는 것(상태보기의 「채울」 한 줄 등) */
   renderAfterSave?: (saved: SavedEvening, state: EveningState) => ReactNode;
 }) {
-  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
+  /*
+   * 처음 값에서 사용자가 바꾼 것이 있나(PM d-126): 쓴 시간 −/+·숫자 칸, 나누기 칩 고르기·풀기(「+ 분야」로 더해 골라진 칩 포함), 다이얼, 분야 줄 값.
+   * 처음 값을 채우는 일(불러오기·처음 나누기)은 바꾼 것이 아니다. 불러올 때(날 바꾸기 포함)와 저장한 뒤 거둔다.
+   * 바꾼 것이 있으면 「닫기」·Esc·뒤로 가기가 확인 한 단계를 거친다. 없으면 그냥 닫는다
+   */
+  const dirtyRef = useRef(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose, {
+    holdBack: () => {
+      if (!dirtyRef.current) return false;
+      setConfirmClose(true);
+      return true;
+    },
+  });
+  function requestClose() {
+    if (dirtyRef.current) setConfirmClose(true);
+    else onClose();
+  }
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
   const online = useOnline() || api.localFirst === true;
   const [offsetDays, setOffsetDays] = useState<0 | 1>(0);
@@ -204,6 +222,7 @@ export function EveningRecord({
       setDialPick(OTHER_KEY);
     }
     editedRef.current = false;
+    dirtyRef.current = false;
     setAdded([]);
     setNewCatOpen(false);
     setNewCatDraft("");
@@ -308,11 +327,13 @@ export function EveningRecord({
     if (has(prev, id)) return;
     const res = pickChip(total, prev, id);
     editedRef.current = true;
+    dirtyRef.current = true;
     perRef.current = res.perCategory;
     setPerCategory(res.perCategory);
     if (res.taken > 0) setDialPick(id);
   }
   function toggleChip(id: string) {
+    dirtyRef.current = true;
     setNewCatHelp("");
     const prev = perRef.current;
     if (!has(prev, id)) {
@@ -444,6 +465,7 @@ export function EveningRecord({
     });
     setSaving(false);
     if (res.ok) {
+      dirtyRef.current = false; // 저장한 뒤 닫기는 묻지 않는다
       setSaved(res.data);
       setPhase("saved");
       onSaved?.(res.data);
@@ -455,8 +477,14 @@ export function EveningRecord({
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape" && !composing(event)) {
       event.preventDefault();
-      onClose();
+      requestClose();
     }
+  }
+
+  /** 쓴 시간을 사용자가 바꿨다(−/+·숫자 칸). 같은 값이면 바꾼 것으로 치지 않는다 */
+  function changeTotal(next: number) {
+    if (next !== total) dirtyRef.current = true;
+    setTotal(next);
   }
 
   const { hours, minutes } = splitMinutes(total);
@@ -475,7 +503,7 @@ export function EveningRecord({
           <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {phase === "split" ? EVENING_TEXT.splitHeading : phase === "saved" ? EVENING_TEXT.saved : ask}
           </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
+          <TextButton className="btn-flush-end" onClick={requestClose}>
             {EVENING_TEXT.close}
           </TextButton>
         </div>
@@ -513,8 +541,8 @@ export function EveningRecord({
             {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
             {!state.existing && timerSum > 0 && <p className="todo-sub">{EVENING_TEXT.timerFilled(timerSum)}</p>}
             <div className="evening-time">
-              <Stepper id="evening-hours" label={EVENING_TEXT.hours} unit={EVENING_TEXT.hours} value={hours} max={24} step={1} onChange={(h) => setTotal(Math.min(APP_CONFIG.maxDayMinutes, h * 60 + minutes))} />
-              <Stepper id="evening-minutes" label={EVENING_TEXT.minutes} unit={EVENING_TEXT.minutes} value={minutes} max={59} step={APP_CONFIG.minuteStep} onChange={(m) => setTotal(Math.min(APP_CONFIG.maxDayMinutes, hours * 60 + m))} />
+              <Stepper id="evening-hours" label={EVENING_TEXT.hours} unit={EVENING_TEXT.hours} value={hours} max={24} step={1} onChange={(h) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, h * 60 + minutes))} />
+              <Stepper id="evening-minutes" label={EVENING_TEXT.minutes} unit={EVENING_TEXT.minutes} value={minutes} max={59} step={APP_CONFIG.minuteStep} onChange={(m) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, hours * 60 + m))} />
             </div>
             <p className="ratio-total" role="status">
               {EVENING_TEXT.total(total)}
@@ -630,6 +658,7 @@ export function EveningRecord({
                   onSelect={setDialPick}
                   onChange={(values) => {
                     editedRef.current = true;
+                    dirtyRef.current = true;
                     setPerCategory((prev) => ({ ...prev, ...Object.fromEntries(chosen.map((c, i) => [c.id, values[i]])) }));
                   }}
                   format={formatMinutes}
@@ -658,6 +687,7 @@ export function EveningRecord({
                     step={APP_CONFIG.minuteStep}
                     onChange={(m) => {
                       editedRef.current = true;
+                      dirtyRef.current = true;
                       setPerCategory((prev) => ({ ...prev, [c.id]: m }));
                     }}
                   />
@@ -717,6 +747,7 @@ export function EveningRecord({
           </div>
         )}
       </div>
+      {confirmClose && <CloseConfirm onKeep={() => setConfirmClose(false)} onClose={onClose} />}
     </div>
   );
 }
