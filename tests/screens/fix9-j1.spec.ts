@@ -107,9 +107,23 @@ test("S1-1~S1-4 처음 설정: 「‹」(2~4단계) · 진행 막대 · 이름�
   // S1-4
   await page.getByRole("button", { name: "다음" }).click();
   await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
-  await expect(page.getByText("오후 7:30 · “오늘 몇 시간 썼는지 적어 둘까요?”")).toBeVisible();
-  await expect(page.getByText(/^오전 10:00 · “오늘 먼저 할 일 · .+”$/)).toBeVisible();
-  await expect(page.getByRole("combobox")).toHaveCount(0);
+  // PM d-157 · 명세 ⑲(Figma 50:4 고침): 이름 아래 시각 칸 → 그 아래 실제 알림 글 미리 보기
+  const eveningTime = page.getByLabel("오늘 기록 알림 시각");
+  await expect(eveningTime).toHaveValue("1170");
+  await expect(page.getByLabel("아침 알림 시각")).toHaveValue("600");
+  await expect(page.getByText("“오늘 몇 시간 썼는지 적어 둘까요?”")).toBeVisible();
+  await expect(page.getByText("“오늘 먼저 할 일”", { exact: true })).toBeVisible();
+  const timeBox = await eveningTime.evaluate((e) => {
+    const s = getComputedStyle(e);
+    const r = e.getBoundingClientRect();
+    return { h: Math.round(r.height), bw: s.borderTopWidth, radius: s.borderTopLeftRadius, bg: s.backgroundColor, w: r.width };
+  });
+  expect(timeBox).toMatchObject({ h: 32, bw: "1px", radius: "8px", bg: rgb(COLOR_TOKENS["--color-surface"]) });
+  expect(timeBox.w, "시각 칸은 글 폭만큼").toBeLessThan(160);
+  const nameY = (await page.locator(".notify-name", { hasText: "오늘 기록 알림" }).boundingBox())!.y;
+  const timeY = (await eveningTime.boundingBox())!.y;
+  const previewY = (await page.getByText("“오늘 몇 시간 썼는지 적어 둘까요?”").boundingBox())!.y;
+  expect(nameY < timeY && timeY < previewY, "이름 → 시각 칸 → 미리 보기").toBe(true);
   for (const name of ["오늘 기록 알림", "아침 알림"]) await expect(page.getByRole("checkbox", { name })).toBeChecked();
   const sw = (await page.locator(".notify-switch").first().boundingBox())!;
   expect([Math.round(sw.width), Math.round(sw.height)], "스위치 44×26").toEqual([44, 26]);

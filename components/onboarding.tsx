@@ -22,7 +22,8 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  * - 분야는 적고 넓게. 예시 칩은 lib/app-config.ts 한 곳에서 읽는다(마감 있는 일 없음, D-132).
  * - 알림(S1-4): 줄 둘(켬이 기본) + 줄마다 시각과 실제 알림 글 미리 보기(⑬ 4·5·6, 글은 lib/push/next.ts NOTIFY_ITEMS 한 곳에서). 끝 단추는 「시작하기」 하나(PM 1).
  *   누르면 켠 알림이 있을 때만 브라우저 허락을 묻고 구독한다(D-102⑤). 다 껐으면 허락을 묻지 않는다(requestPermission 호출 없음). 허락하지 않아도 앱으로 들어간다.
- *   시각은 여기서 고르지 않는다(Figma 50:4에 고르기 칸이 없다 — 고르기는 내 정보). 처음 값(오후 7:30 · 오전 10:00)을 그대로 저장한다.
+ *   줄마다 이름 아래 시각 칸 「오후 7:30 ▾」(내 정보와 같은 NotifyRow, PM d-157 ① · 명세 ⑲ — 보이는 「시각」 글은 없고 화면 읽기 이름 「… 시각」), 그 아래 미리 보기. 처음 값은 오후 7:30 · 오전 10:00, 고른 값이 저장 인자(notify eveningMinute·morningMinute)로 간다.
+ *   미리 보기는 실제 알림 글 그대로(PM d-157 ②): 저녁 = 본문, 아침 = 제목(분야 이름 없음). 글 원본은 lib/push/next.ts NOTIFY_ITEMS 한 곳.
  * - AI 없이 돈다. 이 화면에 AI는 없다(AI 자리 ① 분야 초안은 다음 판).
  * 모든 글은 React 텍스트로만 그린다.
  */
@@ -49,10 +50,9 @@ export const ONBOARDING_TEXT = {
   notifyHeading: "알림",
   eveningName: "오늘 기록 알림",
   morningName: "아침 알림",
-  /** 줄 아래 미리 보기(⑬ 5·6): 시각 · “실제 알림 글”. 저녁 = 알림 본문, 아침 = 알림 제목 · 고른 첫 분야(없으면 「분야」 — 22 판단) */
-  eveningPreview: (minute: number) => `${formatClock(minute)} · “${NOTIFY_ITEMS.evening.body}”`,
-  morningPreview: (minute: number, firstCategory: string | null) =>
-    `${formatClock(minute)} · “${NOTIFY_ITEMS.morning.title} · ${firstCategory ?? "분야"}”`,
+  /** 시각 칸 아래 미리 보기(명세 ⑲ · PM d-157 ②, Figma 50:4 고침): “실제 알림 글”. 저녁 = 알림 본문, 아침 = 알림 제목(실제 푸시 글 그대로 — 분야 이름 없음). 시각은 위 시각 칸에 있다 */
+  eveningPreview: () => `“${NOTIFY_ITEMS.evening.body}”`,
+  morningPreview: () => `“${NOTIFY_ITEMS.morning.title}”`,
   next: "다음",
   skipGoal: "건너뛰기",
   start: "시작하기",
@@ -130,8 +130,8 @@ export function Onboarding({
   const [categoryMessage, setCategoryMessage] = useState("");
   const [eveningOn, setEveningOn] = useState(true);
   const [morningOn, setMorningOn] = useState(true);
-  const eveningMinute = initialNotify.eveningMinute;
-  const morningMinute = initialNotify.morningMinute;
+  const [eveningMinute, setEveningMinute] = useState(initialNotify.eveningMinute);
+  const [morningMinute, setMorningMinute] = useState(initialNotify.morningMinute);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -298,8 +298,6 @@ export function Onboarding({
   }
 
   const examples = APP_CONFIG.categoryExamples.filter((name) => !catalog.some((c) => sameCategoryName(c.name, name)));
-  // 아침 알림 미리 보기에 쓰는 「고른 첫 분야」(고른 차례의 첫째)
-  const firstCategory = selected.map((id) => catalog.find((c) => c.id === id)?.name).find((n): n is string => n !== undefined) ?? null;
 
   return (
     <main className="onboarding screen-fill" aria-labelledby="onboarding-heading">
@@ -400,16 +398,22 @@ export function Onboarding({
               <NotifyRow
                 id="evening"
                 name={ONBOARDING_TEXT.eveningName}
-                preview={ONBOARDING_TEXT.eveningPreview(eveningMinute)}
+                preview={ONBOARDING_TEXT.eveningPreview()}
                 on={eveningOn}
+                minute={eveningMinute}
                 onToggle={setEveningOn}
+                onMinute={setEveningMinute}
+                hideTimeLabel
               />
               <NotifyRow
                 id="morning"
                 name={ONBOARDING_TEXT.morningName}
-                preview={ONBOARDING_TEXT.morningPreview(morningMinute, firstCategory)}
+                preview={ONBOARDING_TEXT.morningPreview()}
                 on={morningOn}
+                minute={morningMinute}
                 onToggle={setMorningOn}
+                onMinute={setMorningMinute}
+                hideTimeLabel
               />
             </div>
           </section>
@@ -451,8 +455,10 @@ export function Onboarding({
 
 /**
  * 알림 한 줄(처음 설정 S1-4와 내 정보 S8이 같이 쓴다): 이름 + 오른쪽 켜고 끄기(스위치 모양의 체크 상자, 이름이 접근성 이름).
- * - preview가 있으면 줄 아래에 시각 · 실제 알림 글 미리 보기(처음 설정, ⑬ 5·6).
- * - onMinute가 있으면 줄 아래에 「시각」 고르기(30분 단위, 내 정보). 끈 알림은 시각을 못 고른다. 줄 설명 글은 없다(⑬ 25 뺀 채로).
+ * - preview가 있으면 시각 칸 아래에 실제 알림 글 미리 보기(처음 설정, ⑬ 5·6 · ⑲).
+ * - onMinute가 있으면 줄 아래에 「시각」 고르기(30분 단위 — 처음 설정·내 정보). 끈 알림은 시각을 못 고른다. 줄 설명 글은 없다(⑬ 25 뺀 채로).
+ * - busy(내 정보 바로 저장 중)는 disabled가 아니라 aria-disabled로 막는다: 바꾸기는 무시하고 키보드 포커스는 그 자리에 남는다(검토 LOW).
+ *   disabled(오프라인)는 진짜로 막는다.
  */
 export function NotifyRow({
   id,
@@ -463,6 +469,8 @@ export function NotifyRow({
   onToggle,
   onMinute,
   disabled,
+  busy,
+  hideTimeLabel,
 }: {
   id: string;
   name: string;
@@ -471,8 +479,12 @@ export function NotifyRow({
   minute?: number;
   onToggle: (on: boolean) => void;
   onMinute?: (minute: number) => void;
-  /** 저장 중·오프라인이면 켜고 끄기·시각을 막는다(내 정보 바로 저장, O-5) */
+  /** 오프라인이면 켜고 끄기·시각을 막는다(내 정보 바로 저장, O-5) */
   disabled?: boolean;
+  /** 저장 중: aria-disabled로 알리고 바꾸기를 무시한다(포커스는 남음) */
+  busy?: boolean;
+  /** 시각 칸 앞 「시각」 글을 화면 읽기에만 둔다(처음 설정 — Figma 50:4) */
+  hideTimeLabel?: boolean;
 }) {
   const options = timeOptions();
   // 30분 단위가 아닌 값(옛 설정)도 고를 수 있게 목록에 끼워 둔다
@@ -486,22 +498,31 @@ export function NotifyRow({
           className="notify-switch-input"
           checked={on}
           disabled={disabled}
-          onChange={(e) => onToggle(e.target.checked)}
+          aria-disabled={busy ? true : undefined}
+          onChange={(e) => {
+            if (busy) return; // 저장 중: 바꾸지 않는다(controlled라 화면은 그대로)
+            onToggle(e.target.checked);
+          }}
           aria-describedby={preview ? `${id}-preview` : undefined}
         />
         <span className="notify-switch" aria-hidden="true" />
       </label>
-      {preview && (
-        <p id={`${id}-preview`} className="notify-preview">
-          {preview}
-        </p>
-      )}
       {onMinute && minute !== undefined && (
         <div className="notify-time">
-          <label htmlFor={`${id}-time`} className="notify-time-label">
+          <label htmlFor={`${id}-time`} className={hideTimeLabel ? "sr-only" : "notify-time-label"}>
             <span className="sr-only">{name} </span>시각
           </label>
-          <select id={`${id}-time`} className="input notify-time-select" value={minute} disabled={!on || disabled} onChange={(e) => onMinute(Number(e.target.value))}>
+          <select
+            id={`${id}-time`}
+            className="input notify-time-select"
+            value={minute}
+            disabled={!on || disabled}
+            aria-disabled={busy ? true : undefined}
+            onChange={(e) => {
+              if (busy) return;
+              onMinute(Number(e.target.value));
+            }}
+          >
             {list.map((m) => (
               <option key={m} value={m}>
                 {formatClock(m)}
@@ -509,6 +530,11 @@ export function NotifyRow({
             ))}
           </select>
         </div>
+      )}
+      {preview && (
+        <p id={`${id}-preview`} className="notify-preview">
+          {preview}
+        </p>
       )}
     </div>
   );
