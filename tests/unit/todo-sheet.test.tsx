@@ -27,6 +27,7 @@ vi.mock("../../lib/read-client", () => ({ fetchToday: (...a: unknown[]) => fetch
 vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
+import { resetChipRowMemory } from "../../components/chip-scroller";
 import { CATEGORY_ADD_TIMEOUT_MS, SAVE_TIMEOUT_MS, TodoScreen } from "../../components/todo-screen";
 import { TodoView, type TodoViewProps } from "../../components/todo-view";
 
@@ -555,6 +556,43 @@ describe("C12~C20 분야 더하기", () => {
     expect(liveText()).toBe("분야를 더하고 골랐어요: 자격증");
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ inline: "nearest", block: "nearest" });
     expect(todoInput().value).toBe("할 일 칸 글");
+  });
+
+  it("고침9 K: 칩이 두 줄을 넘는 적는 창에서 분야를 더하면 칩 줄이 펼친 채로 남아 새 칩이 보이고(aria-pressed true) 초점이 새 칩, 「분야 접기」 aria-expanded true", async () => {
+    // 가짜 배치: 칩 줄 폭 320, 칩 폭 = 글자 수 × 14 + 32, 칩 사이 8, 줄 높이 44
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const row = this.parentElement;
+      if (!row || !row.classList.contains("chip-row")) return new DOMRect(0, 0, 0, 0);
+      let x = 0;
+      let line = 0;
+      for (const child of [...row.children]) {
+        const w = child.hasAttribute("data-chip-more") ? 56 : (child.textContent ?? "").length * 14 + 32;
+        if (x > 0 && x + w > 320) {
+          line += 1;
+          x = 0;
+        }
+        if (child === this) return new DOMRect(x, line * 44, w, 36);
+        x += w + 8;
+      }
+      return new DOMRect(0, 0, 0, 0);
+    });
+    resetChipRowMemory();
+    const many = Array.from({ length: 12 }, (_, i) => cat(`${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`, `분야 이름 ${i + 1}`));
+    renderScreen(read([], many));
+    open();
+    const more = within(chipGroup()).queryByRole("button", { name: /^분야 \d+개 더 보기$/ });
+    expect(more, "더하기 전에는 두 줄로 접혀 「+n」이 있다").not.toBeNull();
+    fireEvent.click(more!); // 「+ 분야」는 숨은 쪽 — 펼쳐서 누른다
+    fireEvent.click(addCategoryChip());
+    addCategory.mockImplementation(async (id: string) => added(id, "새로 만든 분야"));
+    typeCategory("새로 만든 분야");
+    pressAdd();
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "새 분야 이름" })).toBeNull());
+    const fresh = chip("새로 만든 분야");
+    expect(fresh.getAttribute("aria-pressed")).toBe("true");
+    expect(within(chipGroup()).queryByRole("button", { name: /^분야 \d+개 더 보기$/ }), "새 칩을 「+n」 뒤로 숨기지 않는다").toBeNull();
+    expect(within(chipGroup()).getByRole("button", { name: "분야 접기" }).getAttribute("aria-expanded")).toBe("true");
+    await waitFor(() => expect(document.activeElement).toBe(fresh));
   });
 
   it("C15 빈 이름: 요청이 나가지 않고 포커스가 새 분야 칸에 남는다", () => {
