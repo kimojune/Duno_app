@@ -591,15 +591,7 @@ for (const many of [false, true]) {
 // 분야 10개(긴 이름 하나)에서 줄 높이가 칩 하나 높이이고, 넘치면 「›」(칩 줄 밖 제 칸, 누름 48), 한 화면 폭씩 넘기고, 가로 넘침이 없다
 const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (page: Page) => Promise<void> }[] = [
   { id: "timer", state: "timer-many", group: "분야" },
-  {
-    id: "detail",
-    state: "detail-many",
-    group: "분야",
-    prepare: async (page) => {
-      await page.locator("#dev-open-window").click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-    },
-  },
+  // 고침9 PM 3: 할 일 자세히(S2-b)에는 칩 줄이 없다(고른 분야 한 줄 + 분야 고르기 시트) — tests/screens/fix9-j2.spec.ts가 본다
   {
     id: "onboarding",
     state: "ratio-onboarding-many",

@@ -10,6 +10,7 @@ import { formatMinutes, formatTimer } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, OtherChip } from "./todo-view";
+import { categoryColorValue } from "../lib/category-color";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
 
 /**
@@ -318,8 +319,8 @@ export function TimerScreen({
                 </span>
                 <ChipScroller aria-labelledby="timer-category-label">
                   <OtherChip pressed={noneCategory === null} onSelect={() => setNoneCategory(null)} />
-                  {categories.map((c) => (
-                    <CategoryChip key={c.id} chip={c} pressed={noneCategory === c.id} onToggle={(id) => setNoneCategory(noneCategory === id ? null : id)} />
+                  {categories.map((c, index) => (
+                    <CategoryChip key={c.id} chip={c} color={categoryColorValue(index)} pressed={noneCategory === c.id} onToggle={(id) => setNoneCategory(noneCategory === id ? null : id)} />
                   ))}
                 </ChipScroller>
               </>
@@ -337,7 +338,7 @@ export function TimerScreen({
         </p>
 
         {load === "ready" && (
-          <section aria-labelledby="timer-records-title">
+          <section aria-labelledby="timer-records-title" className={ended.length === 0 ? "timer-records is-empty" : "timer-records"}>
             <h2 id="timer-records-title" className="growth-sub-title">
               {TIMER_TEXT.recordsHeading}
             </h2>

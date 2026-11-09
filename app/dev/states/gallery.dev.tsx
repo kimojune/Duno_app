@@ -102,6 +102,16 @@ function TopCards() {
 const TODO_STATES: Record<string, Partial2> = {
   // 창 닫힘
   C1: { list: "ready", rows: BASIC, sheetOpen: false },
+  // 고침9 PM 2-B: 작업 기록이 있는 줄(첫 줄 · 긴 글 둘째 줄)에 종이 아이콘
+  "C1-notes": {
+    list: "ready",
+    rows: [
+      row("r1", "토익 단어 50개", { category: "어학", hasNotes: true }),
+      row("r2", "포트폴리오 2장 고치기 — 표지와 목차를 먼저 다시 그리고 사례 둘을 고르기", { category: "포트폴리오", hasNotes: true }),
+      row("r3", "정보처리기사 기출 1회", { done: true, category: "자격증" }),
+    ],
+    sheetOpen: false,
+  },
   "C1-12": { list: "ready", rows: twelve(), sheetOpen: false },
   C2: { list: "loading", rows: [], categories: "loading", sheetOpen: false },
   C3: { list: "ready", rows: [], sheetOpen: false },

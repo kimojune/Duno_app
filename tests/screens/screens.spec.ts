@@ -260,7 +260,10 @@ for (const state of C_STATES) {
         }
         if (state.id === "C3") {
           await expect(page.getByText("0개 중 0개 끝냄", { exact: false })).toBeVisible();
-          await expect(page.getByText(sheet === "open" ? "아래 칸에 적어 보세요." : "아래 단추를 눌러 적어 보세요.")).toBeVisible();
+          // 고침9 ⑬ 9: 「아래 단추를 눌러 적어 보세요.」 대신 이름표 「예시」 + 예시 할 일 줄 둘(창이 열려도 같다)
+          await expect(page.getByRole("region", { name: "예시" })).toBeVisible();
+          await expect(page.getByRole("region", { name: "예시" }).locator("li")).toHaveCount(2);
+          await expect(page.getByText("아래 단추를 눌러 적어 보세요.")).toHaveCount(0);
         }
         if (state.id === "C4") {
           await expect(page.locator(".notice[role=alert]")).toHaveText(/할 일을 불러오지 못했어요/);

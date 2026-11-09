@@ -436,8 +436,11 @@ export function AddTodoButton({ resume, onOpen }: { resume: boolean; onOpen: () 
   );
 }
 
-/** 칩 하나. 누름 영역 48×48 이상, 보이는 면은 높이 32. 고름은 면 색 + 체크 그림 둘로 가른다 */
-export function CategoryChip({ chip, pressed, onToggle }: { chip: ChipView; pressed: boolean; onToggle: (id: string) => void }) {
+/**
+ * 칩 하나. 누름 영역 48×48 이상, 보이는 면은 높이 32. 고름은 면 색 + 체크 그림 둘로 가른다.
+ * color(고침9, Figma 50:103 · 50:390 · ④-2 「이름 + 색 점」)를 주면 이름 앞에 분야 색 점(1px 윤곽). 색만으로 가르지 않는다(이름이 늘 함께)
+ */
+export function CategoryChip({ chip, pressed, onToggle, color }: { chip: ChipView; pressed: boolean; onToggle: (id: string) => void; color?: string }) {
   return (
     <button
       type="button"
@@ -449,6 +452,7 @@ export function CategoryChip({ chip, pressed, onToggle }: { chip: ChipView; pres
     >
       <span className="chip-face">
         {pressed && <CheckIcon />}
+        {color && <span className="chip-dot" style={{ background: color }} aria-hidden="true" />}
         {/* 말줄임은 CSS로만. 접근 이름은 전체 이름이다(C23) */}
         <span className="chip-label">{chip.name}</span>
       </span>
@@ -472,6 +476,7 @@ export function OtherChip({ pressed, onSelect }: { pressed: boolean; onSelect: (
     >
       <span className="chip-face">
         {pressed && <CheckIcon />}
+        <span className="chip-dot" style={{ background: categoryColorValue(null) }} aria-hidden="true" />
         <span className="chip-label">{TODO_TEXT.other}</span>
       </span>
     </button>
@@ -527,8 +532,14 @@ export function CategoryChipRow(
           if (props.selectedCategoryId !== null) props.onToggleChip(props.selectedCategoryId);
         }}
       />
-      {props.chips.map((chip) => (
-        <CategoryChip key={chip.id} chip={chip} pressed={chip.id === props.selectedCategoryId} onToggle={props.onToggleChip} />
+      {props.chips.map((chip, index) => (
+        <CategoryChip
+          key={chip.id}
+          chip={chip}
+          color={categoryColorValue(index)}
+          pressed={chip.id === props.selectedCategoryId}
+          onToggle={props.onToggleChip}
+        />
       ))}
       <AddCategoryChip onOpen={props.onOpenNewCategory} />
     </ChipScroller>
