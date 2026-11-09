@@ -398,6 +398,23 @@ describe("고침9 PM 3 분야 고르기 시트(Figma 77:18)", () => {
   });
 });
 
+describe("고침9 S2 목록 줄 꼴(Figma 50:52)", () => {
+  it("분야 점(분야 색) + 이름, 기타는 표시 없음, 줄 오른쪽 「›」(이름 「자세히 보기: 글」), 저장 대기 줄에는 「›」 대신 도는 원 자리", () => {
+    render(<TodoScreen initial={initial([item(A, "단어", CAT), item(B, "기타 할 일")])} manage={fakeApi()} />);
+    const rowA = document.getElementById(`row-${A}`)!;
+    const dot = rowA.querySelector<HTMLElement>(".category-tag-dot")!;
+    expect(dot.style.background).toBe("var(--color-category-1)");
+    expect(dot.getAttribute("aria-hidden")).toBe("true");
+    expect(rowA.querySelector(".category-tag")!.textContent).toBe("분야 어학");
+    const go = within(rowA).getByRole("button", { name: "자세히 보기: 단어" });
+    expect(go.textContent).toBe("›");
+    expect(rowA.closest("ul")!.classList.contains("todo-list")).toBe(true);
+    const rowB = document.getElementById(`row-${B}`)!;
+    expect(rowB.querySelector(".category-tag-line")).toBeNull();
+    expect(rowB.querySelector(".category-tag-dot")).toBeNull();
+  });
+});
+
 describe("고침9 PM 2-B 할 일 줄 작업 기록 아이콘", () => {
   it("기록이 있는 할 일만 글 바로 뒤에 종이 아이콘(화면 읽기 「작업 기록 있음」), 없으면 없음", () => {
     const withNotes: TodoItem = { ...item(A, "토익 단어 50개"), hasNotes: true };

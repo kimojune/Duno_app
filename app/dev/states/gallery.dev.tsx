@@ -106,9 +106,9 @@ const TODO_STATES: Record<string, Partial2> = {
   "C1-notes": {
     list: "ready",
     rows: [
-      row("r1", "토익 단어 50개", { category: "어학", hasNotes: true }),
-      row("r2", "포트폴리오 2장 고치기 — 표지와 목차를 먼저 다시 그리고 사례 둘을 고르기", { category: "포트폴리오", hasNotes: true }),
-      row("r3", "정보처리기사 기출 1회", { done: true, category: "자격증" }),
+      row("r1", "토익 단어 50개", { category: "어학", categoryColor: "var(--color-category-2)", hasNotes: true }),
+      row("r2", "포트폴리오 2장 고치기 — 표지와 목차를 먼저 다시 그리고 사례 둘을 고르기", { category: "포트폴리오", categoryColor: "var(--color-category-1)", hasNotes: true }),
+      row("r3", "정보처리기사 기출 1회", { done: true, category: "자격증", categoryColor: "var(--color-category-3)" }),
     ],
     sheetOpen: false,
   },
@@ -228,9 +228,9 @@ const TODO_STATES: Record<string, Partial2> = {
   "T-pending": {
     list: "ready",
     rows: [
-      row("r1", "토익 단어 50개", { category: "어학" }),
-      row("q1", "포트폴리오 2장 고치기", { queued: true, category: "포트폴리오" }),
-      row("f1", "저장하지 못한 할 일", { failed: true, category: "운동" }),
+      row("r1", "토익 단어 50개", { category: "어학", categoryColor: "var(--color-category-2)" }),
+      row("q1", "포트폴리오 2장 고치기", { queued: true, category: "포트폴리오", categoryColor: "var(--color-category-1)" }),
+      row("f1", "저장하지 못한 할 일", { failed: true, category: "운동", categoryColor: "var(--color-category-4)" }),
     ],
     sheetOpen: false,
     online: false,

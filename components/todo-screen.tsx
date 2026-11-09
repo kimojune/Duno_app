@@ -31,6 +31,7 @@ import {
   type NewCategoryHelp,
   type RowView,
 } from "./todo-view";
+import { categoryColorValue } from "../lib/category-color";
 import { CarryOver } from "./carry-over";
 import { CloseConfirm } from "./close-confirm";
 import { PAST_DAYS_TEXT, PastDays } from "./past-days";
@@ -1174,6 +1175,14 @@ export function TodoScreen({
     return categoryState === "ready" ? TODO_TEXT.unreadableCategory : null;
   }
 
+  /** 분야 점 색(Figma 50:52): 이름을 읽을 수 있는 분야의 만든 순서 자리 → 분야 색. 모르는 분야는 점 없음(이름만) */
+  const readableOrder = new Map(categories.filter((c) => c.name !== null).map((c, i) => [c.id, i]));
+  function categoryColorOf(categoryId: string | null): string | undefined {
+    if (!categoryId) return undefined;
+    const order = readableOrder.get(categoryId);
+    return order === undefined ? undefined : categoryColorValue(order);
+  }
+
   const rowViews: RowView[] = rows.map((r) => ({
     id: r.id,
     text: r.text,
@@ -1184,6 +1193,7 @@ export function TodoScreen({
     queued: r.status === "queued",
     checkFailed: r.checkFailed,
     category: categoryText(r.categoryId),
+    categoryColor: categoryColorOf(r.categoryId),
     hasNotes: r.status === "saved" && r.hasNotes === true,
   }));
   const chips: ChipView[] = categories.filter((c): c is ChipView => c.name !== null);

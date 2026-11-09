@@ -175,6 +175,8 @@ export type RowView = {
   category?: string | null;
   /** 작업 기록이 하나라도 있으면 true: 할 일 글 바로 뒤에 종이 아이콘(고침9 PM 2-B) */
   hasNotes?: boolean;
+  /** 분야 색(분야 점, Figma 50:52). 없으면 점 없이 이름만 */
+  categoryColor?: string;
 };
 
 /** 칩 하나(풀 수 있는 이름만. 풀 수 없는 분야는 칩에 보이지 않는다, 12-7) */
@@ -353,9 +355,11 @@ export function SavePending({ id }: { id?: string }) {
 }
 
 /** 목록 줄의 분야 표시. 기타(분야 없음)는 붙이지 않는다. 화면 읽기용으로 앞에 「분야 」 */
-export function CategoryTag({ id, name }: { id: string; name: string }) {
+export function CategoryTag({ id, name, color }: { id: string; name: string; color?: string }) {
   return (
     <div className="category-tag-line">
+      {/* 고침9 Figma 50:52: 분야 점(10, 1px 윤곽) + 이름 12 보조. 색만으로 가르지 않는다(이름이 늘 함께) */}
+      {color && <span className="category-tag-dot" style={{ background: color }} aria-hidden="true" />}
       <span id={id} className="category-tag">
         <span className="sr-only">{TODO_TEXT.categoryPrefix}</span>
         {name}
@@ -398,7 +402,7 @@ function Row({
           {row.hasNotes && <NoteIcon id={noteId} />}
         </p>
         {/* C-D6: 저장 중 줄에도 분야 표시를 바로 그린다 */}
-        {row.category && <CategoryTag id={tagId} name={row.category} />}
+        {row.category && <CategoryTag id={tagId} name={row.category} color={row.categoryColor} />}
         {/* 늘 그린다(체크 칸 aria-describedby가 가리킨다). 처음 SAVING_HINT_DELAY_MS 동안은 화면 읽기용으로만 있다 */}
         {row.saving && (
           <p id={statusId} className={row.savingSlow ? "todo-sub" : "todo-sub sr-only"}>
@@ -432,11 +436,11 @@ function Row({
       </div>
       {/* 고침9: 저장 대기는 할 일 글 줄 세로 가운데, 줄 오른쪽에 16px 도는 원(글 「연결되면 저장해요」 대신) */}
       {row.queued && <SavePending id={statusId} />}
-      {/* 저장된 줄에만, 줄 오른쪽의 작은 단추로(B16). 보이는 글은 작아도 누르는 면은 48px 이상. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
+      {/* 저장된 줄에만, 줄 오른쪽 「›」(고침9 Figma 50:52 — 할 일 페이지로). 누름 48. 그림 글자라 접근 이름은 「자세히 보기: 할 일 글」 */}
       {onOpenDetail && !notSaved && (
         <div className="row-actions row-detail">
           <TextButton className="row-detail-btn" aria-label={`자세히 보기: ${row.text ?? TODO_TEXT.unreadable}`} onClick={() => onOpenDetail(row.id)}>
-            자세히
+            <span aria-hidden="true">›</span>
           </TextButton>
         </div>
       )}
