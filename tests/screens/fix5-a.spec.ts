@@ -49,6 +49,9 @@ test("처음 설정 목표 비율 단계 360px: 균등 배분 단추, 다이얼 
   await page.getByRole("button", { name: "다음" }).click();
   await expect(page.getByText("합계 100%")).toBeVisible();
   await expect(page.getByRole("button", { name: "균등 배분" })).toBeVisible();
+  const caption = page.getByText("분야마다 쓰고 싶은 몫 · 합 100%");
+  await expect(caption).toBeVisible();
+  expect(await caption.evaluate((el) => { const s = getComputedStyle(el); return [s.fontSize, s.color]; })).toEqual(["12px", rgb(COLOR_TOKENS["--color-text-sub"])]);
   const slices = await page.$$eval(".dial-slice", (els) =>
     els.map((e) => {
       const s = getComputedStyle(e);
@@ -71,7 +74,7 @@ test("내 정보 360px: 목표 비율 이름과 균등 배분 단추, 아래 탭
   await open(page, "/dev/v2?s=me-ratio");
   await expect(page.getByRole("heading", { name: "목표 비율" })).toBeVisible();
   await expect(page.getByRole("button", { name: "균등 배분" })).toBeVisible();
-  await expect(page.getByText("오늘 기록 알림")).toBeVisible();
+  await expect(page.getByText("오늘 기록 알림", { exact: true })).toBeVisible();
   const tabs = await page.$$eval(".tabbar-btn", (els) => els.map((e) => e.textContent));
   expect(tabs).toEqual(["상태보기", "할 일", "타이머", "내 정보"]);
   await page.getByRole("heading", { name: "목표 비율" }).scrollIntoViewIfNeeded();

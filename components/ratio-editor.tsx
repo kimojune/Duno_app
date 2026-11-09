@@ -52,6 +52,8 @@ export function entriesToRatios(entries: RatioEntry[]): RatioItem[] {
 }
 
 export const RATIO_TEXT = {
+  // 단계 제목 아래 작은 글(고침 5바퀴, PM 「모호한 곳엔 예시·선택지를」, Figma 49:232). 처음 설정·내 정보 비율 고치기가 같은 부품이라 같이 나온다
+  caption: "분야마다 쓰고 싶은 몫 · 합 100%",
   total: (n: number) => `합계 ${n}%`,
   // 이름 기준(2026-10-13-feature-names)의 이름 「균등 배분」(고침 5바퀴, 디자인 명세 ④)
   even: "균등 배분",
@@ -126,6 +128,7 @@ export function RatioEditor({ entries, onChange }: { entries: RatioEntry[]; onCh
 
   return (
     <div className="ratio">
+      <p className="ratio-caption">{RATIO_TEXT.caption}</p>
       <p className="todo-sub">{RATIO_TEXT.hint}</p>
       <RatioDial id="ratio-dial" slices={slices} selectedKey={selected} onSelect={setSelected} onChange={(values) => onChange(withValues(values))} />
       <ul className="ratio-list">

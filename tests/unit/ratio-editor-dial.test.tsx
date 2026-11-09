@@ -46,6 +46,7 @@ describe("RatioEditor 위의 원형 다이얼 — 합 100 고정(PM 확정 11-08
     expect(dial.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("합계 100%")).toBeTruthy();
     expect(screen.getByRole("button", { name: "균등 배분" })).toBeTruthy();
+    expect(screen.getByText("분야마다 쓰고 싶은 몫 · 합 100%").className).toBe("ratio-caption");
     expect(screen.getByRole("button", { name: "어학 5% 줄이기" })).toBeTruthy();
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(2); // 기타 0%는 폭이 없다
     expect(screen.queryByText(/합이 100이 아니어도/)).toBeNull(); // 거짓이 된 글은 없다

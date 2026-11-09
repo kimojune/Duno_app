@@ -237,6 +237,7 @@ button, input { font: inherit; color: inherit; }
 .todo-body { flex: 1; min-width: 0; margin-left: var(--space-1); padding-top: var(--space-3); }
 .todo-text { font: var(--font-body); overflow-wrap: anywhere; white-space: pre-wrap; }
 .todo-text.is-done { color: var(--color-text-sub); text-decoration: line-through; }
+.ratio-caption { margin: 0; font-size: 12px; line-height: 16px; color: var(--color-text-sub); overflow-wrap: anywhere; } /* 목표 비율 단계 작은 글(12, 보조색) */
 .todo-sub { font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .row-actions { display: flex; flex-wrap: wrap; margin-left: calc(var(--space-3) * -1); }
 
