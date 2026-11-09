@@ -457,7 +457,7 @@ async function openWith(s: EveningState, hours: number, mins = 0) {
 }
 
 describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고침 5바퀴, PM 10)", () => {
-  it("처음 값: 기타 100% — 고른 칩 없음, 줄은 기타뿐, 조각 하나에 손잡이 없음, 가운데 「{합계}」「기타」. 이름표·기타 줄 작은 글·설명 글이 보인다", async () => {
+  it("처음 값: 기타 100% — 고른 칩 없음, 줄은 기타뿐, 조각 하나에 손잡이 없음, 가운데 「{합계}」「기타」. 이름표·기타 줄·안내 글이 보인다", async () => {
     await openWith(state(), 2);
     expect(pressed("어학")).toBe("false");
     expect(pressed("포트폴리오")).toBe("false");
