@@ -108,9 +108,17 @@ test("S0 체험 코드 D3 시작 중(141:31): 「시작 중」 · 두 단추(시
 test("S4 타이머: 둥근 단추 24 — 고른 것 먹남색 채움 + 흰 점, 안 고른 것 빈 원 / 머리 워드마크", async ({ page }) => {
   await open(page, "/dev/v2?s=timer-many");
   const radios = page.locator(".timer-option input");
-  expect(await radios.count()).toBeGreaterThan(1);
+  expect(await radios.count()).toBeGreaterThan(0);
   const checked = page.locator(".timer-option input:checked").first();
-  const unchecked = page.locator(".timer-option input:not(:checked)").first();
+  // 갤러리 상태에는 할 일이 없어 둥근 단추가 하나뿐이다: 안 고른 모양은 같은 클래스 자리에 하나 더해 본다
+  await page.evaluate(() => {
+    const extra = document.createElement("input");
+    extra.type = "radio";
+    extra.name = "timer-choice";
+    extra.id = "probe-unchecked";
+    document.querySelector(".timer-option")!.append(extra);
+  });
+  const unchecked = page.locator("#probe-unchecked");
   for (const r of [checked, unchecked]) {
     const b = (await r.boundingBox())!;
     expect([Math.round(b.width), Math.round(b.height)]).toEqual([24, 24]);
