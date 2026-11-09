@@ -14,7 +14,7 @@ async function open(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/dev/v2?s=evening-todo");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "오늘 기록" })).toBeVisible();
 }
 async function photo(page: Page, name: string) {
   fs.mkdirSync(OUT, { recursive: true });
@@ -28,11 +28,12 @@ async function noOverflow(page: Page) {
 test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤로 가기가 같은 확인, 「계속 적기」 뒤 뒤로 가기 다시 → 다시 확인, 「나가기」면 창만 닫힘", async ({ page }) => {
   await open(page);
   const startUrl = page.url();
-  const record = page.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
-  const total = record.locator(".ratio-total");
-  const before = await total.textContent();
-  await page.getByRole("button", { name: "시간 1시간 늘리기" }).click();
-  const after = await total.textContent();
+  const record = page.getByRole("dialog", { name: "오늘 기록" });
+  // 고침9: 쓴 시간 = 두 줄 휠. 「+ 5분」(끌지 않는 길)으로 바꾼다 — 「분」 열 값이 바뀐다
+  const total = record.getByRole("spinbutton", { name: "분", exact: true });
+  const before = await total.getAttribute("aria-valuetext");
+  await record.getByRole("button", { name: "+ 5분" }).click();
+  const after = await total.getAttribute("aria-valuetext");
   expect(after).not.toBe(before);
 
   const close = record.getByRole("button", { name: "닫기" }).first();
@@ -53,7 +54,7 @@ test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤�
   await confirm.getByRole("button", { name: "계속 적기" }).click();
   await expect(confirm).toHaveCount(0);
   await expect(close).toBeFocused();
-  await expect(total).toHaveText(after ?? "");
+  await expect(total).toHaveAttribute("aria-valuetext", after ?? "");
 
   // 진짜 브라우저 뒤로 가기: 같은 확인, 창은 열린 채, 문서·주소 그대로
   await page.goBack();
@@ -62,7 +63,7 @@ test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤�
   expect(page.url()).toBe(startUrl);
   await confirm.getByRole("button", { name: "계속 적기" }).click();
   await expect(confirm).toHaveCount(0);
-  await expect(total).toHaveText(after ?? "");
+  await expect(total).toHaveAttribute("aria-valuetext", after ?? "");
 
   // 한 번 더 뒤로 가기 → 다시 확인(먹히지 않고, 앱 밖으로 나가지 않는다)
   await page.goBack();
@@ -78,7 +79,7 @@ test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤�
 test("PM d-126 시트 360x800: 「+ 할 일」에 글이 있으면 「닫기」·뒤로 가기가 시트 확인만 띄운다, 「나가기」면 시트만 닫히고 할 일은 늘지 않는다", async ({ page }) => {
   await open(page);
   const startUrl = page.url();
-  const record = page.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
+  const record = page.getByRole("dialog", { name: "오늘 기록" });
   await page.getByRole("button", { name: /^오늘 할 일 2\/4/ }).click();
   const sheet = page.getByRole("dialog", { name: "오늘 할 일" });
   await expect(sheet).toBeVisible();

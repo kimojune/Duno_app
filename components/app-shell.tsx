@@ -455,6 +455,7 @@ function MainShell({
           active={tab === "growth"}
           activation={growthActivation}
           entry={growthEntry}
+          openByGoal={growthEntry === "after_save"}
           onOpenCategory={(id, name) => setCategory({ id, name })}
           onOpenEvening={() => setEveningOpen(true)}
           onOpenGoal={(d) => setGoalEditor({ weekStart: d.weekStart, goal: d.goal?.items ?? null, thisWeek: d.thisWeek, categories: d.categories })}

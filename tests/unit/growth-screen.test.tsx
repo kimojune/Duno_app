@@ -412,6 +412,7 @@ describe("AppShell의 탭", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기에서 보기" })));
     await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
     expect(screen.queryByRole("dialog")).toBeNull(); // 저녁 기록 창은 닫혔다
+    expect(screen.getByRole("tab", { name: "목표 비율" }).getAttribute("aria-selected")).toBe("true"); // 목표 없는 주 → 「목표 비율」 탭(고침9, 흐름도 135:2)
     expect(screen.getByRole("button", { name: "상태보기" }).getAttribute("aria-current")).toBe("page");
     expect(recordViewAction.mock.calls.at(-1)?.[0]).toMatchObject({ screen: "growth", entry: "after_save" });
   });

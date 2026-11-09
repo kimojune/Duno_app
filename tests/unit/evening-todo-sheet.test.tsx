@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -925,5 +927,76 @@ describe("닫기 전 확인(PM d-126)", () => {
     history.flush();
     expect(history.index).toBe(1);
     expect(history.leftApp).toBe(false);
+  });
+});
+
+describe("시트 꼴(고침9 Figma 88:12): 흰 카드 목록 · 원 체크 · 색 점 분야 · 「기타」 칩 · 「더하기」 폭 가득", () => {
+  it("목록은 흰 카드 하나(줄 사이 1px 선), 체크는 원 24(끝냄 = 채운 원 + 흰 체크, 안 함 = 2px 테두리 원 — CSS가 실제로 칠함), 네모 체크 상자 없음", async () => {
+    const local = await makeLocal();
+    await mountEvening({ local });
+    await openSheet();
+    const list = sheet().querySelector("ul.evening-todo-list")!;
+    expect(list.querySelectorAll("li.todo-row")).toHaveLength(2);
+    expect(list.querySelectorAll(".check-box")).toHaveLength(0);
+    const circles = list.querySelectorAll(".check-circle svg");
+    expect(circles).toHaveLength(2);
+    expect([circles[0].getAttribute("width"), circles[0].querySelector("circle")!.getAttribute("r")]).toEqual(["24", "11"]);
+    expect(sheetCheck("빨래").closest("label")!.className).toBe("check-hit evening-todo-check");
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.evening-todo-list \{[^}]*border-radius: var\(--radius-card\); background: var\(--color-surface\);/);
+    expect(css).toMatch(/\.evening-todo-list > \.todo-row \+ \.todo-row \{ border-top: 1px solid var\(--color-notice-bg\); \}/);
+    expect(css).toMatch(/\.check-circle-ring \{ fill: none; stroke: var\(--color-primary\); stroke-width: 2; \}/);
+    expect(css).toMatch(/\.evening-todo-check input:checked \+ \.check-circle \.check-circle-ring \{ fill: var\(--color-primary\); \}/);
+    expect(css).toMatch(/\.evening-todo-check input:checked \+ \.check-circle \.check-circle-mark \{ stroke: var\(--color-on-primary\); \}/);
+    expect(css).toMatch(/\.evening-todo-category-name \{[^}]*font: 400 0\.75rem\/1rem var\(--font-family\); color: var\(--color-text-sub\);/);
+  });
+
+  it("「+ 할 일」을 열면 글 칸 · 이름표 「분야」 · 칩 줄(맨 앞 「기타」 골라짐, 색 점) · 「더하기」(주 단추, 폭 가득, 맨 끝)", async () => {
+    const local = await makeLocal();
+    await mountEvening({ local });
+    await openSheet();
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
+    const form = sheet().querySelector("form.evening-todo-form")!;
+    const order = Array.from(form.children).map((c) => c.className);
+    expect(order).toEqual(["input-label", "input evening-todo-input", "input-help", "evening-todo-category-label", "chip-scroller", "btn btn-primary evening-todo-submit"]);
+    expect(form.querySelector(".evening-todo-category-label")!.textContent).toBe("분야");
+    const add = within(sheet()).getByRole("button", { name: "더하기" }) as HTMLButtonElement;
+    expect(add.type).toBe("submit");
+    const chips = within(within(sheet()).getByRole("group", { name: "분야" })).getAllByRole("button");
+    expect(chips[0].querySelector<HTMLElement>(".chip-dot")!.style.background).toBe("var(--color-category-other)");
+    expect(chips[1].querySelector<HTMLElement>(".chip-dot")!.style.background).toBe("var(--color-category-1)");
+    expect(chips[0].querySelector(".chip-check")).not.toBeNull(); // 고른 칩 = 체크
+  });
+
+  it("「기타」 칩 = 분야 없음(저장 값 null): 그대로 더하면 null, 어학을 골랐다 다시 누르거나 「기타」를 누르면 기타로 돌아간다. 새 분야를 만들지 않는다", async () => {
+    const local = await makeLocal();
+    const addCategory = vi.spyOn(local, "addCategory");
+    await mountEvening({ local });
+    await openSheet();
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
+    const input = within(sheet()).getByRole("textbox", { name: "할 일" });
+    const group = () => within(sheet()).getByRole("group", { name: "분야" });
+    const chipPressed = () => within(group()).getAllByRole("button").map((b) => [b.textContent, b.getAttribute("aria-pressed")]);
+    fireEvent.change(input, { target: { value: "책 읽기" } });
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
+    expect(vi.mocked(local.addTodo).mock.calls[0][0]).toMatchObject({ text: "책 읽기", categoryId: null });
+    // 어학 → 다시 누르면 풀려 기타
+    fireEvent.click(within(group()).getByRole("button", { name: "어학" }));
+    expect(chipPressed()).toEqual([["기타", "false"], ["어학", "true"], ["포트폴리오", "false"]]);
+    fireEvent.click(within(group()).getByRole("button", { name: "어학" }));
+    expect(chipPressed()).toEqual([["기타", "true"], ["어학", "false"], ["포트폴리오", "false"]]);
+    // 포트폴리오 → 「기타」를 누르면 기타
+    fireEvent.click(within(group()).getByRole("button", { name: "포트폴리오" }));
+    fireEvent.click(within(group()).getByRole("button", { name: "기타" }));
+    fireEvent.change(input, { target: { value: "산책" } });
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
+    expect(vi.mocked(local.addTodo).mock.calls[1][0]).toMatchObject({ text: "산책", categoryId: null });
+    // 고른 분야는 그 분야로(정상 길)
+    fireEvent.click(within(group()).getByRole("button", { name: "포트폴리오" }));
+    fireEvent.change(input, { target: { value: "표지 고치기" } });
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
+    expect(vi.mocked(local.addTodo).mock.calls[2][0]).toMatchObject({ text: "표지 고치기", categoryId: C2 });
+    expect(chipPressed()[0]).toEqual(["기타", "true"]); // 더한 뒤 다시 기타
+    expect(addCategory).not.toHaveBeenCalled();
   });
 });

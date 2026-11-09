@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanupTodos } from "../integration/cleanup";
 import { loadIntegrationEnv } from "../integration/load-env";
 import { accountA, contextFor, markOnboardingDone, nodeClient, pollUntil, sessionCookies } from "./helpers";
+import { fillWheel } from "./wheel";
 
 /**
  * 기기 먼저 저장(고침 3바퀴)의 실제 흐름(운영 빌드 + duno_dev 시험 계정):
@@ -80,11 +81,11 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "나누지 않고 저장" })).toBeVisible({ timeout: 2_000 });
     // 그날 이미 남긴 기록이 있으면 그 값에서 시작하므로, 이번에 정한 시간을 직접 적는다(이번 실행마다 다른 값)
-    await dialog.getByLabel("시간", { exact: true }).fill(String(hours));
-    await dialog.getByLabel("분", { exact: true }).fill("0");
+    await fillWheel(dialog, "시간", hours); // 고침9: 두 줄 휠 숫자 바로 쓰기
+    await fillWheel(dialog, "분", 0);
     await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 2_000 });
-    await expect(dialog.getByText("오늘 바뀐 분야별 시간")).toBeVisible();
+    await expect(dialog.locator(".after-save-card")).toBeVisible(); // 고침9: 저장 뒤 「이번 주」 카드(옛 「오늘 바뀐 분야별 시간」 줄)
     await dialog.getByRole("button", { name: "닫기" }).last().click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
@@ -305,8 +306,8 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(칩으로 넣고 Ste
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 2_000 });
-    await dialog.getByLabel("시간", { exact: true }).fill(String(hours));
-    await dialog.getByLabel("분", { exact: true }).fill("0");
+    await fillWheel(dialog, "시간", hours); // 고침9: 두 줄 휠 숫자 바로 쓰기
+    await fillWheel(dialog, "분", 0);
     await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
     await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible({ timeout: 2_000 });
     await expect(dialog.locator("svg.dial")).toBeVisible(); // 다이얼이 같이 보인다

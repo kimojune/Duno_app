@@ -876,3 +876,28 @@ describe("고침6 PM d-129 ②: 폭 0 조각을 건너뛰는 손잡이(skipZero,
     }
   });
 });
+
+describe("가운데 순서·12시 눈금 옵션(고침9 — 오늘 기록 나누기만 켬)", () => {
+  const slices: DialSlice[] = [
+    { key: "a", name: "어학", color: "var(--color-category-1)", value: 60 },
+    { key: "b", name: "기타", color: "var(--color-category-other)", value: 40 },
+  ];
+  it("기본(처음 정한 비율·내 정보): 이름 위 · 값 아래, 12시 눈금 있음 — 바뀌지 않는다", () => {
+    render(<RatioDial id="d" slices={slices} selectedKey="a" onSelect={() => {}} onChange={() => {}} />);
+    const name = document.querySelector(".dial-center-name")!;
+    const value = document.querySelector(".dial-center-value")!;
+    expect(Number(name.getAttribute("y"))).toBeLessThan(Number(value.getAttribute("y")));
+    expect(value.querySelector("tspan.dial-center-unit")).not.toBeNull();
+    expect(document.getElementById("d-noon")).not.toBeNull();
+  });
+  it("valueFirst · noonMark={false}: 값(24 Bold) 위 · 이름(12) 아래, 12시 눈금 없음. 아무것도 안 골랐을 때 가운데 글도 큰 글", () => {
+    const { rerender } = render(<RatioDial id="d" slices={slices} selectedKey="a" onSelect={() => {}} onChange={() => {}} valueFirst noonMark={false} />);
+    const value = document.querySelector(".dial-center-big")!;
+    const name = document.querySelector(".dial-center-small")!;
+    expect([value.textContent, name.textContent]).toEqual(["60%", "어학"]);
+    expect(Number(value.getAttribute("y"))).toBeLessThan(Number(name.getAttribute("y")));
+    expect(document.getElementById("d-noon")).toBeNull();
+    rerender(<RatioDial id="d" slices={slices} selectedKey={null} onSelect={() => {}} onChange={() => {}} valueFirst noonMark={false} center="3시간" />);
+    expect(document.querySelector(".dial-center-big")!.textContent).toBe("3시간");
+  });
+});

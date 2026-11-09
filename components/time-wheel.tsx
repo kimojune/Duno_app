@@ -87,14 +87,17 @@ export function TimeWheel({ id, total, onChange, disabled }: { id: string; total
   function onPointerDown(column: WheelColumn, e: PointerEvent<HTMLDivElement>) {
     if (disabled || editing) return;
     suppressClickRef.current = false;
+    // 포인터는 끌기가 시작될 때 잡는다(누르기만 하면 click이 가운데 숫자에 그대로 가서 숫자 바로 쓰기가 열린다)
     dragRef.current = { column, pointerId: e.pointerId, startY: e.clientY, startTotal: totalRef.current, moved: false };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
   }
   function onPointerMove(e: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
     const dy = drag.startY - e.clientY; // 손가락을 위로 올리면(+) 큰 값이 가운데로 온다
-    if (Math.abs(dy) > DRAG_SLOP_PX) drag.moved = true;
+    if (!drag.moved && Math.abs(dy) > DRAG_SLOP_PX) {
+      drag.moved = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
     if (!drag.moved) return;
     e.preventDefault();
     const steps = Math.round(dy / WHEEL_ROW_PX);
@@ -109,7 +112,8 @@ export function TimeWheel({ id, total, onChange, disabled }: { id: string; total
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
     dragRef.current = null;
-    if (drag.moved) suppressClickRef.current = true;
+    if (!drag.moved) return; // 누름: click이 맡는다
+    suppressClickRef.current = true;
     // 가운데로 걸려 들어감(동작 줄이기면 바로)
     setOffset(reduced ? null : { column: drag.column, px: 0, settling: true });
   }

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { fillWheel } from "../e2e/wheel";
 
 /**
  * 고침 5바퀴 D(합치기·이음매): PM이 보는 화면 사진 열 장, 360×800. docs/oneshot-v2/고침5/ 에 화면 이름으로 둔다.
@@ -59,7 +60,7 @@ test("오늘 기록 나누기: 칩이 골라진 채(조각 3px·빛)", async ({ 
   await open(page, "/dev/v2?s=evening-split");
   await page.locator("#dev-open-window").click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByLabel("시간", { exact: true }).fill("2");
+  await fillWheel(page, "시간", 2); // 고침9: 두 줄 휠
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
   const group = page.getByRole("group", { name: "분야 · 여러 개" });

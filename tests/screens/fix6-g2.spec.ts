@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { fillWheel } from "../e2e/wheel";
 
 /**
  * 고침6 G2(PM d-129 ②·③·④): 오늘 기록 나누기 기타 0분 손잡이 · 안내 글 한 줄 · 시간 단계 「타이머 n」 띠. 360×800 사진은 docs/oneshot-v2/고침6-G2/에 둔다.
@@ -24,8 +25,8 @@ test("나누기 기타 0분(마지막 분야 고름): 12시에 손잡이가 없�
   await page.locator("#dev-open-window").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await page.getByLabel("시간", { exact: true }).fill("1");
-  await page.getByLabel("분", { exact: true }).fill("30");
+  await fillWheel(page, "시간", 1); // 고침9: 두 줄 휠 숫자 바로 쓰기
+  await fillWheel(page, "분", 30);
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
   for (const name of ["어학", "포트폴리오", "CS 공부"]) await page.getByRole("button", { name: `${name}, 다이얼에 넣기` }).click();
@@ -94,8 +95,10 @@ test("시간 단계: 타이머로 채웠으면 「타이머 2시간 30분」 띠
   await expect(line).toBeVisible();
   const chipBox = (await chip.boundingBox())!;
   const lineBox = (await line.boundingBox())!;
-  const totalBox = (await page.getByText("합계 2시간 30분", { exact: true }).boundingBox())!;
-  expect(chipBox.y, "띠는 합계 아래").toBeGreaterThan(totalBox.y);
+  // 고침9: 시간 단계 「합계」 줄은 없앴다 — 띠는 두 줄 휠(2시간 30분)의 아래
+  await expect(page.getByRole("spinbutton", { name: "분", exact: true })).toHaveAttribute("aria-valuenow", "30");
+  const totalBox = (await page.locator(".time-wheel").boundingBox())!;
+  expect(chipBox.y, "띠는 휠 아래").toBeGreaterThan(totalBox.y + totalBox.height - 0.5);
   expect(lineBox.y, "오늘 할 일 줄은 띠 아래").toBeGreaterThan(chipBox.y + chipBox.height);
   await noHorizontalScroll(page);
   await page.screenshot({ path: `${OUT}/time-step-timer-chip-360x800.png` });

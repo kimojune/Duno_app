@@ -120,6 +120,7 @@ export function GrowthScreen({
   onOpenEvening,
   onOpenGoal,
   refreshKey = 0,
+  openByGoal = false,
 }: {
   api: GrowthApi;
   /** 이 탭이 지금 보이는가 */
@@ -134,6 +135,11 @@ export function GrowthScreen({
   onOpenGoal?: (data: GrowthData) => void;
   /** 바뀌면 다시 읽는다(본 것은 다시 남기지 않는다). 목표를 저장한 뒤 등 */
   refreshKey?: number;
+  /**
+   * 오늘 기록 저장 직후 「상태보기에서 보기 ›」로 열었나(고침9, 23 흐름도 135:2). true면 이번 열림(activation)에서는 기억한 탭보다
+   * 목표 유무로 정한 탭이 먼저다: 목표 세운 주 → 「이번 주 목표」, 없는 주 → 「목표 비율」. 그 열림에서 사용자가 탭을 고르면 고른 것.
+   */
+  openByGoal?: boolean;
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [pref, setPref] = useState<StatusPref>(DEFAULT_STATUS_PREF);
@@ -210,10 +216,14 @@ export function GrowthScreen({
   }
 
   const data = load.status === "ready" ? load.data : null;
-  const tab: StatusTab | null = data ? initialStatusTab(pref, data.weekStart, hasWeekGoal(data)) : null;
+  // openByGoal: 이 열림에서 사용자가 탭을 고르기 전까지만(고른 열림 번호를 둔다)
+  const [pickedAt, setPickedAt] = useState<number | null>(null);
+  const byGoal = openByGoal && pickedAt !== activation;
+  const tab: StatusTab | null = data ? (byGoal ? (hasWeekGoal(data) ? "goal" : "ratio") : initialStatusTab(pref, data.weekStart, hasWeekGoal(data))) : null;
 
   function selectTab(next: StatusTab, focus: boolean) {
     if (!data) return;
+    setPickedAt(activation);
     choose({ ...pref, tab: next, tabWeek: data.weekStart });
     if (focus) tabRefs.current[next]?.focus();
   }
