@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EveningEntry, EveningRecord } from "../../components/evening-record";
 import type { EveningState, SavedEvening } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
+import { buildDemoPlan } from "../../lib/demo/seed";
 import { setNumberField, wheelTotal, wheelValue } from "./time-wheel-helpers";
 
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
@@ -284,6 +285,25 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("100");
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 150, saveMode: "prefilled" }));
+  });
+
+  it("체험 데이터의 오늘 기록 줄(PM 13)이 「이미 남긴 기록」으로 들어와도 깨지지 않고 그 값으로 열린다", async () => {
+    const plan = buildDemoPlan("11111111-1111-4111-8111-111111111111", "2026-11-07");
+    const log = plan.eveningLogs.find((l) => l.targetDay === "2026-11-07")!;
+    expect(log).toBeTruthy();
+    const ids = [C1, C2];
+    const existing = {
+      id: log.id,
+      targetDay: log.targetDay,
+      totalMinutes: log.totalMinutes,
+      items: log.items.map((i) => ({ categoryId: i.categoryIndex === null ? null : ids[i.categoryIndex % 2], minutes: i.minutes })),
+      saveMode: "edited" as const,
+      savedAt: "x",
+    };
+    const api = fakeApi(state({ existing }));
+    await mount(api);
+    expect([wheelValue("시간"), wheelValue("분")]).toEqual([Math.floor(log.totalMinutes / 60), log.totalMinutes % 60]);
+    expect(screen.getByRole("button", { name: "나누지 않고 저장" })).toBeTruthy();
   });
 
   it("저장이 실패하면 안내를 보이고 값은 그대로, 같은 내용으로 다시 누르면 같은 id", async () => {
