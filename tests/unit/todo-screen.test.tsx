@@ -35,7 +35,8 @@ const ID_B = "22222222-2222-4222-8222-222222222222";
  * 화면에 보이는 글만 센다(화면 읽기용 안내 영역 .sr-only는 뺀다 — todo-offline.test.tsx와 같은 방식, 고침8 검토).
  * 실패·끊김 안내는 보이는 줄과 안내 영역이 같은 글을 담는데, 안내 영역은 announce(…, { again: true })가 비운 뒤 100ms 뒤에 채운다.
  * 그래서 시험이 빠르면 한 곳, 느리면(전체 시험이 몰려 도는 때) 두 곳에서 잡혀 getByText가 「여러 개」로 가끔 실패했다.
- * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다).
+ * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다). 「없다」도 보이는 줄 0개로 센다: 안내 영역은 앞서 알린 글을 늦게 채워 남겨 두므로
+ * (그 내용은 liveText()로 따로 본다) 전체 queryByText(…).toBeNull()은 느린 실행에서만 걸렸다(todo-offline.test.tsx 131줄과 같은 방식).
  */
 function visibleTexts(text: string): HTMLElement[] {
   return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
@@ -183,7 +184,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     await waitFor(() => expect(addTodo).toHaveBeenCalledTimes(3));
     expect(addTodo.mock.calls[2]).toEqual([id1, "첫째 글", null]); // 방향 C: 셋째 인자는 분야 번호(null = 기타)
-    await waitFor(() => expect(screen.queryByText("저장하지 못했어요.")).toBeNull());
+    await waitFor(() => expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0));
     expect(screen.getAllByText("첫째 글")).toHaveLength(1); // 줄은 하나
   });
 
@@ -288,7 +289,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
       window.dispatchEvent(new Event("online"));
     });
     await waitFor(() => expect(fetchTodayTodos).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.")).toBeNull();
+    expect(visibleTexts("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.")).toHaveLength(0);
     expect(input().value).toBe("지하철에서 적은 글"); // 입력 칸 글은 건드리지 않는다 (D10)
   });
 });
@@ -567,14 +568,14 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     fireEvent.click(box);
     expect(box.checked).toBe(false);
     expect(setTodoDone).not.toHaveBeenCalled();
-    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(visibleTexts("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toHaveLength(0);
 
     const id = addTodo.mock.calls[0][0] as string;
     addTodo.mockResolvedValueOnce(ok({ day: DAY, todo: item(id, "저장 못 한 글") }));
     setTodoDone.mockResolvedValue(ok({ id, done: true }));
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     await waitFor(() => expect(screen.queryByText("저장하는 중")).toBeNull()); // 저장됨
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
     fireEvent.click(screen.getByRole("checkbox", { name: "저장 못 한 글" }));
     await waitFor(() => expect(setTodoDone).toHaveBeenCalledWith(id, true));
   });
@@ -664,7 +665,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
     });
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
@@ -677,7 +678,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
 
     first.resolve(ok({ day: DAY, todo: item(id, "느린 글") })); // 늦게 온 성공
     await act(async () => {});
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
     expect(screen.queryByText("저장하는 중")).toBeNull();
     expect(screen.getAllByText("느린 글")).toHaveLength(1);
   });
@@ -691,7 +692,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     resolvers[1](fail("unavailable"));
     await findOneVisible("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     resolvers[0](ok({ id: ID_A, done: true }));
-    await waitFor(() => expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull());
+    await waitFor(() => expect(visibleTexts("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toHaveLength(0));
     expect(box.checked).toBe(true);
   });
 
@@ -706,11 +707,11 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     expect(box.checked).toBe(true);
     fireEvent.click(box); // 3: 끔 요청(진행 중)
     expect(box.checked).toBe(false);
-    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(visibleTexts("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toHaveLength(0);
     resolvers[0](ok({ id: ID_A, done: false })); // 낡은 첫 응답: 성공
     await act(async () => {});
     expect(box.checked).toBe(false); // 세 번째 값 그대로
-    expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull();
+    expect(visibleTexts("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toHaveLength(0);
     resolvers[2](ok({ id: ID_A, done: false }));
     await act(async () => {});
     expect(box.checked).toBe(false);
@@ -937,13 +938,13 @@ describe("MO-17 LOW 고침", () => {
     expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     expect(addTodo).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
 
     first.resolve(fail("unavailable")); // 앞 시도의 실패가 늦게 도착
     await act(async () => {
       await vi.advanceTimersByTimeAsync(200);
     });
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull(); // 새 시도는 아직 저장하는 중
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0); // 새 시도는 아직 저장하는 중
     expect(screen.getByText("저장하는 중")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "다시" })).toBeNull();
   });
@@ -1017,7 +1018,7 @@ describe("MO-17 LOW 고침", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS + 200); // 새 시도의 15초 한도가 지난다
     });
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
     expect(liveText()).toBe("할 일을 저장했어요");
   });
 
@@ -1033,7 +1034,7 @@ describe("MO-17 LOW 고침", () => {
     expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     first.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "늦은 성공") }));
     await act(async () => {});
-    expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(0);
     expect(screen.getAllByText("늦은 성공")).toHaveLength(1);
   });
 

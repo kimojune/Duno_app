@@ -41,7 +41,8 @@ const CAT_CS = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
  * 화면에 보이는 글만 센다(화면 읽기용 안내 영역 .sr-only는 뺀다 — todo-offline.test.tsx와 같은 방식, 고침8 검토).
  * 실패·끊김 안내는 보이는 줄과 안내 영역이 같은 글을 담는데, 안내 영역은 announce(…, { again: true })가 비운 뒤 100ms 뒤에 채운다.
  * 그래서 시험이 빠르면 한 곳, 느리면(전체 시험이 몰려 도는 때) 두 곳에서 잡혀 getByText가 「여러 개」로 가끔 실패했다.
- * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다).
+ * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다). 「없다」도 보이는 줄 0개로 센다: 안내 영역은 앞서 알린 글을 늦게 채워 남겨 두므로
+ * (그 내용은 liveText()로 따로 본다) 전체 queryByText(…).toBeNull()은 느린 실행에서만 걸렸다(todo-offline.test.tsx 131줄과 같은 방식).
  */
 function visibleTexts(text: string): HTMLElement[] {
   return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
