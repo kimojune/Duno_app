@@ -136,20 +136,40 @@ describe("requestOfferForUser (제시 기록)", () => {
     const res = await requestOfferForUser(deps(store), { surface: "card" });
     expect(res.ok && res.data.offer?.todoId).toBeNull();
   });
-  it("저녁에는 카드를 건네지 않고 기록도 안 한다. 타이머 탭 추천은 저녁에도 한다", async () => {
+  it("저녁(서울 19시·22시)에도 카드를 건네고 제시를 기록한다. 같은 날 두 번 요청해도 한 줄이다(시간대 규칙 없음, d-223)", async () => {
     const { store, todo } = setup();
     todo(T1, "단어 외우기", C1);
-    const card = await requestOfferForUser(deps(store, EVENING), { surface: "card" });
-    expect(card).toEqual({ ok: true, data: { offer: null, reason: "evening" } });
-    expect(store.table("todo_offers")).toHaveLength(0);
+    for (const at of [EVENING, new Date("2026-11-07T13:00:00.000Z")]) { // 서울 19:00, 22:00
+      const card = await requestOfferForUser(deps(store, at), { surface: "card" });
+      expect(card.ok && card.data.offer?.surface).toBe("card");
+      expect(card.ok && card.data.reason).toBeUndefined();
+    }
+    expect(store.table("todo_offers")).toHaveLength(1);
     const tab = await requestOfferForUser(deps(store, EVENING), { surface: "timer_tab" });
     expect(tab.ok && tab.data.offer?.surface).toBe("timer_tab");
+    expect(store.table("todo_offers")).toHaveLength(2);
+  });
+  it("새벽(서울 02시·03시)에도 카드를 건넨다(그날로 센다, d-223)", async () => {
+    const { store, todo } = setup();
+    todo(T1, "단어 외우기", C1);
+    for (const iso of ["2026-11-07T17:00:00.000Z", "2026-11-07T18:00:00.000Z"]) { // 서울 11-08 02:00, 03:00 — 하루는 새벽 4시에 바뀐다
+      const res = await requestOfferForUser(deps(store, new Date(iso)), { surface: "card" });
+      expect(res.ok && res.data.offer?.surface).toBe("card");
+    }
     expect(store.table("todo_offers")).toHaveLength(1);
   });
-  it("새벽 4시 전은 아직 저녁이다(카드를 안 건넨다)", async () => {
-    const { store } = setup();
-    const res = await requestOfferForUser(deps(store, new Date("2026-11-07T18:00:00.000Z")), { surface: "card" }); // 서울 03:00
-    expect(res.ok && res.data.reason).toBe("evening");
+  it("그날 넘긴 뒤에는 같은 날 저녁·새벽에도 카드가 다시 나오지 않는다(넘긴 제시 그대로, d-223)", async () => {
+    const { store, todo } = setup();
+    todo(T1, "단어 외우기", C1);
+    const first = await requestOfferForUser(deps(store), { surface: "card" });
+    const id = first.ok ? first.data.offer!.id : "";
+    await dismissOfferForUser(deps(store), id);
+    for (const iso of ["2026-11-07T10:00:00.000Z", "2026-11-07T13:00:00.000Z", "2026-11-07T17:00:00.000Z"]) { // 서울 19:00, 22:00, 다음 날 02:00
+      const again = await requestOfferForUser(deps(store, new Date(iso)), { surface: "card" });
+      expect(again.ok && again.data.offer?.id).toBe(id);
+      expect(again.ok && again.data.offer?.state).toBe("dismissed");
+    }
+    expect(store.table("todo_offers")).toHaveLength(1);
   });
   it("비율이 없으면 건넬 분야가 없다(no_target)", async () => {
     const store = setup().store;

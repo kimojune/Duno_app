@@ -1,5 +1,4 @@
 import { requestOffer } from "../../app/offers/actions";
-import { isEvening } from "../app-config";
 import type { AddCategoryResult } from "../categories/types";
 import { CATEGORY_LIMIT, checkCategoryName, sameCategoryName } from "../categories/validation";
 import { diffItems, sumMinutes } from "../evening/logic";
@@ -258,8 +257,7 @@ export function createLocalApis(runtime: Runtime): LocalApis {
     localFirst: true,
     async request(surface) {
       const today = todoDayFor(new Date(nowMs()));
-      // 저녁에는 카드를 건네지 않는다(서버 규칙): 낮에 받아 둔 카드를 저녁에 먼저 보여 주지 않는다
-      const cached = surface === "card" && isEvening(new Date(nowMs())) ? null : mirror().offers[surface];
+      const cached = mirror().offers[surface];
       const refresh = requestOffer({ surface }).then((res) => {
         if (res.ok) runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, [surface]: res.data.offer } }));
         return res;

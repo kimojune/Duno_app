@@ -259,18 +259,24 @@ describe("분야 페이지", () => {
   });
 });
 
-describe("먼저 할 일 카드: 저녁에는 낮에 받은 제시를 먼저 보이지 않는다", () => {
-  it("서울 저녁(오후 6시~새벽 4시 전)에는 기기에 둔 카드를 건너뛰고 서버 답(건네지 않음)을 기다린다", async () => {
-    const evening = Date.parse("2026-11-07T10:00:00.000Z"); // 서울 19:00
+describe("먼저 할 일 카드: 저녁·새벽에도 기기에 둔 오늘 제시를 먼저 쓴다(시간대 규칙 없음, d-223)", () => {
+  it.each([
+    ["서울 19:00", "2026-11-07T10:00:00.000Z"],
+    ["서울 22:00", "2026-11-07T13:00:00.000Z"],
+    ["서울 다음 날 02:00", "2026-11-07T17:00:00.000Z"],
+  ])("%s에도 오늘 건넨 카드를 기기에서 바로 쓰고 뒤에서 서버에 다시 묻는다", async (_label, iso) => {
+    const evening = Date.parse(iso);
     const mirror: Mirror = { ...emptyMirror(), synced: true };
     const kv = createMemoryKv();
     await kv.set(kvKeys.base(USER), mirror);
     const runtime = createRuntime({ userKey: USER, kv, send: async () => ({ ok: true }), fetchSnapshot: async () => ({ ok: false, error: "unavailable" }), now: () => evening, online: () => false });
     await runtime.boot();
-    runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: { id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: null, todoText: null, state: "new" } } }));
-    requestOffer.mockResolvedValue({ ok: true, data: { offer: null, reason: "evening" } });
+    const card = { id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card" as const, day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: null, todoText: null, state: "new" as const };
+    runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card } }));
+    requestOffer.mockResolvedValue({ ok: true, data: { offer: card } });
     const res = await createLocalApis(runtime).offers.request("card");
-    expect(res).toEqual({ ok: true, data: { offer: null, reason: "evening" } });
-    expect(runtime.getMirror().offers.card).toBeNull();
+    expect(res).toEqual({ ok: true, data: { offer: card } });
+    expect(requestOffer).toHaveBeenCalledWith({ surface: "card" });
+    expect(runtime.getMirror().offers.card).toEqual(card);
   });
 });

@@ -1,7 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { isEvening } from "../app-config";
 import { listCategoriesForUser } from "../categories/core";
 import { listEveningLogs } from "../evening/core";
 import { readWeeklyGoalItems } from "../goals/core";
@@ -20,7 +19,7 @@ import { OFFER_SURFACES, type DismissedOffer, type OfferRequestResult } from "./
  * 같은 규칙: 함수마다 자기 안에서 세션 확인(getClaims), user_id는 세션에서만, 날짜·시각은 서버 시계, 예상된 실패는 짧은 코드.
  * 건넨 것(제시)을 기록한다(먼저 하기 비율의 분모, 22 4-1): 같은 날·자리·분야·할 일은 한 번만 센다(Q4 임시).
  * 건네는 분야는 처음 정한 비율(이번 주 목표가 있으면 목표)보다 덜 한 분야다. 건넬 할 일은 그 분야의 끝내지 않은 할 일에서 가져오고(AI 없음), 없으면 분야만 건넨다.
- * 「저녁에는 건네지 않는다」: 카드는 서울 오후 6시~새벽 4시 전에는 건네지 않는다. 타이머 탭의 추천은 저녁에도 한다(임시, 22 2-9 어긋남은 자리를 따로 기록해 가른다).
+ * 시간대 규칙은 없다(PM 11-10, d-223): 카드도 타이머 탭 추천도 하루 어느 때든 건넨다. 그날 넘긴 제시는 같은 날(하루는 새벽 4시에 바뀐다) 저녁·새벽에도 다시 나오지 않는다.
  */
 export type OfferDeps = { supabase: SupabaseClient; key: TodoKey | null; now?: () => Date };
 
@@ -41,7 +40,6 @@ export async function requestOfferForUser(deps: OfferDeps, input: unknown): Prom
     const key = deps.key;
     const surface = parsed.data.surface;
     const now = (deps.now ?? serverNow)();
-    if (surface === "card" && isEvening(now)) return { ok: true, data: { offer: null, reason: "evening" } };
 
     const day = todoDayFor(now);
     const weekStart = weekStartFor(day);
