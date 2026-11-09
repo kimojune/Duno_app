@@ -108,7 +108,7 @@ describe("「자세히」는 줄 오른쪽 작은 단추 (B16)", () => {
   });
 });
 
-describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", () => {
+describe("상태보기 기록 없음의 「오늘 기록」 단추 (B17, 고침5: PM 4 「오늘 기록」)", () => {
   const empty: GrowthData = {
     today: "2026-11-07",
     weekStart: "2026-11-02",
@@ -123,6 +123,7 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
     loggedDaysThisWeek: 0,
     loggedDaysTotal: 0,
     goal: null,
+    goalText: null,
   };
   const api = (data: GrowthData): GrowthApi =>
     ({ fetchGrowth: async () => ({ ok: true as const, data }), fetchCategoryPage: vi.fn(), recordView: vi.fn() }) as unknown as GrowthApi;
@@ -132,8 +133,9 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
     await act(async () => {
       render(<GrowthScreen api={api(empty)} active activation={1} entry="self" onOpenCategory={() => {}} onOpenEvening={onOpenEvening} />);
     });
-    expect(screen.getByText(/아직 이번 주 저녁 기록이 없어요/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "저녁 기록 남기기" }));
+    expect(screen.getByText(/아직 이번 주 오늘 기록이 없어요/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "저녁 기록 남기기" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "오늘 기록" }));
     expect(onOpenEvening).toHaveBeenCalledTimes(1);
   });
   it("기록이 있으면 단추가 없다", async () => {
@@ -149,6 +151,7 @@ describe("상태보기 빈 안내 아래 「저녁 기록 남기기」 (B17)", (
         />,
       );
     });
+    expect(screen.queryByRole("button", { name: "오늘 기록" })).toBeNull();
     expect(screen.queryByRole("button", { name: "저녁 기록 남기기" })).toBeNull();
   });
 });
