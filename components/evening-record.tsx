@@ -70,8 +70,6 @@ export const EVENING_TEXT = {
   splitHint: "나누지 않은 시간은 기타로 들어가요.",
   other: "기타",
   otherRemain: (m: number) => formatMinutes(m),
-  // 나누기 아래 기타 줄의 이름 아래 작은 글(창구 덧붙임 11-09 11:3x)
-  otherSub: "나누지 않은 시간",
   raised: (m: number) => `나눈 시간이 합계보다 많아서 합계를 ${formatMinutes(m)}으로 맞춰 저장해요.`,
   // 나누기 칩 줄(PM 10): 이름표 「분야 · 여러 개」(창구 덧붙임 11-09 11:3x — 여럿 고를 수 있음을 보임), 칩의 화면 읽기 이름 「{분야}, 다이얼에 넣기」(켬/끔은 aria-pressed)
   categoryLabel: "분야 · 여러 개",
@@ -704,10 +702,8 @@ export function EveningRecord({
                 onClick={() => setDialPick(OTHER_KEY)}
               >
                 <span className="chip-dot" style={{ background: categoryColorValue(null) }} aria-hidden="true" />
-                <span className="ratio-name evening-other-name">
-                  {EVENING_TEXT.other}
-                  <span className="evening-other-sub">{EVENING_TEXT.otherSub}</span>
-                </span>
+                {/* 고침6 PM d-129 ③(PM d-130 가로 확정): 이름 아래 작은 글 「나누지 않은 시간」은 뺐다 — 안내 글과 같은 말이 두 번이라서. 이름은 줄 가운데 한 줄 */}
+                <span className="ratio-name evening-other-name">{EVENING_TEXT.other}</span>
                 <span className="ratio-value">{EVENING_TEXT.otherRemain(otherMinutes)}</span>
               </li>
             </ul>

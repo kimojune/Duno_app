@@ -474,10 +474,17 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     const row = chip("어학").closest(".chip-row")!;
     expect(row.getAttribute("aria-labelledby")).toBe(label.id);
     expect(row.getAttribute("role")).toBe("group");
-    // 기타 줄 이름 아래 작은 글 「나누지 않은 시간」
+    // 기타 줄: 이름 「기타」 한 줄뿐(고침6 PM d-129 ③ · PM d-130 가 — 이름 아래 「나누지 않은 시간」은 뺐다. 같은 말이 안내 글과 두 번 나오지 않는다)
     const otherRow = document.querySelector('.ratio-list [data-row-key="other"]')!;
-    expect(otherRow.querySelector(".evening-other-sub")!.textContent).toBe("나누지 않은 시간");
-    expect(otherRow.querySelector(".ratio-name")!.textContent).toBe("기타나누지 않은 시간");
+    expect(otherRow.querySelector(".evening-other-sub")).toBeNull();
+    expect(otherRow.querySelector(".ratio-name")!.textContent).toBe("기타");
+    expect(otherRow.querySelector(".ratio-name")!.children).toHaveLength(0);
+    expect(screen.getAllByText(/나누지 않은 시간/)).toHaveLength(1); // 안내 글 하나뿐
+    // 이름은 줄 가운데: 줄은 가운데 정렬 flex, 이름을 두 줄 세로 칸으로 만들던 규칙은 없다
+    const css0 = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css0).toMatch(/\.ratio-row \{ display: flex; align-items: center;/);
+    expect(css0).not.toMatch(/\.evening-other-name \{/);
+    expect(css0).not.toMatch(/\.evening-other-sub/);
     // 안내 글(고침6 PM d-129 ③): 「나누지 않은 시간은 기타로 들어가요.」 한 줄만, 분야 줄(목록) 아래 · 합계 위. 앞 문장은 없다
     const hint = screen.getByText("나누지 않은 시간은 기타로 들어가요.");
     expect(hint.className).toBe("evening-split-hint");
