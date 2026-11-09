@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
 import { EveningTodoGallery } from "./evening-todo-gallery.dev";
+import { CONFIRM_GALLERY_IDS, ConfirmGallery, isConfirmGalleryId } from "./confirm-gallery.dev";
 import { GoalEditor } from "../../../components/goal";
 import { GrowthScreen } from "../../../components/growth-screen";
 import { AfterSave } from "../../../components/after-save";
@@ -355,6 +356,7 @@ function Opener({ render }: { render: (close: () => void) => ReactNode }) {
 }
 
 export function V2Gallery({ id }: { id: string }) {
+  if (isConfirmGalleryId(id)) return <ConfirmGallery id={id} />; // 고침10: 확인 창 쓰는 곳 다섯 + 막힘 · 머리 단추 두 변형
   if (id === "evening-todo" || id === "evening-todo-many") return <EveningTodoGallery many={id === "evening-todo-many"} />; // 고침 5바퀴: 오늘 기록의 「오늘 할 일」 줄·시트
   if (id === "tabbar") {
     return (
@@ -591,6 +593,7 @@ export function V2Gallery({ id }: { id: string }) {
           "evening-split",
           "evening-split-many",
           "evening-split-blank",
+          ...CONFIRM_GALLERY_IDS,
         ].map((s) => (
           <li key={s}>
             <a href={`/dev/v2?s=${s}`}>{s}</a>
