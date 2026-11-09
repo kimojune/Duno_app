@@ -18,7 +18,6 @@ vi.mock("../../lib/read-client", () => ({
 vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { TodoScreen } from "../../components/todo-screen";
 import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 
 const DAY: TodoDay = { date: "2026-11-07", year: 2026, month: 11, dayOfMonth: 7, weekday: 6 };

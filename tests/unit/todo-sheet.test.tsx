@@ -29,7 +29,7 @@ vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
 import { resetChipRowMemory } from "../../components/chip-scroller";
-import { CATEGORY_ADD_TIMEOUT_MS, SAVE_TIMEOUT_MS, TodoScreen } from "../../components/todo-screen";
+import { CATEGORY_ADD_TIMEOUT_MS, SAVE_TIMEOUT_MS } from "../../components/todo-screen";
 import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 import { TodoView, type TodoViewProps } from "../../components/todo-view";
 

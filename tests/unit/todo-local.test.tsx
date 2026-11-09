@@ -24,7 +24,6 @@ vi.mock("../../app/offers/actions", () => ({ requestOffer: vi.fn(), dismissOffer
 vi.mock("../../lib/push/subscribe", () => ({ defaultPushApi: { enable: vi.fn(async () => "ok") } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { TodoScreen } from "../../components/todo-screen";
 import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 import { expectConfirmShape, LOGOUT, queryConfirmDialog } from "./confirm-helpers";
 import { createLocalApis } from "../../lib/local/apis";
