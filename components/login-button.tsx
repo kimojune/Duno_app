@@ -10,7 +10,7 @@ import { LiveRegion, Notice, SecondaryButton } from "./ui";
 import { Wordmark } from "./wordmark";
 
 /**
- * 큰 L1 고리(Figma 54:14 · 54:15, 고침10 D): 지름 120 · 두께 24 · 먹남색(--color-text), 한 조각(살구 --color-accent)이 오른쪽 위 45°로 8px 바깥 + 빛 번짐.
+ * 큰 L1 고리(Figma 54:14 · 54:15, 고침10 D): 지름 120 · 두께 24 · 먹남색(--color-text), 한 조각(살구)이 오른쪽 위 45°로 8px 바깥 + 빛 번짐.
  * 작은 워드마크 고리(components/wordmark.tsx)와 같은 모양: 빠진 자리 60°(15°~75°), 조각은 그 자리의 호. 장식이라 화면 읽기에서 숨긴다(제목 「두노」는 h1).
  */
 export const LOGIN_RING = { size: 120, thickness: 24, pieceOffset: 8 } as const;
