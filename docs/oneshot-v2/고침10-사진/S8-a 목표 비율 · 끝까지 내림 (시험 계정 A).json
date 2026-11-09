@@ -23,7 +23,7 @@
   {
    "tag": "button",
    "cls": "me-goal-card",
-   "text": "목표, 글 한 편 끝내고 토익 882점 넘기기, 고치기",
+   "text": "목표, 글 한 편 끝내고 토익 883점 넘기기, 고치기",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
@@ -35,7 +35,7 @@
   {
    "tag": "button",
    "cls": "me-ratio-card card-box",
-   "text": "목표 비율, e2e분야mw4b9mh3 20%, 기타 8",
+   "text": "목표 비율, e2e분야mw4b9mh3 25%, 기타 7",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
@@ -203,7 +203,7 @@
   {
    "tag": "li",
    "cls": "ratio-row",
-   "text": "e2e분야mw8tnj75 − % +",
+   "text": "e2e분야mw8uowtm − % +",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
@@ -215,7 +215,7 @@
   {
    "tag": "button",
    "cls": "ratio-name ratio-name-btn",
-   "text": "e2e분야mw8tnj75",
+   "text": "e2e분야mw8uowtm",
    "family": "system-ui",
    "size": "14px",
    "weight": "400",
@@ -227,7 +227,7 @@
   {
    "tag": "li",
    "cls": "ratio-row",
-   "text": "e2e분야mw8ua6pb − % +",
+   "text": "e2e분야mw90mu8y − % +",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
@@ -239,7 +239,7 @@
   {
    "tag": "button",
    "cls": "ratio-name ratio-name-btn",
-   "text": "e2e분야mw8ua6pb",
+   "text": "e2e분야mw90mu8y",
    "family": "system-ui",
    "size": "14px",
    "weight": "400",
@@ -251,132 +251,12 @@
   {
    "tag": "button",
    "cls": "step-btn ratio-btn",
-   "text": "e2e분야mw8ua6pb 5% 줄이기",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 178,
-   "y": 9,
-   "w": 48,
-   "h": 44
-  },
-  {
-   "tag": "input",
-   "cls": "input stepper-input ratio-field",
-   "text": "e2e분야mw8ua6pb 비율(%)",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "500",
-   "x": 241.9,
-   "y": 19,
-   "w": 8.8,
-   "h": 24
-  },
-  {
-   "tag": "button",
-   "cls": "step-btn ratio-btn",
-   "text": "e2e분야mw8ua6pb 5% 늘리기",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 280,
-   "y": 9,
-   "w": 48,
-   "h": 44
-  },
-  {
-   "tag": "li",
-   "cls": "ratio-row",
-   "text": "e2e분야mw8uowtm − % +",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 32,
-   "y": 58,
-   "w": 296,
-   "h": 53
-  },
-  {
-   "tag": "button",
-   "cls": "ratio-name ratio-name-btn",
-   "text": "e2e분야mw8uowtm",
-   "family": "system-ui",
-   "size": "14px",
-   "weight": "400",
-   "x": 52,
-   "y": 60,
-   "w": 118,
-   "h": 48
-  },
-  {
-   "tag": "button",
-   "cls": "step-btn ratio-btn",
-   "text": "e2e분야mw8uowtm 5% 줄이기",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 178,
-   "y": 62,
-   "w": 48,
-   "h": 44
-  },
-  {
-   "tag": "input",
-   "cls": "input stepper-input ratio-field",
-   "text": "e2e분야mw8uowtm 비율(%)",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "500",
-   "x": 241.9,
-   "y": 72,
-   "w": 8.8,
-   "h": 24
-  },
-  {
-   "tag": "button",
-   "cls": "step-btn ratio-btn",
-   "text": "e2e분야mw8uowtm 5% 늘리기",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 280,
-   "y": 62,
-   "w": 48,
-   "h": 44
-  },
-  {
-   "tag": "li",
-   "cls": "ratio-row",
-   "text": "e2e분야mw90mu8y − % +",
-   "family": "system-ui",
-   "size": "16px",
-   "weight": "400",
-   "x": 32,
-   "y": 111,
-   "w": 296,
-   "h": 53
-  },
-  {
-   "tag": "button",
-   "cls": "ratio-name ratio-name-btn",
-   "text": "e2e분야mw90mu8y",
-   "family": "system-ui",
-   "size": "14px",
-   "weight": "400",
-   "x": 52,
-   "y": 113,
-   "w": 118,
-   "h": 48
-  },
-  {
-   "tag": "button",
-   "cls": "step-btn ratio-btn",
    "text": "e2e분야mw90mu8y 5% 줄이기",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 115,
+   "y": 9,
    "w": 48,
    "h": 44
   },
@@ -388,7 +268,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 125,
+   "y": 19,
    "w": 8.8,
    "h": 24
   },
@@ -400,7 +280,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 115,
+   "y": 9,
    "w": 48,
    "h": 44
   },
@@ -412,7 +292,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 164,
+   "y": 58,
    "w": 296,
    "h": 53
   },
@@ -424,7 +304,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 166,
+   "y": 60,
    "w": 118,
    "h": 48
   },
@@ -436,7 +316,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 168,
+   "y": 62,
    "w": 48,
    "h": 44
   },
@@ -448,7 +328,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 178,
+   "y": 72,
    "w": 8.8,
    "h": 24
   },
@@ -460,7 +340,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 168,
+   "y": 62,
    "w": 48,
    "h": 44
   },
@@ -472,7 +352,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 217,
+   "y": 111,
    "w": 296,
    "h": 53
   },
@@ -484,7 +364,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 219,
+   "y": 113,
    "w": 118,
    "h": 48
   },
@@ -496,7 +376,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 221,
+   "y": 115,
    "w": 48,
    "h": 44
   },
@@ -508,7 +388,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 231,
+   "y": 125,
    "w": 8.8,
    "h": 24
   },
@@ -520,7 +400,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 221,
+   "y": 115,
    "w": 48,
    "h": 44
   },
@@ -532,7 +412,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 270,
+   "y": 164,
    "w": 296,
    "h": 53
   },
@@ -544,7 +424,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 272,
+   "y": 166,
    "w": 118,
    "h": 48
   },
@@ -556,7 +436,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 274,
+   "y": 168,
    "w": 48,
    "h": 44
   },
@@ -568,7 +448,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 284,
+   "y": 178,
    "w": 8.8,
    "h": 24
   },
@@ -580,7 +460,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 274,
+   "y": 168,
    "w": 48,
    "h": 44
   },
@@ -592,7 +472,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 323,
+   "y": 217,
    "w": 296,
    "h": 53
   },
@@ -604,7 +484,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 325,
+   "y": 219,
    "w": 118,
    "h": 48
   },
@@ -616,7 +496,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 327,
+   "y": 221,
    "w": 48,
    "h": 44
   },
@@ -628,7 +508,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 337,
+   "y": 231,
    "w": 8.8,
    "h": 24
   },
@@ -640,7 +520,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 327,
+   "y": 221,
    "w": 48,
    "h": 44
   },
@@ -652,7 +532,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 376,
+   "y": 270,
    "w": 296,
    "h": 53
   },
@@ -664,7 +544,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 378,
+   "y": 272,
    "w": 118,
    "h": 48
   },
@@ -676,7 +556,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 380,
+   "y": 274,
    "w": 48,
    "h": 44
   },
@@ -688,7 +568,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 390,
+   "y": 284,
    "w": 8.8,
    "h": 24
   },
@@ -700,7 +580,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 380,
+   "y": 274,
    "w": 48,
    "h": 44
   },
@@ -712,7 +592,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 429,
+   "y": 323,
    "w": 296,
    "h": 53
   },
@@ -724,7 +604,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 431,
+   "y": 325,
    "w": 118,
    "h": 48
   },
@@ -736,7 +616,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 433,
+   "y": 327,
    "w": 48,
    "h": 44
   },
@@ -748,7 +628,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 443,
+   "y": 337,
    "w": 8.8,
    "h": 24
   },
@@ -760,7 +640,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 433,
+   "y": 327,
    "w": 48,
    "h": 44
   },
@@ -772,7 +652,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 482,
+   "y": 376,
    "w": 296,
    "h": 53
   },
@@ -784,7 +664,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 484,
+   "y": 378,
    "w": 118,
    "h": 48
   },
@@ -796,7 +676,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 486,
+   "y": 380,
    "w": 48,
    "h": 44
   },
@@ -808,7 +688,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 496,
+   "y": 390,
    "w": 8.8,
    "h": 24
   },
@@ -820,7 +700,7 @@
    "size": "16px",
    "weight": "400",
    "x": 280,
-   "y": 486,
+   "y": 380,
    "w": 48,
    "h": 44
   },
@@ -832,7 +712,7 @@
    "size": "16px",
    "weight": "400",
    "x": 32,
-   "y": 535,
+   "y": 429,
    "w": 296,
    "h": 53
   },
@@ -844,7 +724,7 @@
    "size": "14px",
    "weight": "400",
    "x": 52,
-   "y": 537,
+   "y": 431,
    "w": 118,
    "h": 48
   },
@@ -856,7 +736,7 @@
    "size": "16px",
    "weight": "400",
    "x": 178,
-   "y": 539,
+   "y": 433,
    "w": 48,
    "h": 44
   },
@@ -868,7 +748,7 @@
    "size": "16px",
    "weight": "500",
    "x": 241.9,
-   "y": 549,
+   "y": 443,
    "w": 8.8,
    "h": 24
   },
@@ -876,6 +756,126 @@
    "tag": "button",
    "cls": "step-btn ratio-btn",
    "text": "e2e분야mw9ldu13 5% 늘리기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 280,
+   "y": 433,
+   "w": 48,
+   "h": 44
+  },
+  {
+   "tag": "li",
+   "cls": "ratio-row",
+   "text": "e2e분야mw9nsno5 − % +",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 482,
+   "w": 296,
+   "h": 53
+  },
+  {
+   "tag": "button",
+   "cls": "ratio-name ratio-name-btn",
+   "text": "e2e분야mw9nsno5",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "400",
+   "x": 52,
+   "y": 484,
+   "w": 118,
+   "h": 48
+  },
+  {
+   "tag": "button",
+   "cls": "step-btn ratio-btn",
+   "text": "e2e분야mw9nsno5 5% 줄이기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 178,
+   "y": 486,
+   "w": 48,
+   "h": 44
+  },
+  {
+   "tag": "input",
+   "cls": "input stepper-input ratio-field",
+   "text": "e2e분야mw9nsno5 비율(%)",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "500",
+   "x": 241.9,
+   "y": 496,
+   "w": 8.8,
+   "h": 24
+  },
+  {
+   "tag": "button",
+   "cls": "step-btn ratio-btn",
+   "text": "e2e분야mw9nsno5 5% 늘리기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 280,
+   "y": 486,
+   "w": 48,
+   "h": 44
+  },
+  {
+   "tag": "li",
+   "cls": "ratio-row",
+   "text": "e2e분야mw9o5jko − % +",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 32,
+   "y": 535,
+   "w": 296,
+   "h": 53
+  },
+  {
+   "tag": "button",
+   "cls": "ratio-name ratio-name-btn",
+   "text": "e2e분야mw9o5jko",
+   "family": "system-ui",
+   "size": "14px",
+   "weight": "400",
+   "x": 52,
+   "y": 537,
+   "w": 118,
+   "h": 48
+  },
+  {
+   "tag": "button",
+   "cls": "step-btn ratio-btn",
+   "text": "e2e분야mw9o5jko 5% 줄이기",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "400",
+   "x": 178,
+   "y": 539,
+   "w": 48,
+   "h": 44
+  },
+  {
+   "tag": "input",
+   "cls": "input stepper-input ratio-field",
+   "text": "e2e분야mw9o5jko 비율(%)",
+   "family": "system-ui",
+   "size": "16px",
+   "weight": "500",
+   "x": 241.9,
+   "y": 549,
+   "w": 8.8,
+   "h": 24
+  },
+  {
+   "tag": "button",
+   "cls": "step-btn ratio-btn",
+   "text": "e2e분야mw9o5jko 5% 늘리기",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",

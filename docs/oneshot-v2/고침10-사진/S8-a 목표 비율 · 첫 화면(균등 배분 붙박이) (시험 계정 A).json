@@ -23,7 +23,7 @@
   {
    "tag": "button",
    "cls": "me-goal-card",
-   "text": "목표, 글 한 편 끝내고 토익 882점 넘기기, 고치기",
+   "text": "목표, 글 한 편 끝내고 토익 883점 넘기기, 고치기",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
@@ -35,7 +35,7 @@
   {
    "tag": "button",
    "cls": "me-ratio-card card-box",
-   "text": "목표 비율, e2e분야mw4b9mh3 20%, 기타 8",
+   "text": "목표 비율, e2e분야mw4b9mh3 25%, 기타 7",
    "family": "system-ui",
    "size": "16px",
    "weight": "400",
