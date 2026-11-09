@@ -7,6 +7,8 @@
  * - 처음 탭: 이번 주 목표를 세운 주 → goal, 세우지 않은 주 → ratio(initialStatusTab).
  * - 사용자가 고른 탭은 그 주 동안만 기억한다(tabWeek = 고른 주의 월요일). 주가 바뀌면 다시 처음 탭 규칙을 따른다.
  * - 기간(이번 주 / 총 시간 / 비교)과 보기 방식(띠그래프 / 원그래프)은 목표 비율 뷰의 것이다.
+ * - 고침7(PM 15:1x, S6 빈 상태): 처음 기간은 이번 주 0시간이고 쌓인 시간이 있으면 「총 시간」, 그 밖은 「이번 주」(initialStatusPeriod).
+ *   사용자가 칩에서 고른 기간은 그 주 동안만 기억한다(periodWeek = 고른 주의 월요일). 자동으로 고른 기간은 적지 않는다 — 그래서 이번 주 첫 기록이 생기면 다음에 열 때 「이번 주」로 돌아온다.
  */
 
 /**
@@ -21,7 +23,10 @@ export const STATUS_TABS = ["goal", "ratio"] as const;
 export type StatusTab = (typeof STATUS_TABS)[number];
 
 export type StatusPref = {
+  /** 사용자가 칩에서 고른 기간. periodWeek가 이 주일 때만 쓴다(아니면 initialStatusPeriod의 처음 규칙) */
   period: StatusPeriod;
+  /** period를 칩에서 고른 주의 월요일(YYYY-MM-DD). 고른 적이 없거나 옛 판이 적은 값이면 null */
+  periodWeek: string | null;
   /** 목표 비율 뷰의 보기 방식(보기 목록의 번호) */
   view: string;
   /** 사용자가 고른 탭. 고른 적이 없으면 null */
@@ -31,7 +36,7 @@ export type StatusPref = {
 };
 
 /** 처음 값: 이번 주 · 띠그래프(목표 비율 뷰의 처음 보기, PM d-102) · 고른 탭 없음. 기억한 값이 없을 때만 쓴다 */
-export const DEFAULT_STATUS_PREF: StatusPref = { period: "week", view: "band", tab: null, tabWeek: null };
+export const DEFAULT_STATUS_PREF: StatusPref = { period: "week", periodWeek: null, view: "band", tab: null, tabWeek: null };
 
 /** 이전 판이 적어 둔 기간 값 → 지금 값. 「최근 1주」(recent)였던 값은 「이번 주」로 읽는다 */
 const LEGACY_PERIODS: Readonly<Record<string, StatusPeriod>> = { recent: "week" };
@@ -47,16 +52,18 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export function parseStatusPref(raw: unknown, viewIds: readonly string[]): StatusPref {
   const fallbackView = viewIds.includes(DEFAULT_STATUS_PREF.view) ? DEFAULT_STATUS_PREF.view : (viewIds[0] ?? DEFAULT_STATUS_PREF.view);
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ...DEFAULT_STATUS_PREF, view: fallbackView };
-  const { period, view, tab, tabWeek } = raw as Record<string, unknown>;
+  const { period, periodWeek, view, tab, tabWeek } = raw as Record<string, unknown>;
   const legacyView = typeof view === "string" && Object.hasOwn(LEGACY_VIEWS, view) ? LEGACY_VIEWS[view] : null;
   const tabOk = typeof tab === "string" && (STATUS_TABS as readonly string[]).includes(tab) && typeof tabWeek === "string" && DAY.test(tabWeek);
+  const periodOk = typeof period === "string" && (STATUS_PERIODS as readonly string[]).includes(period);
   return {
-    period:
-      typeof period === "string" && (STATUS_PERIODS as readonly string[]).includes(period)
-        ? (period as StatusPeriod)
-        : typeof period === "string" && Object.hasOwn(LEGACY_PERIODS, period)
-          ? LEGACY_PERIODS[period]
-          : DEFAULT_STATUS_PREF.period,
+    period: periodOk
+      ? (period as StatusPeriod)
+      : typeof period === "string" && Object.hasOwn(LEGACY_PERIODS, period)
+        ? LEGACY_PERIODS[period]
+        : DEFAULT_STATUS_PREF.period,
+    // 고른 주는 기간이 지금 값일 때만 믿는다(모르는 기간·옛 이름이면 고른 적 없는 것으로)
+    periodWeek: periodOk && typeof periodWeek === "string" && DAY.test(periodWeek) ? periodWeek : null,
     view: typeof view === "string" && viewIds.includes(view) ? view : legacyView !== null && viewIds.includes(legacyView) ? legacyView : fallbackView,
     tab: tabOk ? (tab as StatusTab) : null,
     tabWeek: tabOk ? (tabWeek as string) : null,
@@ -70,4 +77,14 @@ export function parseStatusPref(raw: unknown, viewIds: readonly string[]): Statu
 export function initialStatusTab(pref: Pick<StatusPref, "tab" | "tabWeek">, weekStart: string, hasGoal: boolean): StatusTab {
   if (pref.tab !== null && pref.tabWeek === weekStart) return pref.tab;
   return hasGoal ? "goal" : "ratio";
+}
+
+/**
+ * 목표 비율 뷰의 지금 기간(고침7, PM 15:1x). 이 주(weekStart)에 칩에서 고른 기간이 있으면 그것.
+ * 아니면 이번 주 0시간이고 쌓인 시간(총 시간)이 있으면 「총 시간」, 그 밖은 「이번 주」.
+ * @param minutes 이번 주 합계(분)와 쓰기 시작한 때부터 쌓인 합계(분) — 각 기간 그림의 합계(buildStatusChart spentTotalMinutes)와 같은 값
+ */
+export function initialStatusPeriod(pref: Pick<StatusPref, "period" | "periodWeek">, weekStart: string, minutes: { week: number; total: number }): StatusPeriod {
+  if (pref.periodWeek !== null && pref.periodWeek === weekStart) return pref.period;
+  return minutes.week === 0 && minutes.total > 0 ? "total" : "week";
 }

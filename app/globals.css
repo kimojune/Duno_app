@@ -704,6 +704,9 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-period:focus-visible .growth-period-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .growth-switch { display: flex; justify-content: flex-end; }
 .growth-empty { margin-top: var(--space-3); }
+/* 목표 비율 뷰가 이번 주 0시간이라 「총 시간」으로 견줄 때 머리 아래 한 줄(고침7 ①, 12 Medium 보조색) */
+.growth-week-zero { margin: var(--space-1) 0 0; font: 500 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.growth-card > .detail-actions { margin-top: var(--space-4); }
 .growth-period-title { margin-top: 0; }
 .growth-days { margin-bottom: var(--space-3); }
 /* 목표 없는 주의 이번 주 목표 탭(고침6 ②, Figma 50:741): 흰 카드 하나. 위→아래 = 이름표 「예시」 → 막대 둘 → 보조 줄 → 주 단추(카드 끝).
@@ -770,6 +773,8 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-pie-box { display: grid; justify-items: center; gap: var(--space-1); min-inline-size: 0; text-align: center; }
 .growth-pie { inline-size: 100%; max-inline-size: 170px; block-size: auto; aspect-ratio: 1; overflow: visible; }
 .growth-pie-empty { fill: none; stroke-width: 1; }
+/* 기록 없음의 오른쪽 원: 회색 빈 고리 1px + 가운데 「0시간」(고침7 ③, 색은 --color-border-input) */
+.growth-pie-ring { fill: none; stroke: var(--color-border-input); stroke-width: 1; }
 .growth-pie-text { font: 400 22px var(--font-family); fill: var(--color-text); font-variant-numeric: tabular-nums; }
 .growth-pie-leader { stroke-width: 1; }
 /* 비교(옛 보기, 꼴 그대로) */

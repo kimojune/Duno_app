@@ -27,6 +27,7 @@ import type { TodayRead } from "../../../lib/today-types";
  * 원샷 v2 화면 모음(개발용, B10). 서버 Action·DB·네트워크를 부르지 않고 진짜 화면 컴포넌트에 가짜 데이터만 넣는다.
  * 쓰는 법: /dev/v2?s=tabbar | growth-empty | growth-week | growth-many | growth-goal | growth-ratio | growth-pie | goal | evening | category | detail
  *          | ratio-onboarding | ratio-onboarding-many | me-ratio | me-ratio-many | evening-split | evening-split-many (고침4 2단계: 원형 다이얼)
+ *  - growth-week-zero: 이번 주 0시간 + 지난 기록 있음(고침7 ①: 목표 비율 뷰가 「총 시간」으로 시작, 머리 아래 「이번 주 0시간」)
  *  - growth-week: 상태보기에 한 주 쓴 기록이 있고 이번 주 목표는 없는 것(목표 비율 탭·띠그래프가 처음. 기간·보기 방식은 화면 시험이 눌러서 바꾼다)
  *  - growth-goal | growth-ratio | growth-pie: 상태보기 두 뷰(고침5) — 목표 한 줄 + 이번 주 목표 뷰 / 목표 비율 뷰 띠 / 목표 비율 뷰 원(기억한 탭·보기로 연다)
  *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
@@ -188,6 +189,9 @@ const WEEK_GROWTH: GrowthData = {
   loggedDaysThisWeek: 6,
   loggedDaysTotal: 20,
 };
+
+/** 이번 주는 아직 0시간, 지난 기록은 쌓인 사람(고침7 ①): 목표 비율 뷰가 「총 시간」(60시간)으로 시작한다 */
+const WEEK_ZERO_GROWTH: GrowthData = { ...WEEK_GROWTH, thisWeek: [], loggedDaysThisWeek: 0 };
 
 /**
  * 상태보기 두 뷰(고침5): 명세 ③-S 예와 같은 값. 이번 주 목표 15시간 중 12시간(어학 2/5 · 포트폴리오 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2),
@@ -381,6 +385,14 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "growth-week-zero") {
+    return (
+      <Shell>
+        <GrowthScreen api={growthApi(WEEK_ZERO_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
   if (id === "growth-week" || id === "growth-many") {
     return (
       <Shell>
@@ -448,6 +460,7 @@ export function V2Gallery({ id }: { id: string }) {
         {[
           "tabbar",
           "growth-empty",
+          "growth-week-zero",
           "growth-week",
           "growth-many",
           "growth-goal",
