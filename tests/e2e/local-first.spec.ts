@@ -77,7 +77,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await expect(page.getByText(`${marker} 끊긴 채 적음`, { exact: true })).toBeVisible({ timeout: 2_000 });
     await expect(input).toHaveValue("");
     await expect(page.getByText("저장하는 중")).toHaveCount(0);
-    // 고침10: 적는 창은 시트 + 막(모달)이라 열려 있는 동안 뒤 목록은 눌리지 않는다 — 닫은 뒤 방금 적은 줄에 바로 끝냄 표시를 한다
+    // 고침10: 적는 창은 시트 + 막이지만 비모달이다(막은 보이기만, 뒤 목록은 눌린다). 여기서는 창을 닫고 난 뒤 방금 적은 줄에 바로 끝냄 표시를 한다
     await input.press("Escape");
     await expect(page.getByRole("form", { name: "할 일 적기" })).toHaveCount(0);
     const box = page.getByRole("checkbox", { name: `${marker} 끊긴 채 적음` });
