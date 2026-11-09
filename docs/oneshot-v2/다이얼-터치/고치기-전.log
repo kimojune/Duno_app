@@ -1,0 +1,76 @@
+# 보고 19절 재현 — 고치기 전(지금 코드) 실패 로그
+# 시각 11-09 23:07 · 브랜치 kimojune/ov10-dialtouch · HEAD 255c27c(components/ratio-dial.tsx 고치기 전)
+# 명령: SCREENS_PORT=3317 SCREENS_DIST_DIR=node_modules/.cache/duno-ov10-screens npx playwright test --config playwright.screens.config.ts tests/screens/dial-touch.spec.ts
+# 터치: Playwright Chrome(isMobile·hasTouch·360×560) + CDP Input.dispatchTouchEvent
+
+
+Running 3 tests using 1 worker
+
+[dial-touch] svg.dial 끌기 0.25바퀴: 값 30 → 35 · 스크롤 88 → 0 · 포인터 pointerdown:dial-ring pointercancel:dial lostpointercapture:dial
+  x  1 tests\screens\dial-touch.spec.ts:147:5 › 오늘 기록 「분야마다 나누기」 다이얼: 손가락 끌기가 끊기지 않고(15분 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 · 조각 탭 (2.7s)
+[dial-touch] svg.dial 끌기 -0.25바퀴: 값 50 → 53 · 스크롤 0 → 0 · 포인터 pointerdown:dial-ring pointercancel:dial lostpointercapture:dial
+  x  2 tests\screens\dial-touch.spec.ts:183:5 › 처음 설정·내 정보 「목표 비율」 다이얼: 조각 탭으로 고르고, 손가락 끌기가 끊기지 않고(15% 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 (2.9s)
+[dial-touch] 휠 끌기: 값 0 → 3 · 스크롤 50 → 50 · lostpointercapture lostpointercapture
+  ok 3 tests\screens\dial-touch.spec.ts:210:5 › 참고: 오늘 기록 두 줄 휠도 손가락 끌기가 끊기지 않는다(pointercancel 없음 · 값이 바뀜 · 바깥 스크롤 그대로) (2.3s)
+
+
+  1) tests\screens\dial-touch.spec.ts:147:5 › 오늘 기록 「분야마다 나누기」 다이얼: 손가락 끌기가 끊기지 않고(15분 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 · 조각 탭 
+
+    Error: 끌기 동안 pointercancel 없음
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "pointercancel:dial",
+    + ]
+
+      120 |   const top1 = await scrollTop(page);
+      121 |   console.log(`[dial-touch] ${dialSel} 끌기 ${turn}바퀴: 값 ${before} → ${after} · 스크롤 ${top0} → ${top1} · 포인터 ${log.join(" ")}`);
+    > 122 |   expect(log.filter((l) => l.startsWith("pointercancel")), "끌기 동안 pointercancel 없음").toEqual([]);
+          |                                                                                      ^
+      123 |   expect(Math.abs(after - before), `손잡이 값이 ${minChange} 넘게 바뀐다`).toBeGreaterThan(minChange);
+      124 |   expect(top1, "끄는 동안 바깥 스크롤 그대로").toBe(top0);
+      125 | }
+
+    Error Context: test-results\artifacts-screens\dial-touch-오늘-기록-「분야마다-나누기-86d15-는다-·-놓은-뒤-조각·바깥은-스크롤-·-조각-탭\error-context.md
+
+  2) tests\screens\dial-touch.spec.ts:183:5 › 처음 설정·내 정보 「목표 비율」 다이얼: 조각 탭으로 고르고, 손가락 끌기가 끊기지 않고(15% 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 
+
+    Error: 끌기 동안 pointercancel 없음
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "pointercancel:dial",
+    + ]
+
+      120 |   const top1 = await scrollTop(page);
+      121 |   console.log(`[dial-touch] ${dialSel} 끌기 ${turn}바퀴: 값 ${before} → ${after} · 스크롤 ${top0} → ${top1} · 포인터 ${log.join(" ")}`);
+    > 122 |   expect(log.filter((l) => l.startsWith("pointercancel")), "끌기 동안 pointercancel 없음").toEqual([]);
+          |                                                                                      ^
+      123 |   expect(Math.abs(after - before), `손잡이 값이 ${minChange} 넘게 바뀐다`).toBeGreaterThan(minChange);
+      124 |   expect(top1, "끄는 동안 바깥 스크롤 그대로").toBe(top0);
+      125 | }
+
+    Error Context: test-results\artifacts-screens\dial-touch-처음-설정·내-정보-「목표--3c603-스크롤되지-않는다-·-놓은-뒤-조각·바깥은-스크롤\error-context.md
+
+  2 failed
+    tests\screens\dial-touch.spec.ts:147:5 › 오늘 기록 「분야마다 나누기」 다이얼: 손가락 끌기가 끊기지 않고(15분 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 · 조각 탭 
+    tests\screens\dial-touch.spec.ts:183:5 › 처음 설정·내 정보 「목표 비율」 다이얼: 조각 탭으로 고르고, 손가락 끌기가 끊기지 않고(15% 넘게) 화면이 따라 스크롤되지 않는다 · 놓은 뒤 조각·바깥은 스크롤 
+  1 passed (13.5s)
+# 종료 코드 1
+
+# 진단(같은 시각, 고치기 전 코드, 커밋하지 않은 임시 시험 — 위 시험 1을 그대로 복사해 손잡이 계산 스타일을 찍고, 한 번은 .dial-handle{display:block}를 페이지에 넣어 돌림)
+# 그대로:            [diag] display=inline touchAction=none
+#                    [dial-touch] svg.dial 끌기 0.25바퀴: 값 30 → 35 · 스크롤 88 → 0 · 포인터 pointerdown:dial-ring pointercancel:dial lostpointercapture:dial  → 1 failed
+# display:block 넣음: [diag] display=block touchAction=none
+#                    [dial-touch] svg.dial 끌기 0.25바퀴: 값 30 → 75 · 스크롤 88 → 88 · 포인터 pointerdown:dial-ring pointerup:dial lostpointercapture:dial  → 1 passed
+# 뜻: 손잡이 <g>의 계산된 touch-action은 none이지만 display가 inline이라 Chromium이 터치 판단에서 무시한다. 손가락이 터치 슬롭을 넘으면 브라우저가 시트를 스크롤하며 pointercancel을 보내 끌기가 끝난다(값 한 걸음 = 5분에서 멈춤).
