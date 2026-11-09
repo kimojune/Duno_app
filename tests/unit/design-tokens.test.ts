@@ -25,6 +25,17 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 const css = read("app/globals.css");
 const offline = read("public/offline.html");
 
+/** 폴더 안 .tsx·.ts 파일 어디에든 낱말이 있는가(클래스 이름이 실제로 쓰이는지) */
+function grepDir(dir: string, word: string): boolean {
+  for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+    const rel = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (grepDir(rel, word)) return true;
+    } else if (/\.tsx?$/.test(entry.name) && read(rel).includes(word)) return true;
+  }
+  return false;
+}
+
 /** CSS 주석을 걷어 낸다 */
 const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "");
 /** 쉼표 둘레·연속 공백 차이는 같은 값으로 본다(offline.html은 줄여 적었다) */
@@ -201,10 +212,20 @@ describe("고침 5바퀴 확정 값(디자인 명세 ①)", () => {
     expect(svg, "SVG 그래픽 윤곽 규칙").not.toBeNull();
     const boxSel = box![1].split(",").map((x) => x.trim());
     const svgSel = svg![1].split(",").map((x) => x.trim());
-    expect(boxSel).toEqual(expect.arrayContaining([`.${CHART_OUTLINE.box}`, ".growth-dot", ".growth-bar-fill", ".growth-band-seg"]));
+    expect(boxSel).toEqual(expect.arrayContaining([`.${CHART_OUTLINE.box}`, ".growth-dot"]));
+    // 없어진 이름이 남아 있지 않다(C가 .growth-bar-fill·.growth-band-seg를 없앴다). 띠 칸·막대 채움은 스스로 테두리가 윤곽이라 1px inset 목록에 없다
+    for (const gone of [".growth-bar-fill", ".growth-band-seg"]) expect(boxSel, `${gone}는 없는 이름`).not.toContain(gone);
+    for (const own of [".growth-band-cell", ".growth-goal-fill"]) expect(boxSel, `${own}는 자기 테두리가 윤곽`).not.toContain(own);
+    // 목록의 클래스가 앱 코드에 실제로 쓰인다(없는 이름 금지)
+    for (const sel of [...boxSel, ...svgSel]) {
+      if (sel === `.${CHART_OUTLINE.box}` || sel === `.${CHART_OUTLINE.svg}`) continue; // 새 그래픽이 달 공통 클래스(아직 쓰는 곳이 없어도 된다)
+      const name = sel.replace(/^\./, "");
+      const used = ["components", "app"].some((dir) => grepDir(dir, name));
+      expect(used, `${sel}가 components·app에서 쓰인다`).toBe(true);
+    }
     expect(svgSel).toEqual(expect.arrayContaining([`.${CHART_OUTLINE.svg}`, ".dial-slice", ".growth-pie-slice"]));
     // 윤곽 규칙이 파일 맨 끝에 있어 앞의 규칙(조각 사이 흰 선 등)보다 나중에 이긴다
-    expect(text.lastIndexOf(box![0])).toBeGreaterThan(text.indexOf(".growth-band-seg {"));
+    expect(text.lastIndexOf(box![0])).toBeGreaterThan(text.indexOf(".growth-dot {"));
     expect(text.lastIndexOf(svg![0])).toBeGreaterThan(text.indexOf(".dial-slice {"));
   });
 

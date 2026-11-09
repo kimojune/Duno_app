@@ -704,7 +704,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
 .growth-legend-box { display: inline-block; inline-size: 16px; block-size: 12px; border: 1.5px solid; box-sizing: border-box; border-radius: 2px; }
 .growth-legend-tick { display: inline-block; inline-size: 2px; block-size: 14px; }
-/* 띠 칸 이름은 growth-band-cell: 워커 A의 공통 윤곽 규칙(.growth-band-seg에 inset box-shadow)이 점선 칸에 실선을 덧그리지 않게 다른 이름을 쓴다.
+/* 띠 칸 이름은 growth-band-cell: 워커 A의 공통 윤곽 규칙(inset box-shadow)이 점선 칸에 실선을 덧그리지 않게 이 이름은 그 규칙 목록에 넣지 않는다.
    1.5px 테두리는 기기 픽셀에 맞춰 그려진다(DPR 2 이상 폰에서 1.5px, DPR 1 화면에서는 1px).
    목표 비율 뷰 띠 두 줄: 위 점선 윤곽(목표 비율) · 아래 실선 윤곽(기간). 칸 안 %, 칸이 28px보다 좁으면 숫자는 아래 목록에만(컨테이너 쿼리) */
 .growth-graph { margin: var(--space-3) 0 var(--space-2); }
@@ -712,14 +712,16 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-line-caption { font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .growth-band { display: flex; inline-size: 100%; block-size: 28px; }
 .growth-band.is-empty { align-items: center; justify-content: center; border-width: 1.5px; box-sizing: border-box; border-radius: var(--radius-check); }
+/* 바깥 칸(.growth-band-slot)은 테두리가 없고 폭이 % 그대로라, 컨테이너 쿼리가 칸 바깥 폭을 잰다(테두리 굵기·첫 칸 여부와 상관없이) */
+.growth-band-slot { display: flex; flex: none; min-inline-size: 0; block-size: 100%; container-type: inline-size; }
 .growth-band-cell {
-  display: flex; align-items: center; justify-content: center; flex: none; min-inline-size: 0; block-size: 100%;
-  border-width: 1.5px; box-sizing: border-box; container-type: inline-size; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; flex: 1 1 auto; min-inline-size: 0; block-size: 100%;
+  border-width: 1.5px; box-sizing: border-box; overflow: hidden;
 }
-.growth-band-cell + .growth-band-cell { border-inline-start-width: 0; }
+.growth-band-slot + .growth-band-slot > .growth-band-cell { border-inline-start-width: 0; }
 .growth-seg-label { font: 400 12px/16px var(--font-family); color: var(--color-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* 컨테이너 쿼리는 테두리 안쪽 폭을 잰다: 칸 폭 28 − 양쪽 테두리 1.5 × 2 = 25 */
-@container (max-width: 24.98px) { .growth-seg-label { display: none; } }
+/* 칸 바깥 폭이 28px보다 좁으면 숫자는 아래 목록에만(첫 칸도 나머지 칸도 같은 기준) */
+@container (max-width: 27.98px) { .growth-seg-label { display: none; } }
 /* 원그래프 둘 나란히(같은 크기, 원 지름 약 132), 조각마다 실선 1px 윤곽, 조각마다 % 글(작은 조각은 이끌 선으로 원 밖) */
 .growth-pies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 .growth-pie-box { display: grid; justify-items: center; gap: var(--space-1); min-inline-size: 0; text-align: center; }
@@ -780,6 +782,8 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 /* ---- 분야 색 윤곽(고침 5바퀴, 디자인 명세 ① · 한 곳) ----
    분야 색은 흰 바탕 3:1 미만이라 칠한 그래픽마다 --color-chart-outline 1px 윤곽을 둔다(WCAG 1.4.11).
    이름은 lib/design-tokens.ts CHART_OUTLINE와 같다. 새 그래픽은 클래스만 달면 된다.
-   아래 목록은 이미 있는 분야 색 그래픽(다이얼 조각·상태보기 점·막대 채움·띠 칸·원 조각)에 같은 규칙을 거는 것이다. */
-.chart-outline, .growth-dot, .growth-bar-fill, .growth-band-seg { box-shadow: inset 0 0 0 1px var(--color-chart-outline); }
+   아래 목록은 이미 있는 분야 색 그래픽 가운데 이 규칙을 받는 것이다: 색 점(.growth-dot) · 다이얼 조각·원 조각(svg).
+   받지 않는 것: 띠 칸(.growth-band-cell)은 1.5px 점선/실선 테두리가 윤곽이라 1px inset을 덧그리지 않는다(점선 칸에 실선이 겹침),
+   막대 채움(.growth-goal-fill)은 1px 테두리(분야 색 위 윤곽색)를 스스로 가진다. */
+.chart-outline, .growth-dot { box-shadow: inset 0 0 0 1px var(--color-chart-outline); }
 .chart-outline-svg, .dial-slice, .growth-pie-slice { stroke: var(--color-chart-outline); stroke-width: 1; }

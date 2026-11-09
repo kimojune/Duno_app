@@ -869,8 +869,9 @@ describe("모양 규칙(CSS 출처 값, app/globals.css) — 실제 칠해짐은
     expect(growth.length).toBeGreaterThan(1000);
     expect(growth).not.toMatch(/ellipsis|--color-accent/);
   });
-  it("띠 칸이 28px보다 좁으면 칸 안 숫자를 숨긴다(컨테이너 쿼리, 테두리 안쪽 폭 25 = 28 − 1.5 × 2)", () => {
-    expect(rule(".growth-band-cell")).toContain("container-type: inline-size");
-    expect(css).toMatch(/@container \(max-width: 24\.98px\) \{ \.growth-seg-label \{ display: none; \} \}/);
+  it("띠 칸이 28px보다 좁으면 칸 안 숫자를 숨긴다(컨테이너 쿼리 — 테두리 없는 바깥 칸의 바깥 폭 28 기준). 실제 27·29px 칸에서 숨음/보임은 screens에서 잰다", () => {
+    expect(rule(".growth-band-slot")).toContain("container-type: inline-size");
+    expect(rule(".growth-band-cell")).not.toContain("container-type"); // 테두리 있는 칸은 쿼리 대상이 아니다(안쪽 폭은 테두리·첫 칸 여부로 달라진다)
+    expect(css).toMatch(/@container \(max-width: 27\.98px\) \{ \.growth-seg-label \{ display: none; \} \}/);
   });
 });

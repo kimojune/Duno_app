@@ -10,7 +10,7 @@ import { bandSegments, pieLabels, pieSlices, type ChartCategoryId, type GoalChar
  * - 목표 비율 뷰: 띠그래프(처음)·원그래프. 보기 하나 = 같은 데이터(buildStatusChart 결과)를 받는 부품 하나(STATUS_VIEWS).
  *   보기를 늘리려면 STATUS_VIEWS 목록에 {id, label, Component} 한 줄을 더한다 — 기억한 값 검사(parseStatusPref)가 이 목록을 따른다.
  * 색: 조각 색을 정하는 곳은 categoryColorValue 한 군데(lib/category-color.ts)다. 분야 색을 칠한 그림에는 모두 --color-chart-outline 윤곽을 둔다
- * (분야 색이 흰 바탕 3:1 미만이라 윤곽이 경계 대비를 맡는다, WCAG 1.4.11). 살구(--color-accent)는 쓰지 않는다(PM 8).
+ * (분야 색이 흰 바탕 3:1 미만이라 윤곽이 경계 대비를 맡는다, WCAG 1.4.11). 살구색은 쓰지 않는다(PM 8).
  * 새 토큰은 lib/design-tokens.ts에 생기기 전이라 var(이름, 대체값)으로 쓴다.
  * 그림은 글로 읽지 않는다(aria-hidden). 카드 앞 숨은 요약 한 줄(화면이 만든다)이 같은 내용을 글로 준다. 분야 이름은 사용자 글이라 React 텍스트로만 그린다.
  */
@@ -96,10 +96,13 @@ function BandLine({ chart, line, empty, caption, kind, text }: { chart: StatusCh
       <span className="growth-line-caption">{caption}</span>
       <div className={empty ? "growth-band is-empty" : "growth-band"} data-line={kind} style={empty ? { borderStyle, borderColor: CHART_OUTLINE } : undefined}>
         {bandSegments(line).map((seg) => {
-          const style: CSSProperties = { inlineSize: `${seg.percent}%`, background: colorOf(order, seg.categoryId), borderStyle, borderColor: CHART_OUTLINE };
+          const style: CSSProperties = { background: colorOf(order, seg.categoryId), borderStyle, borderColor: CHART_OUTLINE };
+          // 칸 폭(바깥 폭, 테두리 포함)은 테두리 없는 바깥 칸(.growth-band-slot)이 정한다. 숫자를 숨길지는 이 바깥 폭으로 잰다(테두리 굵기·첫 칸 여부와 상관없이 28px)
           return (
-            <span key={keyOf(seg.categoryId)} className="growth-band-cell" data-category={keyOf(seg.categoryId)} style={style}>
-              <span className="growth-seg-label">{text.percent(seg.percent)}</span>
+            <span key={keyOf(seg.categoryId)} className="growth-band-slot" style={{ inlineSize: `${seg.percent}%` }}>
+              <span className="growth-band-cell" data-category={keyOf(seg.categoryId)} style={style}>
+                <span className="growth-seg-label">{text.percent(seg.percent)}</span>
+              </span>
             </span>
           );
         })}

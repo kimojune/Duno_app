@@ -209,7 +209,7 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
       els.map((el) => {
         const c = getComputedStyle(el);
         const label = el.querySelector(".growth-seg-label")!;
-        return { line: el.parentElement!.getAttribute("data-line"), style: c.borderTopStyle, width: c.borderTopWidth, color: c.borderTopColor, w: el.getBoundingClientRect().width, labelShown: getComputedStyle(label).display !== "none", text: label.textContent };
+        return { line: el.closest(".growth-band")!.getAttribute("data-line"), style: c.borderTopStyle, width: c.borderTopWidth, color: c.borderTopColor, w: el.getBoundingClientRect().width, labelShown: getComputedStyle(label).display !== "none", text: label.textContent };
       }),
     );
     expect(segs.filter((x) => x.line === "ratio").map((x) => x.style)).toEqual(["dashed", "dashed", "dashed", "dashed"]);
@@ -234,6 +234,38 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     expect(Math.min(...chips.map((c) => c.h))).toBeGreaterThanOrEqual(48);
     expect(chips.every((c) => parseFloat(c.r) >= 16)).toBe(true);
     await shot(page, `growth-ratio-${size}`);
+    // 분야 색 점은 실제로 1px 먹남색 윤곽으로 칠해진다(CSS 값이 아니라 계산값) — 바탕·면 색과도 다르다
+    const dots = await page.$$eval(".growth-dot", (els) => els.map((el) => ({ shadow: getComputedStyle(el).boxShadow, bg: getComputedStyle(el).backgroundColor })));
+    expect(dots.length).toBeGreaterThan(0);
+    const surface = await rootColor(page, "--color-surface");
+    const pageBg = await rootColor(page, "--color-bg");
+    for (const d of dots) {
+      expect(d.shadow, "1px 안쪽 윤곽").toMatch(/inset/);
+      expect(d.shadow).toContain(outline);
+      expect(d.shadow).toMatch(/0px 0px 0px 1px/);
+      expect(d.bg).not.toBe(surface);
+      expect(d.bg).not.toBe(pageBg);
+    }
+    // 칸 바깥 폭 27px은 숫자가 숨고 29px은 보인다 — 첫 칸(왼쪽 테두리 있음)도 나머지 칸(왼쪽 테두리 0)도 같은 기준이다(실제 폭을 바꿔 잰다)
+    for (const index of [0, 1, 2]) {
+      const probe = await page.evaluate((i) => {
+        const band = document.querySelector('.growth-band[data-line="spent"]')!;
+        const slot = band.children[i] as HTMLElement;
+        const label = slot.querySelector(".growth-seg-label") as HTMLElement;
+        const out: Record<string, { width: number; shown: boolean }> = {};
+        for (const w of [27, 29]) {
+          slot.style.flex = "none";
+          slot.style.inlineSize = `${w}px`;
+          void slot.offsetWidth;
+          out[String(w)] = { width: slot.getBoundingClientRect().width, shown: getComputedStyle(label).display !== "none" };
+        }
+        return out;
+      }, index);
+      expect(probe["27"].width, `칸 ${index} 바깥 폭 27`).toBeCloseTo(27, 1);
+      expect(probe["29"].width, `칸 ${index} 바깥 폭 29`).toBeCloseTo(29, 1);
+      expect(probe["27"].shown, `칸 ${index}: 27px 칸은 숫자 숨김`).toBe(false);
+      expect(probe["29"].shown, `칸 ${index}: 29px 칸은 숫자 보임`).toBe(true);
+    }
     await noHorizontalScroll(page, "목표 비율 띠");
     await insideViewport(page, ".growth-band", "띠");
     await insideViewport(page, ".growth-row-value", "오른쪽 %");
