@@ -240,6 +240,25 @@ test("시트 넷(위 모서리 16 · 손잡이 40×4 #E7E1D6 · 막 45%): 적는
   await photo(page, "시트-분야고르기");
 });
 
+test("고침10 QA1 ⑦ S8-a: 「균등 배분」이 첫 화면에 보이고 아래 주 단추(단추 하나) 바로 위에 붙박이 — 가려지지 않는다", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/dev/v2?s=me-ratio-many");
+  await page.getByRole("button", { name: /^목표 비율, / }).click();
+  const dialog = page.getByRole("dialog", { name: "목표 비율" });
+  const even = dialog.getByRole("button", { name: "균등 배분" });
+  await expect(even).toBeVisible();
+  // 붙박이 높이는 .bottom-actions가 단추 하나일 때의 높이에서 온다 — 이 화면이 늘 단추 하나임을 못 박는다
+  expect(await dialog.locator(".bottom-actions > .btn").count(), "아래 주 단추 자리의 단추 수").toBe(1);
+  const g = await page.evaluate(() => {
+    const foot = document.querySelector(".ratio-foot")!.getBoundingClientRect();
+    const actions = document.querySelector(".bottom-actions")!.getBoundingClientRect();
+    return { footBottom: foot.bottom, actionsTop: actions.top, viewport: innerHeight, footTop: foot.top };
+  });
+  expect(g.footBottom, "「균등 배분」 줄이 아래 단추 자리 위에 있다").toBeLessThanOrEqual(g.actionsTop + 1);
+  expect(g.footTop, "첫 화면 안").toBeGreaterThan(0);
+  expect(g.footBottom).toBeLessThanOrEqual(g.viewport);
+});
+
 test("분야 줄은 한 줄(점 12 + 이름 말줄임 + −/숫자/+ 고정): 긴 이름도 두세 줄이 되지 않는다. 숫자 칸 글 가운데", async ({ page }) => {
   await open(page, "ratio-onboarding-many");
   await page.getByRole("button", { name: "다음" }).click();

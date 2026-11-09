@@ -115,7 +115,10 @@ describe("고침10 QA1 ⑤ ⑥ ⑦ ⑧ ⑨ CSS", () => {
     const m = CSS.match(/\.ratio-foot \{ justify-content: center;[^}]*\}/);
     expect(m, ".ratio-foot 규칙").not.toBeNull();
     expect(m![0]).toContain("position: sticky");
-    expect(m![0]).toContain("100px");
+    // 박힌 100px이 아니라 .bottom-actions와 같은 토큰에서 온다
+    expect(m![0]).toContain("var(--bottom-actions-pad-bottom)");
+    expect(m![0]).not.toContain("100px");
+    expect(CSS).toMatch(/\.bottom-actions \{[^}]*padding: var\(--space-4\) 0 calc\(var\(--bottom-actions-pad-bottom\)/);
   });
   it("⑧ 보조 단추 두 곳이 겹선 없이 보조 단추 꼴 그대로(Bold · 1.5)", () => {
     expect(rule(".btn-secondary")).toContain("box-shadow: inset 0 0 0 1.5px var(--color-primary)");
