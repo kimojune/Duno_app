@@ -37,12 +37,12 @@ test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤�
   const after = await total.getAttribute("aria-valuetext");
   expect(after).not.toBe(before);
 
-  const close = record.getByRole("button", { name: "닫기" }).first();
+  const close = record.getByRole("button", { name: "이전" }); // 고침10 A: 머리 「‹」(시간 단계 = 닫기)
   await close.click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
-  await expect(confirm.getByRole("button")).toHaveText(["계속 적기", "나가기"]);
+  await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused(); // 고침10 B: 첫 초점 = 제목
+  await expect(confirm.getByRole("button")).toHaveText(["나가기", "계속 적기"]);
   const keepBg = await confirm.getByRole("button", { name: "계속 적기" }).evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(keepBg).toBe("rgb(28, 35, 64)"); // 주 단추 먹남색(--color-primary #1C2340)
   const box = (await confirm.boundingBox())!;
@@ -71,6 +71,14 @@ test("PM d-126 오늘 기록 360x800: 쓴 시간을 바꾸면 「닫기」·뒤�
   await expect(confirm).toBeVisible();
   await expect(record).toBeVisible();
   expect(page.url()).toBe(startUrl);
+  // 고침10 B: 확인이 뜬 채 뒤로 가기 = 「계속 적기」(확인만 닫힘, 창·값·주소 그대로)
+  await page.goBack();
+  await expect(confirm).toHaveCount(0);
+  await expect(record).toBeVisible();
+  await expect(total).toHaveAttribute("aria-valuetext", after ?? "");
+  expect(page.url()).toBe(startUrl);
+  await page.goBack();
+  await expect(confirm).toBeVisible();
   await confirm.getByRole("button", { name: "나가기" }).click();
   await expect(record).toHaveCount(0);
   await expect(confirm).toHaveCount(0);
@@ -92,7 +100,7 @@ test("PM d-126 시트 360x800: 「+ 할 일」에 글이 있으면 「닫기」�
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(1);
-  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
+  await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused();
   await noOverflow(page);
   await photo(page, "PM-d126-시트-닫기확인");
 

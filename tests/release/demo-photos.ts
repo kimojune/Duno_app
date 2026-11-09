@@ -109,8 +109,8 @@ async function main() {
       for (let i = pressed; i < 2; i++) await group.getByRole("button", { name: /, 다이얼에 넣기$/, pressed: false }).first().click();
       await shot(page, "S5-2 나누기 · 칩 둘 고른 상태");
     });
-    // 저장하지 않고 닫는다
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    // 저장하지 않고 닫는다(고침10 A: 나누기 단계의 머리 「‹」는 시간 단계로 가므로 Esc로 닫기를 건다)
+    await dialog.press("Escape");
     const confirm = page.getByRole("alertdialog");
     if (await confirm.isVisible({ timeout: 2_000 }).catch(() => false)) {
       log("닫기 확인 창 단추: " + (await confirm.getByRole("button").allInnerTexts()).join(" | "));

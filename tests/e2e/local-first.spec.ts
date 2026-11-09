@@ -86,7 +86,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 2_000 });
     await expect(dialog.locator(".after-save-card")).toBeVisible(); // 고침9: 저장 뒤 「이번 주」 카드(옛 「오늘 바뀐 분야별 시간」 줄)
-    await dialog.getByRole("button", { name: "닫기" }).last().click();
+    await dialog.getByRole("button", { name: "이전" }).click(); // 고침10 A: 오늘 기록 머리 「‹」(저장 뒤 = 닫기)
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // 끊긴 동안 서버에는 아무것도 없다
@@ -173,7 +173,7 @@ test("누르면 서버 응답 전에 화면이 바뀐다(서버 Action 요청을
     await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 1_500 });
     const eveningMs = Date.now() - t2;
-    await dialog.getByRole("button", { name: "닫기" }).last().click();
+    await dialog.getByRole("button", { name: "이전" }).click(); // 고침10 A: 오늘 기록 머리 「‹」(저장 뒤 = 닫기)
 
     // 그동안 서버 요청은 붙잡혀 있었고 서버에는 아무것도 없다
     expect(held.length, "서버 Action 요청이 아직 답을 못 받은 채 붙잡혀 있다").toBeGreaterThan(0);
@@ -213,11 +213,13 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
     await expect(page.getByText(`${marker} 못 보낸 글`, { exact: true })).toBeVisible({ timeout: 2_000 });
     await page.getByRole("textbox", { name: "할 일 적기" }).press("Escape");
 
-    // 끊긴 채 로그아웃: 먼저 보내 보고(못 보냄), 「보내지 못한 기록이 있어요」를 알린다. 취소하면 그대로
+    // 끊긴 채 로그아웃: 먼저 보내 보고(못 보냄), 확인 창 「로그아웃할까요?」(고침10 B)를 띄운다. 「계속 쓰기」면 그대로
     await page.getByRole("button", { name: "로그아웃" }).first().click();
-    await expect(page.getByText(/보내지 못한 기록이 있어요/)).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "취소" }).click();
-    await expect(page.getByText(/보내지 못한 기록이 있어요/)).toHaveCount(0);
+    const logoutConfirm = page.getByRole("alertdialog", { name: "로그아웃할까요?" });
+    await expect(logoutConfirm).toBeVisible({ timeout: 15_000 });
+    await expect(logoutConfirm.getByRole("button")).toHaveText(["로그아웃", "계속 쓰기"]);
+    await logoutConfirm.getByRole("button", { name: "계속 쓰기" }).click();
+    await expect(logoutConfirm).toHaveCount(0);
     await expect(page.getByText(`${marker} 못 보낸 글`, { exact: true })).toBeVisible();
 
     // 연결되면 보내고, 그 뒤 로그아웃하면 확인 없이 로그아웃하고 기기 저장소가 비워진다
@@ -331,7 +333,7 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(칩으로 넣고 Ste
     await expect(fields.first()).toHaveValue(String(piece));
     await dialog.getByRole("button", { name: "저장", exact: true }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 2_000 });
-    await dialog.getByRole("button", { name: "닫기" }).last().click();
+    await dialog.getByRole("button", { name: "이전" }).click(); // 고침10 A: 오늘 기록 머리 「‹」(저장 뒤 = 닫기)
 
     // 끊긴 동안 서버에는 아무것도 없다
     await page.waitForTimeout(1500);

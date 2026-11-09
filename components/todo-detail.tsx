@@ -6,10 +6,12 @@ import { NOTE_MAX_LENGTH_PUBLIC, countNoteChars } from "../lib/notes/public";
 import type { NoteItem } from "../lib/notes/types";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
-import { inertOutside, useOverlayWindow } from "../lib/use-overlay-window";
+import { useOverlayWindow } from "../lib/use-overlay-window";
 import { categoryColorValue } from "../lib/category-color";
 import { CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
 import { categoryOverLimitText, TODO_TEXT } from "./todo-view";
+import { BackHeader } from "./back-header";
+import { CONFIRM_TEXT, ConfirmDialog } from "./close-confirm";
 import { Notice, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -21,21 +23,17 @@ import { Notice, SecondaryButton, TextButton } from "./ui";
 
 export const DETAIL_TEXT = {
   title: "할 일 자세히",
-  close: "닫기",
   editLabel: "할 일 글",
   // 고침9 PM 3(④-2, Figma 51:55 · 77:18): 칩 줄 대신 고른 분야 한 줄(색 원 + 이름 + 「›」). 누르면 분야 고르기 시트
   categoryLabel: "분야",
   categoryChange: "분야 바꾸기",
   sheetTitle: "분야 고르기",
-  sheetClose: "닫기",
   addCategory: "+ 분야",
   newCategoryLabel: "새 분야 이름",
   newCategoryAdd: "더하기",
   newCategoryAdding: "더하는 중",
   newCategoryCancel: "취소",
-  // 고침9 Figma 51:55 · 58:92 · 66:12 · 66:76: 페이지 머리 「‹ 할 일」 · 저장 상태 · 「⋯」 메뉴
-  back: "할 일",
-  backName: "할 일로 돌아가기",
+  // 고침10 A(146:10 · 147:58): 페이지 머리 = 왼쪽 위 「‹」(화면 읽기 「이전」 — components/back-header.tsx) · 저장 상태 · 「⋯」 메뉴. 머리의 「할 일」 글은 없다
   more: "더 보기",
   menuName: "할 일 메뉴",
   doneLabel: "끝냄",
@@ -44,14 +42,12 @@ export const DETAIL_TEXT = {
   saved: "저장됨",
   saveFailedShort: "저장 안 됨",
   saveFailedRetry: "저장 안 됨 · 다시 시도",
-  removeCancel: "취소",
   offline: "인터넷에 연결되면 고치거나 지울 수 있어요.",
   moveUp: "위로",
   moveDown: "아래로",
   moveFailed: "순서를 바꾸지 못했어요.",
   remove: "지우기",
-  removeConfirm: "이 할 일을 지울까요? 작업 기록도 함께 지워져요.", // Figma 66:12
-  removeYes: "지우기",
+  // 지우기 확인 글은 공통 확인 창 글(components/close-confirm.tsx CONFIRM_TEXT.todoRemove · noteRemove, 147:2)
   removeFailed: "지우지 못했어요. 다시 눌러 주세요.",
   notesTitle: "작업 기록",
   notesLoading: "작업 기록을 불러오는 중",
@@ -137,6 +133,8 @@ export function TodoDetail({
   const lastPatchRef = useRef<{ text?: string; categoryId?: string | null } | null>(null);
   const [message, setMessage] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  /** 고침10 B(147:95 · PM 11): 「지우기」를 누른 작업 기록. 있으면 확인 창 「이 작업 기록을 지울까요?」 */
+  const [confirmNote, setConfirmNote] = useState<string | null>(null);
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [notesState, setNotesState] = useState<"loading" | "ready" | "error">("loading");
   const [noteDraft, setNoteDraft] = useState("");
@@ -237,7 +235,10 @@ export function TodoDetail({
     const res = await api.deleteTodo(todo.id);
     setBusy(null);
     if (res.ok) onDeleted(todo.id);
-    else setMessage(DETAIL_TEXT.removeFailed);
+    else {
+      setConfirmRemove(false);
+      setMessage(DETAIL_TEXT.removeFailed);
+    }
   }
 
   async function move(direction: -1 | 1) {
@@ -273,10 +274,15 @@ export function TodoDetail({
     }
   }
 
+  /** 작업 기록 지우기(확인 창 「지우기」가 부른다). 끝나면 확인을 닫고, 지운 그 카드만 목록에서 뺀다 */
   async function removeNote(id: string) {
-    if (!online) return;
+    if (!online) {
+      setConfirmNote(null);
+      return;
+    }
     setNoteMessage("");
     const res = await api.deleteNote(id);
+    setConfirmNote(null);
     if (res.ok || res.error === "not_found") setNotes((prev) => prev.filter((n) => n.id !== id));
     else setNoteMessage(DETAIL_TEXT.noteDeleteFailed);
   }
@@ -329,12 +335,10 @@ export function TodoDetail({
       onKeyDown={onKeyDown}
     >
       <div className="detail-inner">
-        {/* 고침9 Figma 51:55 머리(A1): 왼쪽 「‹ 할 일」(돌아가기) · 오른쪽 저장 상태 · 「⋯」 */}
-        <div className="detail-page-head">
-          <TextButton className="detail-back text-tap" aria-label={DETAIL_TEXT.backName} onClick={onClose}>
-            <span aria-hidden="true">‹ </span>
-            {DETAIL_TEXT.back}
-          </TextButton>
+        {/* 고침10 A(146:10 · 147:58): 왼쪽 위 머리 단추 「‹」(이전) · 오른쪽 저장 상태 · 「⋯」. 「‹ 할 일」 글 단추와 머리의 「할 일」 글은 없다 */}
+        <BackHeader
+          onBack={onClose}
+          end={
           <div className="detail-page-tools">
             {failed ? (
               <TextButton className="detail-status-retry text-tap" onClick={() => void retrySave()}>
@@ -408,7 +412,8 @@ export function TodoDetail({
               )}
             </div>
           </div>
-        </div>
+          }
+        />
 
         <h2 id="detail-title" className="sr-only" tabIndex={-1} ref={titleRef}>
           {DETAIL_TEXT.title}
@@ -515,7 +520,13 @@ export function TodoDetail({
                 <li key={note.id} className="note-item">
                   <p className="todo-sub">{note.day}</p>
                   <p className="note-text">{note.readable ? note.text : DETAIL_TEXT.unreadable}</p>
-                  <TextButton className="btn-flush-start text-tap" aria-label={`${DETAIL_TEXT.noteDelete}: ${note.day} 기록`} onClick={() => void removeNote(note.id)}>
+                  <TextButton
+                    id={`note-delete-${note.id}`}
+                    className="btn-flush-start text-tap"
+                    aria-label={`${DETAIL_TEXT.noteDelete}: ${note.day} 기록`}
+                    disabled={!online}
+                    onClick={() => setConfirmNote(note.id)}
+                  >
                     {DETAIL_TEXT.noteDelete}
                   </TextButton>
                 </li>
@@ -551,14 +562,32 @@ export function TodoDetail({
           </form>
         </section>
       </div>
+      {/* 고침10 B(147:2 셋째 — 66:12 가로 단추 꼴을 대신함): 「⋯」 → 지우기. 위 「지우기」(「지우는 중」 막힘) · 아래 「그대로 두기」.
+          연 메뉴 항목은 이미 없으니, 닫히면 초점은 「⋯」로 */}
       {confirmRemove && (
-        <RemoveConfirm
+        <ConfirmDialog
+          title={CONFIRM_TEXT.todoRemove.title}
+          description={CONFIRM_TEXT.todoRemove.description}
+          confirmLabel={CONFIRM_TEXT.todoRemove.confirm}
+          busyLabel={CONFIRM_TEXT.todoRemove.busy}
+          cancelLabel={CONFIRM_TEXT.todoRemove.cancel}
           busy={busy === "remove"}
+          onConfirm={() => remove()}
           onCancel={() => {
             setConfirmRemove(false);
             requestAnimationFrame(() => document.getElementById("detail-more")?.focus());
           }}
-          onRemove={() => void remove()}
+        />
+      )}
+      {/* 고침10 B(147:95 · PM 11): 작업 기록 「지우기」 → 확인. 위 「지우기」(「지우는 중」 막힘) · 아래 「그대로 두기」. 지운 뒤 그 카드만 사라진다 */}
+      {confirmNote !== null && (
+        <ConfirmDialog
+          title={CONFIRM_TEXT.noteRemove.title}
+          confirmLabel={CONFIRM_TEXT.noteRemove.confirm}
+          busyLabel={CONFIRM_TEXT.noteRemove.busy}
+          cancelLabel={CONFIRM_TEXT.noteRemove.cancel}
+          onConfirm={() => removeNote(confirmNote)}
+          onCancel={() => setConfirmNote(null)}
         />
       )}
       {sheetOpen && (
@@ -571,46 +600,6 @@ export function TodoDetail({
           limitReached={categoryLimitReached}
         />
       )}
-    </div>
-  );
-}
-
-/**
- * 고침9 Figma 66:12 지우기 확인: 닫기 전 확인(close-confirm)과 같은 꼴의 가운데 흰 카드(role alertdialog). 글은 지우기 확인 글.
- * 처음 초점은 되돌릴 수 있는 「취소」, Esc·바깥 누름 = 취소. 떠 있는 동안 밖은 inert.
- */
-function RemoveConfirm({ busy, onCancel, onRemove }: { busy: boolean; onCancel: () => void; onRemove: () => void }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const root = rootRef.current;
-    const inerted = root ? inertOutside(root) : [];
-    root?.querySelector<HTMLButtonElement>("[data-remove-cancel]")?.focus();
-    return () => {
-      for (const el of inerted) el.removeAttribute("inert");
-    };
-  }, []);
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    onCancel();
-  }
-  return (
-    <div ref={rootRef} className="close-confirm-layer" onKeyDown={onKeyDown}>
-      <div className="close-confirm-backdrop" aria-hidden="true" onClick={onCancel} />
-      <div className="close-confirm detail-remove-confirm" role="alertdialog" aria-modal="true" aria-labelledby="detail-remove-title">
-        <p id="detail-remove-title" className="detail-remove-title">
-          {DETAIL_TEXT.removeConfirm}
-        </p>
-        <div className="detail-remove-actions">
-          <SecondaryButton busy={busy} disabled={busy} onClick={onRemove}>
-            {DETAIL_TEXT.removeYes}
-          </SecondaryButton>
-          <TextButton className="text-tap" data-remove-cancel="" disabled={busy} onClick={onCancel}>
-            {DETAIL_TEXT.removeCancel}
-          </TextButton>
-        </div>
-      </div>
     </div>
   );
 }
@@ -720,14 +709,16 @@ function CategorySheet({
     <div ref={rootRef} className="category-sheet-layer" onKeyDown={onKeyDown}>
       <div className="category-sheet-backdrop" aria-hidden="true" onClick={onClose} />
       <div className="category-sheet" role="dialog" aria-modal="true" aria-labelledby="category-sheet-title">
-        <div className="category-sheet-head">
-          <h2 id="category-sheet-title" className="category-sheet-title">
-            {DETAIL_TEXT.sheetTitle}
-          </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
-            {DETAIL_TEXT.sheetClose}
-          </TextButton>
-        </div>
+        {/* 고침10 A: 왼쪽 위 머리 단추 「✕」(닫기) + 바로 옆 시트 제목. 오른쪽 위 글 「닫기」는 없다 */}
+        <BackHeader
+          onClose={onClose}
+          titleAlign="start"
+          title={
+            <h2 id="category-sheet-title" className="category-sheet-title">
+              {DETAIL_TEXT.sheetTitle}
+            </h2>
+          }
+        />
         <ul className="category-sheet-list">
           {rows.map((row, index) => {
             const picked = row.id === selectedId;

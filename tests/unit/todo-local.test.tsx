@@ -25,6 +25,7 @@ vi.mock("../../lib/push/subscribe", () => ({ defaultPushApi: { enable: vi.fn(asy
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
 import { TodoScreen } from "../../components/todo-screen";
+import { expectConfirmShape, LOGOUT, queryConfirmDialog } from "./confirm-helpers";
 import { createLocalApis } from "../../lib/local/apis";
 import { createMemoryKv, kvKeys } from "../../lib/local/kv";
 import { emptyMirror } from "../../lib/local/reduce";
@@ -236,24 +237,34 @@ describe("로그아웃·로그인 풀림", () => {
     expect(await kvRef.keys("base/")).toEqual([]);
     expect(document.cookie).not.toContain("duno-device"); // 이 기기에 거울이 없어졌다는 표시도 지운다
   });
-  it("못 보낸 쓰기가 있으면 「보내지 못한 기록이 있어요」를 알리고, 취소하면 그대로, 로그아웃을 고르면 기기 저장소를 지우고 로그아웃한다", async () => {
+  it("못 보낸 쓰기가 있으면 확인 창 「로그아웃할까요?」(고침10 B)를 띄우고, 「계속 쓰기」·Esc면 그대로, 「로그아웃」을 고르면 기기 저장소를 지우고 한 번만 로그아웃한다", async () => {
     await mount();
     online = false;
     fireEvent.click(openButton());
     typeTodo("못 보낸 글");
     pressWrite();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
-    expect(await screen.findByText(/보내지 못한 기록이 있어요/)).toBeTruthy();
+    const dialog = await screen.findByRole("alertdialog", { name: LOGOUT.title });
+    expectConfirmShape(dialog, LOGOUT.top, LOGOUT.bottom);
     expect(signOut).not.toHaveBeenCalled();
-    // 취소: 기록은 그대로
-    fireEvent.click(screen.getByRole("button", { name: "취소" }));
-    expect(screen.queryByText(/보내지 못한 기록이 있어요/)).toBeNull();
+    // 「계속 쓰기」: 기록은 그대로
+    fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.bottom }));
+    expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
     expect(runtime.pendingCount()).toBe(1);
-    // 다시 로그아웃 → 확인에서 로그아웃
+    // Esc = 「계속 쓰기」(악용 시나리오: 저장 안 된 기록을 실수로 잃지 않는다 — 로그아웃 호출 0)
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
-    await screen.findByText(/보내지 못한 기록이 있어요/);
-    const notice = screen.getByText(/보내지 못한 기록이 있어요/).closest("[role=alert]") as HTMLElement;
-    await act(async () => fireEvent.click(within(notice).getByRole("button", { name: "로그아웃" })));
+    fireEvent.keyDown(await screen.findByRole("alertdialog", { name: LOGOUT.title }), { key: "Escape" });
+    expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
+    expect(signOut).not.toHaveBeenCalled();
+    expect(runtime.pendingCount()).toBe(1);
+    // 다시 로그아웃 → 확인에서 로그아웃(연타해도 한 번)
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    const again = await screen.findByRole("alertdialog", { name: LOGOUT.title });
+    const top = within(again).getByRole("button", { name: LOGOUT.top });
+    await act(async () => {
+      fireEvent.click(top);
+      fireEvent.click(top);
+    });
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(await kvRef.keys("op/")).toEqual([]);
     expect(await kvRef.keys("base/")).toEqual([]);
@@ -266,7 +277,7 @@ describe("로그아웃·로그인 풀림", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(sent.map((q) => q.op.kind)).toContain("todo.add");
-    expect(screen.queryByText(/보내지 못한 기록이 있어요/)).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
   it("로그인이 풀려 서버에 보내지 못하면 안내를 보인다. 보낼 줄은 기기에 남는다고 알리고 복사 단추는 없다", async () => {
     await mount();

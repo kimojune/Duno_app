@@ -211,7 +211,7 @@ test(`반응 속도(${scenario.name}): 할 일 적기·끝냄·저녁 기록 저
         `() => { const d = document.querySelector('[role=dialog]'); return !!d && /저장했어요/.test(d.textContent || ''); }`,
       );
       eveningSave.push(saveMs);
-      await page.getByRole("dialog").getByRole("button", { name: "닫기" }).last().click();
+      await page.getByRole("dialog").getByRole("button", { name: "이전" }).click(); // 고침10 A: 오늘 기록 머리 「‹」(저장 뒤 = 닫기)
       await expect(page.getByRole("dialog")).toHaveCount(0);
     }
     result.eveningOpen = { median: median(eveningOpen), all: eveningOpen };

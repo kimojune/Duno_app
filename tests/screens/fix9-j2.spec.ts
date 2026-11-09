@@ -185,7 +185,13 @@ test("S2-a 적는 창(50:103): 이름표 「분야」, 맨 앞 「기타」 골�
   expect(face.borderColor).toBe(await tokenColor(page, "--color-primary"));
   expect(face.check).toBe(true);
   expect(face.dot).toBe(true);
-  await expect(page.locator(".todo-sheet .sheet-head .sheet-label")).toHaveCSS("font-weight", "700");
+  await expect(page.locator(".todo-sheet .screen-head .sheet-label")).toHaveCSS("font-weight", "700");
+  // 고침10 A: 적는 창 머리 = 왼쪽 위 「✕」(이름 「닫기」) + 바로 옆 「할 일 적기」. 오른쪽 위 글 「닫기」 없음
+  const sheetClose = page.locator(".todo-sheet").getByRole("button", { name: "닫기" });
+  await expect(sheetClose).toHaveCount(1);
+  await expect(sheetClose).toHaveText("");
+  const [sc, sh] = [(await sheetClose.boundingBox())!, (await page.locator(".todo-sheet").boundingBox())!];
+  expect([Math.round(sc.x - sh.x), Math.round(sc.y - sh.y), Math.round(sc.width), Math.round(sc.height)], "판 왼쪽 4 · 위 10 · 48×48").toEqual([4, 10, 48, 48]);
   await noOverflow(page);
   await photo(page, "S2-a-적는창(50-103)");
 });
@@ -209,17 +215,18 @@ test("S2-b 할 일 페이지(51:55) · S2-b′ 분야 고르기 시트(77:18): �
   expect(lineBox.dotW, "색 원 12").toBe(12);
   expect(lineBox.dotBorder, "1px 윤곽").toBe("1px");
   expect(lineBox.go).toBe("›");
-  // 고침9 Figma 51:55 머리·큰 제목: 왼쪽 「‹ 할 일」 · 오른쪽 「⋯」(누름 48) · 큰 제목 24 Bold = 할 일 글 · 「고치기」 없음
-  const back = dialog.getByRole("button", { name: "할 일로 돌아가기" });
-  await expect(back).toHaveText("‹ 할 일");
+  // 머리·큰 제목: 왼쪽 위 머리 단추 「‹」(고침10 A — 이름 「이전」, 「할 일」 글 없음) · 오른쪽 「⋯」(누름 48) · 큰 제목 24 Bold = 할 일 글 · 「고치기」 없음
+  const back = dialog.getByRole("button", { name: "이전" });
+  await expect(back).toHaveText("");
+  await expect(dialog.getByRole("button", { name: "할 일로 돌아가기" })).toHaveCount(0);
   const more = dialog.getByRole("button", { name: "더 보기" });
   const head = await page.evaluate(() => {
-    const b = document.querySelector(".detail-back")!.getBoundingClientRect();
+    const b = document.querySelector(".detail .head-btn")!.getBoundingClientRect();
     const m = document.getElementById("detail-more")!.getBoundingClientRect();
     const t = getComputedStyle(document.getElementById("detail-text")!);
     return { backLeft: b.left, moreRight: m.right, moreW: m.width, moreH: m.height, titleSize: t.fontSize, titleWeight: t.fontWeight, vw: window.innerWidth };
   });
-  expect(head.backLeft, "「‹ 할 일」은 왼쪽 위").toBeLessThan(40);
+  expect(Math.round(head.backLeft), "「‹」는 화면 왼쪽 4").toBe(4);
   expect(head.moreRight, "「⋯」는 오른쪽 위").toBeGreaterThan(head.vw - 40);
   expect(head.moreW).toBeGreaterThanOrEqual(48);
   expect(head.moreH).toBeGreaterThanOrEqual(48);
@@ -243,12 +250,14 @@ test("S2-b 할 일 페이지(51:55) · S2-b′ 분야 고르기 시트(77:18): �
   expect(menuBox.radius).toBe("16px");
   expect(menuBox.right).toBeLessThanOrEqual(360 + 0.5);
   await photo(page, "S2-b-메뉴(58-92)");
-  // 지우기 확인(66:12): 가운데 카드, 초점 「취소」
+  // 지우기 확인(고침10 B 147:2 — 66:12 가로 단추 꼴을 대신함): 가운데 카드, 초점 제목, 위 「지우기」 · 아래 「그대로 두기」
   await menu.getByRole("menuitem", { name: "지우기" }).click();
-  const confirm = page.getByRole("alertdialog", { name: "이 할 일을 지울까요? 작업 기록도 함께 지워져요." });
+  const confirm = page.getByRole("alertdialog", { name: "이 할 일을 지울까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button", { name: "취소" })).toBeFocused();
-  await photo(page, "S2-b-지우기확인(66-12)");
+  await expect(confirm.getByRole("heading", { name: "이 할 일을 지울까요?" })).toBeFocused();
+  await expect(confirm.getByRole("button")).toHaveText(["지우기", "그대로 두기"]);
+  await expect(confirm.locator(".close-confirm-desc")).toHaveText("작업 기록도 함께 지워져요.");
+  await photo(page, "S2-b-지우기확인(147-2)");
   await page.keyboard.press("Escape");
   await expect(confirm).toHaveCount(0);
   await expect(dialog).toBeVisible();

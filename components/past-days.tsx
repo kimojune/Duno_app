@@ -7,7 +7,8 @@ import type { TodayTodos } from "../lib/todos/types";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { addDays } from "../lib/week";
 import { dayText } from "./todo-view";
-import { Notice, SecondaryButton, TextButton } from "./ui";
+import { BackHeader } from "./back-header";
+import { Notice, SecondaryButton } from "./ui";
 
 /**
  * 지난 날 할 일 보기(보기만, 고침 3바퀴 PM 답 d-69 ⑦). 어제부터 하루씩 거슬러 가며 그날 적은 할 일과 끝냄 여부를 본다.
@@ -19,7 +20,6 @@ export const PAST_DAYS_TEXT = {
   open: "지난 날 보기",
   title: "지난 날",
   readOnly: "보기만 할 수 있어요.",
-  close: "닫기",
   older: "이전 날",
   newer: "다음 날",
   loading: "할 일을 불러오는 중",
@@ -82,13 +82,12 @@ export function PastDays({ api, today, onClose }: { api: ManageApi; today: strin
   return (
     <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="past-days-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
+        {/* 고침10 A(146:10 · 148:56): 왼쪽 위 머리 단추 「‹」(이전). 오른쪽 위 글 「닫기」는 없다 */}
+        <BackHeader onBack={onClose} />
         <div className="detail-head">
           <h2 id="past-days-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {PAST_DAYS_TEXT.title}
           </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
-            {PAST_DAYS_TEXT.close}
-          </TextButton>
         </div>
         <p className="todo-sub">{PAST_DAYS_TEXT.readOnly}</p>
 

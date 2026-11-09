@@ -114,7 +114,7 @@ test("체험 계정(운영 빌드) 다이얼 사진 넉 장: 분야마다 나누
     console.log(`[dial-demo] 나누기 다이얼: 값 ${d1.before} → ${r1.after} · pointercancel ${r1.cancels}`);
     expect(r1.cancels, "끌기 동안 pointercancel 없음").toBe(0);
     expect(r1.after, "끈 뒤 값이 달라진다").not.toBe(d1.before);
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    await dialog.press("Escape"); // 고침10 A: 나누기 단계의 머리 「‹」는 시간 단계로 — 닫기는 Esc
     const confirm = page.getByRole("alertdialog");
     if (await confirm.isVisible({ timeout: 2_000 }).catch(() => false)) await confirm.getByRole("button", { name: /나가기|저장하지 않고/ }).first().click();
     await expect(dialog).toHaveCount(0);

@@ -177,7 +177,7 @@ describe("내 정보 맨 아래 로그아웃 (B18)", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
     await act(async () => fireEvent.click(document.getElementById("me-logout-button")!));
     expect(signOut).not.toHaveBeenCalled();
-    expect(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.")).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "로그아웃할까요?" })).toBeTruthy();
   });
 });
 

@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoDay, TodoItem, TodoResult } from "../../lib/todos/types";
+import { confirmDialog, expectConfirmShape, LOGOUT, queryConfirmDialog } from "./confirm-helpers";
 
 const fetchTodayTodos = vi.fn();
 const addTodo = vi.fn();
@@ -351,6 +352,49 @@ describe("체크 (T8, D5)", () => {
 });
 
 describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
+  it("고침10: 로그아웃 요청이 성공(redirect)하면 확인 창이 사라져도(화면이 떠남) history.back은 0번 — 떠나는 이동과 겹치지 않는다", async () => {
+    await renderLoaded([]);
+    write("적던 글");
+    const back = vi.spyOn(window.history, "back");
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const dialog = confirmDialog(LOGOUT.title);
+    signOut.mockResolvedValueOnce(undefined); // 서버 Action이 redirect로 끝남(클라이언트에서는 풀림)
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.top })));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(within(dialog).queryByRole("alert"), "성공이면 실패 안내 없음").toBeNull();
+    cleanup(); // 로그인 화면으로 떠나며 이 화면이 사라진다
+    expect(back).not.toHaveBeenCalled();
+    back.mockRestore();
+  });
+
+  it("고침10: 로그아웃 요청이 실패하면 확인 창은 그대로 · 막힘이 풀리고 안내 한 줄 · 「계속 쓰기」면 확인이 쌓은 history 칸을 거둔다", async () => {
+    await renderLoaded([]);
+    write("적던 글");
+    const back = vi.spyOn(window.history, "back");
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const dialog = confirmDialog(LOGOUT.title);
+    signOut.mockRejectedValueOnce(new Error("network"));
+    const top = within(dialog).getByRole("button", { name: LOGOUT.top }) as HTMLButtonElement;
+    await act(async () => fireEvent.click(top));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(confirmDialog(LOGOUT.title), "창 그대로").toBe(dialog);
+    expect(within(dialog).getByRole("alert").textContent).toBe("로그아웃하지 못했어요. 다시 눌러 주세요.");
+    expect(top.disabled, "막힘이 풀린다").toBe(false);
+    expect(top.textContent).toBe(LOGOUT.top);
+    expect(back).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.bottom }));
+    expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
+    expect(back, "확인이 쌓은 칸을 거둔다(「눌렀다」가 풀렸다)").toHaveBeenCalledTimes(1);
+    // 다시 열면 안내는 없다. 다시 누르면 이번에는 로그아웃(실패 뒤 다시 누를 수 있다)
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const again = confirmDialog(LOGOUT.title);
+    expect(within(again).queryByRole("alert")).toBeNull();
+    await act(async () => fireEvent.click(within(again).getByRole("button", { name: LOGOUT.top })));
+    expect(signOut).toHaveBeenCalledTimes(2);
+    expect(within(again).queryByRole("alert")).toBeNull();
+    back.mockRestore();
+  });
+
   it("T13 저장 중 401: 로그인 화면으로 넘기지 않고, 글이 보이며, 복사 단추가 클립보드에 넣는다", async () => {
     await renderLoaded([]);
     addTodo.mockResolvedValue(fail("unauthenticated"));
@@ -381,17 +425,24 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     expect(screen.queryByText("할 일을 불러오지 못했어요.")).toBeNull(); // T9가 아니라 T13
   });
 
-  it("T16 칸에 글이 있으면 확인을 먼저 보이고, 취소하면 사라지며, 비었으면 바로 로그아웃한다", async () => {
+  it("T16 칸에 글이 있으면 확인 창(고침10 B 「로그아웃할까요?」)을 먼저 보이고, 「계속 쓰기」면 사라지며, 비었으면 바로 로그아웃한다", async () => {
     await renderLoaded([]);
     write("적던 글");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    const notice = screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]") as HTMLElement;
+    const dialog = confirmDialog(LOGOUT.title);
+    expectConfirmShape(dialog, LOGOUT.top, LOGOUT.bottom);
+    expect(dialog.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(dialog.getAttribute("aria-describedby")!)!.textContent).toBe(LOGOUT.description);
     expect(signOut).not.toHaveBeenCalled();
-    fireEvent.click(within(notice).getByRole("button", { name: "취소" }));
-    expect(screen.queryByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.bottom }));
+    expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
+    expect(signOut).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    fireEvent.click(within(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]") as HTMLElement).getByRole("button", { name: "로그아웃" }));
+    const top = within(confirmDialog(LOGOUT.title)).getByRole("button", { name: LOGOUT.top });
+    fireEvent.click(top);
+    fireEvent.click(top); // 연타해도 한 번
     expect(signOut).toHaveBeenCalledTimes(1);
+    await act(async () => {}); // 로그아웃 요청이 끝난다(시험에서는 화면이 남는다 — 막힘이 풀린다)
 
     signOut.mockClear();
     write("");
@@ -603,8 +654,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     await findOneVisible("저장하지 못했어요.");
     expect(input().value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    const notice = screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]");
-    expect(notice).toBeTruthy();
+    expect(confirmDialog(LOGOUT.title)).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
   });
 
@@ -614,7 +664,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     write("저장 중인 글");
     press();
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    expect(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.")).toBeTruthy();
+    expect(confirmDialog(LOGOUT.title)).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
   });
 
@@ -816,8 +866,8 @@ describe("다듬기 1회차 P1 「저장하는 중」은 1초 뒤에만 보인�
 });
 
 describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
-  const CONFIRM = "아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.";
-  const confirmBox = () => (screen.queryByText(CONFIRM)?.closest("[role=alert]") ?? null) as HTMLElement | null;
+  // 고침10 B: 로그아웃 확인은 공통 확인 창(모달). 떠 있는 동안 창 밖(목록·입력 칸)은 inert
+  const confirmBox = () => queryConfirmDialog(LOGOUT.title);
 
   it("① 입력 칸 글만 / 저장 중 줄만 / 저장 못 한 줄만 — 세 경우 모두 확인 문구가 같다", async () => {
     // 입력 칸만
@@ -863,14 +913,23 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1); // 줄 안의 문구는 그대로
   });
 
-  it("③ 확인이 뜬 뒤 실패 줄을 빼면 확인이 사라지고 포커스가 다음 줄 체크 칸(없으면 입력 칸)에 있다", async () => {
+  it("③ 확인이 뜬 동안 목록은 inert(「빼기」에 닿지 않음). Esc = 「계속 쓰기」로 닫히면 초점은 머리 「로그아웃」, 그 뒤 실패 줄을 빼면 포커스가 다음 줄 체크 칸(없으면 입력 칸)", async () => {
     await renderLoaded([item(ID_A, "서버에 있던 글")]);
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
     await findOneVisible("저장하지 못했어요.");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    logoutButton.focus();
+    fireEvent.click(logoutButton);
     expect(confirmBox()).toBeTruthy();
+    expect(screen.getByRole("button", { name: "빼기" }).closest("[inert]"), "확인이 뜬 동안 목록은 inert").not.toBeNull();
+    expect(input().closest("[inert]"), "확인이 뜬 동안 입력 칸도 inert").not.toBeNull();
+    fireEvent.keyDown(confirmBox()!, { key: "Escape" });
+    expect(confirmBox()).toBeNull();
+    expect(signOut).not.toHaveBeenCalled();
+    expect(document.activeElement, "닫히면 초점은 연 단추").toBe(logoutButton);
+    expect(document.querySelector("[inert]")).toBeNull();
     // 실패 줄은 마지막 줄이라 아래 줄이 없다 → 위 줄 체크 칸
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
     await waitFor(() => expect(confirmBox()).toBeNull());
@@ -905,14 +964,16 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: "둘째 실패" }));
   });
 
-  it("④ 확인 안 「취소」에 포커스가 있는 채 저장 중이던 줄이 저장되면 확인이 사라지고 포커스가 머리 「로그아웃」으로 간다", async () => {
+  it("④ 확인 안 「계속 쓰기」에 포커스가 있는 채 저장 중이던 줄이 저장되면 확인이 사라지고 포커스가 머리 「로그아웃」으로 간다", async () => {
     await renderLoaded([]);
     const d = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
     addTodo.mockReturnValue(d.promise);
     write("저장 중인 글");
     press();
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    const cancel = within(confirmBox()!).getByRole("button", { name: "취소" });
+    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    logoutButton.focus(); // 브라우저는 누른 단추에 초점을 둔다(fireEvent.click은 옮기지 않는다)
+    fireEvent.click(logoutButton);
+    const cancel = within(confirmBox()!).getByRole("button", { name: LOGOUT.bottom });
     cancel.focus();
     expect(document.activeElement).toBe(cancel);
     d.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "저장 중인 글") }));

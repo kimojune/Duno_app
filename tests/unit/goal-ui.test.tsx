@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GoalEditor, GoalLine } from "../../components/goal";
+import { expectConfirmShape } from "./confirm-helpers";
 import type { GoalsApi } from "../../lib/goals-api";
 import type { GoalSummary } from "../../lib/goals/types";
 
@@ -95,18 +96,31 @@ describe("이번 주 목표 정하기 창", () => {
     render(<GoalEditor api={api} categories={categories} goal={[{ categoryId: C1, minutes: 300 }]} onClose={vi.fn()} onSaved={onSaved} />);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("5");
     expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
-    // 고침9 ④-2(Figma 51:48): 「목표 없애기」는 확인 한 단계 — 「그대로」면 아무것도 안 함, 「없애기」면 없앤다
+    // 고침10 B(147:2 넷째 — 50:332 아래 붙은 카드 꼴을 대신함): 「목표 없애기」는 공통 확인 창 — 위 「없애기」 · 아래 「그대로 두기」
+    const clearButton = screen.getByRole("button", { name: "목표 없애기" });
+    clearButton.focus();
     await press("목표 없애기");
     expect(api.clear).not.toHaveBeenCalled();
-    const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("이번 주 목표를 없앨까요?");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "그대로" }));
-    await press("그대로");
-    expect(screen.queryByText("이번 주 목표를 없앨까요?")).toBeNull();
+    const box = screen.getByRole("alertdialog", { name: "이번 주 목표를 없앨까요?" });
+    expectConfirmShape(box, "없애기", "그대로 두기");
+    expect(screen.getByRole("button", { name: "목표 없애기" }).closest("[inert]"), "확인 밖은 inert").not.toBeNull();
+    await act(async () => fireEvent.click(within(box).getByRole("button", { name: "그대로 두기" })));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "목표 없애기" }));
     expect(api.clear).not.toHaveBeenCalled();
+    // Esc = 「그대로 두기」
     await press("목표 없애기");
-    await press("없애기");
+    fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "이번 주 목표" }), "Esc는 확인만 닫는다").toBeTruthy();
+    expect(api.clear).not.toHaveBeenCalled();
+    // 「없애기」 연타에도 한 번
+    await press("목표 없애기");
+    const yes = within(screen.getByRole("alertdialog")).getByRole("button", { name: "없애기" });
+    await act(async () => {
+      fireEvent.click(yes);
+      fireEvent.click(yes);
+    });
     expect(api.clear).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalled();
   });

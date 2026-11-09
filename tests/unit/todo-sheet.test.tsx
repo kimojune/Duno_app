@@ -7,6 +7,7 @@ import type { AddCategoryResult, CategoryItem } from "../../lib/categories/types
 import type { TodayRead } from "../../lib/today-types";
 import type { TodoDay, TodoItem, TodoResult } from "../../lib/todos/types";
 import { FakeHistory } from "./fake-history";
+import { confirmDialog as confirmByTitle, expectConfirmShape, expectHeadButton, LOGOUT } from "./confirm-helpers";
 
 /**
  * 방향 C(디자인 명세 12절) 적는 창·분야 칩 시험. 상태 C1~C26 가운데 「코드」로 확인하는 칸, D-125 개발 항목 넷,
@@ -163,15 +164,21 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     expect(document.activeElement).toBe(todoInput());
   });
 
-  it("C5 라벨이 칸 위에 있고(플레이스홀더 없음), 「닫기」의 접근 이름은 「적는 창 닫기」, 칩 묶음은 group", () => {
+  it("C5 라벨이 칸 위에 있고(플레이스홀더 없음), 왼쪽 위 머리 단추 「✕」의 접근 이름은 「닫기」(고침10 A, 글 「닫기」 단추 없음), 칩 묶음은 group", () => {
     renderScreen();
     open();
     const input = todoInput();
     expect(input.getAttribute("placeholder")).toBeNull();
     const label = document.querySelector("label[for=todo-input]")!;
     expect(label.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const close = screen.getByRole("button", { name: "적는 창 닫기" });
-    expect(close.textContent).toBe("닫기");
+    const close = screen.getByRole("button", { name: "닫기" });
+    expect(close.id).toBe("sheet-close");
+    expect(expectHeadButton(screen.getByRole("form", { name: "할 일 적기" }), "close")).toBe(close);
+    expect(close.getAttribute("data-head-button")).toBe("close");
+    expect(close.textContent).toBe(""); // 아이콘(꾸밈)만 — 이름은 aria-label
+    expect(close.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getAllByRole("button", { name: "닫기" })).toHaveLength(1);
+    expect([...document.querySelectorAll(".btn-text")].some((b) => b.textContent === "닫기")).toBe(false);
     expect(chipGroup().getAttribute("aria-labelledby")).toBe("category-label");
     // 고침9 ④-2: 맨 앞 「기타」 칩(분야를 고르지 않아도 되는 줄)
     expect(within(chipGroup()).getAllByRole("button").map((b) => b.textContent)).toEqual(["기타", "취업 준비", "운동", "CS 공부", "+ 분야"]);
@@ -194,7 +201,7 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     const order = [
       document.getElementById("logout-button")!,
       screen.getByRole("checkbox", { name: "목록 글" }),
-      screen.getByRole("button", { name: "적는 창 닫기" }),
+      screen.getByRole("button", { name: "닫기" }),
       todoInput(),
       screen.getByRole("button", { name: "적기" }),
       chip("취업 준비"),
@@ -223,7 +230,7 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     open();
     const form = screen.getByRole("form", { name: "할 일 적기" });
     const parts = [
-      form.querySelector(".sheet-head")!,
+      form.querySelector(".screen-head")!,
       form.querySelector(".input-row")!,
       form.querySelector("#todo-help")!,
       form.querySelector("#category-label")!,
@@ -235,7 +242,9 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
       expect(parts[i - 1].compareDocumentPosition(parts[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${i}번째`).toBeTruthy();
     }
     // 글 칸의 라벨은 머리에 있고, 칩 묶음의 이름은 분야 라벨이다
-    expect(form.querySelector(".sheet-head label[for=todo-input]")!.textContent).toBe("할 일 적기");
+    expect(form.querySelector(".screen-head label[for=todo-input]")!.textContent).toBe("할 일 적기");
+    // 고침10 A: 머리 단추 「✕」가 머리의 맨 앞(왼쪽 위), 라벨이 그 바로 뒤
+    expect(form.querySelector(".screen-head")!.querySelector("button")!.id).toBe("sheet-close");
     expect(document.getElementById("category-label")!.textContent).toBe("분야");
     expect(chipGroup().getAttribute("aria-labelledby")).toBe("category-label");
   });
@@ -430,7 +439,7 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
     open();
     fireEvent.click(chip("운동"));
     typeTodo("적다 만 글");
-    if (how === "button") fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    if (how === "button") fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     else if (how === "esc") fireEvent.keyDown(todoInput(), { key: "Escape" });
     else browserBack();
     leaveViaConfirm(); // 고침9 O-3: 글·분야를 바꿨으니 확인 → 「나가기」(창만 닫고 글은 남긴다)
@@ -459,7 +468,7 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
     open();
     expect(history.pushState).toHaveBeenCalledTimes(1);
     expect(typeof (history.state as Record<string, unknown>).dunoTodoSheet).toBe("string"); // 열기마다 고유한 표시
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(history.back).toHaveBeenCalledTimes(1);
     history.flush(); // back()이 한 칸 돌아간다
     expect(history.index).toBe(0);
@@ -513,14 +522,14 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
     renderScreen();
     open();
     fireEvent.click(chip("운동"));
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm(); // 고침9 O-3: 분야를 바꾼 것도 확인
     expect(openButton().textContent).toBe("할 일 적기");
     open();
     expect(chip("운동").getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(addCategoryChip());
     typeCategory("자격증");
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm();
     expect(openButton().textContent).toBe("적던 글 이어 적기");
     open();
@@ -814,7 +823,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     typeCategory("자격증");
     pressAdd();
     expect(screen.getByRole("button", { name: "더하는 중" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm(); // 고침9 O-3
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CATEGORY_ADD_TIMEOUT_MS + 100);
@@ -831,7 +840,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     addCategory.mockReturnValueOnce(fail.promise);
     typeCategory("자격증");
     pressAdd();
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm(); // 고침9 O-3
     fail.resolve({ ok: false, error: "unavailable" });
     await act(async () => {
@@ -844,7 +853,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     const success = deferred<AddCategoryResult>();
     addCategory.mockReturnValueOnce(success.promise);
     pressAdd();
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm();
     const liveBefore = liveText();
     success.resolve(added(addCategory.mock.calls[1][0], "자격증"));
@@ -1005,9 +1014,9 @@ describe("로그아웃 확인이 닫힌 창의 글도 센다 (D-125 ④, C-D9)",
     renderScreen();
     open();
     typeTodo("닫힌 창의 글");
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    expect(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]")).toBeTruthy();
+    expectConfirmShape(confirmByTitle(LOGOUT.title), LOGOUT.top, LOGOUT.bottom);
     expect(signOut).not.toHaveBeenCalled();
   });
 
@@ -1016,14 +1025,14 @@ describe("로그아웃 확인이 닫힌 창의 글도 센다 (D-125 ④, C-D9)",
     open();
     fireEvent.click(addCategoryChip());
     typeCategory("이름만");
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm(); // 고침9 O-3
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
-    expect(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.")).toBeTruthy();
-    fireEvent.click(within(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]") as HTMLElement).getByRole("button", { name: "취소" }));
+    fireEvent.click(within(confirmByTitle(LOGOUT.title)).getByRole("button", { name: LOGOUT.bottom }));
+    expect(signOut).not.toHaveBeenCalled();
     open();
     fireEvent.click(screen.getByRole("button", { name: "취소" })); // 새 분야 줄을 닫으면 이름은 버려진다
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(signOut).toHaveBeenCalledTimes(1);
   });

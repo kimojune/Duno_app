@@ -67,11 +67,11 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     const ask = screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" });
     expect(document.activeElement).toBe(ask);
     expect(ask.className).toBe("evening-ask");
-    // 머리 줄: 가운데 「오늘 기록」 · 오른쪽 「닫기」. 시간 단계에는 「‹」(이전)가 없다
+    // 머리 줄(고침10 A): 왼쪽 위 「‹」(이름 「이전」) · 가운데 「오늘 기록」. 오른쪽 위 글 「닫기」는 없다
     const head = dialog.querySelector<HTMLElement>(".screen-head")!;
     expect(head.querySelector(".screen-head-title")!.textContent).toBe("오늘 기록");
-    expect(within(head).getByRole("button", { name: "닫기" })).toBeTruthy();
-    expect(within(dialog).queryByRole("button", { name: "이전" })).toBeNull();
+    expect(within(head).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["이전"]);
+    expect(within(dialog).queryByRole("button", { name: "닫기" })).toBeNull();
     expect(head.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // 큰 제목은 머리 아래
     expect(screen.queryByText(/^합계/)).toBeNull();
     expect(wheelTotal()).toBe(0);
@@ -133,7 +133,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(Array.from(document.querySelectorAll('[role="status"]')).map((e) => e.textContent).filter(Boolean)).toEqual(["저장했어요. 기타 +3시간."]);
     expect(afterSaveRows()).toEqual([["기타", "+3시간"]]); // 모두 기타로 저장한 날에도 값이 있다(상태보기 데이터 없이 바뀐 몫만)
     expect(document.querySelector(".bottom-actions")).toBeNull();
-    expect(within(screen.getByRole("dialog")).getAllByRole("button").map((b) => b.textContent)).toEqual(["닫기"]);
+    expect(within(screen.getByRole("dialog")).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["이전"]); // 머리 「‹」 하나(닫기)
   });
 
   it("분야마다 나누기: 타이머 분야는 그 시간, 끝낸 할 일의 분야는 칩이 골라진 채 기타에서 30분(남은 시간을 나눠 채우지 않는다 — d-115 나·d-116 가). 그대로 저장하면 prefilled", async () => {
@@ -364,10 +364,10 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(await screen.findByRole("button", { name: "분야마다 나누기" })).toBeTruthy();
   });
 
-  it("Esc와 「닫기」로 닫힌다", async () => {
+  it("Esc와 머리 「‹」(시간 단계)로 닫힌다", async () => {
     const { onClose } = await mount(fakeApi());
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "닫기" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "이전" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 

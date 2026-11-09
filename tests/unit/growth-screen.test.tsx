@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { expectHeadButton } from "./confirm-helpers";
 import type { HomeRead } from "../../lib/home-types";
 import type { GrowthData } from "../../lib/growth/types";
 import type { GrowthApi } from "../../lib/growth-api";
@@ -405,7 +406,9 @@ describe("AppShell의 탭", () => {
     await ratioPanel();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: /^어학/ })));
     const dialog = await screen.findByRole("dialog", { name: "어학" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    expect(within(dialog).queryByRole("button", { name: "닫기" }), "고침10 A: 오른쪽 위 글 「닫기」 없음").toBeNull();
+    expectHeadButton(dialog, "back");
+    fireEvent.click(within(dialog).getByRole("button", { name: "이전" }));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
