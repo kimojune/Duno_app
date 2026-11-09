@@ -721,8 +721,8 @@ export function EveningRecord({
   );
 }
 
-/** 오늘 기록을 여는 단추 글(할 일 탭 입구·상태보기 빈 안내가 같은 글을 쓴다). PM 4: 사용자에게 보이는 「저녁 기록」 → 「오늘 기록」 */
-export const EVENING_ENTRY_LABEL = "오늘 기록 남기기";
+/** 할 일 탭 입구 단추 글. 이름은 EVENING_TEXT.title 한 곳에서 온다(상태보기 빈 상태 단추는 이름 그대로 EVENING_TEXT.title — 명세 ⑩ PM 4). PM 4: 사용자에게 보이는 「저녁 기록」 → 「오늘 기록」 */
+export const EVENING_ENTRY_LABEL = `${EVENING_TEXT.title} 남기기`;
 
 /** 할 일 화면 위에 얹는 오늘 기록 입구. 저녁(오후 6시~새벽 4시 전)에는 질문 글을 앞세운다 */
 export function EveningEntry({ evening, onOpen }: { evening: boolean; onOpen: () => void }) {

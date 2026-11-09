@@ -17,6 +17,7 @@ import type { GrowthData } from "../lib/growth/types";
 import type { GrowthApi } from "../lib/growth-api";
 import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import type { ViewEntry } from "../lib/views/core-types";
+import { EVENING_TEXT } from "./evening-record";
 import { GOAL_TEXT } from "./goal";
 import { EmptyBands, GoalBars, GoalExample, ratioOf, STATUS_VIEWS } from "./growth-views";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -54,9 +55,8 @@ export const GROWTH_TEXT = {
   totalHeading: "분야마다 쌓인 시간",
   compareHeading: "분야마다 나란히",
   days: (n: number) => `오늘 기록 ${n}일`,
-  empty: "아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.", // 이번 주 빈 안내(지우기는 발표 뒤 PM 7, 지금은 「저녁 기록」만 「오늘 기록」으로)
+  empty: "아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.", // 이번 주 빈 안내(지우기는 발표 뒤 PM 7, 지금은 옛 이름만 「오늘 기록」으로)
   emptyTotal: "아직 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.",
-  eveningButton: "오늘 기록", // 기록 없음 빈 상태 단추(PM 4)
   ratioLine: "목표 비율",
   percent: (n: number) => `${n}%`,
   ratioValue: (spent: number, ratio: number | null) => (ratio === null ? `${spent}%` : `${spent}% / 목표 ${ratio}%`),
@@ -302,7 +302,7 @@ function EveningButton({ onOpenEvening }: { onOpenEvening?: () => void }) {
   if (!onOpenEvening) return null;
   return (
     <div className="detail-actions">
-      <SecondaryButton onClick={onOpenEvening}>{GROWTH_TEXT.eveningButton}</SecondaryButton>
+      <SecondaryButton onClick={onOpenEvening}>{EVENING_TEXT.title}</SecondaryButton>
     </div>
   );
 }
