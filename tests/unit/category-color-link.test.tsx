@@ -117,7 +117,7 @@ describe("다이얼과 상태보기가 같은 분야에 같은 색을 준다", (
   });
 });
 
-describe("분야 색 자리값(디자인 확정 전 임시)", () => {
+describe("분야 색 값(디자인 명세 ① 확정)", () => {
   it("함수는 순서와 기타에 맞는 변수를 준다", () => {
     expect(categoryColorValue(0)).toBe("var(--color-category-1)");
     expect(categoryColorValue(8)).toBe("var(--color-category-1)");
@@ -138,9 +138,27 @@ describe("분야 색 자리값(디자인 확정 전 임시)", () => {
     }
   });
 
-  it("자리값은 지금 있는 색 토큰의 값 중에서만 고른다(새 색을 짓지 않는다)", () => {
-    const known = new Set(Object.values(COLOR_TOKENS).map((v) => v.toUpperCase()));
-    for (const [name, value] of Object.entries(CATEGORY_COLOR_TOKENS)) expect(known, name).toContain(value.toUpperCase());
+  it("분야 색은 디자인 명세 ① 「분야 색」 표의 값이다(번호는 표의 이름 그대로)", () => {
+    expect(CATEGORY_COLOR_TOKENS).toEqual({
+      "--color-category-1": "#7391FF",
+      "--color-category-2": "#2DBE8C",
+      "--color-category-3": "#AC8BFA",
+      "--color-category-4": "#F5C33B",
+      "--color-category-5": "#3BB8D0",
+      "--color-category-6": "#E58AC7",
+      "--color-category-7": "#A3B03A",
+      "--color-category-8": "#8C97B8",
+      "--color-category-other": "#CFCBC4",
+    });
+  });
+
+  it("분야 색은 바탕·면 색과 다르다(칠한 그래픽이 바탕에 묻히지 않는다)", () => {
+    const surfaces = ["--color-bg", "--color-surface", "--color-notice-bg", "--color-skeleton", "--color-divider", "--color-secondary-pressed"] as const;
+    const colors = Object.entries(CATEGORY_COLOR_TOKENS);
+    expect(colors.length).toBeGreaterThan(0);
+    for (const [name, value] of colors) {
+      for (const s of surfaces) expect(value.toUpperCase(), `${name} ≠ ${s}`).not.toBe(COLOR_TOKENS[s].toUpperCase());
+    }
   });
 });
 

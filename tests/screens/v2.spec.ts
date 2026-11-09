@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { TEXT200_CSS } from "./text200-css";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
@@ -16,14 +17,6 @@ const SIZES = {
   "text200-sim": { width: 360, height: 800, text200: true },
 } as const;
 type SizeTag = keyof typeof SIZES;
-
-const TEXT200_CSS = `:root{
-  --font-name: 700 64px/80px var(--font-family);
-  --font-title: 700 48px/64px var(--font-family);
-  --font-body: 400 32px/48px var(--font-family);
-  --font-sub: 400 28px/40px var(--font-family);
-  --font-google: 500 28px/40px var(--font-family);
-}`;
 
 async function open(page: Page, state: string, size: SizeTag) {
   const s = SIZES[size];

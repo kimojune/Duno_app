@@ -4,7 +4,7 @@
 // 사용자 데이터가 로그아웃 뒤 캐시에 남지 않게 하려는 것이다.
 // skipWaiting·clients.claim을 쓰지 않는다: 앱을 모두 닫았다 다시 열 때 새 버전이 적용된다.
 
-const VERSION = "v2"; // 오프라인 화면(offline.html)이 바뀌어 올렸다
+const VERSION = "v3"; // 오프라인 화면(offline.html)의 색·단추 모양이 바뀌어 올렸다(고침 5바퀴)
 const CACHE_PREFIX = "duno-";
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 const OFFLINE_URL = "/offline.html";

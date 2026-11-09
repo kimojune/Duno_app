@@ -2,31 +2,33 @@
    값의 한 출처는 lib/design-tokens.ts다. 여기 :root의 값을 바꾸면 그 표도 같이 바꾼다(tests/unit/design-tokens.test.ts가 같은지 본다).
    :root 밖에서는 색 hex를 쓰지 않는다(Google 단추만 Google 지침 값). public/offline.html의 :root도 같은 값이다. */
 :root {
-  /* 색 (임시) */
-  --color-bg: #FAFAF7;
+  /* 색 (디자인 명세 ① 확정 값, 고침 5바퀴) */
+  --color-bg: #FAF7F2;
   --color-surface: #FFFFFF;
-  --color-text: #1C1C1A;
-  --color-text-sub: #5C5B55;
-  --color-primary: #2F5D50;
-  --color-primary-pressed: #24493F;
-  --color-secondary-pressed: #E3E1D9; /* 명세 2-3 SecondaryButton 눌림. 2-1 표에 빠져 있어 더함 */
+  --color-text: #1C2340;
+  --color-text-sub: #5E6478;
+  --color-primary: #1C2340;
+  --color-primary-pressed: #2E3350;
+  --color-secondary-pressed: #E7E1D6; /* 명세 2-3 SecondaryButton 눌림. 2-1 표에 빠져 있어 더함 */
   --color-on-primary: #FFFFFF;
-  --color-border-input: #7A7972;
-  --color-border-check: #5C5B55;
-  --color-divider: #E6E4DD;
-  --color-notice-bg: #EFEDE6;
-  --color-skeleton: #E6E4DD;
+  --color-border-input: #7D8299;
+  --color-border-check: #5E6478;
+  --color-divider: #E7E1D6;
+  --color-notice-bg: #F3EEE6;
+  --color-skeleton: #E7E1D6;
+  --color-accent: #FF8A57; /* 살구: 글자색·단추 채움으로 쓰지 않는다. 이번 판에는 쓰는 자리 없음 */
+  --color-chart-outline: #1C2340; /* 분야 색 그래픽의 1px 윤곽 */
 
-  /* 분야 색(자리값). 임시, 디자인 확정 뒤 바꾼다. 번호는 분야 순서 0부터 1~8, 9번째부터 다시 1(lib/category-color.ts). 기타는 따로 */
-  --color-category-1: #2F5D50;
-  --color-category-2: #24493F;
-  --color-category-3: #5C5B55;
-  --color-category-4: #FFFFFF;
-  --color-category-5: #1C1C1A;
-  --color-category-6: #E3E1D9;
-  --color-category-7: #EFEDE6;
-  --color-category-8: #E6E4DD;
-  --color-category-other: #7A7972;
+  /* 분야 색(보드 원래 밝은 색). 번호는 분야 순서 0부터 1~8, 9번째부터 다시 1(lib/category-color.ts). 기타는 따로 */
+  --color-category-1: #7391FF;
+  --color-category-2: #2DBE8C;
+  --color-category-3: #AC8BFA;
+  --color-category-4: #F5C33B;
+  --color-category-5: #3BB8D0;
+  --color-category-6: #E58AC7;
+  --color-category-7: #A3B03A;
+  --color-category-8: #8C97B8;
+  --color-category-other: #CFCBC4;
 
   /* 글자 — 한 화면에 크기 셋 */
   --font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif;
@@ -35,6 +37,7 @@
   --font-body: 400 16px/24px var(--font-family);
   --font-sub: 400 14px/20px var(--font-family);
   --font-google: 500 14px/20px var(--font-family); /* Google 단추 글(명세 2-4) */
+  --font-goal-line: 700 20px/28px var(--font-family); /* 상태보기 맨 위 목표 한 줄(PM 8) */
 
   /* 간격 — 4의 배수 */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
@@ -43,6 +46,8 @@
   /* 모서리 */
   --radius-control: 8px;
   --radius-check: 4px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
 
   /* 그림자는 쓰지 않는다. 입력 줄 경계만 선으로 */
   --edge-bar-top: 0 -1px 0 var(--color-divider);
@@ -92,7 +97,7 @@ button, input { font: inherit; color: inherit; }
   min-height: var(--tap-min);
   padding: 0 var(--space-4);
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   font: var(--font-body);
   background: transparent;
   cursor: pointer;
@@ -341,7 +346,7 @@ button, input { font: inherit; color: inherit; }
   min-height: 32px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border-input);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-text);
   font: var(--font-sub);
@@ -486,7 +491,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .after-save-go { font: var(--font-sub); color: var(--color-primary); }
 /* 목록 위 카드(오늘 먼저 할 일·저녁 기록 입구)는 한 줄 줄이다(고침 4바퀴): 글은 왼쪽, 단추는 오른쪽에 한 줄로 놓고,
    폭이 모자라거나 글자가 커지면 단추가 아래 줄로 감싼다(글을 줄이거나 자르지 않는다). 카드 안 구조·글은 그대로, 규칙만 바꿨다 */
-.entry-card { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-3); row-gap: var(--space-1); margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-4); border-radius: var(--radius-control); background: var(--color-notice-bg); }
+.entry-card { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-3); row-gap: var(--space-1); margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-4); border-radius: var(--radius-card); background: var(--color-notice-bg); }
 .entry-title { margin: 0; flex: 0 1 auto; min-width: 0; font: var(--font-body); font-weight: 700; overflow-wrap: anywhere; }
 .entry-card > .todo-sub, .entry-card > .offer-text { flex: 1 1 auto; min-width: 0; }
 .entry-card > .notice { flex: 1 1 100%; }
@@ -599,3 +604,10 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 
 /* ---- 로그아웃(내 정보 맨 아래, B18) ---- */
 .me-logout { margin-top: var(--space-8); display: flex; justify-content: flex-start; }
+
+/* ---- 분야 색 윤곽(고침 5바퀴, 디자인 명세 ① · 한 곳) ----
+   분야 색은 흰 바탕 3:1 미만이라 칠한 그래픽마다 --color-chart-outline 1px 윤곽을 둔다(WCAG 1.4.11).
+   이름은 lib/design-tokens.ts CHART_OUTLINE와 같다. 새 그래픽은 클래스만 달면 된다.
+   아래 목록은 이미 있는 분야 색 그래픽(다이얼 조각·상태보기 점·막대 채움·띠 칸·원 조각)에 같은 규칙을 거는 것이다. */
+.chart-outline, .growth-dot, .growth-bar-fill, .growth-band-seg { box-shadow: inset 0 0 0 1px var(--color-chart-outline); }
+.chart-outline-svg, .dial-slice, .growth-pie-slice { stroke: var(--color-chart-outline); stroke-width: 1; }

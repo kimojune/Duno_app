@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { COLOR_TOKENS } from "../../lib/design-tokens";
+import { TEXT200_CSS } from "./text200-css";
 
 /**
  * 상태별 스크린샷과 치수 확인(디자인 명세 12-13 방향 C). 개발 서버(next dev, 3200 포트)에서만 돈다: npm run screens
@@ -21,14 +22,6 @@ const SIZES = {
 } as const;
 type SizeTag = keyof typeof SIZES;
 type Sheet = "closed" | "open";
-
-const TEXT200_CSS = `:root{
-  --font-name: 700 64px/80px var(--font-family);
-  --font-title: 700 48px/64px var(--font-family);
-  --font-body: 400 32px/48px var(--font-family);
-  --font-sub: 400 28px/40px var(--font-family);
-  --font-google: 500 28px/40px var(--font-family);
-}`;
 
 /** 출처 표(lib/design-tokens.ts)의 hex를 브라우저 계산값 모양 `rgb(r, g, b)`로 */
 function hexToRgb(hex: string): string {
