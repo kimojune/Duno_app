@@ -163,8 +163,7 @@ describe("토큰·단추 값 (명세 2-1, 2-4)", () => {
     const block = /\.google-btn\s*\{([^}]*)\}/.exec(css)![1];
     expect(block).toContain("border-radius: var(--radius-pill)");
     expect(block).toContain("inline-size: 100%");
-    const actions = /
-\.login-actions \{([^}]*)\}/.exec(css)![1];
+    const actions = /\.login-actions \{([^}]*)\}/.exec(css)![1];
     expect(actions).toContain("inline-size: 320px");
     expect(actions).toContain("margin-inline: auto");
     expect(fs.existsSync(path.join(process.cwd(), "public/google-g.svg"))).toBe(true);
