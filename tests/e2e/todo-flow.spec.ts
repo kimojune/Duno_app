@@ -1,9 +1,25 @@
 import fs from "node:fs";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, test, type BrowserContext, type Cookie } from "@playwright/test";
+import { expect, test, type BrowserContext, type Cookie, type Page } from "@playwright/test";
 import { cleanupTodos } from "../integration/cleanup";
 import { loadIntegrationEnv, type IntegrationEnv } from "../integration/load-env";
+
+/**
+ * 적는 창 칩 줄을 모두 보이게 한다(고침9 칩 두 줄 부품 components/chip-scroller.tsx: 셋째 줄로 넘치면 「+n」으로 접히고
+ * 「+ 분야」·뒤 칩이 숨는다 — 시험 계정에 분야가 쌓이면 접힌다). 접혔으면 「분야 n개 더 보기」를 눌러 펼치고 「분야 접기」가 뜬 것까지 본다.
+ * 펼친 뒤에는 숨은 칩이 없으므로, 「없다」 단언(B에게 A의 분야 칩 0개)이 숨은 칩 때문에 거저 통과하지 않는다.
+ */
+async function showAllChips(p: Page) {
+  const addCategory = p.getByRole("button", { name: "+ 분야" });
+  const more = p.getByRole("group", { name: "분야" }).getByRole("button", { name: /^분야 \d+개 더 보기$/ });
+  await expect(addCategory.or(more).first()).toBeVisible({ timeout: 20_000 });
+  if (await more.isVisible()) {
+    await more.click();
+    await expect(p.getByRole("button", { name: "분야 접기" })).toBeVisible();
+  }
+  await expect(addCategory).toBeVisible();
+}
 
 /**
  * 실제 흐름(production 빌드 + duno_dev 시험 계정, 방향 C): A로 로그인한 세션에서 적는 창 열기 → 「+ 분야」로 분야 더하기
@@ -127,7 +143,7 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     await expect(todoInput).toBeFocused();
 
     // 「+ 분야」로 분야 더하기(C12~C14): 새 칩이 생기고 골라진 채, 포커스는 할 일 칸
-    await expect(page.getByRole("button", { name: "+ 분야" })).toBeVisible({ timeout: 20_000 });
+    await showAllChips(page); // 고침9 칩 두 줄: 접혔으면 펼친다(「+ 분야」가 숨은 쪽에 든다)
     await page.getByRole("button", { name: "+ 분야" }).click();
     await page.getByRole("textbox", { name: "새 분야 이름" }).fill(categoryName);
     await page.getByRole("button", { name: "더하기" }).click();
@@ -200,7 +216,7 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     // B에게는 A의 분야도 보이지 않는다: 목록 분야 표시에도, B의 적는 창 칩에도
     await expect(pageB.getByText(categoryName, { exact: false })).toHaveCount(0);
     await pageB.getByRole("button", { name: "할 일 적기" }).click();
-    await expect(pageB.getByRole("button", { name: "+ 분야" })).toBeVisible({ timeout: 20_000 });
+    await showAllChips(pageB); // 펼친 뒤 「없다」를 본다(숨은 칩으로 거저 통과하지 않게)
     await expect(pageB.getByRole("button", { name: categoryName })).toHaveCount(0);
 
     // 로그아웃 → 로그인 화면, 뒤로 가기·캐시에 할 일이 남지 않는다
