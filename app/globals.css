@@ -173,7 +173,7 @@ button, input { font: inherit; color: inherit; }
 .demo-form { display: flex; flex-direction: column; }
 .demo-input { text-transform: uppercase; letter-spacing: 0.04em; }
 .demo-input[aria-invalid="true"] { border-width: 2px; border-color: var(--color-primary); padding: 0 calc(var(--space-3) - 1px); }
-.demo-start { flex: none; min-width: 80px; white-space: nowrap; }
+.demo-start { flex: none; min-width: 88px; white-space: nowrap; } /* 「시작 중」이 들어가는 폭으로 고정(상태가 바뀌어도 칸 폭이 흔들리지 않게). 23 그림은 80 */
 .demo-error { display: flex; align-items: flex-start; gap: var(--space-1); margin-top: var(--space-1); font: var(--font-sub); font-weight: 500; color: var(--color-primary); overflow-wrap: anywhere; }
 .demo-error-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; min-height: 16px; margin-top: 2px; border: 1.5px solid currentColor; border-radius: 50%; font-size: 11px; line-height: 1; font-weight: 700; }
 

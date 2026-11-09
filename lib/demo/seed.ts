@@ -6,7 +6,8 @@ import { encryptCategoryName, encryptTodoText, type TodoKey } from "../todos/cry
 import { addDays, weekStartFor } from "../week";
 
 /**
- * 시연용 예시 데이터(서버 전용). 체험 코드로 들어온 익명 사용자(app/demo/actions.ts)와 시연 계정 시드 스크립트(scripts/seed-demo.ts)가 같이 쓴다.
+ * 시연용 예시 데이터(서버 전용). 체험 코드로 들어온 익명 사용자(app/demo/actions.ts → lib/demo/start.ts)에게 넣는다.
+ * 입력은 세션 클라이언트·사용자 번호·키·오늘뿐이라 다른 진입점에서도 그대로 부를 수 있다(시연 계정 시드 스크립트 d-160은 PM이 취소).
  *
  * 규칙
  * - 그 사용자 자기 세션의 Supabase 클라이언트로 표에 직접 넣는다(RLS를 거친다). service role 키는 쓰지 않는다.
@@ -64,7 +65,6 @@ export type DemoSeedCounts = {
   settings: number;
 };
 
-// 매개변수 속성(constructor(readonly x))은 쓰지 않는다: scripts/seed-demo.ts가 Node의 타입 지우기로 이 파일을 돌린다
 export class DemoSeedError extends Error {
   readonly step: string;
   readonly code: string | null;
