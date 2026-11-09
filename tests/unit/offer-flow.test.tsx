@@ -188,12 +188,12 @@ describe("카드 다시 받기·타이머가 돌 때 (A13·B3)", () => {
     await mount({ offers: { request, dismiss: vi.fn() } as unknown as OffersApi, focus: focusApi() });
     expect(screen.getByRole("region", { name: "오늘 먼저 할 일" })).toBeTruthy();
     // 4시를 넘기면(1분 + 1초) 다시 받는다. 서버가 새 하루(11-08)의 제시를 주면 그것으로 바뀐다
-    request.mockResolvedValue({ ok: true, data: { offer: offer({ day: "2026-11-08", categoryName: "포트폴리오" }) } });
+    request.mockResolvedValue({ ok: true, data: { offer: offer({ day: "2026-11-08", categoryName: "글쓰기" }) } });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(61_000);
     });
     expect(request).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" }).textContent).toContain("포트폴리오");
+    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" }).textContent).toContain("글쓰기");
     // 날짜가 오늘이 아닌 제시(옛 하루)는 보이지 않는다
     request.mockResolvedValue({ ok: true, data: { offer: offer({ day: "2026-11-07" }) } });
     await visible();

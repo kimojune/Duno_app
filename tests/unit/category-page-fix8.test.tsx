@@ -37,7 +37,7 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     lastMonthRange: { from: "2026-10-01", to: "2026-10-31" },
     categories: [
       { id: C1, name: "어학" },
-      { id: C2, name: "포트폴리오" },
+      { id: C2, name: "글쓰기" },
     ],
     ratios: [
       { categoryId: C1, percent: 30 },
@@ -46,7 +46,7 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     thisWeek: [{ categoryId: C1, minutes: 120 }],
     lastWeek: [],
     lastMonth: [],
-    // 어학 12시간 / 포트폴리오 36시간 → 전체 중 어학 25%
+    // 어학 12시간 / 글쓰기 36시간 → 전체 중 어학 25%
     cumulative: [
       { categoryId: C1, minutes: 720 },
       { categoryId: C2, minutes: 2160 },
@@ -88,7 +88,7 @@ describe("요약 카드 값(categorySummary)", () => {
     const three = growth({
       categories: [
         { id: C1, name: "어학" },
-        { id: C2, name: "포트폴리오" },
+        { id: C2, name: "글쓰기" },
         { id: C3, name: "CS" },
       ],
       cumulative: [
@@ -160,7 +160,7 @@ describe("분야 페이지 요약 카드(화면)", () => {
   });
 
   it("0이면 바탕 고리만 + 「0%」 · 「총 0시간」 · 「이번 주 0시간」, 빈 글 「할 일 0개」", async () => {
-    await mount({ data: { categoryId: C2, days: [] }, growth: EMPTY, categoryId: C2, name: "포트폴리오" });
+    await mount({ data: { categoryId: C2, days: [] }, growth: EMPTY, categoryId: C2, name: "글쓰기" });
     expect(document.querySelector(".category-ring-track")).not.toBeNull();
     expect(document.querySelector(".category-ring-slice")).toBeNull();
     expect(document.querySelector(".category-ring-percent")!.textContent).toBe("0%");

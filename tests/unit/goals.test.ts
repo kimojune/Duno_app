@@ -37,7 +37,7 @@ describe("goal validation", () => {
 function setup() {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   store.seed("categories", { id: C3, user_id: OTHER, name_encrypted: "x", archived_at: null });
@@ -119,7 +119,7 @@ describe("readGoalSummaryForUser (A14)", () => {
       weekStart: "2026-11-02",
       goal: [{ categoryId: C2, minutes: 120 }],
       thisWeek: [{ categoryId: C2, minutes: 90 }],
-      categories: [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }],
+      categories: [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }],
     });
     expect(growth.ok && summary.ok && { weekStart: growth.data.weekStart, goal: growth.data.goal?.items ?? null, thisWeek: growth.data.thisWeek, categories: growth.data.categories }).toEqual(summary.ok ? summary.data : null);
   });
@@ -147,7 +147,7 @@ describe("이번 주 목표가 다른 기능에 닿는다", () => {
     const store = setup();
     await saveWeeklyGoalForUser(deps(store), [{ categoryId: C2, minutes: 120 }]);
     const res = await requestOfferForUser(deps(store), { surface: "card" });
-    expect(res.ok && res.data.offer?.categoryId).toBe(C2); // 비율은 어학(C1)이 크지만 목표에 든 포트폴리오를 건넨다
+    expect(res.ok && res.data.offer?.categoryId).toBe(C2); // 비율은 어학(C1)이 크지만 목표에 든 글쓰기를 건넨다
   });
   it("먼저 한 기록에 이번 주 목표 기준 반대편 여부가 남는다(목표 없는 주는 null)", async () => {
     const store = setup();

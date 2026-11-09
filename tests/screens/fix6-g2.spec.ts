@@ -22,7 +22,7 @@ async function noHorizontalScroll(page: Page) {
 }
 
 test("나누기 기타 0분(마지막 분야 고름): 12시에 손잡이가 없고, 안내 글은 분야 줄 아래 한 줄 · 기타 줄은 「기타」 한 줄", async ({ page }) => {
-  await open(page, "evening-split-blank"); // 어학 · 포트폴리오 · CS 공부, 타이머·끝낸 할 일 없음
+  await open(page, "evening-split-blank"); // 어학 · 글쓰기 · CS 공부, 타이머·끝낸 할 일 없음
   await page.locator("#dev-open-window").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
@@ -30,12 +30,12 @@ test("나누기 기타 0분(마지막 분야 고름): 12시에 손잡이가 없�
   await fillWheel(page, "분", 30);
   await page.getByRole("button", { name: "분야마다 나누기" }).click();
   await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
-  for (const name of ["어학", "포트폴리오", "CS 공부"]) await page.getByRole("button", { name: `${name}, 다이얼에 넣기` }).click();
+  for (const name of ["어학", "글쓰기", "CS 공부"]) await page.getByRole("button", { name: `${name}, 다이얼에 넣기` }).click();
   // 30분씩 셋 = 1시간 30분 → 기타 0분, 마지막에 고른 CS 공부(마지막 분야)가 골라져 있다
   await expect(dialog.locator('.ratio-list [data-row-key="other"] .ratio-value')).toHaveText("0분");
   await expect(dialog.locator(".ratio-list li.is-picked")).toHaveCount(1);
   await expect(dialog.locator(".ratio-list li.is-picked .stepper-label")).toHaveText("CS 공부");
-  // 손잡이: 앞(포트폴리오·CS 공부) 하나뿐, 끝(12시) 없음. 보이는 자리도 12시(다이얼 맨 위 가운데)가 아니다
+  // 손잡이: 앞(글쓰기·CS 공부) 하나뿐, 끝(12시) 없음. 보이는 자리도 12시(다이얼 맨 위 가운데)가 아니다
   const handles = dialog.locator('[id^="evening-dial-handle-"]');
   await expect(handles).toHaveCount(1);
   await expect(handles.first()).toHaveAttribute("id", "evening-dial-handle-start");

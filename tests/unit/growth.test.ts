@@ -97,7 +97,7 @@ describe("growth logic", () => {
 function setup() {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   store.seed("category_ratios", { user_id: ME, category_id: C1, percent: 60 });
@@ -129,7 +129,7 @@ describe("readGrowthForUser", () => {
     expect(totalOf(d.cumulative)).toBe(40 + 20 + 50 + 30 + 10);
     expect(d.loggedDaysThisWeek).toBe(1);
     expect(d.loggedDaysTotal).toBe(4);
-    expect(d.categories.map((c) => c.name)).toEqual(["어학", "포트폴리오"]);
+    expect(d.categories.map((c) => c.name)).toEqual(["어학", "글쓰기"]);
     expect(d.ratios).toEqual([{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }]);
     expect(d.goal).toBeNull();
   });

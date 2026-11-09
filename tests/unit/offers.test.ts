@@ -59,7 +59,7 @@ describe("건넬 할 일 고르기", () => {
 function setup() {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   store.seed("categories", { id: C3, user_id: OTHER, name_encrypted: "x", archived_at: null });

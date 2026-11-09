@@ -761,7 +761,7 @@ function turnOf(el: Element): number {
   return ((t % 1) + 1) % 1;
 }
 const noonGap = (t: number) => Math.min(t, 1 - t); // 12시에서 떨어진 정도(바퀴)
-const NAMES3 = ["어학", "포트폴리오", "기타"];
+const NAMES3 = ["어학", "글쓰기", "기타"];
 const NAMES4 = ["어학", "코딩", "운동", "기타"];
 
 describe("고침6 PM d-129 ②: 폭 0 조각을 건너뛰는 손잡이(skipZero, 오늘 기록 나누기)", () => {
@@ -773,7 +773,7 @@ describe("고침6 PM d-129 ②: 폭 0 조각을 건너뛰는 손잡이(skipZero,
     expect(hs[0].getAttribute("transform")).toBe("translate(0.00 81.00)"); // 6시(60/120)
     expect(noonGap(turnOf(hs[0]))).toBeCloseTo(0.5, 5);
     expect(slider("end")).toBeNull();
-    expect(hs[0].getAttribute("aria-label")).toContain("포트폴리오·어학 사이");
+    expect(hs[0].getAttribute("aria-label")).toContain("글쓰기·어학 사이");
     cleanup();
     // 같은 값·같은 고름, skipZero 없음(지금 처음 정한 비율 규칙): 끝 손잡이가 12시에 선다 — 위 단언이 그 차이를 잡는다
     render(<SkipHarness initial={[60, 60, 0]} names={NAMES3} seen={[]} selected0="k1" skipZero={false} />);

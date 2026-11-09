@@ -18,7 +18,7 @@ function expectFieldSum100() {
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 const NOTIFY_OFF: NotifySettings = { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 };
-const categories = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }];
+const categories = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }];
 
 function settings(over: Partial<SettingsData> = {}): SettingsData {
   return { goal: "토익 900점", goalReadable: true, onboardingDone: true, notify: NOTIFY_OFF, ratios: [{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }], ...over };
@@ -70,13 +70,13 @@ describe("내 정보 탭", () => {
     await press("목표, 토익 900점, 고치기");
     const input = screen.getByRole("textbox", { name: "목표" }) as HTMLInputElement;
     expect(input.value).toBe("토익 900점");
-    fireEvent.change(input, { target: { value: "  포트폴리오   완성 " } });
+    fireEvent.change(input, { target: { value: "  글 한 편   완성 " } });
     await press("저장");
-    expect(api.saveSettings).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
-    expect(onChanged).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
+    expect(api.saveSettings).toHaveBeenCalledWith({ goal: "글 한 편 완성" });
+    expect(onChanged).toHaveBeenCalledWith({ goal: "글 한 편 완성" });
     expect(screen.queryByRole("dialog", { name: "목표" })).toBeNull();
-    expect(screen.getByRole("button", { name: "목표, 포트폴리오 완성, 고치기" })).toBeTruthy();
-    await press("목표, 포트폴리오 완성, 고치기");
+    expect(screen.getByRole("button", { name: "목표, 글 한 편 완성, 고치기" })).toBeTruthy();
+    await press("목표, 글 한 편 완성, 고치기");
     fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "  " } });
     await press("저장");
     expect(api.saveSettings).toHaveBeenLastCalledWith({ goal: null });
@@ -110,14 +110,14 @@ describe("내 정보 탭", () => {
     await openRatio();
     expectFieldSum100();
     fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" })); // 60·40·0 → 55·45·0 (뒤 줄로)
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" })); // → 55·40·5 (뒤 줄 기타로)
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5% 줄이기" })); // → 55·40·5 (뒤 줄 기타로)
     await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 55 }, { categoryId: C2, percent: 40 }, { categoryId: null, percent: 5 }]);
     expect(screen.queryByRole("dialog", { name: "목표 비율" })).toBeNull(); // 저장하면 내 정보로 돌아간다
     await openRatio();
     for (let i = 0; i < 20; i++) {
       fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" }));
-      fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" }));
+      fireEvent.click(screen.getByRole("button", { name: "글쓰기 5% 줄이기" }));
     }
     expectFieldSum100();
     await saveRatio();
@@ -132,7 +132,7 @@ describe("내 정보 탭", () => {
     await openRatio();
     expectFieldSum100();
     expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
-    expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("글쓰기 비율(%)") as HTMLInputElement).value).toBe("50");
     await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 50 }, { categoryId: C2, percent: 50 }]);
   });
@@ -141,7 +141,7 @@ describe("내 정보 탭", () => {
     const { unmount } = render(<MeScreen settings={settings({ ratios: [] })} categories={categories} api={fakeApi()} push={fakePush()} />);
     await openRatio();
     expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
-    expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("글쓰기 비율(%)") as HTMLInputElement).value).toBe("50");
     expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("0");
     unmount();
     render(<MeScreen settings={settings({ ratios: [] })} categories={[]} api={fakeApi()} push={fakePush()} />);
@@ -318,7 +318,7 @@ describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
     expectFieldSum100();
     expect(screen.getByRole("button", { name: "기타 5% 줄이기" })).toBeTruthy();
     expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("10");
-    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" })); // 기타는 맨 끝 줄: 앞 줄(포트폴리오)에서 떼어 온다
+    fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" })); // 기타는 맨 끝 줄: 앞 줄(글쓰기)에서 떼어 온다
     await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 60 },

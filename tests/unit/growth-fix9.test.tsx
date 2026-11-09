@@ -29,7 +29,7 @@ function data(over: Partial<GrowthData> = {}): GrowthData {
     lastMonthRange: { from: "2026-10-01", to: "2026-10-31" },
     categories: [
       { id: G1, name: "어학" },
-      { id: G2, name: "포트폴리오" },
+      { id: G2, name: "글쓰기" },
     ],
     ratios: [
       { categoryId: G1, percent: 60 },
@@ -336,7 +336,7 @@ describe("보기 단추 자리 · 목록 「›」 · 줄 사이 선", () => {
       return rows;
     };
     const goalRows = check();
-    expect(goalRows.length).toBe(2); // 어학(목표) · 포트폴리오(쓴 시간). 기타는 목표도 쓴 시간도 없어 줄이 없다
+    expect(goalRows.length).toBe(2); // 어학(목표) · 글쓰기(쓴 시간). 기타는 목표도 쓴 시간도 없어 줄이 없다
     fireEvent.click(goalRows[0]);
     // 셋째 인자 = 상태보기가 읽은 GrowthData(고침8 I: 분야 페이지 요약 카드가 같은 값으로 그린다)
     expect(onOpenCategory).toHaveBeenLastCalledWith(G1, "어학", d);
@@ -411,7 +411,7 @@ describe("S6-1 목표 없는 주(Figma 50:741): 예시 막대 = 점선 막대 + 
       expect(bar.querySelector(".growth-goal-tick")).not.toBeNull();
       expect(bar.classList.contains("growth-example-bar")).toBe(true);
     }
-    // 포트폴리오 목표 6시간 = 축 → 점선이 끝까지(오른쪽 0%), 어학 5시간 → 오른쪽 16.667% 남김
+    // 글쓰기 목표 6시간 = 축 → 점선이 끝까지(오른쪽 0%), 어학 5시간 → 오른쪽 16.667% 남김
     expect(bars.map((b) => b.querySelector<HTMLElement>(".growth-goal-gap")!.style.insetInlineEnd)).toEqual(["0%", "16.667%"]);
     const card = container.querySelector<HTMLElement>(".growth-goal-set")!;
     expect(Array.from(card.children).map((el) => el.className)).toEqual(["growth-example", "growth-goal-hint", "btn btn-primary growth-goal-set-button"]);

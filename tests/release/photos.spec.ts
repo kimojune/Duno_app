@@ -91,7 +91,7 @@ test.describe("S1 처음 설정(가짜 응답: 설정 onboardingDone=false)", ()
     await expect(page.getByRole("heading", { name: "목표" })).toBeVisible({ timeout: 30_000 });
     for (const [i, [name, node]] of steps.entries()) {
       try {
-        if (i === 0) await page.getByRole("textbox").first().fill("포트폴리오 끝내고 토익 800점 넘기기");
+        if (i === 0) await page.getByRole("textbox").first().fill("글 한 편 끝내고 토익 800점 넘기기");
         await shot(page, name, node, { fake: true });
         if (i < 3) await page.getByRole("button", { name: "다음" }).click();
       } catch (e) {
@@ -432,7 +432,7 @@ test("S8 내 정보 · S8-a · S8-b · 확인 창", async ({ browser }) => {
   const goal = page.getByRole("dialog", { name: "목표" });
   await expect(goal).toBeVisible();
   await shot(page, "S8-b 목표 고치기", "102:314");
-  await goal.getByRole("textbox").fill("포트폴리오 끝내고 토익 800점 넘기기 (고치는 중)");
+  await goal.getByRole("textbox").fill("글 한 편 끝내고 토익 800점 넘기기 (고치는 중)");
   await goal.getByRole("button", { name: "이전" }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await shot(page, "S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창", "121:449");

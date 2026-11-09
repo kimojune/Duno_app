@@ -9,7 +9,7 @@ const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 
 function summary(over: Partial<GoalSummary> = {}): GoalSummary {
-  return { weekStart: "2026-11-02", categories: [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }], thisWeek: [], goal: null, ...over };
+  return { weekStart: "2026-11-02", categories: [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }], thisWeek: [], goal: null, ...over };
 }
 const summaryApi = (data: GoalSummary | null): GoalsApi => ({
   fetchSummary: vi.fn(async () => (data ? { ok: true as const, data } : { ok: false as const, error: "unavailable" as const })),
@@ -66,7 +66,7 @@ describe("이번 주 목표 한 줄 (D-113, D-114)", () => {
 });
 
 describe("이번 주 목표 정하기 창", () => {
-  const categories = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }];
+  const categories = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }];
   const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
 
   it("분야마다 시간을 1시간 단위로 넣고 합계가 보이며, 0시간인 분야는 목표에 넣지 않는다", async () => {
@@ -81,7 +81,7 @@ describe("이번 주 목표 정하기 창", () => {
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true); // 합 0
     fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
     fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
-    fireEvent.change(screen.getByLabelText("포트폴리오"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("글쓰기"), { target: { value: "10" } });
     expect(screen.getByText("합계 12시간")).toBeTruthy();
     await press("저장");
     expect(api.save).toHaveBeenCalledWith([{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 600 }]);
@@ -94,7 +94,7 @@ describe("이번 주 목표 정하기 창", () => {
     const onSaved = vi.fn();
     render(<GoalEditor api={api} categories={categories} goal={[{ categoryId: C1, minutes: 300 }]} onClose={vi.fn()} onSaved={onSaved} />);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("5");
-    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
     // 고침9 ④-2(Figma 51:48): 「목표 없애기」는 확인 한 단계 — 「그대로」면 아무것도 안 함, 「없애기」면 없앤다
     await press("목표 없애기");
     expect(api.clear).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe("이번 주 목표 정하기 창", () => {
   it("한 주 168시간을 넘으면 저장이 막히고 안내가 보인다", () => {
     render(<GoalEditor api={goalsApi()} categories={categories} goal={null} onClose={vi.fn()} onSaved={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("어학"), { target: { value: "100" } });
-    fireEvent.change(screen.getByLabelText("포트폴리오"), { target: { value: "69" } });
+    fireEvent.change(screen.getByLabelText("글쓰기"), { target: { value: "69" } });
     expect(screen.getByText("한 주는 168시간까지예요.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
   });

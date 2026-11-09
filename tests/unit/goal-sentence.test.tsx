@@ -116,7 +116,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(field().value).toBe("토익 900점 넘기기");
     expect(dlg.querySelector("label[for='goal-sentence-input']")?.textContent).toBe("목표");
     const help = dlg.querySelector("#goal-sentence-help")!;
-    expect(help.textContent).toBe("예: 포트폴리오 끝내고 토익 800점 넘기기");
+    expect(help.textContent).toBe("예: 글 한 편 끝내고 토익 800점 넘기기");
     expect(field().getAttribute("aria-describedby")).toBe("goal-sentence-help");
     expect(field().compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // 칸 아래
     expect(field().getAttribute("placeholder")).toBeNull(); // 예시는 칸 안 흐린 글이 아니다(UI-06)
@@ -134,14 +134,14 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     const { api, onChanged } = mount();
     card().focus();
     await open();
-    await type("  포트폴리오   끝내기 ");
+    await type("  글 한 편   끝내기 ");
     await pressIn(editor()!, "저장");
     expect(api.saveSettings).toHaveBeenCalledTimes(1);
-    expect(api.saveSettings).toHaveBeenCalledWith({ goal: "포트폴리오 끝내기" });
-    expect(onChanged).toHaveBeenCalledWith({ goal: "포트폴리오 끝내기" });
+    expect(api.saveSettings).toHaveBeenCalledWith({ goal: "글 한 편 끝내기" });
+    expect(onChanged).toHaveBeenCalledWith({ goal: "글 한 편 끝내기" });
     expect(editor()).toBeNull();
-    expect(card().getAttribute("aria-label")).toBe("목표, 포트폴리오 끝내기, 고치기");
-    expect(card().querySelector(".me-goal-text")?.textContent).toBe("포트폴리오 끝내기");
+    expect(card().getAttribute("aria-label")).toBe("목표, 글 한 편 끝내기, 고치기");
+    expect(card().querySelector(".me-goal-text")?.textContent).toBe("글 한 편 끝내기");
     expect(document.activeElement).toBe(card());
     history.flush();
     expect(history.index).toBe(0); // 쌓은 칸을 거뒀다

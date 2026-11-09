@@ -124,7 +124,7 @@ describe("TimeWheel 화면", () => {
     expect(centerText("분")).toBe("05"); // 분은 두 자리
   });
 
-  it("PM 14: 5의 배수가 아닌 합(타이머가 채운 1·2분 등)도 분 휠은 5분 격자 값만 보이고, 합도 그 눈금으로 맞는다", () => {
+  it("PM 14: 5의 배수가 아닌 합(타이머가 채운 1·2분 등)도 분 휠은 5분 격자 값만 보인다(합은 만지기 전까지 그대로, 만지면 그 눈금에서 한 걸음)", () => {
     for (const [initial, shown, saved, dims] of [
       [1, "00", 0, ["", "", "05", "10"]],
       [2, "00", 0, ["", "", "05", "10"]],
@@ -136,7 +136,9 @@ describe("TimeWheel 화면", () => {
       expect(centerText("분")).toBe(shown);
       expect(dimTexts("분")).toEqual([...dims]);
       expect(spin("분").getAttribute("aria-valuenow")).toBe(String(Number(shown)));
-      expect(seen).toEqual(initial === saved ? [] : [saved]); // 보이는 값과 합이 같아지게 한 번만 알린다
+      expect(seen).toEqual([]); // 보이기만 맞춘다: 만지기 전에는 합을 바꾸지 않는다
+      key("분", "ArrowUp");
+      expect(seen).toEqual([saved + 5]); // 만지면 보이는 눈금에서 한 걸음
       cleanup();
     }
   });

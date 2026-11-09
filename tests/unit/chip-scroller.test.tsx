@@ -15,7 +15,7 @@ import type { TodayRead } from "../../lib/today-types";
  * 실제 화면 배치(줄 수 ≤ 2 · 「+n」 수 = 숨은 칩 수 · 가로 넘침 없음)는 tests/screens/chip-row.ts가 360px·글자 200% 흉내에서 잰다.
  */
 
-const NAMES = ["취업 준비", "운동", "CS 공부", "영어", "독서", "포트폴리오", "사이드 프로젝트", "자격증"];
+const NAMES = ["취업 준비", "운동", "CS 공부", "영어", "독서", "글쓰기", "사이드 프로젝트", "자격증"];
 
 function Row({ names = NAMES, pressed = null }: { names?: string[]; pressed?: string | null }) {
   return (

@@ -47,7 +47,7 @@ test("PM d-125 360x800: 예시 글 넷은 보조 글 색·불투명 곱 1, 막�
   expect(r.sub).toBe("rgb(94, 100, 120)"); // #5E6478
   expect(r.sub).not.toBe(r.surface);
   expect(r.texts.length).toBeGreaterThan(0);
-  expect(r.texts.map((t) => t.text)).toEqual(["포트폴리오", "목표 6시간", "어학", "목표 5시간"]);
+  expect(r.texts.map((t) => t.text)).toEqual(["글쓰기", "목표 6시간", "어학", "목표 5시간"]);
   for (const t of r.texts) {
     expect(t.color, `${t.text} 글 색`).toBe(r.sub);
     expect(t.opacity, `${t.text} 불투명 곱`).toBe(1);

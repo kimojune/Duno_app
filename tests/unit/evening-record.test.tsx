@@ -20,7 +20,7 @@ function state(over: Partial<EveningState> = {}): EveningState {
     timerByCategory: [],
     categories: [
       { id: C1, name: "어학" },
-      { id: C2, name: "포트폴리오" },
+      { id: C2, name: "글쓰기" },
     ],
     ...over,
   };
@@ -140,11 +140,11 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     const api = fakeApi(state({ doneCategoryIds: [C2, null], timerByCategory: [{ categoryId: C1, minutes: 30 }] }));
     await mount(api);
     setNumber("시간", 2); // 타이머 30분이 처음 총시간이라 분은 30이다
-    setNumber("분", 0); // 120분: 타이머 30 + 끝낸 할 일 분야(포트폴리오) 30 + 기타 60
+    setNumber("분", 0); // 120분: 타이머 30 + 끝낸 할 일 분야(글쓰기) 30 + 기타 60
     await press("분야마다 나누기");
     expect(screen.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeTruthy();
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("30");
-    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("30");
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("30");
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,7 +155,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     );
     expect(afterSaveRows()).toEqual([
       ["어학", "+30분"],
-      ["포트폴리오", "+30분"],
+      ["글쓰기", "+30분"],
       ["기타", "+1시간"],
     ]);
   });
@@ -191,7 +191,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     await mount(api);
     setNumber("시간", 2);
     await press("분야마다 나누기");
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5분 줄이기" }));
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5분 줄이기" }));
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
       expect.objectContaining({ items: [{ categoryId: C2, minutes: 25 }, { categoryId: null, minutes: 95 }], saveMode: "edited" }),
@@ -207,11 +207,11 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     setNumber("어학", 90);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("60");
     expect((screen.getByRole("button", { name: "어학 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
-    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분이라 0분 줄
-    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
-    expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true); // 기타가 0분이라 다른 분야도 못 늘린다
-    setNumber("포트폴리오", 30);
-    expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
+    await press("글쓰기, 다이얼에 넣기"); // 기타 0분이라 0분 줄
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
+    expect((screen.getByRole("button", { name: "글쓰기 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true); // 기타가 0분이라 다른 분야도 못 늘린다
+    setNumber("글쓰기", 30);
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
     expect(screen.queryByText(/나눈 시간이 합계보다 많아서/)).toBeNull();
     expect(screen.getByText("합계 1시간")).toBeTruthy();
     await press("저장");

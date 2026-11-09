@@ -212,7 +212,7 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     expect(card.radius).toBe("16px");
     expect(card.bg).toBe(await rootColor(page, "--color-surface"));
     expect(card.bg).not.toBe(await rootColor(page, "--color-bg"));
-    await expect(page.locator(".growth-item .growth-name")).toHaveText(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    await expect(page.locator(".growth-item .growth-name")).toHaveText(["어학", "글쓰기", "자격증", "운동", "기타"]);
     await expect(page.locator("[aria-pressed]")).toHaveCount(0);
     // 막대: 채움은 6px 이상 + 1px 윤곽, 어학의 빈 자리는 점선, 눈금은 글자색
     const fills = await page.$$eval(".growth-goal-fill", (els) => els.map((el) => ({ w: el.getBoundingClientRect().width, bw: getComputedStyle(el).borderTopWidth, bs: getComputedStyle(el).borderTopStyle })));
@@ -379,7 +379,7 @@ async function expectExampleTextSharp(page: Page) {
   expect(r.sub).toBe("rgb(94, 100, 120)");
   expect(r.sub).not.toBe(r.surface);
   expect(r.texts.length).toBeGreaterThan(0);
-  expect(r.texts.map((t) => t.text)).toEqual(["포트폴리오", "목표 6시간", "어학", "목표 5시간"]);
+  expect(r.texts.map((t) => t.text)).toEqual(["글쓰기", "목표 6시간", "어학", "목표 5시간"]);
   for (const t of r.texts) {
     expect(t.color, `${t.text} 글 색`).toBe(r.sub);
     expect(t.opacity, `${t.text} 불투명 곱`).toBe(1);

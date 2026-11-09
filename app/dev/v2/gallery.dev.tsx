@@ -37,8 +37,8 @@ import type { TodayRead } from "../../../lib/today-types";
  *  - category · category-other · category-empty(고침8): 분야 페이지 요약 카드 + 날짜별 시간 막대 / 기타 페이지 / 빈 분야(0%)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
  *  - me-goal · me-goal-empty · me-goal-fail(고침6 ③): 내 정보 첫 카드(목표 있음·없음). 카드를 누르면 S8-b 「목표」. me-goal-fail은 저장이 늘 실패한다
- *  - after-save · after-save-ratio(고침9 S5-3, Figma 49:142 · 59:2): 오늘 기록을 저장한 뒤 「이번 주」 카드. 저장 결과는 늘 어학 +1시간 · 포트폴리오 +2시간.
- *    after-save = 목표 세운 주(어학 2/5시간 → 「3시간 더」, 포트폴리오 12/6시간 → 「목표 6시간」), after-save-ratio = 목표 없는 주(어학 20%/30%, 포트폴리오 60%/40%)
+ *  - after-save · after-save-ratio(고침9 S5-3, Figma 49:142 · 59:2): 오늘 기록을 저장한 뒤 「이번 주」 카드. 저장 결과는 늘 어학 +1시간 · 글쓰기 +2시간.
+ *    after-save = 목표 세운 주(어학 2/5시간 → 「3시간 더」, 글쓰기 12/6시간 → 「목표 6시간」), after-save-ratio = 목표 없는 주(어학 20%/30%, 글쓰기 60%/40%)
  *  - after-save-many: 바뀐 분야 여섯 → 큰 순 넷 + 「그 밖 2개」
  *  - timer-many · detail-many(고침 5바퀴): 분야 10개(긴 이름 포함)의 타이머 「할 일 없이 시작」 칩 줄 · 할 일 자세히 칩 줄. 한 줄 + 옆으로 넘김을 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
@@ -51,7 +51,7 @@ const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 const C3 = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
 const CATEGORIES = [
   { id: C1, name: "어학" },
-  { id: C2, name: "포트폴리오" },
+  { id: C2, name: "글쓰기" },
   { id: C3, name: "CS 공부" },
 ];
 
@@ -107,7 +107,7 @@ const eveningApi: EveningApi = {
   }),
   save: never,
 };
-/** 저녁 나누기 다이얼: 타이머 어학 30분, 끝낸 할 일 포트폴리오 → 쓴 시간을 2시간으로 두면 어학 30 · 포트폴리오 90 */
+/** 저녁 나누기 다이얼: 타이머 어학 30분, 끝낸 할 일 글쓰기 → 쓴 시간을 2시간으로 두면 어학 30 · 글쓰기 90 */
 const eveningSplitApi = (categories: { id: string; name: string }[]): EveningApi => ({
   fetchState: async () => ({
     ok: true,
@@ -230,15 +230,15 @@ const WEEK_GROWTH: GrowthData = {
 const WEEK_ZERO_GROWTH: GrowthData = { ...WEEK_GROWTH, thisWeek: [], loggedDaysThisWeek: 0 };
 
 /**
- * 상태보기 두 뷰(고침5): 명세 ③-S 예와 같은 값. 이번 주 목표 15시간 중 12시간(어학 2/5 · 포트폴리오 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2),
- * 목표 비율 어학 30 · 포트폴리오 40 · 자격증 20 · 운동 10 → 이번 주 10 · 60 · 15 · 5 · 기타 10
+ * 상태보기 두 뷰(고침5): 명세 ③-S 예와 같은 값. 이번 주 목표 15시간 중 12시간(어학 2/5 · 글쓰기 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2),
+ * 목표 비율 어학 30 · 글쓰기 40 · 자격증 20 · 운동 10 → 이번 주 10 · 60 · 15 · 5 · 기타 10
  */
 const G = ["a1", "a2", "a3", "a4"].map((k) => `${k}${k}${k}${k}-0000-4000-8000-000000000000`);
 const GOAL_GROWTH: GrowthData = {
   ...EMPTY_GROWTH,
   categories: [
     { id: G[0], name: "어학" },
-    { id: G[1], name: "포트폴리오" },
+    { id: G[1], name: "글쓰기" },
     { id: G[2], name: "자격증" },
     { id: G[3], name: "운동" },
   ],
@@ -274,7 +274,7 @@ const GOAL_GROWTH: GrowthData = {
       { categoryId: G[3], minutes: 60 },
     ],
   },
-  goalText: "토익 900점 넘기고 포트폴리오 사이트 열기",
+  goalText: "토익 900점 넘기고 블로그 열기",
 };
 /** 목표 최대 길이(100자) 글: 띄어쓰기 없는 긴 낱말과 꺾쇠 모양 글을 섞는다(가로 넘침·글자 그대로 보기) */
 export const LONG_GOAL = ("<img src=x onerror=alert(1)> " + "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허".repeat(3)).slice(0, 100);
@@ -390,7 +390,7 @@ export function V2Gallery({ id }: { id: string }) {
   }
   if (id === "me-goal" || id === "me-goal-empty" || id === "me-goal-fail") {
     // 고침6 ③: 내 정보 첫 카드 → S8-b 「목표」. 목표 있음은 360px에서 두 줄로 감기는 길이
-    const settings: SettingsData = { ...SETTINGS, goal: id === "me-goal-empty" ? null : "올해 안에 토익 900점 넘기고 포트폴리오 끝내기" };
+    const settings: SettingsData = { ...SETTINGS, goal: id === "me-goal-empty" ? null : "올해 안에 토익 900점 넘기고 글 한 편 끝내기" };
     const api: SettingsApi = id === "me-goal-fail" ? { ...settingsApi, saveSettings: async () => ({ ok: false, error: "unavailable" }) } : settingsApi;
     return (
       <Shell>
@@ -525,7 +525,7 @@ export function V2Gallery({ id }: { id: string }) {
   }
   if (id === "category-empty") {
     // 고침8: 빈 분야 — 요약 카드(0%, 총 0시간, 이번 주 0시간, 목표 비율 30%) + 「할 일 0개」
-    return <Opener render={(close) => <CategoryPage api={categoryApi(C2, [])} categoryId={C2} name="포트폴리오" growth={EMPTY_GROWTH} onClose={close} />} />;
+    return <Opener render={(close) => <CategoryPage api={categoryApi(C2, [])} categoryId={C2} name="글쓰기" growth={EMPTY_GROWTH} onClose={close} />} />;
   }
   if (id === "timer-many") {
     return (

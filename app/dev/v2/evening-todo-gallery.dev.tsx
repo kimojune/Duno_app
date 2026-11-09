@@ -17,7 +17,7 @@ const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 const C3 = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
 const CATEGORIES = [
   { id: C1, name: "어학" },
-  { id: C2, name: "포트폴리오" },
+  { id: C2, name: "글쓰기" },
   { id: C3, name: "CS 공부" },
 ];
 // 분야 열 개(긴 이름 하나): 시트의 칩 줄이 한 줄을 넘쳐 「›」가 나는지 본다(/dev/v2?s=evening-todo-many)

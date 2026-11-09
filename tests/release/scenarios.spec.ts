@@ -83,7 +83,7 @@ test("S-01 첫날 ②~⑤(가짜 응답: 처음 설정 전)", async ({ browser }
   await page.goto("/");
   await step(S, "② 목표 칸 → 다음", "8-1 AC1", async () => {
     await expect(page.getByRole("heading", { name: "목표" })).toBeVisible({ timeout: 30_000 });
-    await page.getByRole("textbox").first().fill("포트폴리오 끝내고 토익 800점 넘기기");
+    await page.getByRole("textbox").first().fill("글 한 편 끝내고 토익 800점 넘기기");
     await page.getByRole("button", { name: "다음" }).click();
     await expect(page.getByRole("heading", { name: "분야" })).toBeVisible();
     await expect(page.getByRole("button", { name: "이전" })).toBeVisible(); // 2~4단계 「‹」 = 「이전」
@@ -119,7 +119,7 @@ test("S-01 첫날 ②~⑤(가짜 응답: 처음 설정 전)", async ({ browser }
   });
   await step(S, "⑤ 상태보기 맨 위에 목표 한 줄", "8-1 AC6", async () => {
     await tab(page, "상태보기");
-    await expect(page.getByText("포트폴리오 끝내고 토익 800점 넘기기")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("글 한 편 끝내고 토익 800점 넘기기")).toBeVisible({ timeout: 20_000 });
   });
   finish();
 });
@@ -447,7 +447,7 @@ test("S-07 내 정보 — 목표·목표 비율 고치기 · 알림", async ({ b
   await tab(page, "내 정보");
   await expect(page.getByRole("heading", { name: "내 정보" })).toBeVisible({ timeout: 20_000 });
   const confirm = page.getByRole("alertdialog");
-  const newGoal = `포트폴리오 끝내고 토익 ${800 + (Date.now() % 100)}점 넘기기`;
+  const newGoal = `글 한 편 끝내고 토익 ${800 + (Date.now() % 100)}점 넘기기`;
   await step(S, "① 목표 카드 › → 고침 → 「‹」 → 확인(121:449) 「계속 적기」 → 「저장」 → 상태보기 맨 위 줄", "8-1 AC7", async () => {
     await page.getByRole("button", { name: /^목표,/ }).first().click();
     const g = page.getByRole("dialog", { name: "목표" });
