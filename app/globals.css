@@ -718,6 +718,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   font: 500 11px/16px var(--font-family);
 }
 .growth-period-chip:active .growth-period-chip-face { background: var(--color-notice-bg); }
+.growth-period-caret { white-space: pre; } /* 「이번 주 ▾」의 띄어쓰기를 살린다(flex 안 글 조각 앞 칸은 지워진다) */
 .growth-period-chip:focus-visible { outline: none; }
 .growth-period-chip:focus-visible .growth-period-chip-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .growth-period-list {
