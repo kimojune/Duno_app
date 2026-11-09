@@ -247,7 +247,7 @@ test("S-03 저녁 — 오늘 기록부터 상태보기까지(이번 주 목표 �
     expect(await pressedSplitChips(dialog).count()).toBeGreaterThanOrEqual(1);
     await expect(dialog.getByText("기타", { exact: true }).first()).toBeVisible();
   });
-  await step(S, "⑤ 칩 하나 더 → 30분 조각 · 합계 2시간 30분 유지", "8-3 AC4", async () => {
+  await step(S, "⑤ 칩 하나 더 → 고른 칩끼리 남은 시간을 똑같이(타이머 분야는 잰 시간 그대로, PM d-180) · 합계 2시간 30분 유지", "8-3 AC4", async () => {
     const before = await pressedSplitChips(dialog).count();
     await pickSplitChip(dialog);
     await expect(pressedSplitChips(dialog)).toHaveCount(before + 1);
