@@ -57,7 +57,7 @@ type Pref = NonNullable<GrowthApi["viewPref"]>;
 function api(d: GrowthData, viewPref?: Pref): GrowthApi {
   return { fetchGrowth: vi.fn(async () => ({ ok: true as const, data: d })), fetchCategoryPage: vi.fn(), recordView: vi.fn(async () => ({ ok: true })), ...(viewPref ? { viewPref } : {}) } as unknown as GrowthApi;
 }
-async function mount(d: GrowthData, viewPref?: Pref, props: { onOpenCategory?: (id: string | null, name: string) => void; onOpenEvening?: () => void } = {}) {
+async function mount(d: GrowthData, viewPref?: Pref, props: { onOpenCategory?: (id: string | null, name: string, growth: GrowthData) => void; onOpenEvening?: () => void } = {}) {
   const view = render(
     <div>
       <button type="button">바깥 단추</button>
@@ -322,7 +322,8 @@ describe("보기 단추 자리 · 목록 「›」 · 줄 사이 선", () => {
 
   it("두 뷰 목록 줄마다 끝에 「›」(숨김), 누르면 지금처럼 분야 페이지", async () => {
     const onOpenCategory = vi.fn();
-    const { container } = await mount(data(), undefined, { onOpenCategory });
+    const d = data();
+    const { container } = await mount(d, undefined, { onOpenCategory });
     const check = () => {
       const rows = Array.from(container.querySelectorAll<HTMLElement>(".growth-item > button"));
       expect(rows.length).toBeGreaterThan(0);
@@ -337,11 +338,12 @@ describe("보기 단추 자리 · 목록 「›」 · 줄 사이 선", () => {
     const goalRows = check();
     expect(goalRows.length).toBe(2); // 어학(목표) · 포트폴리오(쓴 시간). 기타는 목표도 쓴 시간도 없어 줄이 없다
     fireEvent.click(goalRows[0]);
-    expect(onOpenCategory).toHaveBeenLastCalledWith(G1, "어학");
+    // 셋째 인자 = 상태보기가 읽은 GrowthData(고침8 I: 분야 페이지 요약 카드가 같은 값으로 그린다)
+    expect(onOpenCategory).toHaveBeenLastCalledWith(G1, "어학", d);
     ratioTab();
     const ratioRows = check();
     fireEvent.click(ratioRows[ratioRows.length - 1]);
-    expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타");
+    expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타", d);
   });
 
   it("CSS: 목표 뷰·비율 뷰 줄 사이 선 없음(비교만), 비율 뷰는 범례 아래 선 하나", () => {
