@@ -310,11 +310,50 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     await page.getByRole("tab", { name: "이번 주 목표" }).click();
     await expect(page.getByRole("group", { name: "예시" })).toBeVisible();
     await expect(page.getByRole("button", { name: "이번 주 목표 정하기" })).toHaveCount(1);
-    const opacity = await page.locator(".growth-example-list").evaluate((el) => getComputedStyle(el).opacity);
-    expect(opacity).toBe("0.4");
+    // PM d-125: 흐림은 막대(채움·점선·눈금)에만. 막대는 여전히 불투명 40%
+    const barOpacity = await page.locator(".growth-example-item .growth-goal-bar").evaluateAll((els) => els.map((el) => getComputedStyle(el).opacity));
+    expect(barOpacity).toEqual(["0.4", "0.4"]);
+    await expectExampleTextSharp(page);
     await shot(page, `growth-nogoal-${size}`);
     await noHorizontalScroll(page, "목표 없는 주의 이번 주 목표 탭");
   });
+}
+
+/**
+ * PM d-125: 목표 없는 주의 예시 글(분야 이름·「목표 n시간」)은 흐리지 않는다 — 계산된 글 색이 보조 글 토큰(--color-text-sub)이고,
+ * 그 요소와 조상들의 계산된 opacity 곱이 1이다(흰 바탕 5.88:1). 토큰 값 자체와도, 바탕(--color-surface)과도 따로 맞춰 본다
+ */
+async function expectExampleTextSharp(page: Page) {
+  const r = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--color-text-sub)";
+    document.body.appendChild(probe);
+    const sub = getComputedStyle(probe).color;
+    probe.style.color = "var(--color-surface)";
+    const surface = getComputedStyle(probe).color;
+    probe.remove();
+    const root = getComputedStyle(document.documentElement).getPropertyValue("--color-text-sub").trim();
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".growth-example-item .growth-name, .growth-example-item .growth-goal-of"));
+    return {
+      sub,
+      surface,
+      root,
+      texts: els.map((el) => {
+        let opacity = 1;
+        for (let n: HTMLElement | null = el; n; n = n.parentElement) opacity *= parseFloat(getComputedStyle(n).opacity);
+        return { text: el.textContent, color: getComputedStyle(el).color, opacity };
+      }),
+    };
+  });
+  expect(r.root.toUpperCase()).toBe("#5E6478");
+  expect(r.sub).toBe("rgb(94, 100, 120)");
+  expect(r.sub).not.toBe(r.surface);
+  expect(r.texts.length).toBeGreaterThan(0);
+  expect(r.texts.map((t) => t.text)).toEqual(["포트폴리오", "목표 6시간", "어학", "목표 5시간"]);
+  for (const t of r.texts) {
+    expect(t.color, `${t.text} 글 색`).toBe(r.sub);
+    expect(t.opacity, `${t.text} 불투명 곱`).toBe(1);
+  }
 }
 
 // 악용 시나리오: 목표 최대 길이(100자, 띄어쓰기 없는 긴 낱말 + 꺾쇠 모양 글) — 줄바꿈하고 가로로 넘치지 않으며 글자 그대로 보인다

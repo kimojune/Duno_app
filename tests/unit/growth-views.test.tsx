@@ -355,7 +355,8 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     const rows = Array.from(example.querySelectorAll<HTMLElement>(".growth-example-item"));
     expect(rows.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["포트폴리오", "어학"]);
     expect(rows.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 6시간", "목표 5시간"]);
-    expect(example.querySelector(".growth-example-list")).not.toBeNull(); // 흐림(불투명 40%)은 이 묶음의 CSS
+    // 흐림(불투명 40%)은 막대에만 거는 CSS(PM d-125 — 예시 글은 흐리지 않는다). 줄마다 막대가 하나씩 있다
+    expect(rows.map((li) => li.querySelectorAll(".growth-goal-bar").length)).toEqual([1, 1]);
     expect(example.querySelector("button, a, [tabindex]")).toBeNull();
     // 예시 막대는 단추 아래
     expect(screen.getByRole("button", { name: GOAL_TEXT.set }).compareDocumentPosition(example) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
