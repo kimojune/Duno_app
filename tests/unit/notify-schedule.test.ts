@@ -70,6 +70,22 @@ describe("알림 키 스크립트 (d-214)", () => {
     expect(again.cronSecret).not.toBe(keys.cronSecret);
     expect(again.privateKey).not.toBe(keys.privateKey);
   });
+  it("키를 200번 만들어도 길이가 모두 맞고 서명이 공개 키로 검증된다(값은 찍지 않는다)", () => {
+    for (let i = 0; i < 200; i++) {
+      const k = generateNotifyKeys();
+      const pub = Buffer.from(k.publicKey, "base64url");
+      expect(pub.length).toBe(65);
+      expect(pub[0]).toBe(4);
+      expect(Buffer.from(k.privateKey, "base64url").length).toBe(32);
+      expect(Buffer.from(k.cronSecret, "base64url").length).toBeGreaterThanOrEqual(32);
+      const jwt = createVapidJwt({ endpoint: "https://push.example.com/send/abc", subject: "mailto:dummy@example.com", publicKey: k.publicKey, privateKey: k.privateKey });
+      const [header, payload, signature] = jwt.split(".");
+      const ok = createVerify("SHA256")
+        .update(`${header}.${payload}`)
+        .verify({ key: createPublicKey({ key: jwkOf(k.publicKey), format: "jwk" }), dsaEncoding: "ieee-p1363" }, Buffer.from(signature, "base64url"));
+      expect(ok).toBe(true);
+    }
+  });
   it("만든 키가 앱 서명 코드(createVapidJwt)를 통과하고 서명이 공개 키로 검증된다", () => {
     const jwt = createVapidJwt({ endpoint: "https://push.example.com/send/abc", subject: "mailto:dummy@example.com", publicKey: keys.publicKey, privateKey: keys.privateKey });
     const [header, payload, signature] = jwt.split(".");

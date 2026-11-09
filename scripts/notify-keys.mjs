@@ -5,14 +5,21 @@
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
+/** JWK 좌표(base64url)를 정확히 32바이트로 맞춘다. 모자라면 앞을 0으로 채우고, 넘치거나 비면 던진다 */
+function toBytes32(value) {
+  const raw = Buffer.from(typeof value === "string" ? value : "", "base64url");
+  if (raw.length === 0 || raw.length > 32) throw new RangeError("invalid key component");
+  return Buffer.concat([Buffer.alloc(32 - raw.length), raw]);
+}
+
 /** 공개 키(비압축 점 65바이트, base64url) · 비밀 키(32바이트, base64url) · 예약 비밀(무작위 32바이트, base64url) */
 export function generateNotifyKeys() {
   const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const jwk = privateKey.export({ format: "jwk" });
-  const point = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, "base64url"), Buffer.from(jwk.y, "base64url")]);
+  const point = Buffer.concat([Buffer.from([4]), toBytes32(jwk.x), toBytes32(jwk.y)]);
   return {
     publicKey: point.toString("base64url"),
-    privateKey: Buffer.from(jwk.d, "base64url").toString("base64url"),
+    privateKey: toBytes32(jwk.d).toString("base64url"),
     cronSecret: randomBytes(32).toString("base64url"),
   };
 }

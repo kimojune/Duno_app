@@ -1,10 +1,12 @@
 # 알림 예약 켜기 — PM 할 일 (d-214 가)
 
-**결론**: 아침 10:00·저녁 19:30 알림이 오게 하려면 PM이 값을 5곳에 넣고 SQL을 한 번 돌린다. 저장소 쪽(SQL·키 스크립트·시험)은 준비됐다. **SQL 미실행**, 실제 기기 알림 **미검증**.
+**결론**: 아침 10:00·저녁 19:30 알림이 오게 하려면 PM이 값을 Vercel과 Supabase Vault 두 곳에 넣고 SQL을 한 번 돌린다. 저장소 쪽(SQL·키 스크립트·시험)은 준비됐다. **SQL 미실행**, 실제 기기 알림 **미검증**.
 
 **왜 Supabase Cron인가** (공식 문서 11-10 확인): Vercel Hobby Cron은 작업마다 하루 한 번이고 시각이 최대 59분 늦다(vercel.com/docs/cron-jobs/usage-and-pricing, 갱신 2026-07-15). Vercel Schedules는 베타이고 Hobby는 15분 흔들림이 붙는다(vercel.com/docs/schedules/limits). 그래서 `vercel.json`을 만들지 않는다. 만들면 두 곳에서 불러 알림이 두 번 갈 수 있다.
 
 **값 이름 (값은 여기에 적지 않는다)**
+- Vercel(Production): NEXT_PUBLIC_VAPID_PUBLIC_KEY · VAPID_PRIVATE_KEY · VAPID_SUBJECT · SUPABASE_SERVICE_ROLE_KEY · CRON_SECRET · NOTIFY_TICK_MINUTES (그리고 이미 들어 있어야 하는 NEXT_PUBLIC_SUPABASE_URL)
+- Supabase Vault: duno_notify_tick_url · duno_cron_secret
 - 채팅·문서·커밋에 값을 붙이지 않는다.
 
 ---
@@ -26,11 +28,12 @@
 - SUPABASE_SERVICE_ROLE_KEY (Sensitive)
 - CRON_SECRET (Sensitive)
 - NOTIFY_TICK_MINUTES = 15
+- NEXT_PUBLIC_SUPABASE_URL: 예약 실행에 필요하고 이미 들어 있어야 한다(`lib/push/config.ts`의 getTickConfig). 없으면 채운다.
 
 **SUPABASE_SERVICE_ROLE_KEY 자리**: 이름은 그대로 두고 새 secret 키(sb_secret_로 시작)를 넣기를 권한다. 옛 service_role 키는 2026년 말 폐기 예정이다(Supabase 문서). 새 키로 이 코드가 도는지는 **미검증**이다.
 **넣은 뒤**: 다시 배포한다(NEXT_PUBLIC_ 값은 빌드 때 박힌다).
 **확인**:
-- 비밀 없이 `https://<배포 주소>/api/notify/tick` 을 부르면 401이 나와야 한다.
+- 비밀 없이 `https://<배포 주소>/api/notify/tick` 을 부르면 401이 나와야 한다. 401은 「비밀이 안 맞거나 서버에 없다」는 뜻이다. Vercel에 CRON_SECRET이 없어도 401이 나므로, 401만으로는 설정이 다 됐는지 알 수 없다. 다 됐는지는 4)의 `net._http_response` 가 200인지로 본다.
 - 응답이 503 not_configured면 값이 빠진 것이다.
 - 비밀을 넣어 부르는 확인은 PM이 원할 때만 한다. 그 순간 알림 보낼 때가 된 사용자가 있으면 실제로 알림이 간다.
 **되돌리기**: 값을 지우고 다시 배포한다.
@@ -54,7 +57,7 @@
 **확인**:
 - `select * from cron.job;` 에 작업이 하나 있다.
 - 15분쯤 뒤 `cron.job_run_details` 의 최근 줄이 succeeded 다.
-- `net._http_response` 의 최근 status_code 가 200이다. 401은 비밀 불일치, 503은 Vercel 값 빠짐. 칼럼 이름은 먼저 `select * from net._http_response limit 1;` 로 본다.
+- `net._http_response` 의 최근 status_code 가 200이다. 401은 비밀이 안 맞거나 Vercel에 CRON_SECRET이 없다는 뜻, 503은 그 밖의 Vercel 값 빠짐. 설정이 다 됐는지는 이 200으로 본다. 칼럼 이름은 먼저 `select * from net._http_response limit 1;` 로 본다.
 - 기기 확인: 홈 화면에 설치한 앱에서 알림을 켜고, 내 정보에서 아침 시각을 다음 30분 칸으로 바꿔 기다린다.
 **되돌리기**: 아래 「되돌리기」.
 
@@ -71,6 +74,7 @@
 - 실제 기기에 알림이 오는지는 PM이 값을 넣은 뒤에야 확인된다.
 - pg_net은 비동기이고 재시도·전달 보장이 문서에 없다. 한 번 놓치면 그 15분 칸 알림은 안 간다.
 - 비밀이 새면 같은 창 안에서 반복 호출하는 대로 같은 알림이 반복된다. 막는 장치는 아직 없다(보낸 기록 표는 DB 변경이라 이번 범위 밖).
+- 비밀 없는 반복 호출은 첫 줄에서 401로 값싸게 끝난다. 더 막으려면 Vercel WAF 규칙을 걸 수 있다(이번 범위 밖, 선택).
 - Supabase Cron이 무료 요금제에 드는지는 제3자 글로만 확인했다.
 
 ## 비밀 하나 더
