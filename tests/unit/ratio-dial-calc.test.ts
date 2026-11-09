@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dragBoundary, parseShare, rescaleSplit, setShare, startHundred, toTotal } from "../../lib/ratio-dial-calc";
+import { dragBetween, dragBoundary, parseShare, rescaleSplit, setShare, skipZeroHandles, startHundred, toTotal } from "../../lib/ratio-dial-calc";
 import { evenRatios } from "../../lib/settings/validation";
 
 const sum = (v: number[]) => v.reduce((a, b) => a + b, 0);
@@ -238,5 +238,105 @@ describe("저녁 나누기: 쓴 시간이 바뀔 때 다시 나누기(rescaleSpl
     expect(rescaleSplit([30, 30], 60, 0, 5)).toEqual([0, 0]);
     expect(rescaleSplit([0, 0], 60, 90, 5)).toEqual([0, 0]);
     expect(rescaleSplit([30, 30], 0, 90, 5)).toEqual([0, 0]);
+  });
+});
+
+describe("고침6 PM d-129 ②: 폭 0 조각을 건너뛰는 손잡이(skipZeroHandles)·경계 끌기(dragBetween) — 오늘 기록 나누기", () => {
+  it("기타 0분 + 마지막 분야 고름: 끝 손잡이(12시)가 없고 앞 손잡이만 있다. 손잡이 자리는 12시(0·합)가 아니다", () => {
+    // 어학 60 · 포트폴리오 60 · 기타 0, 포트폴리오 고름
+    expect(skipZeroHandles([60, 60, 0], 1)).toEqual([{ side: "start", at: 60, a: 0, b: 1 }]);
+    // 첫 분야를 고르면 끝 손잡이 하나(어학·포트폴리오), 기타 0분을 고르면 손잡이 없음(자리가 12시)
+    expect(skipZeroHandles([60, 60, 0], 0)).toEqual([{ side: "end", at: 60, a: 0, b: 1 }]);
+    expect(skipZeroHandles([60, 60, 0], 2)).toEqual([]);
+  });
+
+  it("0분 분야 조각의 양옆 손잡이는 하나로: 이웃 고름이면 0분을 건너뛴 경계, 0분 고름이면 겹친 손잡이 하나", () => {
+    // 어학 60 · 코딩 0 · 운동 60 · 기타 0
+    expect(skipZeroHandles([60, 0, 60, 0], 0)).toEqual([{ side: "end", at: 60, a: 0, b: 2 }]);
+    expect(skipZeroHandles([60, 0, 60, 0], 2)).toEqual([{ side: "start", at: 60, a: 0, b: 2 }]);
+    expect(skipZeroHandles([60, 0, 60, 0], 1)).toEqual([{ side: "both", at: 60, a: 0, b: 2 }]);
+    // 맨 앞(12시) 0분 조각·맨 끝(12시) 0분 조각은 손잡이 없음
+    expect(skipZeroHandles([0, 60, 60, 0], 0)).toEqual([]);
+    expect(skipZeroHandles([0, 60, 60, 0], 3)).toEqual([]);
+    // 0분이 여럿 이어져도 하나
+    expect(skipZeroHandles([30, 0, 0, 90], 0)).toEqual([{ side: "end", at: 30, a: 0, b: 3 }]);
+  });
+
+  it("기타 > 0이고 0분 조각이 없으면 지금 규칙(이웃마다 경계, 12시 없음)과 같다", () => {
+    const v = [40, 30, 20, 10];
+    expect(skipZeroHandles(v, 0)).toEqual([{ side: "end", at: 40, a: 0, b: 1 }]);
+    expect(skipZeroHandles(v, 1)).toEqual([{ side: "start", at: 40, a: 0, b: 1 }, { side: "end", at: 70, a: 1, b: 2 }]);
+    expect(skipZeroHandles(v, 3)).toEqual([{ side: "start", at: 90, a: 2, b: 3 }]);
+    // 이웃 조각끼리 dragBetween = dragBoundary
+    for (const d of [-100, -7, -1, 1, 3, 100, Infinity, -Infinity]) {
+      for (let k = 0; k < 3; k++) expect(dragBetween(v, k, k + 1, d, 1)).toEqual(dragBoundary(v, k, d, 1));
+    }
+  });
+
+  it("고른 것이 없거나·없는 조각·모두 0이면 손잡이 없음", () => {
+    expect(skipZeroHandles([60, 60, 0], -1)).toEqual([]);
+    expect(skipZeroHandles([60, 60, 0], 3)).toEqual([]);
+    expect(skipZeroHandles([0, 0, 0], 1)).toEqual([]);
+    expect(skipZeroHandles([120], 0)).toEqual([]);
+  });
+
+  it("dragBetween: 사이의 0 조각은 0 그대로, 양쪽 조각만 바뀌고 합 그대로. 5분 반올림·끝까지(±Infinity)", () => {
+    expect(dragBetween([60, 0, 60, 0], 0, 2, 10, 5)).toEqual([70, 0, 50, 0]);
+    expect(dragBetween([60, 0, 60, 0], 0, 2, -12, 5)).toEqual([50, 0, 70, 0]);
+    expect(dragBetween([60, 0, 60, 0], 0, 2, Infinity, 5)).toEqual([120, 0, 0, 0]);
+    expect(dragBetween([60, 0, 60, 0], 0, 2, -Infinity, 5)).toEqual([0, 0, 120, 0]);
+    // 겹친 손잡이(코딩 0 고름): 뒤 쌍(1,2) 시계 = 운동에서, 앞 쌍(0,1) 반시계 = 어학에서
+    expect(dragBetween([60, 0, 60, 0], 1, 2, 10, 5)).toEqual([60, 10, 50, 0]);
+    expect(dragBetween([60, 0, 60, 0], 0, 1, -10, 5)).toEqual([50, 10, 60, 0]);
+  });
+
+  it("dragBetween: 사이에 0이 아닌 조각·a ≥ b·없는 조각·NaN이면 값을 그대로", () => {
+    const v = [30, 30, 60];
+    expect(dragBetween(v, 0, 2, 10, 5)).toBe(v);
+    expect(dragBetween(v, 1, 1, 10, 5)).toBe(v);
+    expect(dragBetween(v, 2, 1, 10, 5)).toBe(v);
+    expect(dragBetween(v, -1, 1, 10, 5)).toBe(v);
+    expect(dragBetween(v, 0, 3, 10, 5)).toBe(v);
+    expect(dragBetween(v, 0, 1, Number.NaN, 5)).toBe(v);
+    expect(dragBetween(v, 0.5, 1, 10, 5)).toBe(v);
+  });
+
+  it("악용: 기타 0분에서 시작해 손잡이 목록의 어느 손잡이를 어느 만큼 1200번 끌어도 합 = 쓴 시간, 값은 0 이상 정수, 12시에 손잡이가 서지 않는다", () => {
+    let seed = 20261109;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const TOTAL = 95; // 5의 배수가 아닌 쓴 시간
+    let values = [35, 0, 60, 0]; // 어학 35 · 코딩 0 · 운동 60 · 기타 0
+    let moves = 0;
+    let checked = 0;
+    for (let i = 0; i < 1200; i++) {
+      const si = Math.floor(rand() * values.length);
+      const hs = skipZeroHandles(values, si);
+      for (const h of hs) {
+        expect(h.at).toBeGreaterThan(0); // 12시(0) 아님
+        expect(h.at).toBeLessThan(TOTAL); // 12시(합) 아님
+        expect(values[h.a]).toBeGreaterThan(0); // 경계 양쪽은 0분 아닌 조각
+        expect(values[h.b]).toBeGreaterThan(0);
+        for (let j = h.a + 1; j < h.b; j++) if (j !== si) expect(values[j]).toBe(0);
+      }
+      if (hs.length > 0) {
+        const h = hs[Math.floor(rand() * hs.length)];
+        const pick = [-Infinity, Infinity, -30, -5, -2, 2, 5, 30, 7.5][Math.floor(rand() * 9)];
+        const pair: [number, number] = h.side === "both" ? (pick > 0 ? [si, h.b] : [h.a, si]) : [h.a, h.b];
+        const next = dragBetween(values, pair[0], pair[1], pick, 5);
+        if (next !== values) moves++;
+        values = next;
+      } else if (rand() < 0.3) {
+        // Stepper −(끌지 않는 길): 고른 조각을 5분 줄여 첫 이웃(뒤, 마지막은 앞)에 준다 — 기타로 돌려주기
+        values = setShare(values, si, Math.max(0, values[si] - 5), TOTAL);
+      }
+      expect(values.reduce((a, b) => a + b, 0)).toBe(TOTAL);
+      expect(values.every((v) => Number.isInteger(v) && v >= 0)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBe(1200);
+    expect(moves).toBeGreaterThan(100); // 실제로 움직였다(빈 걸음만 돈 것이 아니다)
   });
 });

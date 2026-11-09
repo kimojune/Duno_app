@@ -55,6 +55,59 @@ export function dragBoundary(values: number[], k: number, delta: number, step = 
 }
 
 /**
+ * 조각 a와 b(a < b) 사이 경계를 시계 방향으로 delta만큼 끈다. 둘 사이 조각이 모두 0이어야 한다(폭 0 조각을 건너뛴 경계, 고침6 PM d-129 ②).
+ * 사이의 0 조각들은 0 그대로 경계와 같이 옮겨 간다. 나머지는 dragBoundary와 같다(step 반올림, 양쪽 0에서 멈춤, 합 그대로, ±Infinity = 끝까지).
+ * 없는 조각·a ≥ b·사이에 0이 아닌 조각·NaN이면 값을 그대로 돌려준다.
+ */
+export function dragBetween(values: number[], a: number, b: number, delta: number, step = 1): number[] {
+  const n = values.length;
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b >= n || a >= b || Number.isNaN(delta)) return values;
+  for (let j = a + 1; j < b; j++) if (values[j] !== 0) return values;
+  const s = Number.isFinite(step) && step > 0 ? step : 1;
+  const at = values.slice(0, a + 1).reduce((x, y) => x + y, 0);
+  const lo = at - values[a];
+  const hi = at + values[b];
+  const want = Number.isFinite(delta) ? Math.round((at + delta) / s) * s : delta > 0 ? hi : lo;
+  const p = Math.max(lo, Math.min(hi, want));
+  if (p === at) return values;
+  const out = values.slice();
+  out[a] = p - lo;
+  out[b] = hi - p;
+  return out;
+}
+
+/** 다이얼 손잡이 하나: side(고른 조각의 앞 start · 뒤 end · 폭 0 조각의 겹친 both), at(합 단위 자리), 경계 양쪽 조각 a·b(both는 앞 쌍 a·sel과 뒤 쌍 sel·b) */
+export interface DialHandle {
+  side: "start" | "end" | "both";
+  at: number;
+  a: number;
+  b: number;
+}
+
+/**
+ * 고른 조각 si의 손잡이 목록 — 「폭 0 조각을 건너뛰는」 규칙(고침6, PM d-129 ②, 오늘 기록 나누기).
+ * - 손잡이는 0이 아닌 조각 사이 경계에만 선다. 폭 0 조각(기타든 분야든)은 경계를 만들지 않고 건너뛴다.
+ * - 그래서 12시(첫 0 아닌 조각의 앞 = 마지막 0 아닌 조각의 끝)에는 손잡이가 없다 — 예: 기타 0분이면 마지막 분야의 끝 손잡이가 없다.
+ * - 고른 조각이 0이 아니면: 앞쪽에 0 아닌 조각이 있으면 start(그 조각과 사이), 뒤쪽에 있으면 end.
+ * - 고른 조각이 폭 0이면: 앞뒤 모두 0 아닌 조각이 있을 때만(자리가 12시가 아닐 때) 겹친 손잡이 both 하나. 아니면 없다.
+ * - 고른 것이 없거나 모두 0이면 없다.
+ */
+export function skipZeroHandles(values: number[], si: number): DialHandle[] {
+  const n = values.length;
+  if (!Number.isInteger(si) || si < 0 || si >= n || values.every((v) => v === 0)) return [];
+  let prev = -1;
+  for (let j = si - 1; j >= 0; j--) if (values[j] > 0) { prev = j; break; }
+  let next = -1;
+  for (let j = si + 1; j < n; j++) if (values[j] > 0) { next = j; break; }
+  const start = values.slice(0, si).reduce((x, y) => x + y, 0);
+  if (values[si] === 0) return prev >= 0 && next >= 0 ? [{ side: "both", at: start, a: prev, b: next }] : [];
+  const out: DialHandle[] = [];
+  if (prev >= 0) out.push({ side: "start", at: start, a: prev, b: si });
+  if (next >= 0) out.push({ side: "end", at: start + values[si], a: si, b: next });
+  return out;
+}
+
+/**
  * −/+ 단추와 숫자 칸이 함께 쓰는 「한 조각을 이 값으로」(합 total 고정). 손잡이와 같은 직관으로 고른 조각과 이웃끼리 주고받는다:
  * - 이웃 순서: 뒤 조각(i+1)이 먼저, 마지막 조각은 앞 조각(i-1)이 먼저. 그다음 앞뒤로 한 칸씩 멀어진다(i+1, i-1, i+2, i-2 …).
  * - 늘리면 이웃 순서대로 0이 될 때까지 떼어 온다(옛 setByInput은 양옆에서만 떼어 와 넣은 값에 못 미칠 때가 있었다 — 지금은 넣은 값에 닿는다).

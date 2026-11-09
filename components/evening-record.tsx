@@ -32,7 +32,10 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  *   - 다이얼과 아래 −/+ 줄 = 고른 분야 조각 + 맨 끝 기타 조각만. 고르지 않은 분야는 조각도 줄도 없다. 12시 고정(첫 조각 시작·기타 끝이 12시).
  *   - 칩을 새로 고르면 기타에서 30분(기타가 적으면 기타 전부)을 떼어 그 분야 조각이 생기고 그 조각이 골라진다. 칩을 풀면 그 시간이 기타로 돌아간다. 합(쓴 시간)은 늘 그대로.
  *   - 0분 조각(기타가 0분일 때 고른 칩 등)은 다이얼에 칠하지 않고(폭 0) 줄에서만 보인다. 0분으로 생긴 칩은 다이얼 고름을 옮기지 않아
- *     12시에 0분 조각·손잡이가 새로 서지 않는다(E1 판단). 사용자가 그 줄을 눌러 고르면 키울 수 있게 그 경계에 손잡이가 선다(d-113 규칙 그대로).
+ *     12시에 0분 조각·손잡이가 새로 서지 않는다(E1 판단).
+ *   - 손잡이(고침6 PM d-129 ②, RatioDial skipZero): 0분이 아닌 조각 사이 경계에만 서고 0분 조각은 건너뛴다. 그래서 기타 0분이면 마지막 분야의 끝(12시)에 손잡이가 없다.
+ *     0분 조각을 고르면 그 자리가 0분 아닌 두 조각 사이일 때만 겹친 손잡이 하나가 서고(끌어 키움), 12시 자리면 손잡이가 없다 — 줄의 +가 키운다.
+ *     기타 0분에서 마지막 분야를 기타로 돌려주는 끌기 길은 없다: 줄의 −(Stepper)가 줄인 몫을 기타로 돌려준다.
  *   - 조각 고르기는 칩이 아니라 조각이나 아래 줄을 눌러서. 고른 줄 = 연한 면 바탕 + 이름 Bold.
  *   - 처음 값: 기타 100%(가운데 「{합계}」「기타」, 손잡이 없음). 타이머로 잰 분야와 그날 끝낸 할 일의 분야만 칩이 골라진 채 시작(lib/evening/logic.ts initialSelection).
  *     나누기 단계에 들어갈 때 나눈 값을 고친 적이 없으면 그때의 끝낸 할 일(state.doneCategoryIds)로 다시 만든다. 고친 뒤에는 덮지 않는다.
@@ -56,18 +59,16 @@ export const EVENING_TEXT = {
   hours: "시간",
   minutes: "분",
   total: (m: number) => `합계 ${formatMinutes(m)}`,
-  timerFilled: (m: number) => `타이머로 ${formatMinutes(m)} 미리 채웠어요.`,
-  /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시 */
+  /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시. 고침6 PM d-129 ④: 옛 알림 글 「타이머로 n 미리 채웠어요.」는 빼고 이 띠만 남긴다 */
   timerChip: (m: number) => `타이머 ${formatMinutes(m)}`,
   existing: "이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.",
   skipSplit: "나누지 않고 저장",
   split: "분야마다 나누기",
   splitHeading: "분야마다 나눠 주세요",
-  splitHint: "미리 채운 값을 확인하고 고쳐요. 나누지 않은 시간은 기타로 들어가요.",
+  // 고침6 PM d-129 ③: 한 줄만(앞 문장 「미리 채운 값을 확인하고 고쳐요.」를 뺐다). 분야 줄 아래 12 보조 글
+  splitHint: "나누지 않은 시간은 기타로 들어가요.",
   other: "기타",
   otherRemain: (m: number) => formatMinutes(m),
-  // 나누기 아래 기타 줄의 이름 아래 작은 글(창구 덧붙임 11-09 11:3x)
-  otherSub: "나누지 않은 시간",
   raised: (m: number) => `나눈 시간이 합계보다 많아서 합계를 ${formatMinutes(m)}으로 맞춰 저장해요.`,
   // 나누기 칩 줄(PM 10): 이름표 「분야 · 여러 개」(창구 덧붙임 11-09 11:3x — 여럿 고를 수 있음을 보임), 칩의 화면 읽기 이름 「{분야}, 다이얼에 넣기」(켬/끔은 aria-pressed)
   categoryLabel: "분야 · 여러 개",
@@ -539,7 +540,6 @@ export function EveningRecord({
         {state && phase === "time" && (
           <div className="detail-section">
             {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
-            {!state.existing && timerSum > 0 && <p className="todo-sub">{EVENING_TEXT.timerFilled(timerSum)}</p>}
             <div className="evening-time">
               <Stepper id="evening-hours" label={EVENING_TEXT.hours} unit={EVENING_TEXT.hours} value={hours} max={24} step={1} onChange={(h) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, h * 60 + minutes))} />
               <Stepper id="evening-minutes" label={EVENING_TEXT.minutes} unit={EVENING_TEXT.minutes} value={minutes} max={59} step={APP_CONFIG.minuteStep} onChange={(m) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, hours * 60 + m))} />
@@ -573,7 +573,6 @@ export function EveningRecord({
 
         {state && phase === "split" && (
           <div className="detail-section">
-            <p className="todo-sub">{EVENING_TEXT.splitHint}</p>
             <p id="evening-category-label" className="input-label sheet-category-label">
               {EVENING_TEXT.categoryLabel}
             </p>
@@ -663,6 +662,8 @@ export function EveningRecord({
                   }}
                   format={formatMinutes}
                   center={EVENING_TEXT.dialCenter(total)}
+                  // 고침6 PM d-129 ②: 손잡이는 0분이 아닌 조각 사이에만 — 기타 0분이어도 12시에 손잡이가 없다. 기타로 돌려주기는 줄의 −가 맡는다
+                  skipZero
                 />
               </div>
             )}
@@ -699,13 +700,12 @@ export function EveningRecord({
                 onClick={() => setDialPick(OTHER_KEY)}
               >
                 <span className="chip-dot" style={{ background: categoryColorValue(null) }} aria-hidden="true" />
-                <span className="ratio-name evening-other-name">
-                  {EVENING_TEXT.other}
-                  <span className="evening-other-sub">{EVENING_TEXT.otherSub}</span>
-                </span>
+                {/* 고침6 PM d-129 ③(PM d-130 가로 확정): 이름 아래 작은 글 「나누지 않은 시간」은 뺐다 — 안내 글과 같은 말이 두 번이라서. 이름은 줄 가운데 한 줄 */}
+                <span className="ratio-name evening-other-name">{EVENING_TEXT.other}</span>
                 <span className="ratio-value">{EVENING_TEXT.otherRemain(otherMinutes)}</span>
               </li>
             </ul>
+            <p className="evening-split-hint">{EVENING_TEXT.splitHint}</p>
             <p className="ratio-total" role="status">
               {EVENING_TEXT.total(built.total)}
             </p>

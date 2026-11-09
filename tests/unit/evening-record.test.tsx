@@ -72,9 +72,10 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(screen.getByText("합계 1시간 10분")).toBeTruthy();
   });
 
-  it("타이머 시간으로 총시간을 미리 채운다", async () => {
+  it("타이머 시간으로 총시간을 미리 채운다. 알림 글 없이 「타이머 45분」 띠만(고침6 PM d-129 ④)", async () => {
     await mount(fakeApi(state({ timerByCategory: [{ categoryId: C1, minutes: 45 }] })));
-    expect(screen.getByText("타이머로 45분 미리 채웠어요.")).toBeTruthy();
+    expect(screen.queryByText(/미리 채웠어요/)).toBeNull();
+    expect(screen.getByText("타이머 45분").className).toBe("evening-timer-chip");
     expect(screen.getByText("합계 45분")).toBeTruthy();
   });
 

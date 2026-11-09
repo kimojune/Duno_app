@@ -174,12 +174,13 @@ describe("시간 단계의 「오늘 할 일 n/m ›」 줄", () => {
     expect(line().textContent).toBe("오늘 할 일 1/2›");
   });
 
-  it("타이머로 미리 채웠으면 시간 입력 아래 「타이머 2시간 30분」 표시가 있고(앞 알림 글도 그대로), 그 아래에 「오늘 할 일」 줄이 온다", async () => {
+  it("타이머로 미리 채웠으면 시간 입력 아래 「타이머 2시간 30분」 띠만 있고(알림 글은 뺐다 — 고침6 PM d-129 ④), 그 아래에 「오늘 할 일」 줄이 온다", async () => {
     const local = await makeLocal();
     await mountEvening({ local }, eveningApi(eveningState({ timerByCategory: [{ categoryId: C1, minutes: 90 }, { categoryId: null, minutes: 60 }] })));
     const chip = screen.getByText("타이머 2시간 30분");
     expect(chip.className).toBe("evening-timer-chip");
-    expect(screen.getByText("타이머로 2시간 30분 미리 채웠어요.")).toBeTruthy(); // 지우지 않는다(PM 11-09)
+    expect(screen.queryByText(/미리 채웠어요/)).toBeNull(); // 옛 알림 글 없음(PM d-129 ④)
+    expect(screen.getAllByText(/2시간 30분/).map((e) => e.textContent)).toEqual(["합계 2시간 30분", "타이머 2시간 30분"]); // 2시간 30분은 합계와 띠, 두 번만
     expect(screen.getByText("합계 2시간 30분").compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chip.compareDocumentPosition(line()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
