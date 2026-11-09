@@ -159,6 +159,8 @@ export function LoginActionsView({
   );
 }
 
+const SERVER_DEMO_ERRORS: readonly string[] = ["wrong_code", "rate_limited", "failed", "off"];
+
 /** 체험 코드로 시작하는 서버 행동(app/demo/actions.ts startDemo). 서버 컴포넌트(app/page.tsx)가 켜졌을 때만 넘긴다 — 코드 값은 넘어오지 않는다. */
 export type StartDemo = (code: string) => Promise<DemoStartResult>;
 
@@ -212,7 +214,8 @@ export function LoginButton({
     }
     busyRef.current = false;
     setDemoBusy(false);
-    showDemoNotice(result.error);
+    // 화면 글은 정해진 글만: 서버가 준 값이 약속한 오류 이름이 아니면 「시작하지 못했어요」로(원문·코드 값을 띄우지 않는다)
+    showDemoNotice(SERVER_DEMO_ERRORS.includes(result.error) ? result.error : "failed");
   }
 
   // Google 창에서 뒤로 가기로 돌아오면(bfcache) 페이지가 「이동하는 중」인 채 되살아날 수 있다. L1로 되돌린다.
