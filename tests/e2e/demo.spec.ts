@@ -41,7 +41,7 @@ test.describe("체험 코드로 시작", () => {
     // 상태보기: 예시 분야 이름이 보인다(기록·목표 비율이 있다)
     await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "상태보기" }).click();
     await expect(page.getByText("어학").first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("포트폴리오").first()).toBeVisible();
+    await expect(page.getByText("글쓰기").first()).toBeVisible();
 
     // 같은 세션으로 다시 열어도 그대로 들어간다(로그인 화면이 아니다)
     await page.goto("/");

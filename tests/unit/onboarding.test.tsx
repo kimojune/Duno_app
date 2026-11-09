@@ -61,7 +61,7 @@ function fakeApi(over: Partial<SettingsApi> = {}): SettingsApi {
   };
 }
 
-function mount(api: SettingsApi, categories = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }], onDone = vi.fn()) {
+function mount(api: SettingsApi, categories = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }], onDone = vi.fn()) {
   render(<Onboarding api={api} categories={categories} initialGoal={null} initialRatios={[]} initialNotify={NOTIFY} onDone={onDone} />);
   return onDone;
 }
@@ -106,7 +106,7 @@ describe("처음 설정 (7-1, ①)", () => {
     mount(fakeApi());
     click("다음");
     click("어학");
-    click("포트폴리오"); // 둘 다 해제 (처음에는 이미 있는 분야가 모두 골라져 있다)
+    click("글쓰기"); // 둘 다 해제 (처음에는 이미 있는 분야가 모두 골라져 있다)
     click("다음");
     expect(screen.getByText("분야를 하나 이상 골라 주세요.")).toBeTruthy();
     expect(screen.getByText("4단계 중 2단계")).toBeTruthy();
@@ -158,14 +158,14 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     expectFieldSum100();
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
-    click("어학 5% 줄이기"); // 줄인 5%는 뒤 줄(포트폴리오)로
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([45, 55, 0]);
-    click("포트폴리오 5% 늘리기"); // 뒤 줄(기타)이 0이라 앞 줄(어학)에서
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([40, 60, 0]);
+    expect(shares("어학", "글쓰기", "기타")).toEqual([50, 50, 0]);
+    click("어학 5% 줄이기"); // 줄인 5%는 뒤 줄(글쓰기)로
+    expect(shares("어학", "글쓰기", "기타")).toEqual([45, 55, 0]);
+    click("글쓰기 5% 늘리기"); // 뒤 줄(기타)이 0이라 앞 줄(어학)에서
+    expect(shares("어학", "글쓰기", "기타")).toEqual([40, 60, 0]);
     expectFieldSum100();
     click("균등 배분");
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
+    expect(shares("어학", "글쓰기", "기타")).toEqual([50, 50, 0]);
   });
 
   it("합 100 고정: 분야를 모두 0%까지 줄여도 몫이 기타로 가서 합이 0이 되지 않고, 다음 단계로 간다(PM 확정 11-08)", () => {
@@ -173,11 +173,11 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     for (let i = 0; i < 10; i++) click("어학 5% 줄이기");
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([0, 100, 0]);
+    expect(shares("어학", "글쓰기", "기타")).toEqual([0, 100, 0]);
     expect((screen.getByRole("button", { name: "어학 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "포트폴리오 5% 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
-    for (let i = 0; i < 20; i++) click("포트폴리오 5% 줄이기");
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([0, 0, 100]);
+    expect((screen.getByRole("button", { name: "글쓰기 5% 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    for (let i = 0; i < 20; i++) click("글쓰기 5% 줄이기");
+    expect(shares("어학", "글쓰기", "기타")).toEqual([0, 0, 100]);
     expectFieldSum100();
     click("다음");
     expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
@@ -385,7 +385,7 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     expect(screen.getByRole("button", { name: "기타 5% 늘리기" })).toBeTruthy();
     expect((screen.getByRole("button", { name: "기타 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
     expectFieldSum100();
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]); // 기타만 0%
+    expect(shares("어학", "글쓰기", "기타")).toEqual([50, 50, 0]); // 기타만 0%
   });
   it("기타를 올리면 앞 줄에서 떼어 오고(합 100 그대로), 저장 목록에 categoryId null로 실린다. 「균등 배분」은 기타를 0%로 돌린다", async () => {
     const api = fakeApi();
@@ -394,10 +394,10 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     click("다음");
     click("기타 5% 늘리기");
     click("기타 5% 늘리기");
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 40, 10]); // 기타는 맨 끝 줄이라 앞 줄(포트폴리오)에서
+    expect(shares("어학", "글쓰기", "기타")).toEqual([50, 40, 10]); // 기타는 맨 끝 줄이라 앞 줄(글쓰기)에서
     expectFieldSum100();
     click("균등 배분");
-    expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
+    expect(shares("어학", "글쓰기", "기타")).toEqual([50, 50, 0]);
     click("기타 5% 늘리기");
     click("다음");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));

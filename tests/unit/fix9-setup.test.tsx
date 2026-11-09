@@ -122,7 +122,7 @@ describe("머리 부품 BackHeader · BottomActions (정합 A1·A2, PM 1-A)", ()
   });
 });
 
-function mountOnboarding(api: SettingsApi = fakeApi(), categories = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }], onDone = vi.fn()) {
+function mountOnboarding(api: SettingsApi = fakeApi(), categories = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }], onDone = vi.fn()) {
   render(<Onboarding api={api} categories={categories} initialGoal={null} initialRatios={[]} initialNotify={NOTIFY} onDone={onDone} />);
   return { api, onDone };
 }
@@ -174,11 +174,11 @@ describe("처음 설정 머리 「‹」 (PM 1-A)", () => {
 });
 
 describe("처음 설정 ⑬ 글 · 이름표", () => {
-  it("1단계: 이름표 「목표」, 칸 아래 「예: 포트폴리오 끝내고 토익 800점 넘기기」(칸 안 흐린 글 없음), 옛 힌트 없음", () => {
+  it("1단계: 이름표 「목표」, 칸 아래 「예: 글 한 편 끝내고 토익 800점 넘기기」(칸 안 흐린 글 없음), 옛 힌트 없음", () => {
     mountOnboarding();
     expect(screen.getByRole("heading", { level: 1, name: "목표" })).toBeTruthy();
     const input = screen.getByRole("textbox", { name: "목표" });
-    expect(document.getElementById(input.getAttribute("aria-describedby")!)?.textContent).toBe("예: 포트폴리오 끝내고 토익 800점 넘기기");
+    expect(document.getElementById(input.getAttribute("aria-describedby")!)?.textContent).toBe("예: 글 한 편 끝내고 토익 800점 넘기기");
     expect(input.getAttribute("placeholder")).toBeNull();
     expect(document.body.textContent).not.toContain("흐릿해도 괜찮아요");
   });
@@ -285,7 +285,7 @@ describe("처음 설정 끝 「시작하기」 하나 (PM 1 · D-102⑤)", () =>
 });
 
 // ---- S8-a ----
-const CATS = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }];
+const CATS = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }];
 function meSettings(over: Partial<SettingsData> = {}): SettingsData {
   return { goal: "토익 900점", goalReadable: true, onboardingDone: true, notify: NOTIFY, ratios: [{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }], ...over };
 }
@@ -310,7 +310,7 @@ const typeField = (name: string, value: string) => {
 describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 81:380)", () => {
   it("내 정보에서는 고치지 않는다: 카드 = 이름 + 띠(숫자 없음) + 「›」, 카드 전체가 단추 하나(화면 읽기 이름에 몫). 숫자 칸·「비율 저장」 없음", () => {
     mountMe();
-    const card = screen.getByRole("button", { name: "목표 비율, 어학 60%, 포트폴리오 40%, 고치기" });
+    const card = screen.getByRole("button", { name: "목표 비율, 어학 60%, 글쓰기 40%, 고치기" });
     expect(card).toBe(ratioCard());
     expect(card.querySelector(".me-card-title")?.textContent).toBe("목표 비율");
     expect(card.querySelector(".me-chevron")?.textContent).toBe("›");
@@ -341,14 +341,14 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     expect(within(dlg).getByRole("button", { name: "저장" }).closest(".bottom-actions")).not.toBeNull();
     expect(dlg.textContent).not.toMatch(/단계|분야마다 쓰고 싶은 몫|대략이면|합계/);
     expect(dlg.querySelector("nav, [role='tablist']")).toBeNull();
-    expect([fieldVal("어학"), fieldVal("포트폴리오"), fieldVal("기타")]).toEqual([60, 40, 0]);
+    expect([fieldVal("어학"), fieldVal("글쓰기"), fieldVal("기타")]).toEqual([60, 40, 0]);
   });
 
   it("악용: 다이얼 키·숫자 칸·−/+를 섞어 합을 깨려 해도 저장 인자 합은 100(정수, 0~100). 저장하면 닫히고 띠가 바뀐다", async () => {
     const { api, onChanged } = mountMe();
     await openS8a();
     fireEvent.keyDown(document.getElementById("ratio-dial-handle-end")!, { key: "PageUp" }); // 어학 +5
-    typeField("포트폴리오", "90"); // 칸: 합을 넘기는 값
+    typeField("글쓰기", "90"); // 칸: 합을 넘기는 값
     typeField("기타", "abc"); // 이상한 글은 무시
     typeField("어학", "-20"); // 음수는 무시
     fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" }));
@@ -362,7 +362,7 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     expect(onChanged).toHaveBeenCalledWith({ ratios: sent });
     const byId = new Map(sent.map((r) => [r.categoryId ?? "other", r.percent]));
     expect(band()).toEqual([...byId.entries()]); // 띠 = 저장한 값(0% 칸 없음)
-    expect(ratioCard().getAttribute("aria-label")).toContain(`포트폴리오 ${byId.get(C2)}%`);
+    expect(ratioCard().getAttribute("aria-label")).toContain(`글쓰기 ${byId.get(C2)}%`);
     expect(screen.getByText("저장했어요")).toBeTruthy();
   });
 
@@ -386,7 +386,7 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     mountMe(fakeApi(), meSettings({ ratios: [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 30 }] }));
     ratioCard().focus();
     await openS8a();
-    expect([fieldVal("어학"), fieldVal("포트폴리오")]).toEqual([50, 50]);
+    expect([fieldVal("어학"), fieldVal("글쓰기")]).toEqual([50, 50]);
     await inDialog("이전");
     expect(confirmBox()).toBeNull();
     expect(dialog()).toBeNull();
@@ -432,7 +432,7 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
 
     await openS8a();
     expect(history.index).toBe(1);
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 늘리기" }));
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5% 늘리기" }));
     await act(async () => history.userBack());
     expect(confirmBox()).not.toBeNull();
     history.flush();

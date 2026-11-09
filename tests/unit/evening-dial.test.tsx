@@ -41,7 +41,7 @@ function state(over: Partial<EveningState> = {}): EveningState {
     timerByCategory: [],
     categories: [
       { id: C1, name: "어학" },
-      { id: C2, name: "포트폴리오" },
+      { id: C2, name: "글쓰기" },
     ],
     ...over,
   };
@@ -51,7 +51,7 @@ function state(over: Partial<EveningState> = {}): EveningState {
 function realApi(s: EveningState = state()) {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   const sent: EveningSaveInput[] = [];
@@ -91,7 +91,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** 쓴 시간 2시간, 타이머 어학 30분, 끝낸 할 일 포트폴리오 → 처음 값 어학 30(타이머) · 포트폴리오 30(체크 칩, 기타에서 30분) · 기타 60 (고침 5바퀴 d-115 나·d-116 가) */
+/** 쓴 시간 2시간, 타이머 어학 30분, 끝낸 할 일 글쓰기 → 처음 값 어학 30(타이머) · 글쓰기 30(체크 칩, 기타에서 30분) · 기타 60 (고침 5바퀴 d-115 나·d-116 가) */
 async function openSplit120() {
   const r = realApi(state({ doneCategoryIds: [C2], timerByCategory: [{ categoryId: C1, minutes: 30 }] }));
   const m = await mount(r.api);
@@ -108,9 +108,9 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(svg).toBeTruthy();
     const list = document.querySelector("ul.ratio-list")!;
     expect(svg.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(document.querySelectorAll(".dial-slice")).toHaveLength(3); // 어학 · 포트폴리오 · 기타
+    expect(document.querySelectorAll(".dial-slice")).toHaveLength(3); // 어학 · 글쓰기 · 기타
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("1시간");
     const end = handle("end"); // 처음에는 첫 분야(어학)를 고른다
     expect(end.getAttribute("aria-valuenow")).toBe("30");
@@ -127,18 +127,18 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
   it("다이얼로 바꾼 값이 Stepper·기타 줄과 저장 요청에 그대로 가고, 지금 저장 검증을 지난다. 기타와 이웃한 경계를 움직이면 기타가 늘고 준다", async () => {
     const { sent, results } = await openSplit120();
     const svg = dial()!;
-    key(svg, "ArrowRight"); // 포트폴리오 고름
-    expect(document.getElementById("evening-dial-changes")!.textContent).toBe("포트폴리오 30분, 고름");
-    key(handle("end"), "PageUp"); // 포트폴리오·기타 경계: 포트폴리오 +30분 ← 기타 −30분
-    expect(stepper("포트폴리오")).toBe(60);
+    key(svg, "ArrowRight"); // 글쓰기 고름
+    expect(document.getElementById("evening-dial-changes")!.textContent).toBe("글쓰기 30분, 고름");
+    key(handle("end"), "PageUp"); // 글쓰기·기타 경계: 글쓰기 +30분 ← 기타 −30분
+    expect(stepper("글쓰기")).toBe(60);
     expect(otherText()).toBe("30분");
-    expect(document.getElementById("evening-dial-changes")!.textContent).toBe("포트폴리오 30분 → 1시간, 기타 1시간 → 30분");
+    expect(document.getElementById("evening-dial-changes")!.textContent).toBe("글쓰기 30분 → 1시간, 기타 1시간 → 30분");
     key(handle("end"), "ArrowRight"); // +5분(기타에서)
-    expect(stepper("포트폴리오")).toBe(65);
+    expect(stepper("글쓰기")).toBe(65);
     expect(otherText()).toBe("25분");
-    key(handle("start"), "ArrowRight"); // 어학·포트폴리오 경계: 포트폴리오 +5분(어학에서)
+    key(handle("start"), "ArrowRight"); // 어학·글쓰기 경계: 글쓰기 +5분(어학에서)
     expect(stepper("어학")).toBe(25);
-    expect(stepper("포트폴리오")).toBe(70);
+    expect(stepper("글쓰기")).toBe(70);
     await press("저장");
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
@@ -153,15 +153,15 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     const { sent, results } = await openSplit120();
     key(dial()!, "End"); // 기타 고름
     const start = handle("start");
-    key(start, "End"); // 기타가 포트폴리오를 다 가져간다
-    expect(stepper("포트폴리오")).toBe(0);
+    key(start, "End"); // 기타가 글쓰기를 다 가져간다
+    expect(stepper("글쓰기")).toBe(0);
     expect(otherText()).toBe("1시간 30분");
     key(dial()!, "Home"); // 어학 고름
-    // 고침6 PM d-129 ②: 손잡이는 0분 조각(포트폴리오)을 건너뛰어 어학·기타 사이에 선다(옛 규칙은 어학·포트폴리오 0 사이라 그대로였다)
+    // 고침6 PM d-129 ②: 손잡이는 0분 조각(글쓰기)을 건너뛰어 어학·기타 사이에 선다(옛 규칙은 어학·글쓰기 0 사이라 그대로였다)
     expect(handle("end").getAttribute("aria-label")).toContain("어학·기타 사이");
-    key(handle("end"), "PageUp"); // 어학 +30분 ← 기타(포트폴리오 0은 0 그대로)
+    key(handle("end"), "PageUp"); // 어학 +30분 ← 기타(글쓰기 0은 0 그대로)
     expect(stepper("어학")).toBe(60);
-    expect(stepper("포트폴리오")).toBe(0);
+    expect(stepper("글쓰기")).toBe(0);
     expect(otherText()).toBe("1시간");
     key(handle("end"), "End"); // 기타를 다 가져가도 기타 0에서 멈춘다
     expect(stepper("어학")).toBe(120);
@@ -172,7 +172,7 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     setNumber("어학", 500); // Stepper 숫자 칸: 기타에 남은 만큼(90)까지만
     expect(stepper("어학")).toBe(120);
     expect(otherText()).toBe("0분");
-    expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "글쓰기 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
     setNumber("어학", -20);
     expect(stepper("어학")).toBe(0);
     setNumber("어학", 45);
@@ -198,10 +198,10 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
   it("앞 단계로 돌아가 쓴 시간을 고치면: 고친 적이 없으면 새 쓴 시간으로 다시 미리 채운다(저장 방식 prefilled)", async () => {
     const { sent } = await openSplit120();
     await press("이전");
-    setNumber("시간", 1); // 60분: 타이머 30은 어학, 나머지 30은 포트폴리오
+    setNumber("시간", 1); // 60분: 타이머 30은 어학, 나머지 30은 글쓰기
     await press("분야마다 나누기");
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(handle("end").getAttribute("aria-valuemax")).toBe("60");
     await press("저장");
     expect(sent[0]).toMatchObject({ totalMinutes: 60, saveMode: "prefilled" });
@@ -210,12 +210,12 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
   it("고친 뒤 쓴 시간을 고치면 비율을 지키며 5분 단위로 다시 나누고 남는 것은 기타(나눈 합 ≤ 쓴 시간)", async () => {
     const { sent, results } = await openSplit120();
     key(dial()!, "ArrowRight");
-    key(handle("end"), "PageUp"); // 어학 30 · 포트폴리오 60 · 기타 30
+    key(handle("end"), "PageUp"); // 어학 30 · 글쓰기 60 · 기타 30
     await press("이전");
     setNumber("시간", 1); // 120 → 60분
     await press("분야마다 나누기");
     expect(stepper("어학")).toBe(15);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("15분");
     await press("저장");
     expect(sent[0]).toMatchObject({
@@ -225,25 +225,25 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(results).toEqual([true]);
   });
 
-  it("쓴 시간이 5의 배수가 아닐 때(타이머가 62분을 채움 — 고침9 휠은 손으로 5분 단위만 쓴다): 휠은 1시간 02분을 그대로 보이고, 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
+  it("쓴 시간이 5의 배수가 아닐 때(타이머가 62분을 채움 — 고침9 휠은 손으로 5분 단위만 쓴다): 휠은 5분 눈금(1시간 00분 — PM 14)만 보이고 합 62분은 그대로, 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
     const { sent, results } = await (async () => {
       const r = realApi(state({ timerByCategory: [{ categoryId: null, minutes: 62 }] }));
       await mount(r.api);
       return r;
     })();
     expect(screen.getByRole("spinbutton", { name: "시간" }).getAttribute("aria-valuenow")).toBe("1");
-    expect(screen.getByRole("spinbutton", { name: "분" }).getAttribute("aria-valuenow")).toBe("2");
-    expect(screen.getByRole("spinbutton", { name: "분" }).querySelector(".time-wheel-center")!.textContent).toBe("02");
+    expect(screen.getByRole("spinbutton", { name: "분" }).getAttribute("aria-valuenow")).toBe("0");
+    expect(screen.getByRole("spinbutton", { name: "분" }).querySelector(".time-wheel-center")!.textContent).toBe("00");
     await press("분야마다 나누기");
     expect(otherText()).toBe("1시간 2분"); // 기타 100%
     await press("어학, 다이얼에 넣기"); // 기타에서 30분
-    await press("포트폴리오, 다이얼에 넣기"); // 기타에서 30분 → 기타 2분
+    await press("글쓰기, 다이얼에 넣기"); // 기타에서 30분 → 기타 2분
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("2분");
-    expect(handle("start").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오, 마지막으로 고른 칩)
+    expect(handle("start").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(글쓰기, 마지막으로 고른 칩)
     key(handle("end"), "End"); // 기타 2분을 다 가져간다(5분 걸음이어도 끝은 끝값)
-    expect(stepper("포트폴리오")).toBe(32);
+    expect(stepper("글쓰기")).toBe(32);
     expect(otherText()).toBe("0분");
     await press("저장");
     expect(sent[0].totalMinutes).toBe(62);
@@ -283,13 +283,13 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(document.activeElement).toBe(svg);
     key(svg, "ArrowRight");
     act(() => handle("start").focus());
-    key(handle("start"), "PageUp"); // 포트폴리오 +30분(어학에서)
+    key(handle("start"), "PageUp"); // 글쓰기 +30분(어학에서)
     expect(stepper("어학")).toBe(0);
-    expect(stepper("포트폴리오")).toBe(60);
-    // 고침6 PM d-129 ②: 어학이 0분이라 앞 경계가 12시에 닿아 앞 손잡이가 사라진다 → 포커스는 같은 조각의 남은 손잡이(포트폴리오·기타)로
+    expect(stepper("글쓰기")).toBe(60);
+    // 고침6 PM d-129 ②: 어학이 0분이라 앞 경계가 12시에 닿아 앞 손잡이가 사라진다 → 포커스는 같은 조각의 남은 손잡이(글쓰기·기타)로
     expect(document.getElementById("evening-dial-handle-start")).toBeNull();
     expect(document.activeElement).toBe(handle("end"));
-    expect(handle("end").getAttribute("aria-label")).toContain("포트폴리오·기타 사이");
+    expect(handle("end").getAttribute("aria-label")).toContain("글쓰기·기타 사이");
     expect(onClose).not.toHaveBeenCalled();
     // 손잡이에서 Esc: 바꾼 값이 있으니 확인이 뜬다(창은 아직 닫히지 않는다). 확인에서 Esc = 계속 적기
     fireEvent.keyDown(handle("end"), { key: "Escape" });
@@ -297,7 +297,7 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(confirm, { key: "Escape" });
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(stepper("포트폴리오")).toBe(60);
+    expect(stepper("글쓰기")).toBe(60);
     // 다이얼에서 Esc: 다시 같은 확인 → 「나가기」면 창이 닫힌다(PM d-135 글)
     fireEvent.keyDown(svg, { key: "Escape" });
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "나가기" }));
@@ -319,12 +319,12 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
 describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
   it("끝까지 밀어 손잡이가 사라진 뒤(포커스는 다이얼로) Stepper에 쳐도 포커스가 다이얼·손잡이로 안 간다", async () => {
     await openSplit120();
-    const end = handle("end"); // 어학·포트폴리오 경계
+    const end = handle("end"); // 어학·글쓰기 경계
     act(() => end.focus());
-    key(end, "End"); // 어학이 포트폴리오를 다 가져간다
+    key(end, "End"); // 어학이 글쓰기를 다 가져간다
     expect(stepper("어학")).toBe(60);
-    expect(stepper("포트폴리오")).toBe(0);
-    // 고침6 PM d-129 ②: 끝 손잡이는 0분 포트폴리오를 건너뛰어 어학·기타 사이로 옮겨 서고, 포커스가 그 손잡이에 있다
+    expect(stepper("글쓰기")).toBe(0);
+    // 고침6 PM d-129 ②: 끝 손잡이는 0분 글쓰기를 건너뛰어 어학·기타 사이로 옮겨 서고, 포커스가 그 손잡이에 있다
     expect(document.activeElement).toBe(handle("end"));
     expect(handle("end").getAttribute("aria-label")).toContain("어학·기타 사이");
     key(handle("end"), "End"); // 어학이 기타까지 다 가져간다 → 0분 아닌 조각이 하나라 손잡이가 없다
@@ -333,14 +333,14 @@ describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
     expect(document.activeElement).toBe(dial()); // 포커스를 잃지 않고 다이얼(원 전체)로
     key(dial()!, "End"); // 다이얼 키: 기타 고름(값은 그대로)
     expect(stepper("어학")).toBe(120);
-    const input = screen.getByLabelText("포트폴리오") as HTMLInputElement;
+    const input = screen.getByLabelText("글쓰기") as HTMLInputElement;
     act(() => input.focus());
-    // 어학을 줄여 기타에 자리를 만든 뒤 포트폴리오에 친다 — 칠 때마다 다이얼이 다시 그려진다
+    // 어학을 줄여 기타에 자리를 만든 뒤 글쓰기에 친다 — 칠 때마다 다이얼이 다시 그려진다
     // (단추를 눌러도 포커스는 숫자 칸에 둔 채로 다시 그린다 — 여기서 손잡이로 가면 안 된다)
     fireEvent.click(screen.getByRole("button", { name: "어학 5분 줄이기" }));
     expect(document.activeElement).toBe(input);
     fireEvent.change(input, { target: { value: "5" } });
-    expect(stepper("포트폴리오")).toBe(5);
+    expect(stepper("글쓰기")).toBe(5);
     expect(document.activeElement).toBe(input);
     fireEvent.change(input, { target: { value: "0" } });
     expect(document.activeElement).toBe(input);
@@ -374,7 +374,7 @@ describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
       synced: true,
       categories: [
         { id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" },
-        { id: C2, readable: true, name: "포트폴리오", createdAt: "2026-11-01T00:00:00.000Z" },
+        { id: C2, readable: true, name: "글쓰기", createdAt: "2026-11-01T00:00:00.000Z" },
       ],
     };
     const kv = createMemoryKv();
@@ -394,20 +394,20 @@ describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
     await press("분야마다 나누기");
     expect(screen.queryByLabelText("어학")).toBeNull(); // 처음 값 = 기타 100%(고른 칩 없음)
     expect(otherText()).toBe("2시간");
-    // 칩으로 넣고(각 30분) 다이얼(키보드)로 나눈다: 포트폴리오 고름 → 기타 쪽 손잡이 PageUp(+30분) → 어학 고름 → 끝 손잡이 PageUp(+30분, 포트폴리오에서) → 다시 포트폴리오 끝 PageUp
-    await press("포트폴리오, 다이얼에 넣기");
+    // 칩으로 넣고(각 30분) 다이얼(키보드)로 나눈다: 글쓰기 고름 → 기타 쪽 손잡이 PageUp(+30분) → 어학 고름 → 끝 손잡이 PageUp(+30분, 글쓰기에서) → 다시 글쓰기 끝 PageUp
+    await press("글쓰기, 다이얼에 넣기");
     await press("어학, 다이얼에 넣기");
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
-    key(dial()!, "ArrowRight"); // 어학 → 포트폴리오
-    key(handle("end"), "PageUp"); // 포트폴리오 60 · 기타 30
+    expect(stepper("글쓰기")).toBe(30);
+    key(dial()!, "ArrowRight"); // 어학 → 글쓰기
+    key(handle("end"), "PageUp"); // 글쓰기 60 · 기타 30
     key(dial()!, "Home");
-    key(handle("end"), "PageUp"); // 어학 60 · 포트폴리오 30
-    key(handle("end"), "PageDown"); // 어학 30 · 포트폴리오 60
+    key(handle("end"), "PageUp"); // 어학 60 · 글쓰기 30
+    key(handle("end"), "PageDown"); // 어학 30 · 글쓰기 60
     key(dial()!, "ArrowRight");
-    key(handle("end"), "PageDown"); // 포트폴리오 30 · 기타 60
+    key(handle("end"), "PageDown"); // 글쓰기 30 · 기타 60
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("1시간");
     await press("저장");
     expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
@@ -450,7 +450,7 @@ const screenItems = (names: Record<string, string>) => {
   if (other > 0) out.push({ categoryId: null, minutes: other });
   return out;
 };
-const NAMES = { [C1]: "어학", [C2]: "포트폴리오" };
+const NAMES = { [C1]: "어학", [C2]: "글쓰기" };
 
 async function openWith(s: EveningState, hours: number, mins = 0) {
   const r = realApi(s);
@@ -465,7 +465,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
   it("처음 값: 기타 100% — 고른 칩 없음, 줄은 기타뿐, 조각 하나에 손잡이 없음, 가운데 「{합계}」「기타」. 이름표·기타 줄·안내 글이 보인다", async () => {
     await openWith(state(), 2);
     expect(pressed("어학")).toBe("false");
-    expect(pressed("포트폴리오")).toBe("false");
+    expect(pressed("글쓰기")).toBe("false");
     expect(rowKeys()).toEqual(["other"]);
     expect(otherText()).toBe("2시간");
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(1);
@@ -513,7 +513,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
   it("타이머로 잰 분야만 칩이 골라지고 그 시간만큼 채운다. 그 조각이 골라져 있다(손잡이·줄 바탕)", async () => {
     await openWith(state({ timerByCategory: [{ categoryId: C1, minutes: 45 }] }), 2);
     expect(pressed("어학")).toBe("true");
-    expect(pressed("포트폴리오")).toBe("false");
+    expect(pressed("글쓰기")).toBe("false");
     expect(rowKeys()).toEqual([C1, "other"]);
     expect(stepper("어학")).toBe(45);
     expect(otherText()).toBe("1시간 15분");
@@ -525,30 +525,30 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
 
   it("칩을 고르면 기타에서 30분을 떼어 조각이 생기고 그 조각이 골라진다. 합은 그대로. 색은 고른 순서가 아니라 분야 순서", async () => {
     await openWith(state(), 2);
-    await press("포트폴리오, 다이얼에 넣기");
-    expect(pressed("포트폴리오")).toBe("true");
-    expect(chip("포트폴리오").querySelector(".chip-check")).toBeTruthy(); // 고른 칩 = 체크
+    await press("글쓰기, 다이얼에 넣기");
+    expect(pressed("글쓰기")).toBe("true");
+    expect(chip("글쓰기").querySelector(".chip-check")).toBeTruthy(); // 고른 칩 = 체크
     expect(chip("어학").querySelector(".chip-check")).toBeNull();
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("1시간 30분");
     expect(screen.getByText("합계 2시간")).toBeTruthy();
     expect(rowKeys()).toEqual([C2, "other"]);
     expect(pickedRow()).toBe(C2);
     expect(handle("end").getAttribute("aria-valuenow")).toBe("30");
-    expect(handle("end").getAttribute("aria-label")).toContain("포트폴리오·기타");
+    expect(handle("end").getAttribute("aria-label")).toContain("글쓰기·기타");
     const fills = [...document.querySelectorAll(".dial-slice")].map((p) => (p as SVGElement).style.fill);
-    expect(fills).toEqual(["var(--color-category-2)", "var(--color-category-other)"]); // 포트폴리오는 두 번째 분야 → 2번 색
+    expect(fills).toEqual(["var(--color-category-2)", "var(--color-category-other)"]); // 글쓰기는 두 번째 분야 → 2번 색
     await press("어학, 다이얼에 넣기");
     expect(rowKeys()).toEqual([C1, C2, "other"]); // 다이얼·줄은 분야 순서(만든 순서), 기타 맨 끝
-    expect(sliceLabels()).toEqual(["어학 30분, 고름", "포트폴리오 30분", "기타 1시간"]);
+    expect(sliceLabels()).toEqual(["어학 30분, 고름", "글쓰기 30분", "기타 1시간"]);
   });
 
   it("기타가 30분보다 적으면 기타 전부를 뗀다. 칩을 풀면 그 시간이 기타로 돌아가고 조각·줄이 사라진다. 합은 늘 그대로", async () => {
     await openWith(state(), 0, 40);
     await press("어학, 다이얼에 넣기");
     expect(stepper("어학")).toBe(30);
-    await press("포트폴리오, 다이얼에 넣기");
-    expect(stepper("포트폴리오")).toBe(10); // 기타 10분 전부
+    await press("글쓰기, 다이얼에 넣기");
+    expect(stepper("글쓰기")).toBe(10); // 기타 10분 전부
     expect(otherText()).toBe("0분");
     expect(screen.getByText("합계 40분")).toBeTruthy();
     await press("어학, 다이얼에 넣기"); // 풀기
@@ -558,7 +558,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     expect(otherText()).toBe("30분");
     expect(sliceLabels().some((l) => l!.startsWith("어학"))).toBe(false);
     expect(screen.getByText("합계 40분")).toBeTruthy();
-    await press("포트폴리오, 다이얼에 넣기"); // 다 풀면 기타 100%
+    await press("글쓰기, 다이얼에 넣기"); // 다 풀면 기타 100%
     expect(rowKeys()).toEqual(["other"]);
     expect(otherText()).toBe("40분");
     expect(screen.queryAllByRole("slider")).toHaveLength(0);
@@ -566,9 +566,9 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
   });
 
   it("기타가 0분일 때 고른 칩은 0분 줄로만 보이고, 다이얼에는 칠하지 않으며 고름을 옮기지 않는다(12시에 0분 조각·손잡이가 새로 서지 않는다)", async () => {
-    const cats = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }, { id: C3, name: "운동" }];
+    const cats = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }, { id: C3, name: "운동" }];
     await openWith(state({ categories: cats }), 1);
-    await press("포트폴리오, 다이얼에 넣기");
+    await press("글쓰기, 다이얼에 넣기");
     await press("운동, 다이얼에 넣기"); // 기타 0분
     expect(otherText()).toBe("0분");
     expect(pickedRow()).toBe(C3);
@@ -577,7 +577,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     expect(pressed("어학")).toBe("true");
     expect(stepper("어학")).toBe(0);
     expect(rowKeys()).toEqual([C1, C2, C3, "other"]);
-    expect(sliceLabels()).toEqual(["포트폴리오 30분", "운동 30분, 고름"]); // 0분 조각은 칠하지 않는다
+    expect(sliceLabels()).toEqual(["글쓰기 30분", "운동 30분, 고름"]); // 0분 조각은 칠하지 않는다
     expect(pickedRow()).toBe(C3); // 고름이 그대로
     expect(document.getElementById("evening-dial-handle-both")).toBeNull();
     const after = screen.getAllByRole("slider").map((h) => h.getAttribute("aria-label"));
@@ -588,11 +588,11 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
   });
 
   it("조각 고르기는 조각이나 아래 줄을 눌러서: 고른 줄 = 연한 면 바탕 + 이름 Bold, 고른 조각 = 「…, 고름」 + 나옴 + 손잡이. 칩은 고름을 바꾸지 않는다", async () => {
-    await openSplit120(); // 어학 30 · 포트폴리오 30 · 기타 60, 어학 고름
+    await openSplit120(); // 어학 30 · 글쓰기 30 · 기타 60, 어학 고름
     expect(pickedRow()).toBe(C1);
     fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C2}"]`)!);
     expect(pickedRow()).toBe(C2);
-    expect(sliceLabels()).toEqual(["어학 30분", "포트폴리오 30분, 고름", "기타 1시간"]);
+    expect(sliceLabels()).toEqual(["어학 30분", "글쓰기 30분, 고름", "기타 1시간"]);
     expect(document.querySelectorAll(".dial-slice")[1].getAttribute("class")).toContain("is-picked");
     expect(handle("start").getAttribute("aria-valuenow")).toBe("30");
     fireEvent.click(document.querySelectorAll(".dial-slice")[2]); // 기타 조각
@@ -601,7 +601,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     fireEvent.click(document.querySelectorAll(".dial-slice")[0]); // 어학 조각
     expect(pickedRow()).toBe(C1);
     // 줄 안에 포커스가 가도(키보드) 그 조각이 골라진다
-    act(() => (screen.getByLabelText("포트폴리오") as HTMLInputElement).focus());
+    act(() => (screen.getByLabelText("글쓰기") as HTMLInputElement).focus());
     expect(pickedRow()).toBe(C2);
     // 줄 바탕·Bold는 CSS(연한 면 토큰)
     const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
@@ -612,11 +612,11 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
 
   it("저장 요청 items가 화면 값(Stepper·기타 줄)과 같고 지금 저장 검증을 지난다", async () => {
     const { sent, results } = await openSplit120();
-    await press("포트폴리오, 다이얼에 넣기"); // 풀기 → 기타 90
+    await press("글쓰기, 다이얼에 넣기"); // 풀기 → 기타 90
     fireEvent.click(screen.getByRole("button", { name: "어학 5분 늘리기" }));
     key(dial()!, "End"); // 기타 고름
     key(handle("start"), "PageUp"); // 기타 +30(어학에서)
-    await press("포트폴리오, 다이얼에 넣기"); // 다시 고름 → 30분
+    await press("글쓰기, 다이얼에 넣기"); // 다시 고름 → 30분
     const shown = screenItems(NAMES);
     expect(shown.reduce((s, i) => s + i.minutes, 0)).toBe(120);
     await press("저장");
@@ -638,13 +638,13 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     expect(r.sent[0]).toMatchObject({ saveMode: "prefilled", items: [{ categoryId: null, minutes: 120 }] });
     cleanup();
     r = await openSplit120();
-    await press("포트폴리오, 다이얼에 넣기");
-    await press("포트폴리오, 다이얼에 넣기");
+    await press("글쓰기, 다이얼에 넣기");
+    await press("글쓰기, 다이얼에 넣기");
     await press("저장");
     expect(r.sent[0].saveMode).toBe("prefilled");
     cleanup();
     r = await openSplit120();
-    await press("포트폴리오, 다이얼에 넣기");
+    await press("글쓰기, 다이얼에 넣기");
     await press("저장");
     expect(r.sent[0]).toMatchObject({ saveMode: "edited", items: [{ categoryId: C1, minutes: 30 }, { categoryId: null, minutes: 90 }] });
     cleanup();
@@ -665,21 +665,21 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     setNumber("시간", 2);
     s.doneCategoryIds = [C2];
     await press("분야마다 나누기");
-    expect(pressed("포트폴리오")).toBe("true");
+    expect(pressed("글쓰기")).toBe("true");
     expect(pressed("어학")).toBe("false");
     await press("이전");
     s.doneCategoryIds = [C2, C1, null];
     await press("분야마다 나누기");
     expect(pressed("어학")).toBe("true");
     expect(stepper("어학")).toBe(30);
-    expect(stepper("포트폴리오")).toBe(30);
+    expect(stepper("글쓰기")).toBe(30);
     expect(otherText()).toBe("1시간");
     fireEvent.click(screen.getByRole("button", { name: "어학 5분 늘리기" })); // 고침
     await press("이전");
     s.doneCategoryIds = [];
     await press("분야마다 나누기");
     expect(stepper("어학")).toBe(35); // 덮지 않는다
-    expect(pressed("포트폴리오")).toBe("true");
+    expect(pressed("글쓰기")).toBe("true");
   });
 
   it("이미 남긴 기록을 고치러 오면 그 기록의 분야(0분 넘는 것)가 골라진 채 시작한다", async () => {
@@ -694,10 +694,10 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     const { api } = realApi(state({ existing, doneCategoryIds: [C1], timerByCategory: [{ categoryId: C1, minutes: 20 }] }));
     await mount(api);
     await press("분야마다 나누기");
-    expect(pressed("포트폴리오")).toBe("true");
+    expect(pressed("글쓰기")).toBe("true");
     expect(pressed("어학")).toBe("false"); // 기록에 없는 분야는 타이머·체크가 있어도 고르지 않는다(기록 값 그대로)
     expect(rowKeys()).toEqual([C2, "other"]);
-    expect(stepper("포트폴리오")).toBe(100);
+    expect(stepper("글쓰기")).toBe(100);
     expect(pickedRow()).toBe(C2);
   });
 
@@ -711,7 +711,7 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     let checks = 0;
     for (let step = 0; step < 60; step++) {
       const r = rand();
-      const name = rand() < 0.5 ? "어학" : "포트폴리오";
+      const name = rand() < 0.5 ? "어학" : "글쓰기";
       if (r < 0.35) await press(`${name}, 다이얼에 넣기`);
       else if (r < 0.6 && screen.queryByLabelText(name)) {
         const btn = screen.getByRole("button", { name: `${name} 5분 ${rand() < 0.5 ? "늘리기" : "줄이기"}` }) as HTMLButtonElement;
@@ -808,7 +808,7 @@ describe("오늘 기록 나누기 「+ 분야」 (고침 5바퀴, 지금 앱의 
   it("악용: 분야 이름의 HTML은 글자 그대로(칩·줄·조각 이름), 요소가 되지 않는다. 정상 이름도 그대로 지난다", async () => {
     const evil = "<img src=x onerror=alert(1)>";
     const add = vi.fn(async (id: string, name: string) => ({ ok: true as const, data: { category: { id: C3, readable: true as const, name, createdAt: "x" } } }));
-    const { api } = withAdd(state({ categories: [{ id: C1, name: evil }, { id: C2, name: "포트폴리오" }] }), add);
+    const { api } = withAdd(state({ categories: [{ id: C1, name: evil }, { id: C2, name: "글쓰기" }] }), add);
     await mount(api);
     setNumber("시간", 2);
     await press("분야마다 나누기");
@@ -822,7 +822,7 @@ describe("오늘 기록 나누기 「+ 분야」 (고침 5바퀴, 지금 앱의 
     expect(chip("<b>굵게</b>").querySelector(".chip-label")!.textContent).toBe("<b>굵게</b>");
     expect(document.querySelector("img")).toBeNull();
     expect(document.querySelector(".chip-label b")).toBeNull();
-    expect(pressed("포트폴리오")).toBe("false");
+    expect(pressed("글쓰기")).toBe("false");
   });
 
   it("「+ 분야」는 지금 앱의 분야 더하기 함수를 그대로 부른다(서버: app/todos/actions addCategory · 기기 먼저: settings.addCategory — 한도 50)", async () => {
@@ -867,16 +867,16 @@ const fromNoon = (el: Element) => {
 };
 
 describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고침6 PM d-129 ②)", () => {
-  it("기타 0분 + 마지막 분야 고름: 손잡이는 앞(어학·포트폴리오) 하나뿐이고 자리는 12시가 아니다", async () => {
+  it("기타 0분 + 마지막 분야 고름: 손잡이는 앞(어학·글쓰기) 하나뿐이고 자리는 12시가 아니다", async () => {
     await openWith(state(), 1);
     await press("어학, 다이얼에 넣기");
-    await press("포트폴리오, 다이얼에 넣기"); // 어학 30 · 포트폴리오 30 · 기타 0, 포트폴리오(마지막 분야) 고름
+    await press("글쓰기, 다이얼에 넣기"); // 어학 30 · 글쓰기 30 · 기타 0, 글쓰기(마지막 분야) 고름
     expect(otherText()).toBe("0분");
     expect(pickedRow()).toBe(C2);
     const hs = screen.getAllByRole("slider");
     expect(hs).toHaveLength(1);
     expect(hs[0].id).toBe("evening-dial-handle-start");
-    expect(hs[0].getAttribute("aria-label")).toContain("포트폴리오·어학 사이");
+    expect(hs[0].getAttribute("aria-label")).toContain("글쓰기·어학 사이");
     expect(hs[0].getAttribute("transform")).toBe("translate(0.00 81.00)"); // 30/60 = 6시
     expect(fromNoon(hs[0])).toBeGreaterThan(0.4);
     expect(document.getElementById("evening-dial-handle-end")).toBeNull();
@@ -890,23 +890,23 @@ describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고
     expect(screen.queryAllByRole("slider")).toHaveLength(0);
   });
 
-  it("기타 0분에서 마지막 분야를 기타로 돌려주기: 끌기 손잡이는 없고, 줄의 −(Stepper)가 돌려준다. 그 뒤에는 포트폴리오·기타 경계 손잡이가 선다. 저장은 서버 검증을 지난다", async () => {
+  it("기타 0분에서 마지막 분야를 기타로 돌려주기: 끌기 손잡이는 없고, 줄의 −(Stepper)가 돌려준다. 그 뒤에는 글쓰기·기타 경계 손잡이가 선다. 저장은 서버 검증을 지난다", async () => {
     const { sent, results } = await openWith(state(), 1);
     await press("어학, 다이얼에 넣기");
-    await press("포트폴리오, 다이얼에 넣기");
+    await press("글쓰기, 다이얼에 넣기");
     expect(document.getElementById("evening-dial-handle-end")).toBeNull(); // 기타로 돌려줄 끌기 길이 없다
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5분 줄이기" }));
-    expect(stepper("포트폴리오")).toBe(25);
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5분 줄이기" }));
+    expect(stepper("글쓰기")).toBe(25);
     expect(otherText()).toBe("5분");
     expect(stepper("어학")).toBe(30);
     expect(screen.getByText("합계 1시간")).toBeTruthy();
-    // 기타 > 0이 되면 지금과 같다: 포트폴리오의 끝 손잡이(포트폴리오·기타)가 12시가 아닌 자리에 선다
+    // 기타 > 0이 되면 지금과 같다: 글쓰기의 끝 손잡이(글쓰기·기타)가 12시가 아닌 자리에 선다
     fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C2}"]`)!);
     expect(screen.getAllByRole("slider").map((h) => h.id)).toEqual(["evening-dial-handle-start", "evening-dial-handle-end"]);
-    expect(handle("end").getAttribute("aria-label")).toContain("포트폴리오·기타 사이");
+    expect(handle("end").getAttribute("aria-label")).toContain("글쓰기·기타 사이");
     expect(fromNoon(handle("end"))).toBeGreaterThan(0);
-    key(handle("end"), "ArrowLeft"); // 포트폴리오 −5 → 기타(끌기 길도 다시 있다)
-    expect(stepper("포트폴리오")).toBe(20);
+    key(handle("end"), "ArrowLeft"); // 글쓰기 −5 → 기타(끌기 길도 다시 있다)
+    expect(stepper("글쓰기")).toBe(20);
     expect(otherText()).toBe("10분");
     await press("저장");
     expect(sent[0]).toMatchObject({
@@ -917,31 +917,31 @@ describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고
     expect(results).toEqual([true]);
   });
 
-  it("0분 분야(가운데)를 건너뛴 손잡이: 어학·운동 경계 하나, 키보드로 바꿔도 0분 포트폴리오는 0 그대로", async () => {
-    const cats = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }, { id: C3, name: "운동" }];
+  it("0분 분야(가운데)를 건너뛴 손잡이: 어학·운동 경계 하나, 키보드로 바꿔도 0분 글쓰기는 0 그대로", async () => {
+    const cats = [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }, { id: C3, name: "운동" }];
     await openWith(state({ categories: cats }), 1);
     await press("어학, 다이얼에 넣기");
     await press("운동, 다이얼에 넣기"); // 어학 30 · 운동 30 · 기타 0
-    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분 → 0분 줄(가운데)
+    await press("글쓰기, 다이얼에 넣기"); // 기타 0분 → 0분 줄(가운데)
     expect(rowKeys()).toEqual([C1, C2, C3, "other"]);
-    expect(stepper("포트폴리오")).toBe(0);
+    expect(stepper("글쓰기")).toBe(0);
     fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C1}"]`)!);
     expect(screen.getAllByRole("slider").map((h) => h.id)).toEqual(["evening-dial-handle-end"]);
     expect(handle("end").getAttribute("aria-label")).toContain("어학·운동 사이");
     key(handle("end"), "PageUp"); // 어학 +30(운동에서)
     expect(stepper("어학")).toBe(60);
-    expect(stepper("포트폴리오")).toBe(0);
+    expect(stepper("글쓰기")).toBe(0);
     expect(stepper("운동")).toBe(0);
-    // 0분 포트폴리오 줄을 고르면: 앞뒤 0분 아닌 조각이 어학 하나뿐(자리 12시) — 손잡이 없음, 줄의 +로는 키울 수 없다(기타 0분)
+    // 0분 글쓰기 줄을 고르면: 앞뒤 0분 아닌 조각이 어학 하나뿐(자리 12시) — 손잡이 없음, 줄의 +로는 키울 수 없다(기타 0분)
     fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C2}"]`)!);
     expect(screen.queryAllByRole("slider")).toHaveLength(0);
-    expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "글쓰기 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("악용: 기타 0분에서 시작해 끌기·손잡이 키보드·다이얼 키·Stepper −/+ 를 섞어도 화면 합 = 쓴 시간, 12시에 손잡이가 서지 않고, 저장 items 합 = 쓴 시간(서버 검증 통과)", async () => {
     const { sent, results } = await openWith(state(), 1);
     await press("어학, 다이얼에 넣기");
-    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분에서 시작
+    await press("글쓰기, 다이얼에 넣기"); // 기타 0분에서 시작
     expect(otherText()).toBe("0분");
     const svg = dial()!;
     vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200, right: 200, bottom: 200, x: 0, y: 0, toJSON: () => ({}) });
@@ -958,7 +958,7 @@ describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고
     let checks = 0;
     for (let step = 0; step < 80; step++) {
       const r = rand();
-      const name = rand() < 0.5 ? "어학" : "포트폴리오";
+      const name = rand() < 0.5 ? "어학" : "글쓰기";
       const hs = screen.queryAllByRole("slider");
       if (r < 0.3 && hs.length > 0) {
         const h = hs[Math.floor(rand() * hs.length)];

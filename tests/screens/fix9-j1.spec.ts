@@ -62,7 +62,7 @@ test("S1-1~S1-4 처음 설정: 「‹」(2~4단계) · 진행 막대 · 이름�
   await expect(page.getByText("4단계 중 1단계")).toBeVisible();
   await expect(page.getByRole("button", { name: "이전" })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "목표" })).toBeVisible();
-  await expect(page.getByText("예: 포트폴리오 끝내고 토익 800점 넘기기")).toBeVisible();
+  await expect(page.getByText("예: 글 한 편 끝내고 토익 800점 넘기기")).toBeVisible();
   await expect(page.locator(".screen-head-bar.is-done")).toHaveCount(1);
   await checkBottomPrimary(page, "다음");
   await expect(page.locator(".bottom-actions button")).toHaveText(["건너뛰기", "다음"]);
@@ -242,7 +242,7 @@ test("S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창(같은 꼴), 
   expect(fieldH).toBeLessThanOrEqual(56);
   await noOverflow(page);
   await photo(page, "S8-b 목표 고치기");
-  await dlg.getByRole("textbox", { name: "목표" }).fill("포트폴리오 끝내기");
+  await dlg.getByRole("textbox", { name: "목표" }).fill("글 한 편 끝내기");
   await dlg.getByRole("button", { name: "이전" }).click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();

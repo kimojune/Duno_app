@@ -47,7 +47,7 @@ test("오늘 기록 나누기 다이얼(칩 둘 고름): 끌기 전 · 끈 뒤",
   const dialog = page.getByRole("dialog", { name: "오늘 기록" });
   await fillWheel(dialog, "시간", 3);
   await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
-  await dialog.getByRole("button", { name: "포트폴리오, 다이얼에 넣기" }).click();
+  await dialog.getByRole("button", { name: "글쓰기, 다이얼에 넣기" }).click();
   await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click();
   await page.locator("svg.dial").evaluate((el) => el.scrollIntoView({ block: "center" }));
   const handle = page.locator("[id^='evening-dial-handle-']").first();

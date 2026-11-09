@@ -70,7 +70,7 @@ async function makeLocal(todos: MirrorTodo[] = [todo(T1, "단어 외우기", { c
     synced: true,
     categories: [
       { id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" },
-      { id: C2, readable: true, name: "포트폴리오", createdAt: "2026-11-02T00:00:00.000Z" },
+      { id: C2, readable: true, name: "글쓰기", createdAt: "2026-11-02T00:00:00.000Z" },
     ],
     todos,
   };
@@ -105,7 +105,7 @@ function eveningState(over: Partial<EveningState> = {}): EveningState {
     timerByCategory: [],
     categories: [
       { id: C1, name: "어학" },
-      { id: C2, name: "포트폴리오" },
+      { id: C2, name: "글쓰기" },
     ],
     ...over,
   };
@@ -377,18 +377,18 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     expect(within(chips).getAllByRole("button").map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
       ["기타", "true"],
       ["어학", "false"],
-      ["포트폴리오", "false"],
+      ["글쓰기", "false"],
     ]);
 
     fireEvent.change(input, { target: { value: "  면접 준비  " } });
-    fireEvent.click(within(chips).getByRole("button", { name: "포트폴리오" }));
+    fireEvent.click(within(chips).getByRole("button", { name: "글쓰기" }));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(local.addTodo).toHaveBeenCalledTimes(1);
     const arg = vi.mocked(local.addTodo).mock.calls[0][0];
     expect(arg).toEqual({ id: expect.stringMatching(UUID), text: "면접 준비", categoryId: C2 });
     expect(Object.keys(arg).sort()).toEqual(["categoryId", "id", "text"]); // 할 일 탭이 부르는 꼴과 같은 열쇠
     expect(input.value).toBe("");
-    expect(within(chips).getByRole("button", { name: "포트폴리오" }).getAttribute("aria-pressed")).toBe("false");
+    expect(within(chips).getByRole("button", { name: "글쓰기" }).getAttribute("aria-pressed")).toBe("false");
     // 보낼 줄을 거쳐 서버로 간다(할 일 탭과 같은 op)
     await waitFor(() => expect(sent.map((q) => q.op)).toEqual([{ kind: "todo.add", id: arg.id, text: "면접 준비", categoryId: C2 }]));
     expect(within(sheet()).getByText("면접 준비")).toBeTruthy();
@@ -505,10 +505,10 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
     const stepperValue = (name: string) => Number((screen.getByRole("spinbutton", { name }) as HTMLInputElement).value);
     const otherValue = () => document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent;
     expect(stepperValue("어학")).toBe(30);
-    expect(screen.queryByRole("spinbutton", { name: "포트폴리오" }), "고르지 않은 분야는 줄이 없다(E1: 칩으로 고른 분야만 다이얼·줄에)").toBeNull();
+    expect(screen.queryByRole("spinbutton", { name: "글쓰기" }), "고르지 않은 분야는 줄이 없다(E1: 칩으로 고른 분야만 다이얼·줄에)").toBeNull();
     expect(otherValue()).toBe("30분");
     expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: /^포트폴리오, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /^글쓰기, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("오늘 기록에 이어진다: 기타가 30분보다 적으면 남은 만큼만 들어간다(쓴 시간 15분 → 어학 15분, 기타 0분)", async () => {
@@ -982,17 +982,17 @@ describe("시트 꼴(고침9 Figma 88:12): 흰 카드 목록 · 원 체크 · �
     expect(vi.mocked(local.addTodo).mock.calls[0][0]).toMatchObject({ text: "책 읽기", categoryId: null });
     // 어학 → 다시 누르면 풀려 기타
     fireEvent.click(within(group()).getByRole("button", { name: "어학" }));
-    expect(chipPressed()).toEqual([["기타", "false"], ["어학", "true"], ["포트폴리오", "false"]]);
+    expect(chipPressed()).toEqual([["기타", "false"], ["어학", "true"], ["글쓰기", "false"]]);
     fireEvent.click(within(group()).getByRole("button", { name: "어학" }));
-    expect(chipPressed()).toEqual([["기타", "true"], ["어학", "false"], ["포트폴리오", "false"]]);
-    // 포트폴리오 → 「기타」를 누르면 기타
-    fireEvent.click(within(group()).getByRole("button", { name: "포트폴리오" }));
+    expect(chipPressed()).toEqual([["기타", "true"], ["어학", "false"], ["글쓰기", "false"]]);
+    // 글쓰기 → 「기타」를 누르면 기타
+    fireEvent.click(within(group()).getByRole("button", { name: "글쓰기" }));
     fireEvent.click(within(group()).getByRole("button", { name: "기타" }));
     fireEvent.change(input, { target: { value: "산책" } });
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(vi.mocked(local.addTodo).mock.calls[1][0]).toMatchObject({ text: "산책", categoryId: null });
     // 고른 분야는 그 분야로(정상 길)
-    fireEvent.click(within(group()).getByRole("button", { name: "포트폴리오" }));
+    fireEvent.click(within(group()).getByRole("button", { name: "글쓰기" }));
     fireEvent.change(input, { target: { value: "표지 고치기" } });
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(vi.mocked(local.addTodo).mock.calls[2][0]).toMatchObject({ text: "표지 고치기", categoryId: C2 });

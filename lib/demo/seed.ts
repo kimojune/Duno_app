@@ -25,12 +25,12 @@ import { addDays, weekStartFor } from "../week";
 export const DEMO_SPAN_DAYS = 20; // 오늘 포함 21일(3주) — 지난 2~3주치
 
 /** 분야(만든 순서). 이름은 분야 이름 상한(20자) 안 */
-export const DEMO_CATEGORIES = ["어학", "포트폴리오", "자격증", "운동"] as const;
+export const DEMO_CATEGORIES = ["어학", "글쓰기", "자격증", "운동"] as const;
 
 /** 분야별 할 일 글(고정). 마지막 줄은 기타(분야 없음) */
 const TODO_TEXTS: readonly (readonly string[])[] = [
   ["토익 스피킹 모의고사 1회", "영어 단어 50개 외우기", "섀도잉 20분", "오픽 답변 스크립트 다듬기"],
-  ["프로젝트 회고 글 쓰기", "포트폴리오 표지 고치기", "케이스 스터디 한 편 정리", "자기소개 페이지 문장 다듬기"],
+  ["회고 글 초고 쓰기", "글 첫 문단 고치기", "블로그 글 한 편 정리", "자기소개 글 문장 다듬기"],
   ["정보처리기사 기출 1회 풀기", "오답 노트 정리", "데이터베이스 단원 복습", "요약 노트 만들기"],
   ["헬스장 상체 운동", "30분 걷기", "스트레칭 15분", "러닝 3km"],
   ["은행 서류 내기", "방 정리", "장보기"],
@@ -135,8 +135,8 @@ export function buildDemoPlan(userId: string, today: string): DemoPlan {
       });
     }
 
-    // 오늘 기록: 지난날마다 하나(오늘은 아직 저녁 전이라 없음). 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
-    if (!isToday) {
+    // 오늘 기록: 날마다 하나(오늘 포함, PM 13 — 시연 화면이 「이미 남긴 기록」 상태로도 열리게). 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
+    {
       const parts = 2 + pick(`parts|${day}`, 2);
       const first = pick(`first|${day}`, DEMO_CATEGORIES.length);
       const items: { categoryIndex: number | null; minutes: number }[] = [];

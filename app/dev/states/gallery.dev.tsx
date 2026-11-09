@@ -107,7 +107,7 @@ const TODO_STATES: Record<string, Partial2> = {
     list: "ready",
     rows: [
       row("r1", "토익 단어 50개", { category: "어학", categoryColor: "var(--color-category-2)", hasNotes: true }),
-      row("r2", "포트폴리오 2장 고치기 — 표지와 목차를 먼저 다시 그리고 사례 둘을 고르기", { category: "포트폴리오", categoryColor: "var(--color-category-1)", hasNotes: true }),
+      row("r2", "글 2편 고치기 — 첫 문단과 목차를 먼저 다시 쓰고 사례 둘을 고르기", { category: "글쓰기", categoryColor: "var(--color-category-1)", hasNotes: true }),
       row("r3", "정보처리기사 기출 1회", { done: true, category: "자격증", categoryColor: "var(--color-category-3)" }),
     ],
     sheetOpen: false,
@@ -120,7 +120,7 @@ const TODO_STATES: Record<string, Partial2> = {
     list: "ready",
     rows: BASIC,
     sheetOpen: false,
-    draft: "포트폴리오 링크 정리하기",
+    draft: "글 링크 정리하기",
     resume: true,
     selectedCategoryId: "c1",
   },
@@ -217,7 +217,7 @@ const TODO_STATES: Record<string, Partial2> = {
   CD11: { list: "ready", rows: twelve(), sheetOpen: false },
 
   // 5절 T 상태 가운데 C에서 그대로 쓰는 것(「입력 줄」을 「적는 창」으로 읽음, 12-6 머리말)
-  T5: { list: "ready", rows: BASIC, sheetOpen: true, draft: "포트폴리오 링크 정리하기" },
+  T5: { list: "ready", rows: BASIC, sheetOpen: true, draft: "글 링크 정리하기" },
   T6: {
     list: "ready",
     rows: twelve((i) => (i === 12 ? { text: "방금 적은 열두 번째 할 일", saving: true, savingSlow: true, category: "영어" } : {})),
@@ -229,7 +229,7 @@ const TODO_STATES: Record<string, Partial2> = {
     list: "ready",
     rows: [
       row("r1", "토익 단어 50개", { category: "어학", categoryColor: "var(--color-category-2)" }),
-      row("q1", "포트폴리오 2장 고치기", { queued: true, category: "포트폴리오", categoryColor: "var(--color-category-1)" }),
+      row("q1", "글 2편 고치기", { queued: true, category: "글쓰기", categoryColor: "var(--color-category-1)" }),
       row("f1", "저장하지 못한 할 일", { failed: true, category: "운동", categoryColor: "var(--color-category-4)" }),
     ],
     sheetOpen: false,

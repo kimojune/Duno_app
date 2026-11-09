@@ -232,7 +232,7 @@ test("S5-2 나누기 · 칩 하나 고른 상태 — 87:96", async ({ page }) =>
 
 test("S5-2 나누기 · 칩 둘 고른 상태 — 49:26", async ({ page }) => {
   const dialog = await openSplit(page, 3);
-  await dialog.getByRole("button", { name: "포트폴리오, 다이얼에 넣기" }).click();
+  await dialog.getByRole("button", { name: "글쓰기, 다이얼에 넣기" }).click();
   await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click();
   await splitShape(page, dialog, "합계 3시간");
   await expect(dialog.locator(".ratio-list li")).toHaveCount(3);
@@ -244,7 +244,7 @@ test("S5-2 나누기 · 나눈 합이 합계보다 많을 때(기타 0분) — 4
   // 앱은 나눈 합이 쓴 시간을 넘지 못하게 막는다(PM 확정 11-08) — 기타가 0분이 되는 데까지가 화면에서 닿는 끝. 넘침 안내 상자는 숨은 분야가 있는 옛 기록에서만 뜬다
   const dialog = await openSplit(page, 1);
   await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click();
-  await dialog.getByRole("button", { name: "포트폴리오, 다이얼에 넣기" }).click();
+  await dialog.getByRole("button", { name: "글쓰기, 다이얼에 넣기" }).click();
   await splitShape(page, dialog, "합계 1시간");
   await expect(dialog.locator('[data-row-key="other"] .evening-other-value')).toHaveText("0분");
   await expect(dialog.locator('[id^="evening-dial-handle-"]')).toHaveCount(1); // 12시 손잡이 없음
@@ -283,15 +283,15 @@ async function afterSave(page: Page, s: string) {
 test("S5-3 저장 직후 · 목표 세운 주 — 49:142", async ({ page }) => {
   const card = await afterSave(page, "after-save");
   const rows = card.locator(".after-save-row");
-  await expect(rows.locator(".after-save-name")).toHaveText(["포트폴리오", "어학"]);
+  await expect(rows.locator(".after-save-name")).toHaveText(["글쓰기", "어학"]);
   await expect(rows.locator(".after-save-value")).toHaveText(["12시간 +2시간", "2시간 +1시간"]);
   await expect(rows.locator(".after-save-more")).toHaveText(["목표 6시간", "3시간 더"]);
   near((await box(rows.first().locator(".after-save-tick"))).width, 2, 0.5, "목표 눈금 2px");
-  // 막대 길이 = 같은 잣대(12시간 = 끝): 포트폴리오 앞 칸 10시간 ≈ 83% · 빗금 2시간 ≈ 17%
+  // 막대 길이 = 같은 잣대(12시간 = 끝): 글쓰기 앞 칸 10시간 ≈ 83% · 빗금 2시간 ≈ 17%
   const bar = await box(rows.first().locator(".after-save-bar"));
   const hatch = await box(rows.first().locator(".after-save-hatch"));
   near(hatch.width / bar.width, 120 / 720, 0.02, "빗금 몫 = delta");
-  await expect(card.locator('[role="status"]')).toHaveText("저장했어요. 포트폴리오 2시간 더해서 이번 주 12시간. 목표 6시간. 어학 1시간 더해서 이번 주 2시간. 목표까지 3시간.");
+  await expect(card.locator('[role="status"]')).toHaveText("저장했어요. 글쓰기 2시간 더해서 이번 주 12시간. 목표 6시간. 어학 1시간 더해서 이번 주 2시간. 목표까지 3시간.");
   await photo(page, "S5-3 저장 직후 · 목표 세운 주");
 });
 

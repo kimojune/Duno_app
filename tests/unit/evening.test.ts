@@ -167,7 +167,7 @@ describe("diffItems (저장 직후 한 줄: 오늘 바뀐 분야별 시간)", ()
 function setup() {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   store.seed("categories", { id: C3, user_id: OTHER, name_encrypted: "x", archived_at: null });
@@ -283,7 +283,7 @@ describe("readEveningState", () => {
     const state = await readEveningState(deps(store));
     expect(state.ok && state.data.today).toBe("2026-11-07");
     expect(state.ok && [...state.data.doneCategoryIds].sort((a, b) => String(a).localeCompare(String(b)))).toEqual([C1, null]);
-    expect(state.ok && state.data.categories.map((c) => c.name)).toEqual(["어학", "포트폴리오"]);
+    expect(state.ok && state.data.categories.map((c) => c.name)).toEqual(["어학", "글쓰기"]);
     expect(state.ok && state.data.timerByCategory).toEqual([]);
   });
   it("범위 밖 날은 invalid_input", async () => {

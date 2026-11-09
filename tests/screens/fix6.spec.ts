@@ -6,7 +6,7 @@ import { photoDir } from "./photo-dir";
 
 /**
  * 고침6(23 「발표 판 고침6」 ①·②·③·④-①): 360×800 사진을 docs/oneshot-v2/고침6/에 두고, 사진만 남는 시험이 되지 않게 치수·글·순서를 같이 단언한다.
- * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). 개발 서버(3200)에서 돈다: npm run screens
+ * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). 개발 서버에서 돈다(SCREENS_PORT·SCREENS_DIST_DIR를 꼭 준다): npm run screens
  * - ① 목표 없는 주에 처음 열면 「목표 비율」 탭 · ② 「이번 주 목표」 탭 카드: 이름표 → 막대 → 보조 줄 → 단추(간격 16·6·12·16·16, 단추 폭 = 카드 안쪽 폭)
  * - ④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n시간 더」, 「채울」 없음
  * - ③ 내 정보 첫 카드(이름표 「목표」, PM d-136 — 목표 있음·없음) · S8-b · 나가기 확인(PM d-135 글) · 진짜 브라우저 뒤로 가기(page.goBack)
@@ -119,7 +119,7 @@ test("④-① 오늘 기록 저장 직후: 막대 아래 「n시간 더」/「�
   );
   expect(rows.length).toBeGreaterThan(0);
   expect(rows.map((r) => [r.name, r.more])).toEqual([
-    ["포트폴리오", "목표 6시간"],
+    ["글쓰기", "목표 6시간"],
     ["어학", "3시간 더"],
   ]);
   for (const r of rows) {
@@ -135,7 +135,7 @@ test("④-① 오늘 기록 저장 직후: 막대 아래 「n시간 더」/「�
 
 test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확인", async ({ page }) => {
   await open(page, "me-goal");
-  const card = page.getByRole("button", { name: "목표, 올해 안에 토익 900점 넘기고 포트폴리오 끝내기, 고치기" });
+  const card = page.getByRole("button", { name: "목표, 올해 안에 토익 900점 넘기고 글 한 편 끝내기, 고치기" });
   await expect(card).toBeVisible();
   const c = await card.evaluate((btn) => {
     const text = btn.querySelector(".me-goal-text")!;
@@ -166,8 +166,8 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   const dlg = page.getByRole("dialog", { name: "목표" });
   await expect(dlg).toBeVisible();
   const field = dlg.getByRole("textbox", { name: "목표" });
-  await expect(field).toHaveValue("올해 안에 토익 900점 넘기고 포트폴리오 끝내기");
-  await expect(dlg.getByText("예: 포트폴리오 끝내고 토익 800점 넘기기")).toBeVisible();
+  await expect(field).toHaveValue("올해 안에 토익 900점 넘기고 글 한 편 끝내기");
+  await expect(dlg.getByText("예: 글 한 편 끝내고 토익 800점 넘기기")).toBeVisible();
   const back = dlg.getByRole("button", { name: "이전" });
   const b = (await back.boundingBox())!;
   expect(b.width).toBeGreaterThanOrEqual(48);
@@ -183,7 +183,7 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   await noOverflow(page);
   await photo(page, "S8-b-목표");
 
-  await field.fill("포트폴리오 끝내기");
+  await field.fill("글 한 편 끝내기");
   await back.click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
@@ -192,10 +192,10 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   await photo(page, "S8-b-나가기확인");
   await confirm.getByRole("button", { name: "계속 적기" }).click();
   await expect(confirm).toHaveCount(0);
-  await expect(field).toHaveValue("포트폴리오 끝내기");
+  await expect(field).toHaveValue("글 한 편 끝내기");
   await dlg.getByRole("button", { name: "저장" }).click();
   await expect(dlg).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "목표, 포트폴리오 끝내기, 고치기" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "목표, 글 한 편 끝내기, 고치기" })).toBeFocused();
 
   await open(page, "me-goal-empty");
   const empty = page.getByRole("button", { name: "목표, 목표 적기" });

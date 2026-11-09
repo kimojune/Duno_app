@@ -59,7 +59,11 @@ type Drag = { column: WheelColumn; pointerId: number; startY: number; startTotal
 
 export function TimeWheel({ id, total, onChange, disabled }: { id: string; total: number; onChange: (next: number) => void; disabled?: boolean }) {
   const reduced = useReducedMotion();
-  const value = clampTotal(total);
+  // PM 14 원인: 타이머가 채운 1·2분 같은 5의 배수 아닌 합을 그대로 보여 분 열에 「00 · 01 · 05」처럼 격자에서 어긋난 값이 끼었다.
+  // 휠은 5분 눈금에서 가까운 값만 보인다(1·2 → 00, 3 → 05, 47 → 45). 합은 바꾸지 않는다: 휠을 만지기 전에는 타이머가 잰 분이 그대로 남는다
+  // (저녁 나누기에서 남는 분은 기타로 간다). 만지면 그 눈금에서 한 걸음 간다.
+  const raw = clampTotal(total);
+  const value = clampTotal(Math.round(raw / WHEEL_MINUTE_STEP) * WHEEL_MINUTE_STEP);
   const parts = splitTotal(value);
   const totalRef = useRef(value);
   const onChangeRef = useRef(onChange);

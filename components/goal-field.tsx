@@ -12,7 +12,7 @@ import { checkGoal, countGoalChars, GOAL_MAX_LENGTH, type GoalCheck } from "../l
 export const GOAL_FIELD_TEXT = {
   label: "목표",
   /** 칸 아래 예시(⑬ 1 — 칸 안 흐린 글이 아님, UI-06). 처음 설정 S1-1과 S8-b가 같이 쓴다 */
-  example: "예: 포트폴리오 끝내고 토익 800점 넘기기",
+  example: "예: 글 한 편 끝내고 토익 800점 넘기기",
   tooLong: (n: number) => `${GOAL_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${n}자예요.`,
 } as const;
 

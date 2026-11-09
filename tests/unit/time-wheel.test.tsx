@@ -124,6 +124,25 @@ describe("TimeWheel 화면", () => {
     expect(centerText("분")).toBe("05"); // 분은 두 자리
   });
 
+  it("PM 14: 5의 배수가 아닌 합(타이머가 채운 1·2분 등)도 분 휠은 5분 격자 값만 보인다(합은 만지기 전까지 그대로, 만지면 그 눈금에서 한 걸음)", () => {
+    for (const [initial, shown, saved, dims] of [
+      [1, "00", 0, ["", "", "05", "10"]],
+      [2, "00", 0, ["", "", "05", "10"]],
+      [3, "05", 5, ["", "00", "10", "15"]],
+      [47, "45", 45, ["35", "40", "50", "55"]],
+    ] as const) {
+      const seen: number[] = [];
+      render(<Host initial={initial} onChange={(n) => seen.push(n)} />);
+      expect(centerText("분")).toBe(shown);
+      expect(dimTexts("분")).toEqual([...dims]);
+      expect(spin("분").getAttribute("aria-valuenow")).toBe(String(Number(shown)));
+      expect(seen).toEqual([]); // 보이기만 맞춘다: 만지기 전에는 합을 바꾸지 않는다
+      key("분", "ArrowUp");
+      expect(seen).toEqual([saved + 5]); // 만지면 보이는 눈금에서 한 걸음
+      cleanup();
+    }
+  });
+
   it("키보드: 위/아래 화살표 1시간·5분, PageUp/PageDown 3시간·15분(임시), Home/End 끝값", () => {
     const onChange = vi.fn();
     render(<Host initial={150} onChange={onChange} />);

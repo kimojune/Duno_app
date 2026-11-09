@@ -28,6 +28,15 @@ npm run test:rls    # Supabase RLS 시험. .env.local 필요
 npm run e2e         # Playwright. .env.local과 설치된 Chrome 필요
 ```
 
+화면 시험(개발 갤러리 `/dev`)은 같은 작업 폴더의 운영 서버(기본 `.next` · 3200)를 덮지 않게, 빌드 폴더와 포트를 꼭 줘야 돕니다. 없으면 서버를 띄우기 전에 오류로 끝납니다.
+
+```bash
+SCREENS_PORT=3301 SCREENS_DIST_DIR=node_modules/.cache/<작업폴더이름>-screens npm run screens
+```
+
+- `SCREENS_PORT`: 3300~3399 중 하나. 3200·3100은 막혀 있습니다.
+- `SCREENS_DIST_DIR`: `.next`가 아닌 다른 폴더. `.next`와 `.next/` 아래는 막혀 있습니다.
+
 ## 비밀 검사 훅
 
 커밋할 때마다 `.githooks/pre-commit`이 staged 변경에서 키처럼 보이는 문자열을 찾고, 걸리면 커밋을 막습니다. 클론할 때마다 한 번 켭니다.

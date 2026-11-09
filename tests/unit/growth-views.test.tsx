@@ -34,8 +34,8 @@ const G4 = "a4a4a4a4-0000-4000-8000-000000000000";
 const WEEK = "2026-11-02";
 
 /**
- * 명세 ③-S 예와 같은 값(만든 순서 어학 · 포트폴리오 · 자격증 · 운동).
- * 이번 주 목표 15시간 중 12시간: 어학 2/5 · 포트폴리오 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2.
+ * 명세 ③-S 예와 같은 값(만든 순서 어학 · 글쓰기 · 자격증 · 운동).
+ * 이번 주 목표 15시간 중 12시간: 어학 2/5 · 글쓰기 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2.
  * 목표 비율 30 · 40 · 20 · 10 → 이번 주(20시간) 10 · 60 · 15 · 5 · 기타 10
  */
 function spec(over: Partial<GrowthData> = {}): GrowthData {
@@ -46,7 +46,7 @@ function spec(over: Partial<GrowthData> = {}): GrowthData {
     lastMonthRange: { from: "2026-10-01", to: "2026-10-31" },
     categories: [
       { id: G1, name: "어학" },
-      { id: G2, name: "포트폴리오" },
+      { id: G2, name: "글쓰기" },
       { id: G3, name: "자격증" },
       { id: G4, name: "운동" },
     ],
@@ -296,7 +296,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
 
   it("분야 줄 순서 = 만든 순서, 기타 맨 끝(모자란 순이 아니다). 오른쪽 값은 「쓴 시간 · 남은 시간 더」, 닿았거나 넘으면 쓴 시간만", async () => {
     const { container } = await mount(fakeApi(spec()));
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동", "기타"]);
     expect(values(container)).toEqual(["2시간 · 3시간 더", "12시간", "3시간", "1시간", "2시간"]);
     expect(items(container).map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 5시간", "목표 6시간", "목표 3시간", "목표 1시간", "목표 없음"]);
     // 남은 시간이 있는 줄만 굵게(평가 말 「넘음」 없음)
@@ -307,17 +307,17 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
   it("만든 순서는 남은 시간과 상관없다: 가장 많이 남은 분야가 뒤에 있어도 앞으로 오지 않는다", async () => {
     const d = spec({ goal: { weekStart: WEEK, items: [{ categoryId: G4, minutes: 1200 }, { categoryId: G1, minutes: 60 }] } });
     const { container } = await mount(fakeApi(d));
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동", "기타"]);
   });
 
-  it("막대: 축 = 가장 큰 값(포트폴리오 12시간), 채움 = 쓴 시간, 눈금 = 목표, 남은 시간이 있는 줄만 채움 끝→눈금 점선 빈 자리", async () => {
+  it("막대: 축 = 가장 큰 값(글쓰기 12시간), 채움 = 쓴 시간, 눈금 = 목표, 남은 시간이 있는 줄만 채움 끝→눈금 점선 빈 자리", async () => {
     const { container } = await mount(fakeApi(spec()));
     const bars = items(container).map((li) => li.querySelector<HTMLElement>(".growth-goal-bar")!);
     expect(bars).toHaveLength(5);
     const fill = (b: HTMLElement) => b.querySelector<HTMLElement>(".growth-goal-fill");
     const tick = (b: HTMLElement) => b.querySelector<HTMLElement>(".growth-goal-tick");
     const gap = (b: HTMLElement) => b.querySelector<HTMLElement>(".growth-goal-gap");
-    // 채움 폭: 어학 120/720, 포트폴리오 720/720(축), 짧은 막대는 최소 6px
+    // 채움 폭: 어학 120/720, 글쓰기 720/720(축), 짧은 막대는 최소 6px
     expect(fill(bars[0])!.getAttribute("style")).toContain("max(6px, 16.667%)");
     expect(fill(bars[1])!.getAttribute("style")).toContain("max(6px, 100%)");
     // 눈금: 어학 목표 300/720, 기타는 목표가 없어 눈금 없음
@@ -335,7 +335,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
   it("채움은 분야 색 + 1px 윤곽(--color-chart-outline), 0분 분야도 목표가 있으면 한 줄(채움 없이 빈 자리만)", async () => {
     const d = spec({ thisWeek: [{ categoryId: G2, minutes: 720 }] });
     const { container } = await mount(fakeApi(d));
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동"]); // 기타는 쓴 시간이 없어 줄이 없다
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동"]); // 기타는 쓴 시간이 없어 줄이 없다
     const bars = items(container).map((li) => li.querySelector<HTMLElement>(".growth-goal-bar")!);
     expect(bars.map((b) => b.querySelector(".growth-goal-fill") !== null)).toEqual([false, true, false, false]);
     expect(bars.map((b) => b.querySelector(".growth-goal-gap") !== null)).toEqual([true, false, true, true]);
@@ -361,7 +361,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
   it("카드 앞 숨은 요약 하나: 명세 예와 같은 글, 줄 순서는 화면 줄 순서", async () => {
     const { container } = await mount(fakeApi(spec()));
     expect(summary(container)).toBe(
-      "이번 주 목표 15시간 중 12시간. 어학 2시간, 목표 5시간, 3시간 더. 포트폴리오 12시간, 목표 6시간. 자격증 3시간, 목표 3시간. 운동 1시간, 목표 1시간. 기타 2시간.",
+      "이번 주 목표 15시간 중 12시간. 어학 2시간, 목표 5시간, 3시간 더. 글쓰기 12시간, 목표 6시간. 자격증 3시간, 목표 3시간. 운동 1시간, 목표 1시간. 기타 2시간.",
     );
     const sr = container.querySelector(".growth-body > p.sr-only")!;
     expect(sr.compareDocumentPosition(container.querySelector(".growth-card")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -372,7 +372,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     const { container } = await mount(fakeApi(spec()), { onOpenCategory });
     fireEvent.click(within(items(container)[1]).getByRole("button"));
     // 고침8: 지금 그린 GrowthData도 같이 넘긴다(분야 페이지 요약 카드가 새 서버 호출 없이 쓴다)
-    expect(onOpenCategory).toHaveBeenCalledWith(G2, "포트폴리오", spec());
+    expect(onOpenCategory).toHaveBeenCalledWith(G2, "글쓰기", spec());
     fireEvent.click(within(items(container)[4]).getByRole("button"));
     expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타", spec());
   });
@@ -404,7 +404,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     const example = within(panel).getByRole("group", { name: "예시" });
     expect(card.contains(example)).toBe(true);
     const rows = Array.from(example.querySelectorAll<HTMLElement>(".growth-example-item"));
-    expect(rows.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["포트폴리오", "어학"]);
+    expect(rows.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["글쓰기", "어학"]);
     expect(rows.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 6시간", "목표 5시간"]);
     // 흐림(불투명 40%)은 막대에만 거는 CSS(PM d-125 — 예시 글은 흐리지 않는다). 줄마다 막대가 하나씩 있다
     expect(rows.map((li) => li.querySelectorAll(".growth-goal-bar").length)).toEqual([1, 1]);
@@ -422,7 +422,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     const { container } = await mount(fakeApi(d), { onOpenGoal: vi.fn() });
     fireEvent.click(tab("이번 주 목표"));
     const example = screen.getByRole("group", { name: "예시" });
-    expect(example.textContent).toBe("예시포트폴리오목표 6시간어학목표 5시간");
+    expect(example.textContent).toBe("예시글쓰기목표 6시간어학목표 5시간");
     for (const real of ["독서모임", "수영", "7시간", "1시간 30분"]) expect(example.textContent).not.toContain(real);
     expect(container.querySelector(".growth-body > p.sr-only")).toBeNull(); // 이 상태에는 실제 요약이 없다
     fireEvent.click(tab("목표 비율"));
@@ -509,7 +509,7 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
 
   it("띠 아래 목록: 만든 순서 · 기타 끝, 오른쪽 「10% / 목표 30%」(기타 「10%」), 굵은 줄 없음, 색 점은 1px 윤곽", async () => {
     const { container } = await mount(fakeApi(noGoal()));
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동", "기타"]);
     expect(values(container)).toEqual(["10% / 목표 30%", "60% / 목표 40%", "15% / 목표 20%", "5% / 목표 10%", "10%"]);
     expect(container.querySelector(".growth-list strong, .growth-list b, .growth-list .is-left")).toBeNull();
     const dots = Array.from(container.querySelectorAll<HTMLElement>(".growth-dot"));
@@ -520,7 +520,7 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
 
   it("카드 앞 숨은 요약 하나(줄 순서 = 화면 줄 순서)", async () => {
     const { container } = await mount(fakeApi(noGoal()));
-    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 20시간. 어학 10%, 목표 30%. 포트폴리오 60%, 목표 40%. 자격증 15%, 목표 20%. 운동 5%, 목표 10%. 기타 10%.");
+    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 20시간. 어학 10%, 목표 30%. 글쓰기 60%, 목표 40%. 자격증 15%, 목표 20%. 운동 5%, 목표 10%. 기타 10%.");
   });
 
   it("「원그래프로 보기」: 원 둘 나란히(왼쪽 「목표 비율」 · 오른쪽 「이번 주」), 조각마다 실선 1px 윤곽(점선 없음), 튀어나옴 없음", async () => {
@@ -700,7 +700,7 @@ describe("없앤 것(⑩ PM 8 · 명세 ③-S 두 뷰 공통)", () => {
 });
 
 /**
- * 빈 상태 셋(고침7, PM 15:1x · 23 S6 빈 상태). spec()의 쌓인 시간(cumulative) = 어학 20시간 · 포트폴리오 10시간 · 자격증 10시간 = 40시간
+ * 빈 상태 셋(고침7, PM 15:1x · 23 S6 빈 상태). spec()의 쌓인 시간(cumulative) = 어학 20시간 · 글쓰기 10시간 · 자격증 10시간 = 40시간
  * → 총 시간 % 50 · 25 · 25 · 운동 0 · 기타 0, 목표 비율 30 · 40 · 20 · 10
  */
 describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
@@ -759,7 +759,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     ]);
     expect(container.querySelector(".growth-band.is-empty")).toBeNull();
     expect(Array.from(container.querySelectorAll(".growth-legend-item")).map((el) => el.textContent)).toEqual(["목표 비율", "총 시간"]);
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동", "기타"]);
     expect(values(container)).toEqual(["50% / 목표 30%", "25% / 목표 40%", "25% / 목표 20%", "0% / 목표 10%", "0%"]);
     // 같은 계산: 칩에서 「총 시간」을 직접 고른 판(이번 주 기록이 있는 사람)의 목록·띠·합계와 값이 같다
     const shown = { values: values(container), cells: cells(lines[1]).map((c) => c.textContent), total: container.querySelector(".growth-card-total")?.textContent };
@@ -787,7 +787,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
   it("경우 1 화면 읽기: 「목표 비율과 견준 총 시간. 40시간. 이번 주 0시간. …」(이번 주 0시간을 알린다)", async () => {
     const { container } = await mount(fakeApi(weekZero()));
     expect(summary(container)).toBe(
-      "목표 비율과 견준 총 시간. 40시간. 이번 주 0시간. 어학 50%, 목표 30%. 포트폴리오 25%, 목표 40%. 자격증 25%, 목표 20%. 운동 0%, 목표 10%. 기타 0%.",
+      "목표 비율과 견준 총 시간. 40시간. 이번 주 0시간. 어학 50%, 목표 30%. 글쓰기 25%, 목표 40%. 자격증 25%, 목표 20%. 운동 0%, 목표 10%. 기타 0%.",
     );
     // 보이는 「이번 주 0시간」 줄은 요약이 읽으므로 두 번 읽지 않는다
     expect(container.querySelector(".growth-week-zero")?.getAttribute("aria-hidden")).toBe("true");
@@ -829,7 +829,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(chip("원그래프로 보기").parentElement).toBe(headOf(container));
     expect(container.querySelector(".growth-week-zero")).toBeNull();
     expect(container.textContent).not.toContain("아직 이번 주 오늘 기록이 없어요");
-    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%, 목표 30%. 포트폴리오 0%, 목표 40%. 자격증 0%, 목표 20%. 운동 0%, 목표 10%. 기타 0%.");
+    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%, 목표 30%. 글쓰기 0%, 목표 40%. 자격증 0%, 목표 20%. 운동 0%, 목표 10%. 기타 0%.");
     pick("총 시간");
     expect(period()).toBe("총 시간");
     expect(container.querySelector(".growth-card-total")?.textContent).toBe("0시간");
@@ -864,7 +864,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(right.querySelector("text")?.getAttribute("text-anchor")).toBe("middle");
     expect(container.querySelector(".growth-graph")?.getAttribute("aria-hidden")).toBe("true");
     // 고침9(PM d-148 가, Figma 121:240): 원 아래 목록 = 데이터 있는 판과 같은 목록(0%), 줄을 누르면 분야 페이지
-    expect(names(container)).toEqual(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    expect(names(container)).toEqual(["어학", "글쓰기", "자격증", "운동", "기타"]);
     expect(values(container)).toEqual(["0% / 목표 30%", "0% / 목표 40%", "0% / 목표 20%", "0% / 목표 10%", "0%"]);
     const evening = screen.getByRole("button", { name: "오늘 기록" });
     expect(after(container.querySelector(".growth-list")!, evening)).toBe(true); // 카드 끝 「오늘 기록」은 목록 아래
@@ -904,7 +904,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(periodChips()).toEqual(["이번 주", "총 시간", "비교"]);
     expect(screen.queryByRole("button", { name: "원그래프로 보기" })).toBeNull();
     expect(screen.getByRole("button", { name: "오늘 기록" })).toBeTruthy();
-    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%. 포트폴리오 0%. 자격증 0%. 운동 0%. 기타 0%.");
+    expect(summary(container)).toBe("목표 비율과 견준 이번 주. 0시간. 어학 0%. 글쓰기 0%. 자격증 0%. 운동 0%. 기타 0%.");
   });
 
   it("처음 기간 규칙과 기억값: 자동 「총 시간」은 적지 않아 이번 주 첫 기록이 생기면 다음에 열 때 「이번 주」, 칩에서 고른 「총 시간」은 그 주 동안 그대로", async () => {
@@ -942,7 +942,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     const evil = "<img src=x onerror=alert(1)>";
     const cats = [
       { id: G1, name: evil },
-      { id: G2, name: "포트폴리오" },
+      { id: G2, name: "글쓰기" },
       { id: G3, name: "자격증" },
       { id: G4, name: "운동" },
     ];
@@ -959,7 +959,7 @@ describe("빈 상태 셋(고침7) — 목표 비율 뷰", () => {
     expect(summary(c2)).toContain(`${evil} 0%, 목표 30%.`);
     expect(c2.querySelector("img")).toBeNull();
     // 정상 이름은 그대로 보인다(거절만 보는 시험이 아니다)
-    expect(summary(c2)).toContain("포트폴리오 0%, 목표 40%.");
+    expect(summary(c2)).toContain("글쓰기 0%, 목표 40%.");
   });
 });
 
@@ -1135,7 +1135,7 @@ describe("접근성", () => {
       "이번 주 ▾",
       "원그래프로 보기",
       "어학",
-      "포트폴리오",
+      "글쓰기",
       "자격증",
       "운동",
       "기타",

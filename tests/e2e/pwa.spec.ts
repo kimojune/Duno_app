@@ -21,7 +21,7 @@ test("b. manifest", async ({ request }) => {
   expect(res.status()).toBe(200);
   expect(res.headers()["content-type"]).toMatch(/json/);
   const m = await res.json();
-  expect(m).toMatchObject({ name: "duno", short_name: "duno", id: "/", start_url: "/", display: "standalone" });
+  expect(m).toMatchObject({ name: "두노", short_name: "두노", id: "/", start_url: "/", display: "standalone" });
   const icons = m.icons as { sizes: string; purpose?: string }[];
   expect(icons.some((i) => i.sizes === "192x192" && i.purpose === "any")).toBe(true);
   expect(icons.some((i) => i.sizes === "512x512" && i.purpose === "any")).toBe(true);
@@ -103,7 +103,7 @@ test("f'. 콜백: Google 취소는 cancelled, 그 밖의 오류는 login (D2)", 
 });
 
 test("g. 아이콘이 로그인으로 리다이렉트되지 않고 200", async ({ request }) => {
-  for (const p of ["/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/offline.html"]) {
+  for (const p of ["/icon-v2-192.png", "/icon-v2-512.png", "/icon-v2-maskable-512.png", "/offline.html"]) {
     const res = await request.get(p, { maxRedirects: 0 });
     expect(res.status(), p).toBe(200);
   }

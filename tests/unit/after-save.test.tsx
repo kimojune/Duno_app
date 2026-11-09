@@ -15,7 +15,7 @@ const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
 const C3 = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
 const CATS = [
   { id: C1, name: "어학" },
-  { id: C2, name: "포트폴리오" },
+  { id: C2, name: "글쓰기" },
   { id: C3, name: "자격증" },
 ];
 
@@ -39,12 +39,12 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     ...over,
   };
 }
-/** Figma 49:142: 목표 세운 주 — 어학 2시간(+1시간, 목표 5시간) · 포트폴리오 12시간(+2시간, 목표 6시간) */
+/** Figma 49:142: 목표 세운 주 — 어학 2시간(+1시간, 목표 5시간) · 글쓰기 12시간(+2시간, 목표 6시간) */
 const GOAL_WEEK = growth({
   thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 720 }, { categoryId: null, minutes: 60 }],
   goal: { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 360 }] },
 });
-/** Figma 59:2: 목표 없는 주 — 이번 주 10시간 중 어학 2시간(20%, 목표 30%) · 포트폴리오 6시간(60%, 목표 40%) */
+/** Figma 59:2: 목표 없는 주 — 이번 주 10시간 중 어학 2시간(20%, 목표 30%) · 글쓰기 6시간(60%, 목표 40%) */
 const RATIO_WEEK = growth({
   ratios: [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 40 }, { categoryId: C3, percent: 30 }],
   thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 360 }, { categoryId: null, minutes: 120 }],
@@ -126,7 +126,7 @@ describe("AfterSaveCard 화면", () => {
     render(<AfterSaveCard delta={DELTA} data={GOAL_WEEK} fallback={CATS} />);
     expect(screen.getByRole("heading", { name: "이번 주" }).className).toBe("after-save-week");
     expect(rows()).toEqual([
-      { name: "포트폴리오", value: "12시간 +2시간", more: "목표 6시간" },
+      { name: "글쓰기", value: "12시간 +2시간", more: "목표 6시간" },
       { name: "어학", value: "2시간 +1시간", more: "3시간 더" },
     ]);
     expect(Array.from(document.querySelectorAll(".after-save-delta")).map((b) => [b.tagName, b.textContent])).toEqual([
@@ -137,7 +137,7 @@ describe("AfterSaveCard 화면", () => {
     const dots = Array.from(document.querySelectorAll<HTMLElement>(".after-save-card .chip-dot")).map((d) => d.style.background);
     expect(dots).toEqual(["var(--color-category-2)", "var(--color-category-1)"]);
     await flushFrames();
-    // 잣대 720분: 포트폴리오 600 + 120, 어학 60 + 60. 빗금 칸 폭 = delta 몫
+    // 잣대 720분: 글쓰기 600 + 120, 어학 60 + 60. 빗금 칸 폭 = delta 몫
     expect([fill(C2, "before")!.style.width, fill(C2, "added")!.style.width]).toEqual(["83.33%", "16.67%"]);
     expect([fill(C1, "before")!.style.width, fill(C1, "added")!.style.width]).toEqual(["8.33%", "8.33%"]);
     expect(fill(C1, "added")!.className).toBe("after-save-fill after-save-hatch");
@@ -146,19 +146,19 @@ describe("AfterSaveCard 화면", () => {
     expect([tick(C2)!.style.insetInlineStart, tick(C1)!.style.insetInlineStart]).toEqual(["50%", "41.67%"]);
     // 막대 그림은 화면 읽기에서 숨기고 상태 알림 한 문장으로 읽는다
     expect(document.querySelector(".after-save-bar")!.getAttribute("aria-hidden")).toBe("true");
-    expect(status()).toEqual(["저장했어요. 포트폴리오 2시간 더해서 이번 주 12시간. 목표 6시간. 어학 1시간 더해서 이번 주 2시간. 목표까지 3시간."]);
+    expect(status()).toEqual(["저장했어요. 글쓰기 2시간 더해서 이번 주 12시간. 목표 6시간. 어학 1시간 더해서 이번 주 2시간. 목표까지 3시간."]);
   });
 
   it("목표 없는 주(Figma 59:2): 막대 아래 「이번 주 20% / 목표 30%」, 목표 눈금 없음. 상태 알림도 %", async () => {
     render(<AfterSaveCard delta={DELTA} data={RATIO_WEEK} fallback={CATS} />);
     expect(rows()).toEqual([
-      { name: "포트폴리오", value: "6시간 +2시간", more: "이번 주 60% / 목표 40%" },
+      { name: "글쓰기", value: "6시간 +2시간", more: "이번 주 60% / 목표 40%" },
       { name: "어학", value: "2시간 +1시간", more: "이번 주 20% / 목표 30%" },
     ]);
     expect(document.querySelectorAll(".after-save-tick")).toHaveLength(0);
     await flushFrames();
     expect([fill(C2, "before")!.style.width, fill(C2, "added")!.style.width]).toEqual(["66.67%", "33.33%"]);
-    expect(status()).toEqual(["저장했어요. 포트폴리오 2시간 더해서 이번 주 6시간. 이번 주 60%, 목표 40%. 어학 1시간 더해서 이번 주 2시간. 이번 주 20%, 목표 30%."]);
+    expect(status()).toEqual(["저장했어요. 글쓰기 2시간 더해서 이번 주 6시간. 이번 주 60%, 목표 40%. 어학 1시간 더해서 이번 주 2시간. 이번 주 20%, 목표 30%."]);
   });
 
   it("명세 예 문장: 「저장했어요. 어학 1시간 더해서 이번 주 2시간. 목표까지 3시간.」", () => {
@@ -213,8 +213,8 @@ describe("AfterSaveCard 화면", () => {
 
   it("악용: 분야 이름의 HTML은 글자 그대로(img 요소 없음). 정상 이름도 그대로", async () => {
     const evil = '<img src=x onerror="window.__as=1">';
-    render(<AfterSaveCard delta={DELTA} data={{ ...GOAL_WEEK, categories: [{ id: C1, name: evil }, { id: C2, name: "포트폴리오" }] }} fallback={CATS} />);
-    expect(rows().map((r) => r.name)).toEqual(["포트폴리오", evil]);
+    render(<AfterSaveCard delta={DELTA} data={{ ...GOAL_WEEK, categories: [{ id: C1, name: evil }, { id: C2, name: "글쓰기" }] }} fallback={CATS} />);
+    expect(rows().map((r) => r.name)).toEqual(["글쓰기", evil]);
     expect(status()[0]).toContain(evil);
     expect(document.querySelector("img[src='x']")).toBeNull();
     expect((window as unknown as { __as?: number }).__as).toBeUndefined();
@@ -245,6 +245,6 @@ describe("AfterSave(상태보기 데이터 읽기 — 이미 있는 GrowthApi.fe
     const thrower: GrowthApi = { fetchGrowth: vi.fn(async () => Promise.reject(new Error("x"))), fetchCategoryPage: vi.fn(), recordView: vi.fn() };
     render(<AfterSave api={thrower} delta={DELTA} fallback={CATS} />);
     await act(async () => {});
-    expect(status()).toEqual(["저장했어요. 포트폴리오 +2시간. 어학 +1시간."]);
+    expect(status()).toEqual(["저장했어요. 글쓰기 +2시간. 어학 +1시간."]);
   });
 });

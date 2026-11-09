@@ -37,7 +37,7 @@ const LOGS: EveningLog[] = [
 ];
 
 describe("computeGrowth: 이번 주(달력 주)", () => {
-  const base = { logs: LOGS, categories: [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }], ratios: [], goalItems: null };
+  const base = { logs: LOGS, categories: [{ id: C1, name: "어학" }, { id: C2, name: "글쓰기" }], ratios: [], goalItems: null };
   it("월요일부터 일요일까지(11-02 ~ 11-08)만 더한다. 지난 주 일요일(11-01)·토요일(10-31)은 빠진다", () => {
     const d = computeGrowth({ ...base, today: "2026-11-07" });
     expect(d.thisWeek).toEqual(expect.arrayContaining([{ categoryId: C1, minutes: 90 }, { categoryId: C2, minutes: 30 }, { categoryId: null, minutes: 15 }]));
@@ -68,7 +68,7 @@ describe("computeGrowth: 이번 주(달력 주)", () => {
 function serverStore() {
   const store = new FakeStore();
   store.rules = v2Rules();
-  for (const [id, name] of [[C1, "어학"], [C2, "포트폴리오"]] as const) {
+  for (const [id, name] of [[C1, "어학"], [C2, "글쓰기"]] as const) {
     store.seed("categories", { id, user_id: ME, name_encrypted: encryptCategoryName(name, ME, KEY!), archived_at: null });
   }
   store.seed("category_ratios", { user_id: ME, category_id: C1, percent: 60 });
@@ -93,7 +93,7 @@ function deviceMirror(): Mirror {
     synced: true,
     categories: [
       { id: C1, readable: true, name: "어학", createdAt: "2026-10-01T00:00:00.000Z" },
-      { id: C2, readable: true, name: "포트폴리오", createdAt: "2026-10-02T00:00:00.000Z" },
+      { id: C2, readable: true, name: "글쓰기", createdAt: "2026-10-02T00:00:00.000Z" },
     ],
     settings: {
       goal: null,

@@ -7,7 +7,7 @@ import { photoDir } from "./photo-dir";
  * PM d-126: 오늘 기록 · 오늘 할 일 시트의 「닫기」로 입력 잃음 막기 — 진짜 브라우저의 뒤로 가기(page.goBack)로 겹친 창 규칙을 한 번 본다.
  * 바꾼 것이 있으면 「닫기」·뒤로 가기가 확인 「저장하지 않고 나갈까요?」(PM d-135 글 — 「계속 적기」·「나가기」)를 띄우고, 「계속 적기」 뒤 뒤로 가기를 다시 누르면 다시 확인이 뜬다
  * (history 칸이 어긋나 앱 밖으로 나가거나 뒤로 가기가 먹히지 않으면 안 된다). 사진 360×800은 docs/oneshot-v2/고침5/.
- * 개발 갤러리(/dev/v2?s=evening-todo)의 화면이다. 개발 서버(3200)에서 돈다: npm run screens
+ * 개발 갤러리(/dev/v2?s=evening-todo)의 화면이다. 개발 서버에서 돈다(SCREENS_PORT·SCREENS_DIST_DIR를 꼭 준다): npm run screens
  */
 const OUT = photoDir("고침5"); // 기본 test-results/photos/, SAVE_PHOTOS=1일 때만 docs/oneshot-v2/ (tests/screens/photo-dir.ts)
 

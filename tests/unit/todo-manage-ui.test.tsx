@@ -420,7 +420,7 @@ describe("고침9 S2 목록 줄 꼴(Figma 50:52)", () => {
 describe("고침9 PM 2-B 할 일 줄 작업 기록 아이콘", () => {
   it("기록이 있는 할 일만 글 바로 뒤에 종이 아이콘(화면 읽기 「작업 기록 있음」), 없으면 없음", () => {
     const withNotes: TodoItem = { ...item(A, "토익 단어 50개"), hasNotes: true };
-    render(<TodoScreen initial={initial([withNotes, item(B, "포트폴리오")])} manage={fakeApi()} />);
+    render(<TodoScreen initial={initial([withNotes, item(B, "글쓰기")])} manage={fakeApi()} />);
     const icons = screen.getAllByRole("img", { name: "작업 기록 있음" });
     expect(icons).toHaveLength(1);
     const icon = icons[0];
