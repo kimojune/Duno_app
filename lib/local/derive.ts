@@ -13,6 +13,8 @@ import { sortByPosition } from "../todos/order";
 import type { TodayTodos, TodoItem, TodoResult } from "../todos/types";
 import { addDays, isDayString, weekStartFor } from "../week";
 import { latestLogPerDay } from "./logs";
+import { categoryPageFromDay, mergeCategoryMinutes } from "../notes/category-minutes";
+import type { CategoryPageDay } from "../notes/types";
 import type { Mirror, MirrorTodo } from "./types";
 
 /**
@@ -118,6 +120,19 @@ export function deriveGrowth(m: Mirror, nowMs: number): RecordResult<GrowthData>
       goalText: m.settings?.goal ?? null,
     }),
   };
+}
+
+/**
+ * 분야 페이지 날짜별 시간(고침8): 서버가 준 날짜 묶음의 할 일은 그대로 두고, minutes는 기기 사본의 오늘 기록에서 서버와 같은 규칙
+ * (mergeCategoryMinutes · 날마다 가장 늦은 것 latestLogPerDay — F6 기준)으로 다시 센다. 아직 기기에 저장만 하고 보내지 않은 기록도 든다.
+ * 범위도 서버와 같다: 할 일을 상한까지 받았으면 그 가장 오래된 날부터. 기기 사본을 모르면(처음 받기 전) null — 서버 값을 그대로 쓴다
+ */
+export function deriveCategoryDays(m: Mirror, categoryId: string | null, days: CategoryPageDay[]): CategoryPageDay[] | null {
+  if (isUnknown(m)) return null;
+  const todoDays = days.filter((d) => d.todos.length > 0);
+  const todoCount = todoDays.reduce((s, d) => s + d.todos.length, 0);
+  const fromDay = categoryPageFromDay(todoCount, todoDays);
+  return mergeCategoryMinutes(todoDays, latestLogPerDay(m.logs), categoryId, fromDay);
 }
 
 /** 타이머 화면이 열릴 때: 진행 중인 세션과 오늘 시작한 세션들 */

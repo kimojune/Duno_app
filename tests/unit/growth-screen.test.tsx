@@ -175,8 +175,9 @@ describe("상태보기 (7-4, ③)", () => {
     const { onOpenCategory } = await mount(fakeApi());
     fireEvent.click(screen.getByRole("button", { name: /^어학/ }));
     fireEvent.click(screen.getByRole("button", { name: /^기타/ }));
-    expect(onOpenCategory).toHaveBeenNthCalledWith(1, C1, "어학");
-    expect(onOpenCategory).toHaveBeenNthCalledWith(2, null, "기타");
+    // 고침8: 지금 그린 GrowthData를 같이 넘긴다(분야 페이지 요약 카드가 새 서버 호출 없이 쓴다)
+    expect(onOpenCategory).toHaveBeenNthCalledWith(1, C1, "어학", growth());
+    expect(onOpenCategory).toHaveBeenNthCalledWith(2, null, "기타", growth());
   });
 
   it("그려진 뒤에 본 것을 입구와 함께 한 번 남긴다", async () => {
@@ -291,19 +292,20 @@ describe("분야 페이지 (G13-a)", () => {
     days: [
       {
         day: "2026-11-06",
+        minutes: 0,
         todos: [
           { id: "t1", text: "단어 외우기", done: true, notes: [{ id: "n1", todoId: "t1", day: "2026-11-06", createdAt: "x", readable: true, text: "단어 50개 외웠다" }] },
           { id: "t2", text: "듣기", done: false, notes: [] },
         ],
       },
-      { day: "2026-11-05", todos: [{ id: "t3", text: null, done: false, notes: [{ id: "n2", todoId: "t3", day: "2026-11-05", createdAt: "x", readable: false, text: null }] }] },
+      { day: "2026-11-05", minutes: 0, todos: [{ id: "t3", text: null, done: false, notes: [{ id: "n2", todoId: "t3", day: "2026-11-05", createdAt: "x", readable: false, text: null }] }] },
     ],
   };
   const api = (data: CategoryPageData = page) => fakeApi(growth(), { fetchCategoryPage: vi.fn(async () => ({ ok: true as const, data })) });
 
   it("날짜별로 할 일과 작업 기록이 모이고, 끝낸 일은 「끝냄」, 기록이 없으면 그렇게 보인다", async () => {
     const a = api();
-    render(<CategoryPage api={a} categoryId={C1} name="어학" onClose={vi.fn()} />);
+    render(<CategoryPage api={a} categoryId={C1} name="어학" growth={growth()} onClose={vi.fn()} />);
     expect(await screen.findByText("단어 50개 외웠다")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "어학" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "11월 6일 금요일" })).toBeTruthy();
@@ -316,7 +318,7 @@ describe("분야 페이지 (G13-a)", () => {
 
   it("그려지면 본 것을 스스로 연 것(self)으로 한 번 남긴다", async () => {
     const a = api();
-    render(<CategoryPage api={a} categoryId={C1} name="어학" onClose={vi.fn()} />);
+    render(<CategoryPage api={a} categoryId={C1} name="어학" growth={growth()} onClose={vi.fn()} />);
     await screen.findByText("단어 50개 외웠다");
     await waitFor(() => expect(a.recordView).toHaveBeenCalledTimes(1));
     expect(a.recordView).toHaveBeenCalledWith({ id: expect.any(String), screen: "category", entry: "self" });
@@ -324,15 +326,17 @@ describe("분야 페이지 (G13-a)", () => {
 
   it("할 일이 없으면 안내, 기타 페이지는 categoryId null로 읽는다", async () => {
     const a = api({ categoryId: null, days: [] });
-    render(<CategoryPage api={a} categoryId={null} name="기타" onClose={vi.fn()} />);
-    expect(await screen.findByText("이 분야에 적은 할 일이 아직 없어요.")).toBeTruthy();
+    render(<CategoryPage api={a} categoryId={null} name="기타" growth={growth()} onClose={vi.fn()} />);
+    // 빈 글은 「할 일 0개」(명세 ⑬ 24, PM 「143 가」 — 예전 「이 분야에 적은 할 일이 아직 없어요.」)
+    expect(await screen.findByText("할 일 0개")).toBeTruthy();
+    expect(screen.queryByText("이 분야에 적은 할 일이 아직 없어요.")).toBeNull();
     expect(a.fetchCategoryPage).toHaveBeenCalledWith(null);
   });
 
   it("읽기 실패는 안내와 다시 불러오기, Esc로 닫힌다", async () => {
     const fetchCategoryPage = vi.fn().mockResolvedValueOnce({ ok: false, error: "unavailable" }).mockResolvedValue({ ok: true, data: page });
     const onClose = vi.fn();
-    render(<CategoryPage api={fakeApi(growth(), { fetchCategoryPage })} categoryId={C1} name="어학" onClose={onClose} />);
+    render(<CategoryPage api={fakeApi(growth(), { fetchCategoryPage })} categoryId={C1} name="어학" growth={growth()} onClose={onClose} />);
     expect(await screen.findByText("분야 페이지를 불러오지 못했어요.")).toBeTruthy();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" })));
     expect(await screen.findByText("단어 50개 외웠다")).toBeTruthy();
@@ -342,8 +346,8 @@ describe("분야 페이지 (G13-a)", () => {
 
   it("작업 기록 글은 글자 그대로 보인다", async () => {
     const evil = '<script>window.__c=1</script>';
-    const a = api({ categoryId: C1, days: [{ day: "2026-11-06", todos: [{ id: "t", text: evil, done: false, notes: [] }] }] });
-    render(<CategoryPage api={a} categoryId={C1} name="어학" onClose={vi.fn()} />);
+    const a = api({ categoryId: C1, days: [{ day: "2026-11-06", minutes: 0, todos: [{ id: "t", text: evil, done: false, notes: [] }] }] });
+    render(<CategoryPage api={a} categoryId={C1} name="어학" growth={growth()} onClose={vi.fn()} />);
     expect(await screen.findByText(evil)).toBeTruthy();
     expect(document.querySelector("script")).toBeNull();
   });

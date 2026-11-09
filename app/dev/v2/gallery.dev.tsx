@@ -16,6 +16,7 @@ import type { FocusApi } from "../../../lib/focus-api";
 import type { GoalsApi } from "../../../lib/goals-api";
 import type { GrowthApi } from "../../../lib/growth-api";
 import type { GrowthData } from "../../../lib/growth/types";
+import type { CategoryPageData } from "../../../lib/notes/types";
 import type { ManageApi } from "../../../lib/manage-api";
 import type { SettingsApi } from "../../../lib/onboarding-api";
 import type { PushApi } from "../../../lib/push/subscribe";
@@ -32,6 +33,7 @@ import type { TodayRead } from "../../../lib/today-types";
  *  - growth-goal | growth-ratio | growth-pie: 상태보기 두 뷰(고침5) — 목표 한 줄 + 이번 주 목표 뷰 / 목표 비율 뷰 띠 / 목표 비율 뷰 원(기억한 탭·보기로 연다)
  *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
+ *  - category · category-other · category-empty(고침8): 분야 페이지 요약 카드 + 날짜별 시간 막대 / 기타 페이지 / 빈 분야(0%)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
  *  - me-goal · me-goal-empty · me-goal-fail(고침6 ③): 내 정보 첫 카드(목표 있음·없음). 카드를 누르면 S8-b 「목표」. me-goal-fail은 저장이 늘 실패한다
  *  - after-save(고침6 ④-①): 오늘 기록을 「나누지 않고 저장」한 뒤의 한 줄 + 남은 시간(이번 주 목표 어학 5시간 중 2시간 → 「3시간 더」)
@@ -138,6 +140,7 @@ const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
       days: [
         {
           day: "2026-11-06",
+          minutes: 0,
           todos: [
             { id: "t1", text: "단어 서른 개 외우기", done: true, notes: [{ id: "n1", todoId: "t1", day: "2026-11-06", createdAt: "x", readable: true, text: "오전에 열 개, 저녁에 스무 개를 외웠다." }] },
             { id: "t2", text: "듣기 모의고사 한 회", done: false, notes: [] },
@@ -146,6 +149,32 @@ const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
       ],
     },
   }),
+  recordView: async () => ({ ok: true }),
+});
+/**
+ * 분야 페이지(고침8): 날짜별 시간 막대. 11-07 1시간 30분(할 일 하나) · 11-06 2시간(가장 긴 날 = 폭 전체, 끝낸 일 + 작업 기록)
+ * · 11-05 45분(시간만 있고 할 일 없음 — 머리·막대만) · 11-04 0분(할 일만 — 막대 없음)
+ */
+const CATEGORY_DAYS: CategoryPageData["days"] = [
+  { day: "2026-11-07", minutes: 90, todos: [{ id: "t3", text: "듣기 모의고사 한 회", done: false, notes: [] }] },
+  {
+    day: "2026-11-06",
+    minutes: 120,
+    todos: [
+      { id: "t1", text: "단어 서른 개 외우기", done: true, notes: [{ id: "n1", todoId: "t1", day: "2026-11-06", createdAt: "x", readable: true, text: "오전에 열 개, 저녁에 스무 개를 외웠다." }] },
+      { id: "t2", text: "문법 한 단원 정리", done: false, notes: [] },
+    ],
+  },
+  { day: "2026-11-05", minutes: 45, todos: [] },
+  { day: "2026-11-04", minutes: 0, todos: [{ id: "t4", text: "단어장 만들기", done: true, notes: [] }] },
+];
+const OTHER_DAYS: CategoryPageData["days"] = [
+  { day: "2026-11-07", minutes: 90, todos: [{ id: "o1", text: "장보기", done: true, notes: [] }] },
+  { day: "2026-11-05", minutes: 30, todos: [] },
+];
+const categoryApi = (categoryId: string | null, days: CategoryPageData["days"]): GrowthApi => ({
+  fetchGrowth: never,
+  fetchCategoryPage: async () => ({ ok: true, data: { categoryId, days } }),
   recordView: async () => ({ ok: true }),
 });
 const manageApi: ManageApi = {
@@ -425,7 +454,17 @@ export function V2Gallery({ id }: { id: string }) {
     return <Opener render={(close) => <EveningRecord api={eveningApi} onClose={close} />} />;
   }
   if (id === "category") {
-    return <Opener render={(close) => <CategoryPage api={growthApi(EMPTY_GROWTH)} categoryId={C1} name="어학" onClose={close} />} />;
+    // 고침8: 요약 카드(누적 40시간 중 어학 67% · 이번 주 7시간 · 목표 비율 50%) + 날짜별 시간 막대(시간만 있는 날 포함)
+    return <Opener render={(close) => <CategoryPage api={categoryApi(C1, CATEGORY_DAYS)} categoryId={C1} name="어학" growth={WEEK_GROWTH} onClose={close} />} />;
+  }
+  if (id === "category-other") {
+    // 고침8: 기타 페이지 — 같은 꼴, 「목표 비율」 줄 없음
+    const growth: GrowthData = { ...WEEK_GROWTH, cumulative: [...WEEK_GROWTH.cumulative, { categoryId: null, minutes: 400 }] };
+    return <Opener render={(close) => <CategoryPage api={categoryApi(null, OTHER_DAYS)} categoryId={null} name="기타" growth={growth} onClose={close} />} />;
+  }
+  if (id === "category-empty") {
+    // 고침8: 빈 분야 — 요약 카드(0%, 총 0시간, 이번 주 0시간, 목표 비율 30%) + 「할 일 0개」
+    return <Opener render={(close) => <CategoryPage api={categoryApi(C2, [])} categoryId={C2} name="포트폴리오" growth={EMPTY_GROWTH} onClose={close} />} />;
   }
   if (id === "timer-many") {
     return (

@@ -7,7 +7,9 @@ import { decryptTodoText, encryptTodoText, type TodoKey } from "../todos/crypto"
 import { resolveWriteDay } from "../todos/day";
 import { todoIdSchema } from "../todos/validation";
 import { checkNoteText, NOTE_MAX_LENGTH_PUBLIC } from "./public";
-import type { CategoryPageData, CategoryPageDay, NoteItem } from "./types";
+import { readLatestLogsForUser } from "../evening/core";
+import { CATEGORY_PAGE_LOG_LIMIT, CATEGORY_PAGE_TODO_LIMIT, categoryPageFromDay, mergeCategoryMinutes } from "./category-minutes";
+import type { CategoryPageData, CategoryPageTodo, NoteItem } from "./types";
 
 /**
  * 할 일마다 작업 기록(PRD 7-2)과 분야 페이지(7-4, G13-a)의 서버 함수. 서버 전용.
@@ -19,8 +21,8 @@ export type NotesDeps = { supabase: SupabaseClient; key: TodoKey | null; now?: (
 
 /** 임시, 결정 필요: 작업 기록 한 개 글자 수 상한 2000(코드 포인트). 화면과 같은 값(lib/notes/public.ts) */
 export const NOTE_MAX_LENGTH = NOTE_MAX_LENGTH_PUBLIC;
-/** 분야 페이지가 읽는 할 일 수 상한(임시, 최근 것부터) */
-export const CATEGORY_PAGE_TODO_LIMIT = 500;
+/** 분야 페이지가 읽는 할 일 수 상한(임시, 최근 것부터). 값은 lib/notes/category-minutes.ts(기기 먼저 저장도 같은 값) */
+export { CATEGORY_PAGE_TODO_LIMIT };
 
 const serverNow = () => new Date();
 export { checkNoteText };
@@ -139,6 +141,7 @@ const CHUNK = 100;
 /**
  * 분야 페이지: 그 분야(categoryId, null이면 기타)의 할 일을 날짜별로 모으고 각 할 일의 작업 기록을 붙인다.
  * 날짜는 최근 것이 위, 한 날 안은 적은 순서. 할 일은 최근 500개까지 읽는다(임시).
+ * 날마다 minutes(그날 가장 늦은 오늘 기록에서 이 분야 분)를 붙이고, 시간만 있고 할 일이 없는 날도 날짜 목록에 든다(고침8).
  */
 export async function readCategoryPage(deps: NotesDeps, categoryId: unknown): Promise<RecordResult<CategoryPageData>> {
   try {
@@ -177,7 +180,7 @@ export async function readCategoryPage(deps: NotesDeps, categoryId: unknown): Pr
       }
     }
 
-    const days: CategoryPageDay[] = [];
+    const days: { day: string; todos: CategoryPageTodo[] }[] = [];
     for (const row of todoRows) {
       let bucket = days[days.length - 1];
       if (!bucket || bucket.day !== row.day) {
@@ -192,7 +195,13 @@ export async function readCategoryPage(deps: NotesDeps, categoryId: unknown): Pr
         notes: notesByTodo.get(row.id) ?? [],
       });
     }
-    return { ok: true, data: { categoryId: category, days } };
+    // 날짜별 시간(고침8): 이미 저장된 오늘 기록을 읽기만 한다. 세션의 user id로만 읽고(앱 필터 + RLS), 분야 번호는 위 할 일 읽기와
+    // 같은 검사(uuid · 내 할 일만)를 거친 값이다. 남의 분야 번호면 할 일이 비고, 내 기록의 items에 그 번호가 없어 분도 0이다.
+    // 범위: 할 일을 상한까지 읽었으면 그 가장 오래된 날부터, 오늘 기록은 최근 것부터 CATEGORY_PAGE_LOG_LIMIT행까지(상태보기와 같은 상한).
+    const fromDay = categoryPageFromDay(todoRows.length, days);
+    const logs = await readLatestLogsForUser(deps.supabase, user.data, { fromDay, limit: CATEGORY_PAGE_LOG_LIMIT });
+    if (!logs.ok) return logs;
+    return { ok: true, data: { categoryId: category, days: mergeCategoryMinutes(days, logs.data, category, fromDay) } };
   } catch {
     return recordFail("unavailable");
   }

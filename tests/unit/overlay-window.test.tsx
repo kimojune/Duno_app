@@ -24,12 +24,16 @@ const never = () => new Promise<never>(() => {});
 const goalApi = { fetchSummary: never, save: vi.fn(), clear: vi.fn() };
 const growthApi = { fetchCategoryPage: never, recordView: vi.fn(async () => ({ ok: true })) };
 const eveningApi = { fetchState: never, save: vi.fn() };
+const GROWTH = {
+  today: "2026-11-07", weekStart: "2026-11-02", lastWeekStart: "2026-10-26", lastMonthRange: { from: "2026-10-01", to: "2026-10-31" },
+  categories: [], ratios: [], thisWeek: [], lastWeek: [], lastMonth: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0, goal: null, goalText: null,
+};
 const manageApi = { fetchNotes: never, addNote: vi.fn(), deleteNote: vi.fn(), editTodo: vi.fn(), deleteTodo: vi.fn() };
 
 type Renderer = (onClose: () => void) => ReactNode;
 const WINDOWS: [string, Renderer][] = [
   ["이번 주 목표", (onClose) => <GoalEditor api={goalApi as never} categories={[]} goal={null} onClose={onClose} onSaved={() => {}} />],
-  ["분야 페이지", (onClose) => <CategoryPage api={growthApi as never} categoryId={null} name="어학" onClose={onClose} />],
+  ["분야 페이지", (onClose) => <CategoryPage api={growthApi as never} categoryId={null} name="어학" growth={GROWTH} onClose={onClose} />],
   ["저녁 기록", (onClose) => <EveningRecord api={eveningApi as never} onClose={onClose} />],
   [
     "할 일 자세히",
