@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 
 /**
  * 아래 탭 줄의 실제 높이(B9): 글자가 커져 두 줄이 되면 본문 아래 여백(--tabbar-h)도 따라 늘린다.
- * 재기 전·아직 그려지지 않았을 때(0)는 한 줄 기준 값 + 안전 영역을 쓴다.
+ * 재기 전·아직 그려지지 않았을 때(0)는 한 줄 기준 값(64 — 고침9 A6, Figma 아래 탭 높이 64) + 안전 영역을 쓴다.
  * AppShell과 개발용 화면 모음(/dev/v2)이 같은 코드를 쓴다: 시험 화면이 실제 앱과 다른 여백을 쓰지 않게.
  * 돌려받은 ref를 .tabbar를 품은 가장 바깥 요소에 달고, style을 같은 요소에 건다.
  */
@@ -24,6 +24,6 @@ export function useTabbarHeight<T extends HTMLElement = HTMLDivElement>(): { she
     observer.observe(bar);
     return () => observer.disconnect();
   }, []);
-  const shellStyle = { "--tabbar-h": tabbarH === null ? "calc(56px + env(safe-area-inset-bottom))" : `${tabbarH}px` } as CSSProperties;
+  const shellStyle = { "--tabbar-h": tabbarH === null ? "calc(64px + env(safe-area-inset-bottom))" : `${tabbarH}px` } as CSSProperties;
   return { shellRef, shellStyle };
 }

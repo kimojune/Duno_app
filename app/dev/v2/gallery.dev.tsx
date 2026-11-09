@@ -217,6 +217,7 @@ const EMPTY_GROWTH: GrowthData = {
   cumulative: [],
   loggedDaysThisWeek: 0,
   loggedDaysTotal: 0,
+  streakWeeks: 0,
   goal: null,
   goalText: null,
 };
@@ -230,6 +231,7 @@ const WEEK_GROWTH: GrowthData = {
   cumulative: [{ categoryId: C1, minutes: 2400 }, { categoryId: C2, minutes: 900 }, { categoryId: C3, minutes: 300 }],
   loggedDaysThisWeek: 6,
   loggedDaysTotal: 20,
+  streakWeeks: 3,
 };
 
 /** 이번 주는 아직 0시간, 지난 기록은 쌓인 사람(고침7 ①): 목표 비율 뷰가 「총 시간」(60시간)으로 시작한다 */
@@ -270,6 +272,7 @@ const GOAL_GROWTH: GrowthData = {
   ],
   loggedDaysThisWeek: 5,
   loggedDaysTotal: 21,
+  streakWeeks: 3, // Figma 50:137·50:193·50:260 「3주 이어서 기록」
   goal: {
     weekStart: "2026-11-02",
     items: [
@@ -284,6 +287,13 @@ const GOAL_GROWTH: GrowthData = {
 /** 목표 최대 길이(100자) 글: 띄어쓰기 없는 긴 낱말과 꺾쇠 모양 글을 섞는다(가로 넘침·글자 그대로 보기) */
 export const LONG_GOAL = ("<img src=x onerror=alert(1)> " + "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허".repeat(3)).slice(0, 100);
 const RATIO_PREF = (view: "band" | "pie") => ({ period: "week", view, tab: "ratio", tabWeek: "2026-11-02" });
+/** 원 보기만 고른 값(기간·탭은 처음 규칙 그대로) — 빈 상태의 원 보기(고침9, Figma 121:240·121:315) */
+const PIE_ONLY_PREF = { view: "pie" };
+/** 목표를 세운 주 · 이번 주 기록 없음(고침9, Figma 51:107): 막대는 모두 빈 칸, 연속 기록 줄 없음 */
+const GOAL_NO_RECORD_GROWTH: GrowthData = { ...GOAL_GROWTH, thisWeek: [], loggedDaysThisWeek: 0, streakWeeks: 0 };
+/** 목표를 세우지 않은 주에 「이번 주 목표」 탭을 고른 때(고침6 ② · 고침9, Figma 50:741) */
+const NO_GOAL_GROWTH: GrowthData = { ...GOAL_GROWTH, goal: null, streakWeeks: 0 };
+const GOAL_TAB_PREF = { tab: "goal", tabWeek: "2026-11-02" };
 
 /** 분야 50개(꺾쇠·긴 이름 포함): 화면이 가로로 넘치지 않는지 본다. 이름은 모두 지어낸 예시 */
 const MANY_IDS = Array.from({ length: 50 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
@@ -419,6 +429,30 @@ export function V2Gallery({ id }: { id: string }) {
     const cats = id === "evening-split" ? CATEGORIES : MANY;
     return <Opener render={(close) => <EveningRecord api={eveningSplitApi(cats)} onClose={close} />} />;
   }
+  if (id === "growth-goal-norecord" || id === "growth-nogoal") {
+    return (
+      <Shell>
+        <GrowthScreen
+          api={growthApi(id === "growth-nogoal" ? NO_GOAL_GROWTH : GOAL_NO_RECORD_GROWTH, id === "growth-nogoal" ? GOAL_TAB_PREF : undefined)}
+          active
+          activation={1}
+          entry="self"
+          onOpenCategory={noop}
+          onOpenEvening={noop}
+          onOpenGoal={noop}
+        />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
+  if (id === "growth-empty-pie" || id === "growth-week-zero-pie") {
+    return (
+      <Shell>
+        <GrowthScreen api={growthApi(id === "growth-empty-pie" ? EMPTY_GROWTH : WEEK_ZERO_GROWTH, PIE_ONLY_PREF)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
   if (id === "growth-empty") {
     return (
       <Shell>
@@ -517,7 +551,11 @@ export function V2Gallery({ id }: { id: string }) {
         {[
           "tabbar",
           "growth-empty",
+          "growth-empty-pie",
           "growth-week-zero",
+          "growth-week-zero-pie",
+          "growth-goal-norecord",
+          "growth-nogoal",
           "growth-week",
           "growth-many",
           "growth-goal",

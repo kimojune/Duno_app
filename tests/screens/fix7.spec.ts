@@ -8,6 +8,8 @@ import path from "node:path";
  * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). 개발 서버(3200)에서 돈다: npm run screens
  * - 경우 1(growth-week-zero: 이번 주 0 + 쌓인 60시간): 「총 시간」으로 시작, 머리 아래 「이번 주 0시간」, 카드 끝 「오늘 기록」 — 띠 · 원
  * - 경우 2(growth-empty: 기록 하나도 없음): 머리 「0시간」 · 칩 셋 · 「원그래프로 보기」 — 띠, 경우 3: 원(오른쪽 회색 빈 고리 + 「0시간」)
+ * 고침9(J4): 기간은 칩 하나 「이번 주 ▾」(메뉴 단추 — 열면 이번 주 / 총 시간 / 비교), 보기 바꾸기는 같은 머리 줄 오른쪽 끝, 카드 밖 안내 글 없음.
+ * 이 시험의 사진 자리(docs/oneshot-v2/고침7)는 고침7 기록이라 고침9 사진은 fix9-status(고침9-J4)에 둔다
  */
 const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침7");
 
@@ -28,9 +30,17 @@ async function noOverflow(page: Page) {
 /** 카드 위 끝에서 보기 바꾸기 글 단추 위 끝까지(px) — 데이터 있는 판과 빈 판이 같은 자리인지 본다 */
 async function switchOffset(page: Page) {
   return page.locator(".growth-card").evaluate((card) => {
-    const sw = card.querySelector(".growth-switch button")!;
+    const sw = card.querySelector(".growth-switch")!;
     return { top: sw.getBoundingClientRect().top - card.getBoundingClientRect().top, right: card.getBoundingClientRect().right - sw.getBoundingClientRect().right };
   });
+}
+/** 기간 칩(고침9)을 열어 목록의 기간 이름들을 읽고 Esc로 닫는다 */
+async function periodOptions(page: Page) {
+  await page.getByRole("button", { name: /^기간, / }).click();
+  const names = await page.getByRole("menu", { name: "기간" }).getByRole("menuitemradio").allTextContents();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  return names;
 }
 /** 토큰 이름의 실제 계산 색(rgb) */
 async function tokenColor(page: Page, name: string) {
@@ -50,8 +60,8 @@ test("경우 1: 이번 주 0 + 쌓인 시간 → 「총 시간」으로 시작 �
   const withData = await switchOffset(page);
 
   await open(page, "growth-week-zero");
-  await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("group", { name: "기간" }).getByRole("button")).toHaveText(["이번 주", "총 시간", "비교"]);
+  await expect(page.getByRole("button", { name: "기간, 총 시간" })).toHaveText("총 시간 ▾");
+  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
   await expect(page.locator(".growth-card-total")).toHaveText("60시간");
   const note = page.locator(".growth-card > .growth-week-zero");
   await expect(note).toHaveText("이번 주 0시간");
@@ -62,7 +72,8 @@ test("경우 1: 이번 주 0 + 쌓인 시간 → 「총 시간」으로 시작 �
     const n = card.querySelector(".growth-week-zero")!;
     const cs = getComputedStyle(n);
     return {
-      switchBottom: box(".growth-switch").bottom,
+      // 머리 한 줄의 보이는 아래 끝(칩 면). 칩·글 단추의 누름 영역 48은 카드 안 여백으로 넘어간다(고침9)
+      switchBottom: box(".growth-period-chip-face").bottom,
       noteTop: box(".growth-week-zero").top,
       noteBottom: box(".growth-week-zero").bottom,
       graphTop: box(".growth-graph").top,
@@ -102,12 +113,14 @@ test("경우 2: 기록 하나도 없음 → 머리 「0시간」 · 칩 셋 · �
   const withData = await switchOffset(page);
 
   await open(page, "growth-empty");
-  await expect(page.getByRole("button", { name: "이번 주" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("group", { name: "기간" }).getByRole("button")).toHaveText(["이번 주", "총 시간", "비교"]);
+  await expect(page.getByRole("button", { name: "기간, 이번 주" })).toHaveText("이번 주 ▾");
+  expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
   await expect(page.locator(".growth-card-total")).toHaveText("0시간");
   await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
   await expect(page.locator(".growth-week-zero")).toHaveCount(0);
-  await expect(page.getByText(/아직 이번 주 오늘 기록이 없어요/)).toBeVisible();
+  // 고침9(⑬ 20, PM d-143 가): 카드 밖 안내 글은 없앴다. 「오늘 기록」은 카드 안 끝
+  await expect(page.getByText(/아직 이번 주 오늘 기록이 없어요/)).toHaveCount(0);
+  await expect(page.locator(".growth-card .growth-evening-button")).toHaveText("오늘 기록");
   expect(await switchOffset(page), "보기 바꾸기 단추가 데이터 있는 판과 같은 자리").toEqual(withData);
   await noOverflow(page);
   await photo(page, "경우2-기록없음-띠");

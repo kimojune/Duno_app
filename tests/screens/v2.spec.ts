@@ -104,9 +104,25 @@ async function rootColor(page: Page, name: string) {
   }, name);
 }
 
+/** 기간 칩 하나(고침9 J4, 메뉴 단추): 열어서 고른다 */
+async function pickPeriod(page: Page, name: string) {
+  await page.getByRole("button", { name: /^기간, / }).click();
+  await page.getByRole("menu", { name: "기간" }).getByRole("menuitemradio", { name }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: `기간, ${name}` })).toBeVisible();
+}
+/** 칩을 열어 기간 이름들을 읽고 Esc로 닫는다 */
+async function periodOptions(page: Page) {
+  await page.getByRole("button", { name: /^기간, / }).click();
+  const names = await page.getByRole("menu", { name: "기간" }).getByRole("menuitemradio").allTextContents();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  return names;
+}
+
 // 기록 없음(B17 → 고침5 → 고침7): 글은 남기고(PM 11:1x) 예시 값 — 목표 비율 띠 + 빈 띠 「0시간」 + 「오늘 기록」 단추, 머리(합계·칩·보기 바꾸기)는 데이터 있는 판과 같다
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-  test(`growth-empty ${size}: 목표 비율 띠 + 빈 띠 「0시간」 + 안내 글 아래 「오늘 기록」, 가로로 넘치지 않는다`, async ({ page }) => {
+  test(`growth-empty ${size}: 목표 비율 띠 + 빈 띠 「0시간」 + 카드 안 끝 「오늘 기록」(안내 글 없음, 고침9), 가로로 넘치지 않는다`, async ({ page }) => {
     await open(page, "growth-empty", size);
     await expect(page.getByRole("tab", { name: "목표 비율" })).toHaveAttribute("aria-selected", "true");
     await shot(page, `growth-empty-${size}`);
@@ -114,18 +130,21 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
     // 고침7 ②: 빈 상태에도 머리에 합계 「0시간」 · 칩 셋 · 보기 바꾸기 글 단추(데이터 있는 판과 같은 자리)
     await expect(page.locator(".growth-card-total")).toHaveText("0시간");
-    await expect(page.getByRole("group", { name: "기간" }).getByRole("button")).toHaveText(["이번 주", "총 시간", "비교"]);
-    await expect(page.locator(".growth-card > .growth-switch").getByRole("button", { name: "원그래프로 보기" })).toBeVisible();
-    const text = page.getByText(/아직 이번 주 오늘 기록이 없어요/);
+    expect(await periodOptions(page)).toEqual(["이번 주", "총 시간", "비교"]);
+    await expect(page.locator(".growth-card > .growth-card-head > .growth-switch")).toHaveText("원그래프로 보기");
+    // 고침9(⑬ 20, PM d-143 가): 카드 밖 안내 글은 없앴다. 「오늘 기록」은 카드 안 끝(그림 아래)
+    await expect(page.getByText(/아직 이번 주 오늘 기록이 없어요/)).toHaveCount(0);
     const button = page.getByRole("button", { name: "오늘 기록", exact: true });
     await expect(button).toBeVisible();
     await expect(page.getByRole("button", { name: "저녁 기록 남기기" })).toHaveCount(0);
-    const t = (await text.boundingBox())!;
+    const g = (await page.locator(".growth-graph").boundingBox())!;
     const b = (await button.boundingBox())!;
-    expect(b.y).toBeGreaterThanOrEqual(t.y + t.height - 0.5);
+    const c = (await page.locator(".growth-card").boundingBox())!;
+    expect(b.y).toBeGreaterThanOrEqual(g.y + g.height - 0.5);
+    expect(b.y + b.height).toBeLessThanOrEqual(c.y + c.height + 0.5);
     expect(b.height).toBeGreaterThanOrEqual(48);
     await noHorizontalScroll(page, "기록 없음 이번 주");
-    await page.getByRole("button", { name: "총 시간" }).click();
+    await pickPeriod(page, "총 시간");
     await noHorizontalScroll(page, "기록 없음 총 시간");
     // 고침7 ③: 빈 상태 원그래프 — 오른쪽 빈 고리 + 「0시간」도 가로로 넘치지 않는다
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
@@ -158,7 +177,9 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     if (size === "360x800") expect(st.h).toBeLessThanOrEqual(2 * lineH + 0.5); // 360px 보통 글자에서 이 예시 글은 두 줄 안
     const lineBox = (await line.boundingBox())!;
     const tabsBox = (await page.getByRole("tablist").boundingBox())!;
-    const titleBox = (await page.getByRole("heading", { level: 1, name: "상태보기" }).boundingBox())!;
+    // 고침9(A5): 보이는 큰 제목 대신 맨 위 워드마크. 목표 한 줄은 워드마크 아래(숨은 h1 「상태보기」는 그대로 하나)
+    await expect(page.getByRole("heading", { level: 1, name: "상태보기" })).toHaveCount(1);
+    const titleBox = (await page.locator(".growth-head .wordmark").boundingBox())!;
     expect(lineBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height - 0.5);
     expect(tabsBox.y).toBeGreaterThanOrEqual(lineBox.y + lineBox.height - 0.5);
 
@@ -173,7 +194,7 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     expect(tabs.map((t) => [t.name, t.selected])).toEqual([["이번 주 목표", "true"], ["목표 비율", "false"]]);
     expect(Math.min(...tabs.map((t) => t.h))).toBeGreaterThanOrEqual(48);
     expect(Math.abs(tabs[0].w - tabs[1].w)).toBeLessThanOrEqual(1);
-    expect(tabs[0].w + tabs[1].w).toBeGreaterThanOrEqual(tabsBox.width - 32 - 1); // 탭 줄 안쪽 폭(좌우 16 여백)을 둘이 나눈다
+    expect(tabs[0].w + tabs[1].w).toBeGreaterThanOrEqual(tabsBox.width - 1); // 고침9: 탭 줄은 화면 끝에서 끝(Figma 50:144), 둘이 폭을 나눈다
     expect(tabs[0].bw).toBe("3px");
     expect(tabs[0].bc).toBe(await rootColor(page, "--color-text"));
     expect(tabs[0].weight).toBe("700");
@@ -237,9 +258,9 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
     expect(wide.every((x) => x.labelShown)).toBe(true);
     await expect(page.locator(".growth-item .growth-row-value")).toHaveText(["10% / 목표 30%", "60% / 목표 40%", "15% / 목표 20%", "5% / 목표 10%", "10%"]);
     await expect(page.locator(".growth-legend-item")).toHaveText(["목표 비율", "이번 주"]);
-    // 기간 칩: 보이는 면 둥근 999, 누름 영역 48
-    const chips = await page.$$eval(".growth-period", (els) => els.map((el) => ({ h: el.getBoundingClientRect().height, r: getComputedStyle(el.querySelector(".growth-period-face")!).borderTopLeftRadius })));
-    expect(chips.length).toBe(3);
+    // 기간 칩 하나(고침9): 보이는 면 둥근 999, 누름 영역 48
+    const chips = await page.$$eval(".growth-period-chip", (els) => els.map((el) => ({ h: el.getBoundingClientRect().height, r: getComputedStyle(el.querySelector(".growth-period-chip-face")!).borderTopLeftRadius })));
+    expect(chips.length).toBe(1);
     expect(Math.min(...chips.map((c) => c.h))).toBeGreaterThanOrEqual(48);
     expect(chips.every((c) => parseFloat(c.r) >= 16)).toBe(true);
     await shot(page, `growth-ratio-${size}`);
@@ -306,15 +327,14 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   test(`growth-week ${size}: 목표 없는 주 → 목표 비율 탭·띠그래프가 처음, 원그래프·총 시간 · 이번 주 목표 탭(정하기 + 예시)도 가로로 넘치지 않는다`, async ({ page }) => {
     await open(page, "growth-week", size);
     await expect(page.getByRole("tab", { name: "목표 비율" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("button", { name: "이번 주" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "기간, 이번 주" })).toBeVisible();
     await expect(page.getByRole("button", { name: "최근 1주" })).toHaveCount(0);
     await expect(page.locator(".growth-band")).toHaveCount(2);
     await noHorizontalScroll(page, "띠그래프");
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
     await expect(page.locator("svg.growth-pie")).toHaveCount(2);
     await noHorizontalScroll(page, "원그래프");
-    await page.getByRole("button", { name: "총 시간" }).click();
-    await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
+    await pickPeriod(page, "총 시간");
     await noHorizontalScroll(page, "총 시간");
     await page.getByRole("tab", { name: "이번 주 목표" }).click();
     await expect(page.getByRole("group", { name: "예시" })).toBeVisible();
@@ -388,9 +408,8 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   for (const state of ["growth-week", "growth-many"]) {
     test(`${state} ${size}: 비교 보기가 가로로 넘치지 않는다`, async ({ page }) => {
       await open(page, state, size);
-      await page.getByRole("button", { name: "비교" }).click();
-      await expect(page.getByRole("button", { name: "비교" })).toHaveAttribute("aria-pressed", "true");
-      await expect(page.getByRole("heading", { name: "분야마다 나란히" })).toBeVisible();
+      await pickPeriod(page, "비교");
+      await expect(page.locator(".growth-list.is-compare")).toBeVisible(); // 고침9: 카드 위 머리 줄 「분야마다 나란히」 없앰
       await expect(page.locator(".growth-compare")).toHaveCount(state === "growth-many" ? 51 : 4);
       await expect(page.getByText("쌓인 것")).toHaveCount(0);
       await shot(page, `${state}-compare-${size}`);
@@ -400,8 +419,8 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   }
 }
 
-// 키보드만: 탭은 좌우·Home/End로 고르고(켜진 탭만 Tab 차례), Tab으로 기간 → 보기 바꾸기를 지나며 Enter·Space로 바꾼다(진짜 브라우저)
-test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간·보기 바꾸기 단추를 차례로 지나고 Enter·Space로 바꾼다", async ({ page }) => {
+// 키보드만: 탭은 좌우·Home/End로 고르고(켜진 탭만 Tab 차례), Tab으로 기간 칩 → 보기 바꾸기를 지나며 Enter·Space로 바꾼다(진짜 브라우저)
+test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간 칩·보기 바꾸기 단추를 차례로 지나고 Enter·Space로 바꾼다", async ({ page }) => {
   await open(page, "growth-week", "360x800");
   const name = (n: string) => page.getByRole("button", { name: n, exact: true });
   const tab = (n: string) => page.getByRole("tab", { name: n });
@@ -416,8 +435,8 @@ test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간·보기 바�
   await expect(tab("이번 주 목표")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
   await expect(tab("목표 비율")).toHaveAttribute("aria-selected", "true");
-  // 켜진 탭 다음 Tab은 꺼진 탭을 건너뛰고 기간 칩으로
-  for (const next of ["이번 주", "총 시간", "비교", "원그래프로 보기"]) {
+  // 켜진 탭 다음 Tab은 꺼진 탭을 건너뛰고 기간 칩 하나(고침9) → 보기 바꾸기
+  for (const next of ["기간, 이번 주", "원그래프로 보기"]) {
     await page.keyboard.press("Tab");
     await expect(name(next)).toBeFocused();
   }
@@ -426,18 +445,22 @@ test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간·보기 바�
   await expect(name("띠그래프로 보기")).toBeFocused(); // 바꿔도 포커스가 같은 단추에(글만 바뀜)
   await page.keyboard.press("Space");
   await expect(page.locator(".growth-band")).toHaveCount(2);
-  for (let i = 0; i < 2; i++) await page.keyboard.press("Shift+Tab"); // 보기 바꾸기 → 비교 → 총 시간
-  await expect(name("총 시간")).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab"); // 보기 바꾸기 → 기간 칩
+  await expect(name("기간, 이번 주")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(tab("목표 비율")).toBeFocused();
   await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
-  await expect(name("비교")).toBeFocused();
+  await expect(name("기간, 이번 주")).toBeFocused();
+  // 칩: Enter로 열면 지금 기간에 포커스, ↓↓ 비교, Space로 고르면 닫히고 칩으로 돌아온다
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitemradio", { name: "이번 주" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitemradio", { name: "비교" })).toBeFocused();
   await page.keyboard.press("Space");
-  await expect(name("비교")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("heading", { name: "분야마다 나란히" })).toBeVisible();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(name("기간, 비교")).toBeFocused();
+  await expect(page.locator(".growth-list.is-compare")).toBeVisible();
 });
 
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
@@ -450,7 +473,7 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
     await noHorizontalScroll(page, "분야 50개 원그래프");
     await insideViewport(page, "svg.growth-pie", "원");
-    await page.getByRole("button", { name: "총 시간" }).click();
+    await pickPeriod(page, "총 시간");
     await noHorizontalScroll(page, "분야 50개 총 시간");
     // 꺾쇠 이름은 글자로 보인다(요소가 되지 않는다)
     expect(await page.locator("img[src='x']").count()).toBe(0);

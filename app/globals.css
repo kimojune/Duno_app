@@ -150,6 +150,10 @@ button, input { font: inherit; color: inherit; }
 }
 .login-head { margin-top: 30dvh; }
 .login-name { font: var(--font-name); }
+/* 로그인 h1 안의 워드마크: 큰 L1(지름 120 · 살구 조각)은 다음 판이라 작은 고리는 숨기고 글자 「duno」만 h1 글꼴로(Figma 49:169의 큰 「duno」) */
+.login-name .wordmark { display: inline; color: inherit; }
+.login-name .wordmark-ring { display: none; }
+.login-name .wordmark-text { font: inherit; }
 .login-sentence { margin-top: var(--space-2); font: var(--font-body); color: var(--color-text-sub); }
 .login-actions {
   margin-top: auto;
@@ -180,9 +184,12 @@ button, input { font: inherit; color: inherit; }
   padding: var(--space-6) var(--page-x) var(--space-4);
 }
 .today-title { font: var(--font-title); }
-/* 워드마크 「DUNO」 자리표시(components/wordmark.tsx). 로고가 확정되기 전이라 지금 토큰의 글자·색을 그대로 쓴다 */
-.wordmark { font: inherit; color: inherit; }
-.today-wordmark { display: block; margin-bottom: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); }
+/* 워드마크(components/wordmark.tsx, 명세 ② · Figma 50:139·50:140·60:2): 먹남색 고리 18 + 「duno」 16 Bold, 고리와 글 사이 6(Figma 15→39 − 18).
+   조각은 고리 밖으로 2px 나와 그림 칸 밖에 그려진다(overflow: visible). 살구·빛 번짐 없음 */
+.wordmark { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); }
+.wordmark-ring { display: block; flex: none; inline-size: 18px; block-size: 18px; overflow: visible; }
+.wordmark-text { font: 700 16px/24px var(--font-family); }
+.today-wordmark { display: flex; inline-size: fit-content; margin-bottom: var(--space-1); }
 .today-date { margin-top: var(--space-1); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
 .notices { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--page-x) var(--space-4); }
 /* 목록 끝 여백(12-2): 창이 닫혔으면 88px, 열렸으면 창 높이 + 16px. 둘 다 + 안전 영역. scroll-padding-bottom과 같은 값 */
@@ -654,14 +661,19 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 }
 .tabbar-list { list-style: none; margin: 0 auto; padding: 0; max-width: var(--page-max); display: flex; }
 .tabbar-item { flex: 1; min-width: 0; }
+/* 아래 탭(고침9 A6 · 스킬 검토 O-6, Figma 50:185~50:190): 높이 64, 켜진 탭 위 굵은 선 없음. 켜진 탭 = 글 Bold + --color-text(아이콘도), 꺼진 탭 = 보조색.
+   글 12(O-6 — Figma 50:187의 12px; 12 Regular는 이 파일의 다른 보조 글과 같은 값) */
 .tabbar-btn {
-  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px;
-  border: 0; border-top: 3px solid transparent; background: transparent; cursor: pointer;
-  font: var(--font-sub); color: var(--color-text-sub);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: var(--space-1); width: 100%; min-height: 64px;
+  border: 0; background: transparent; cursor: pointer;
+  font: 400 12px/16px var(--font-family); color: var(--color-text-sub);
   /* 글자가 커져 한 줄에 안 들어가면 두 줄로 내려간다(B9). 칸이 글에 밀려 넘치지 않게 .tabbar-item에 min-width: 0 */
-  padding: var(--space-1) var(--space-1); text-align: center; overflow-wrap: anywhere;
+  padding: var(--space-2) var(--space-1); text-align: center; overflow-wrap: anywhere;
 }
-.tabbar-btn[aria-current="page"] { color: var(--color-primary); border-top-color: var(--color-primary); font-weight: 700; }
+/* 아이콘 24 위 + 글 12 아래(스킬 검토 O-6, Figma 132:1215 — 탭 위 8 · 아이콘 → 글 4). 아이콘 색은 글과 같이(currentColor) */
+.tabbar-icon { display: block; flex: none; inline-size: 24px; block-size: 24px; }
+.tabbar-label { display: block; max-inline-size: 100%; }
+.tabbar-btn[aria-current="page"] { color: var(--color-text); font-weight: 700; }
 .tabbar-btn:active { background: var(--color-notice-bg); }
 .growth, .me { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
 /* 내 정보의 글 칸·고르기 칸은 flex 밖이라 기본 폭(글자 수 기준)을 가진다. 글자 200%에서 화면보다 넓어지지 않게 자리 폭에 맞춘다 */
@@ -689,18 +701,21 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .overlay-back:active { background: var(--color-notice-bg); }
 .goal-sentence-actions { display: grid; margin-top: var(--space-6); }
 .growth-body { padding: 0 var(--page-x); }
+/* 상태보기 맨 위(고침9 A5, Figma 50:137): 워드마크(위 12) → 목표 한 줄(12 아래) → 탭. 보이는 큰 제목 없음(숨은 h1만) */
+.growth-head { display: flex; align-items: center; padding: var(--space-3) var(--page-x); }
 .growth-sub-title { margin: var(--space-6) 0 var(--space-1); font: var(--font-body); font-weight: 700; }
 /* ---- 상태보기 두 뷰(원샷 v2 고침5, 명세 ③-S + ⑩ PM 8). 새 토큰(--font-goal-line·--radius-card·--radius-pill·--color-chart-outline)은
    lib/design-tokens.ts에 생기기 전이라 var(이름, 대체값)으로 쓴다. 상태보기에는 살구 강조색을 쓰지 않는다(PM 8).
    분야 색 그림의 윤곽(--color-chart-outline)은 부품이 style로 직접 준다(윤곽 모양 점선/실선을 시험이 요소에서 읽는다) ---- */
 /* 맨 위 목표 한 줄: 20/28 Bold, 낱말 단위로 감쌈(「넘기/기」처럼 글자 단위로 갈리지 않게), 말줄임 없음. 너무 긴 낱말만 끊어 가로로 넘치지 않는다 */
 .growth-goal-line {
-  margin: 0; padding: 0 var(--page-x) var(--space-3);
+  margin: 0; padding: 0 var(--page-x);
   font: var(--font-goal-line, 700 20px/28px var(--font-family)); color: var(--color-text);
   word-break: keep-all; overflow-wrap: anywhere;
 }
-/* 뷰 탭 둘: 각 폭 반, 높이 48. 켜진 탭 = 글자색 3px 밑줄 + Bold, 꺼진 탭 = 보조색 + 1px 구분선 */
-.growth-tabs { display: flex; margin-bottom: var(--space-4); padding: 0 var(--page-x); }
+/* 뷰 탭 둘: 각 폭 반(화면 끝에서 끝, Figma 50:144·50:145), 높이 48. 켜진 탭 = 글자색 3px 밑줄 + Bold, 꺼진 탭 = 보조색 + 1px 구분선.
+   탭 아래 → 카드 20(Figma 149 → 169). Figma 탭 글 15px는 토큰에 없어 --font-body(16) */
+.growth-tabs { display: flex; margin-bottom: calc(var(--space-4) + var(--space-1)); padding: 0; }
 .growth-tab {
   flex: 1 1 50%; min-width: 0; min-height: var(--tap-min); padding: var(--space-1) var(--space-2);
   border: 0; border-bottom: 1px solid var(--color-divider); background: transparent; cursor: pointer;
@@ -712,30 +727,58 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 /* 흰 카드 */
 .growth-card { padding: var(--space-4); border-radius: var(--radius-card, 16px); background: var(--color-surface); }
 .growth-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); }
-.growth-card-title { margin: 0; font: var(--font-body); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.growth-card-title strong { font-weight: 700; }
-.growth-card-total { margin: 0; font: var(--font-title); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-/* 기간 칩(카드 안 작은 둥근 테두리, --radius-pill). 보이는 면 높이 32, 누름 영역 48(위아래 투명 8) */
-.growth-periods { display: flex; flex-wrap: wrap; gap: 0 var(--space-1); }
-.growth-period {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: var(--tap-min); min-height: var(--tap-min); padding: var(--space-2) 0;
-  border: 0; background: transparent; cursor: pointer; font: var(--font-sub); color: var(--color-text);
+/* 카드 머리 글(Figma 50:152 「목표 15시간 중 12시간」 · 50:208 「20시간」): 16 Bold */
+.growth-card-title { margin: 0; font: var(--font-body); font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.growth-card-total { margin: 0; font: var(--font-body); font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+/* 목표 비율 뷰 카드 머리 한 줄(고침9, Figma 50:208·50:212·60:8·60:9): 합계 · 기간 칩(합계와 16 띄움) · 오른쪽 끝 보기 바꾸기 글 단추.
+   칩·글 단추의 누름 영역 48이 카드 안 여백으로 넘어가게 위아래를 12씩 당긴다(보이는 머리 높이 24) */
+.growth-ratio-head { flex-wrap: wrap; justify-content: flex-start; gap: 0 var(--space-4); margin-block: calc(-1 * var(--space-3)); }
+/* 기간 칩 하나 「이번 주 ▾」(--radius-pill, 11px Medium, 보이는 면 높이 24, 누름 영역 48) + 누르면 여는 기간 목록(role=menu) */
+.growth-period-menu { position: relative; display: inline-flex; }
+.growth-period-chip {
+  display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: 0;
+  border: 0; background: transparent; cursor: pointer; color: var(--color-text);
 }
-.growth-period-face {
-  display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--space-3);
+.growth-period-chip-face {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; white-space: nowrap;
   border: 1px solid var(--color-border-input); border-radius: var(--radius-pill, 999px); background: var(--color-surface);
+  font: 500 11px/16px var(--font-family);
 }
-.growth-period[aria-pressed="true"] .growth-period-face { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-.growth-period:focus-visible { outline: none; }
-.growth-period:focus-visible .growth-period-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.growth-switch { display: flex; justify-content: flex-end; }
-.growth-empty { margin-top: var(--space-3); }
+.growth-period-chip:active .growth-period-chip-face { background: var(--color-notice-bg); }
+.growth-period-caret { white-space: pre; } /* 「이번 주 ▾」의 띄어쓰기를 살린다(flex 안 글 조각 앞 칸은 지워진다) */
+.growth-period-chip:focus-visible { outline: none; }
+.growth-period-chip:focus-visible .growth-period-chip-face { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.growth-period-list {
+  position: absolute; z-index: 3; inset-block-start: calc(100% - var(--space-2)); inset-inline-start: 0; min-inline-size: 128px;
+  margin: 0; padding: var(--space-1) 0; list-style: none;
+  border: 1px solid var(--color-border-input); border-radius: var(--radius-control); background: var(--color-surface);
+}
+.growth-period-option {
+  display: flex; align-items: center; width: 100%; min-height: var(--tap-min); padding: 0 var(--space-4);
+  border: 0; background: transparent; cursor: pointer; text-align: left; white-space: nowrap;
+  font: var(--font-sub); color: var(--color-text);
+}
+.growth-period-option[aria-checked="true"] { font-weight: 700; }
+.growth-period-option:active, .growth-period-option:hover { background: var(--color-notice-bg); }
+.growth-period-option:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+/* 보기 바꾸기 글 단추(「원그래프로 보기」 12 Medium, 머리 줄 오른쪽 끝). 누름 높이 44는 공통 .text-tap(스킬 검토 O-2) */
+.btn.growth-switch { margin-inline-start: auto; margin-inline-end: calc(-1 * var(--space-2)); padding: 0 var(--space-2); font: 500 12px/16px var(--font-family); color: var(--color-text); }
 /* 목표 비율 뷰가 이번 주 0시간이라 「총 시간」으로 견줄 때 머리 아래 한 줄(고침7 ①, 12 Medium 보조색) */
 .growth-week-zero { margin: var(--space-1) 0 0; font: 500 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
-.growth-card > .detail-actions { margin-top: var(--space-4); }
-.growth-period-title { margin-top: 0; }
-.growth-days { margin-bottom: var(--space-3); }
+/* 빈 상태 「오늘 기록」(고침9, Figma 51:24·111:149): 카드 안 끝, 폭 가득 보조 단추 — 보이는 면 높이 40(테두리 --color-border-input, 14 Medium), 누름 영역 48 */
+.growth-evening { margin-top: var(--space-3); }
+.btn.growth-evening-button { width: 100%; padding: 0; border: 0; background: transparent; }
+.btn.growth-evening-button:active { background: transparent; }
+.growth-evening-face {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 40px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-input); border-radius: var(--radius-pill); background: var(--color-surface);
+  font: 500 14px/20px var(--font-family); color: var(--color-text);
+}
+.growth-evening-button:active .growth-evening-face { background: var(--color-secondary-pressed); }
+/* 카드 아래 연속 기록 줄(명세 ⑦-9, Figma 60:4~60:6): 보조색 고리 14 + 「3주」(14 Bold, 글자색) + 「 이어서 기록」(14 보조색). 카드 → 줄 12 */
+.growth-streak { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0 0; font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+.growth-streak-ring { display: block; flex: none; }
+.growth-streak-count { font-weight: 700; color: var(--color-text); }
 /* 목표 없는 주의 이번 주 목표 탭(고침6 ②, Figma 50:741): 흰 카드 하나. 위→아래 = 이름표 「예시」 → 막대 둘 → 보조 줄 → 주 단추(카드 끝).
    간격 = 카드 위 16 · 이름표→막대 6 · 막대→보조 줄 12 · 보조 줄→단추 16 · 카드 아래 16 */
 .growth-goal-set { display: flex; flex-direction: column; padding: var(--space-4); border-radius: var(--radius-card, 16px); background: var(--color-surface); }
@@ -748,18 +791,34 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-list.growth-example-list { margin-top: 6px; } /* .growth-list(뒤에 있음)의 8을 이긴다 */
 /* 보이는 거리로 맞춘다(고침6 검토): 줄 위아래 패딩 없음 → 이름표 → 첫 줄 이름 글 6(목록 margin), 마지막 줄의 마지막 보이는 요소 → 보조 줄 12(보조 줄 margin).
    예시 줄 둘 사이는 전과 같은 16(옛 패딩 8 + 8) */
-.growth-example-item { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); padding: 0; font: var(--font-body); color: var(--color-text-sub); }
+.growth-example-item { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); padding: 0; font: var(--font-sub); color: var(--color-text-sub); }
 .growth-example-item + .growth-example-item { margin-top: var(--space-4); }
 .growth-example-item .growth-goal-bar { opacity: 0.4; }
+/* 예시 막대(고침9, Figma 91:643·91:644): 점선 막대 높이 12 + 눈금(20)만, 채움 없음 */
+.growth-goal-bar.growth-example-bar { block-size: 12px; }
 /* 분야 줄: 윗줄 이름 · 오른쪽 값(넘치면 다음 줄로, 말줄임 없음), 아래 막대·글은 전체 폭 */
 .growth-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
-.growth-item { border-bottom: 1px solid var(--color-divider); }
-.growth-item:last-child { border-bottom: 0; }
+/* 줄 사이 선 없음(고침9, Figma 50:137·50:193). 옛 「비교」 보기만 선을 둔다. 목표 비율 뷰는 범례 아래 1px 선 하나(Figma 50:236) */
+.growth-list.is-compare .growth-item { border-bottom: 1px solid var(--color-divider); }
+.growth-list.is-compare .growth-item:last-child { border-bottom: 0; }
+.growth-graph + .growth-list { margin-top: 0; padding-top: var(--space-1); border-top: 1px solid var(--color-divider); }
+/* 목록 줄 글 14(Figma 50:238·50:160). 오른쪽 「›」는 카드 안 여백 자리(값 끝에서 12 띄움) */
 .growth-row {
+  position: relative;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3);
   width: 100%; min-height: var(--tap-min); padding: var(--space-2) 0; border: 0; background: transparent; text-align: left; cursor: pointer;
-  font: var(--font-body); color: var(--color-text);
+  font: var(--font-sub); color: var(--color-text);
 }
+.growth-row .growth-row-value { margin-inline-end: var(--space-3); }
+.growth-chevron {
+  position: absolute; inset-inline-end: calc(-1 * var(--space-3)); inset-block-start: 50%; transform: translateY(-50%);
+  font: 400 18px/26px var(--font-family); color: var(--color-text-sub);
+}
+/* 이번 주 목표 뷰 줄(Figma 50:160~50:165): 이름 14 Medium, 줄 위아래 4(줄 간격 68), 「›」는 이름 줄에 맞춤 */
+.growth-goal-row { padding: var(--space-1) 0; }
+.growth-goal-row .growth-name { font-weight: 500; }
+.growth-goal-row .growth-chevron { inset-block-start: 1px; transform: none; }
+.growth-compare { position: relative; }
 .growth-row:active, .growth-compare:active { background: var(--color-notice-bg); }
 .growth-name { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
 .growth-row-value { margin-inline-start: auto; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
@@ -770,21 +829,26 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-goal-bar { position: relative; display: block; flex: 1 0 100%; block-size: 16px; }
 .growth-goal-fill { position: absolute; inset-block: 0; inset-inline-start: 0; display: block; border: 1px solid; box-sizing: border-box; border-radius: var(--radius-check); }
 .growth-goal-gap { position: absolute; inset-block: 0; display: block; border: 1px dashed; box-sizing: border-box; border-radius: var(--radius-check); background: transparent; }
-.growth-goal-tick { position: absolute; inset-block: -3px; display: block; inline-size: 2px; }
+.growth-goal-tick { position: absolute; inset-block: -4px; display: block; inline-size: 2px; }
 .growth-goal-of { flex: 1 0 100%; font: 400 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
 /* 범례 한 줄 */
-.growth-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-top: var(--space-2); font: var(--font-sub); color: var(--color-text-sub); }
+.growth-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-top: var(--space-2); font: 400 12px/16px var(--font-family); color: var(--color-text-sub); }
 .growth-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
-.growth-legend-box { display: inline-block; inline-size: 16px; block-size: 12px; border: 1.5px solid; box-sizing: border-box; border-radius: 2px; }
+.growth-legend-box { display: inline-block; inline-size: 20px; block-size: 12px; border: 1.5px solid; box-sizing: border-box; border-radius: 2px; }
 .growth-legend-tick { display: inline-block; inline-size: 2px; block-size: 14px; }
 /* 띠 칸 이름은 growth-band-cell: 워커 A의 공통 윤곽 규칙(inset box-shadow)이 점선 칸에 실선을 덧그리지 않게 이 이름은 그 규칙 목록에 넣지 않는다.
    1.5px 테두리는 기기 픽셀에 맞춰 그려진다(DPR 2 이상 폰에서 1.5px, DPR 1 화면에서는 1px).
    목표 비율 뷰 띠 두 줄: 위 점선 윤곽(목표 비율) · 아래 실선 윤곽(기간). 칸 안 %, 칸이 28px보다 좁으면 숫자는 아래 목록에만(컨테이너 쿼리) */
 .growth-graph { margin: var(--space-3) 0 var(--space-2); }
 .growth-band-line { display: grid; gap: var(--space-1); margin-bottom: var(--space-2); }
-.growth-line-caption { font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
-.growth-band { display: flex; inline-size: 100%; block-size: 28px; }
+.growth-line-caption { font: 400 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
+/* 띠 높이: 데이터 있는 띠 36(Figma 50:214), 빈 상태 예시의 띠 28(Figma 91:628·91:637) */
+.growth-band { display: flex; inline-size: 100%; block-size: 36px; }
+.growth-graph.is-empty .growth-band { block-size: 28px; }
 .growth-band.is-empty { align-items: center; justify-content: center; border-width: 1.5px; box-sizing: border-box; border-radius: var(--radius-check); }
+/* 「이번 주」 빈 띠(고침9, Figma 91:637): 연한 면 채움 + 1px 점선 테두리(--color-border-input), 가운데 「0시간」 12 Medium 보조색 */
+.growth-band.is-zero { border: 1px dashed var(--color-border-input); border-radius: 0; background: var(--color-notice-bg); }
+.growth-seg-label.growth-zero-label { color: var(--color-text-sub); } /* 뒤의 .growth-seg-label(글자색)보다 이기게 두 이름 */
 /* 바깥 칸(.growth-band-slot)은 테두리가 없고 폭이 % 그대로라, 컨테이너 쿼리가 칸 바깥 폭을 잰다(테두리 굵기·첫 칸 여부와 상관없이) */
 .growth-band-slot { display: flex; flex: none; min-inline-size: 0; block-size: 100%; container-type: inline-size; }
 .growth-band-cell {
@@ -792,7 +856,7 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   border-width: 1.5px; box-sizing: border-box; overflow: hidden;
 }
 .growth-band-slot + .growth-band-slot > .growth-band-cell { border-inline-start-width: 0; }
-.growth-seg-label { font: 400 12px/16px var(--font-family); color: var(--color-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.growth-seg-label { font: 500 12px/16px var(--font-family); color: var(--color-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* 칸 바깥 폭이 28px보다 좁으면 숫자는 아래 목록에만(첫 칸도 나머지 칸도 같은 기준) */
 @container (max-width: 27.98px) { .growth-seg-label { display: none; } }
 /* 원그래프 둘 나란히(같은 크기, 원 지름 약 132), 조각마다 실선 1px 윤곽, 조각마다 % 글(작은 조각은 이끌 선으로 원 밖) */
@@ -813,6 +877,8 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-3); }
 .growth-dl dt { font: var(--font-sub); color: var(--color-text-sub); }
 .growth-dl dd { margin: 0; font: var(--font-body); }
+/* 상태보기의 시간과 %는 고정폭 숫자(스킬 검토 O-10, PM d-150). 합계·머리·줄 값·띠 칸·원 글은 각 규칙에 이미 있고, 나머지 숫자 자리를 여기서 묶는다 */
+.growth-goal-of, .growth-week-zero, .growth-streak, .growth-dl dd, .growth-compare .todo-sub { font-variant-numeric: tabular-nums; }
 .done-tag { margin-left: var(--space-2); }
 .note-sublist { list-style: none; margin: var(--space-1) 0 0; padding: 0 0 0 var(--space-3); border-left: 2px solid var(--color-divider); }
 .note-sublist > li { margin: 0 0 var(--space-1); }
