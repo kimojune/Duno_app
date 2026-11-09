@@ -149,7 +149,11 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     await page.getByRole("button", { name: "더하기" }).click();
     const chip = page.getByRole("group", { name: "분야" }).getByRole("button", { name: categoryName });
     await expect(chip).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
-    await expect(todoInput).toBeFocused();
+    // 초점(J2 30a0cb8, 칩 두 줄 부품): 새 칩이 접힌 두 줄 밖에 생기면 칩 줄을 펼친 채 두고 초점은 새 칩.
+    // 두 줄 안이면 펼치지 않고 초점은 할 일 칸(C14 그대로). 시험 계정 A는 분야가 많아 보통 앞의 경우다
+    await expect(chip).toBeVisible();
+    if (await page.getByRole("button", { name: "분야 접기" }).isVisible()) await expect(chip).toBeFocused();
+    else await expect(todoInput).toBeFocused();
 
     // 고른 분야로 적기(C7): 창은 열린 채, 칸은 비고, 고름은 풀리고, 새 줄 아래 분야 표시
     await todoInput.fill(plain);
