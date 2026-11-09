@@ -5,7 +5,7 @@ import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
 import { EveningTodoGallery } from "./evening-todo-gallery.dev";
 import { GoalEditor } from "../../../components/goal";
-import { GrowthScreen } from "../../../components/growth-screen";
+import { AfterSaveShortfall, GrowthScreen } from "../../../components/growth-screen";
 import { MeScreen } from "../../../components/me-screen";
 import { Onboarding } from "../../../components/onboarding";
 import { TabBar, type TabId } from "../../../components/tab-bar";
@@ -32,6 +32,8 @@ import type { TodayRead } from "../../../lib/today-types";
  *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
+ *  - me-goal · me-goal-empty · me-goal-fail(고침6 ③): 내 정보 첫 카드(목표 있음·없음). 카드를 누르면 S8-b 「목표」. me-goal-fail은 저장이 늘 실패한다
+ *  - after-save(고침6 ④-①): 오늘 기록을 「나누지 않고 저장」한 뒤의 한 줄 + 남은 시간(이번 주 목표 어학 5시간 중 2시간 → 「3시간 더」)
  *  - timer-many · detail-many(고침 5바퀴): 분야 10개(긴 이름 포함)의 타이머 「할 일 없이 시작」 칩 줄 · 할 일 자세히 칩 줄. 한 줄 + 옆으로 넘김을 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
  */
@@ -114,6 +116,17 @@ const eveningSplitApi = (categories: { id: string; name: string }[]): EveningApi
   }),
   save: never,
 });
+/** 고침6 ④-①: 저장이 바로 되는 오늘 기록(저장 직후 한 줄을 보려고). 서버를 부르지 않는다 */
+const eveningSaveApi: EveningApi = {
+  ...eveningApi,
+  save: async (input) => ({
+    ok: true,
+    data: {
+      log: { id: input.id, targetDay: input.targetDay, totalMinutes: input.totalMinutes, items: input.items, saveMode: input.saveMode, savedAt: "2026-11-07T12:00:00.000Z" },
+      delta: input.items,
+    },
+  }),
+};
 const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
   ...(pref === undefined ? {} : { viewPref: { load: async () => pref, save: async () => {} } }),
   fetchGrowth: async () => ({ ok: true, data }),
@@ -327,6 +340,26 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "me-goal" || id === "me-goal-empty" || id === "me-goal-fail") {
+    // 고침6 ③: 내 정보 첫 카드 → S8-b 「목표」. 목표 있음은 360px에서 두 줄로 감기는 길이
+    const settings: SettingsData = { ...SETTINGS, goal: id === "me-goal-empty" ? null : "올해 안에 토익 900점 넘기고 포트폴리오 끝내기" };
+    const api: SettingsApi = id === "me-goal-fail" ? { ...settingsApi, saveSettings: async () => ({ ok: false, error: "unavailable" }) } : settingsApi;
+    return (
+      <Shell>
+        <MeScreen settings={settings} categories={CATEGORIES} api={api} push={pushApi} onLogout={noop} />
+        <TabBar tabs={TABS} current="me" onSelect={noop} />
+      </Shell>
+    );
+  }
+  if (id === "after-save") {
+    // 고침6 ④-①: 저장 직후 한 줄 아래 남은 시간(목표 세운 주: 어학 5시간 중 2시간 → 3시간 더, 포트폴리오 목표 1시간 중 1시간 30분 → 줄 없음)
+    const growth: GrowthData = {
+      ...EMPTY_GROWTH,
+      thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 90 }, { categoryId: null, minutes: 60 }],
+      goal: { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 60 }, { categoryId: C3, minutes: 100 }] },
+    };
+    return <Opener render={(close) => <EveningRecord api={eveningSaveApi} onClose={close} onOpenGrowth={noop} renderAfterSave={() => <AfterSaveShortfall api={growthApi(growth)} />} />} />;
+  }
   if (id === "evening-split-blank") {
     // 고침 5바퀴: 타이머·끝낸 할 일이 없는 날 — 나누기에 들어가면 기타 100%(칩 고르기 전)
     const blank: EveningApi = {
@@ -431,6 +464,10 @@ export function V2Gallery({ id }: { id: string }) {
           "ratio-onboarding-many",
           "me-ratio",
           "me-ratio-many",
+          "me-goal",
+          "me-goal-empty",
+          "me-goal-fail",
+          "after-save",
           "evening-split",
           "evening-split-many",
           "evening-split-blank",
