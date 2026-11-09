@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
-import { clientIpFrom, DEMO_DEVICE_COOKIE, DemoAttemptLimiter, isDeviceId } from "../../lib/demo/access";
+import { clientIpFrom, DEMO_DEVICE_COOKIE, DemoAttemptLimiter, demoLimitChecks, isDeviceId } from "../../lib/demo/access";
 import { seedDemoData } from "../../lib/demo/seed";
 import { startDemoCore, type DemoStartResult } from "../../lib/demo/start";
 import { getDemoAccessCode } from "../../lib/server-config";
@@ -40,7 +40,7 @@ export async function startDemo(code: unknown): Promise<DemoStartResult> {
     {
       expectedCode,
       limiter,
-      limitKeys: [`ip:${ip}`, `device:${device}`],
+      limitChecks: demoLimitChecks(ip, device),
       now: () => Date.now(),
       getSupabase: createClient,
       key: getTodoKeyFromEnv(),

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clientIpFrom,
-  DEMO_LIMIT_MAX_FAILURES,
+  DEMO_LIMIT_DEVICE_MAX,
+  DEMO_LIMIT_IP_MAX,
   DEMO_LIMIT_WINDOW_MS,
   DemoAttemptLimiter,
   demoCodeMatches,
+  demoLimitChecks,
   isDeviceId,
   normalizeDemoCode,
 } from "../../lib/demo/access";
@@ -66,37 +68,71 @@ describe("일정 시간 비교", () => {
   });
 });
 
-describe("틀린 코드 한도(임시 10분에 5번)", () => {
-  const keys = ["ip:1.2.3.4", "device:a"];
+describe("틀린 코드 한도(임시: 기기 10분 5번 · IP 10분 30번 · unknown IP는 세지 않음)", () => {
+  const IP = "203.0.113.7";
+  const DEV_A = "0b5f6c1e-3a1b-4c2d-8e9f-00000000000a";
+  const DEV_B = "0b5f6c1e-3a1b-4c2d-8e9f-00000000000b";
+  const dev = (i: number) => "0b5f6c1e-3a1b-4c2d-8e9f-" + String(i).padStart(12, "0");
 
-  it("5번 틀릴 때까지는 막지 않고, 5번째 뒤로 막는다", () => {
-    const limiter = new DemoAttemptLimiter();
-    const t0 = 1_000_000;
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES; i += 1) {
-      expect(limiter.isBlocked(keys, t0 + i), `${i}번째 전`).toBe(false);
-      limiter.recordFailure(keys, t0 + i);
-    }
-    expect(limiter.isBlocked(keys, t0 + 10)).toBe(true);
-  });
-
-  it("열쇠 하나만 한도에 닿아도 막는다(같은 IP의 다른 기기, 같은 기기의 다른 IP)", () => {
-    const limiter = new DemoAttemptLimiter();
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES; i += 1) limiter.recordFailure(["ip:1.2.3.4", `device:${i}`], 0);
-    expect(limiter.isBlocked(["ip:1.2.3.4", "device:new"], 1)).toBe(true);
-    expect(limiter.isBlocked(["ip:9.9.9.9", "device:new"], 1)).toBe(false);
-  });
-
-  it("창이 끝나면(10분) 다시 된다", () => {
-    const limiter = new DemoAttemptLimiter();
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES; i += 1) limiter.recordFailure(keys, 0);
-    expect(limiter.isBlocked(keys, DEMO_LIMIT_WINDOW_MS - 1)).toBe(true);
-    expect(limiter.isBlocked(keys, DEMO_LIMIT_WINDOW_MS)).toBe(false);
+  it("값: 기기 5, IP 30, 창 10분(임시)", () => {
+    expect(DEMO_LIMIT_DEVICE_MAX).toBe(5);
+    expect(DEMO_LIMIT_IP_MAX).toBe(30);
     expect(DEMO_LIMIT_WINDOW_MS).toBe(10 * 60 * 1000);
+  });
+
+  it("한도 목록: 기기 열쇠(5) + 아는 IP 열쇠(30), IP가 unknown이면 기기 열쇠만", () => {
+    expect(demoLimitChecks(IP, DEV_A)).toEqual([
+      { key: "device:" + DEV_A, max: 5 },
+      { key: "ip:" + IP, max: 30 },
+    ]);
+    expect(demoLimitChecks("unknown", DEV_A)).toEqual([{ key: "device:" + DEV_A, max: 5 }]);
+  });
+
+  it("같은 기기가 5번 틀리면 그 기기는 막힌다(5번째 전까지는 안 막힘)", () => {
+    const limiter = new DemoAttemptLimiter();
+    const checks = demoLimitChecks(IP, DEV_A);
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX; i += 1) {
+      expect(limiter.isBlocked(checks, i), String(i)).toBe(false);
+      limiter.recordFailure(checks, i);
+    }
+    expect(limiter.isBlocked(checks, 10)).toBe(true);
+  });
+
+  it("같은 IP의 다른 기기는 한 기기가 5번 틀려도 막히지 않는다(발표장 Wi-Fi)", () => {
+    const limiter = new DemoAttemptLimiter();
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX; i += 1) limiter.recordFailure(demoLimitChecks(IP, DEV_A), i);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_A), 10)).toBe(true);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_B), 10)).toBe(false);
+  });
+
+  it("같은 IP에서 30번 틀리면(쿠키를 지워 기기를 바꿔 가며여도) 그 IP의 모든 기기가 막힌다, 다른 IP는 그대로", () => {
+    const limiter = new DemoAttemptLimiter();
+    for (let i = 0; i < DEMO_LIMIT_IP_MAX; i += 1) {
+      expect(limiter.isBlocked(demoLimitChecks(IP, dev(i)), i), String(i)).toBe(false);
+      limiter.recordFailure(demoLimitChecks(IP, dev(i)), i);
+    }
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_B), 100)).toBe(true);
+    expect(limiter.isBlocked(demoLimitChecks("198.51.100.9", DEV_B), 100)).toBe(false);
+  });
+
+  it("IP를 모르면 서로 막지 않는다: unknown 기기 여럿이 틀려도 다른 기기는 그대로", () => {
+    const limiter = new DemoAttemptLimiter();
+    for (let i = 0; i < 40; i += 1) limiter.recordFailure(demoLimitChecks("unknown", dev(i)), i);
+    expect(limiter.isBlocked(demoLimitChecks("unknown", DEV_B), 50)).toBe(false);
+  });
+
+  it("창이 끝나면(10분) 다시 된다 — 기기 한도·IP 한도 모두", () => {
+    const limiter = new DemoAttemptLimiter();
+    for (let i = 0; i < DEMO_LIMIT_IP_MAX; i += 1) limiter.recordFailure(demoLimitChecks(IP, DEV_A), 0);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_A), DEMO_LIMIT_WINDOW_MS - 1)).toBe(true);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_B), DEMO_LIMIT_WINDOW_MS - 1)).toBe(true);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_A), DEMO_LIMIT_WINDOW_MS)).toBe(false);
+    expect(limiter.isBlocked(demoLimitChecks(IP, DEV_B), DEMO_LIMIT_WINDOW_MS)).toBe(false);
   });
 
   it("기억하는 열쇠 수가 끝없이 늘지 않는다(상한 10000)", () => {
     const limiter = new DemoAttemptLimiter();
-    for (let i = 0; i < 10_050; i += 1) limiter.recordFailure([`ip:${i}`], i);
+    for (let i = 0; i < 10_050; i += 1) limiter.recordFailure([{ key: "ip:" + i, max: 30 }], i);
     expect(limiter.size()).toBeGreaterThan(9_000);
     expect(limiter.size()).toBeLessThanOrEqual(10_000);
   });
@@ -109,7 +145,7 @@ describe("IP·기기 열쇠", () => {
     expect(clientIpFrom(null, "198.51.100.2")).toBe("198.51.100.2");
   });
 
-  it("없거나 IP 꼴이 아니면 unknown(모두가 나눠 쓰는 열쇠 — 막는 쪽)", () => {
+  it("없거나 IP 꼴이 아니면 unknown(그때 IP 한도는 세지 않는다)", () => {
     expect(clientIpFrom(null)).toBe("unknown");
     expect(clientIpFrom("")).toBe("unknown");
     expect(clientIpFrom("<script>")).toBe("unknown");

@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { TodoKey } from "../todos/crypto";
-import { demoCodeMatches, type DemoAttemptLimiter } from "./access";
+import { demoCodeMatches, type DemoAttemptLimiter, type DemoLimitCheck } from "./access";
 import { DemoSeedError, type DemoSeedCounts, type DemoSeedInput } from "./seed";
 
 /**
@@ -24,8 +24,8 @@ export type DemoStartDeps = {
   /** 서버 환경 변수의 체험 코드(없으면 null = 꺼짐) */
   expectedCode: string | null;
   limiter: DemoAttemptLimiter;
-  /** 한도를 셀 열쇠(IP·기기 쿠키) */
-  limitKeys: string[];
+  /** 한도를 셀 열쇠와 상한(기기 쿠키 5 · 아는 IP 30 — demoLimitChecks) */
+  limitChecks: DemoLimitCheck[];
   now: () => number;
   getSupabase: () => Promise<SupabaseClient | null>;
   key: TodoKey | null;
@@ -45,12 +45,12 @@ function log(event: string, detail?: { status?: unknown; code?: unknown }) {
 export async function startDemoCore(deps: DemoStartDeps, input: unknown): Promise<DemoStartResult> {
   if (deps.expectedCode === null) return { ok: false, error: "off" };
   const now = deps.now();
-  if (deps.limiter.isBlocked(deps.limitKeys, now)) {
+  if (deps.limiter.isBlocked(deps.limitChecks, now)) {
     log("rate_limited");
     return { ok: false, error: "rate_limited" };
   }
   if (!demoCodeMatches(input, deps.expectedCode)) {
-    deps.limiter.recordFailure(deps.limitKeys, now);
+    deps.limiter.recordFailure(deps.limitChecks, now);
     return { ok: false, error: "wrong_code" };
   }
 

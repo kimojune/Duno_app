@@ -37,24 +37,36 @@ export function demoCodeMatches(input: unknown, expected: string | null): boolea
 }
 
 /**
- * 틀린 코드 한도(앱 수준, 임시값 — 결정 필요): 같은 IP 또는 같은 기기 쿠키에서 10분 안에 틀린 코드 5번이면 그 창이 끝날 때까지 막는다.
+ * 틀린 코드 한도(앱 수준, 값은 모두 임시 — 결정 필요). 창은 10분, 열쇠마다 따로 센다(검토 고침: 같은 IP 연쇄 잠금을 줄임).
+ * - 기기 쿠키 열쇠: 10분에 5번 틀리면 그 기기는 창이 끝날 때까지 막는다(맞는 코드도).
+ * - IP 열쇠: 10분에 30번. 발표장 같은 Wi-Fi(NAT 뒤)에서는 여러 사람이 IP 하나를 나눠 쓰므로, 한 사람이 5번 틀려도 같은 IP의 다른 기기는
+ *   IP 한도(30번) 전까지 맞는 코드로 들어간다. 쿠키를 지워 가며 대입하는 것은 이 IP 한도가 막는다.
+ * - IP를 모르면(헤더 없음·꼴이 이상함 = "unknown") IP 열쇠를 아예 세지 않는다 — 모두가 한 열쇠를 나눠 써 서로를 막지 않게. 그때는 기기 열쇠만 남는다.
  * 한계(보고에 적음): 서버리스는 인스턴스마다 메모리가 따로라 인스턴스가 여럿이면 실제 한도는 그 배수가 된다. 재시작하면 셈이 지워진다.
  * IP는 Vercel이 덮어쓰는 x-forwarded-for의 첫 값을 쓴다. Vercel 밖(로컬·다른 프록시)에서는 그 헤더를 보내는 쪽이 정할 수 있다(위조 가능).
- * 기기 쿠키는 지우면 새로 받으므로 IP 한도가 함께 걸린다.
  */
-export const DEMO_LIMIT_MAX_FAILURES = 5; // 임시, 결정 필요
+export const DEMO_LIMIT_DEVICE_MAX = 5; // 임시, 결정 필요
+export const DEMO_LIMIT_IP_MAX = 30; // 임시, 결정 필요
 export const DEMO_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 임시, 결정 필요
 /** 메모리가 끝없이 늘지 않게 기억하는 열쇠 수 상한(넘으면 끝난 창부터 지우고, 그래도 넘으면 가장 오래된 것부터) */
 const DEMO_LIMIT_MAX_KEYS = 10_000;
+
+/** 한도 하나: 열쇠와 그 열쇠의 상한 */
+export type DemoLimitCheck = { key: string; max: number };
+
+/** 요청 한 번의 한도 목록: 기기 열쇠(5) + 아는 IP면 IP 열쇠(30). unknown IP는 넣지 않는다. */
+export function demoLimitChecks(ip: string, deviceId: string): DemoLimitCheck[] {
+  const checks: DemoLimitCheck[] = [{ key: `device:${deviceId}`, max: DEMO_LIMIT_DEVICE_MAX }];
+  if (ip !== "unknown") checks.push({ key: `ip:${ip}`, max: DEMO_LIMIT_IP_MAX });
+  return checks;
+}
 
 type Bucket = { windowStart: number; failures: number };
 
 export class DemoAttemptLimiter {
   private buckets = new Map<string, Bucket>();
-  private readonly maxFailures: number;
   private readonly windowMs: number;
-  constructor(maxFailures = DEMO_LIMIT_MAX_FAILURES, windowMs = DEMO_LIMIT_WINDOW_MS) {
-    this.maxFailures = maxFailures;
+  constructor(windowMs = DEMO_LIMIT_WINDOW_MS) {
     this.windowMs = windowMs;
   }
 
@@ -68,14 +80,14 @@ export class DemoAttemptLimiter {
     return bucket;
   }
 
-  /** 열쇠 가운데 하나라도 한도에 닿았으면 true(막음) */
-  isBlocked(keys: string[], now: number): boolean {
-    return keys.some((key) => (this.live(key, now)?.failures ?? 0) >= this.maxFailures);
+  /** 한도 가운데 하나라도 그 열쇠의 상한에 닿았으면 true(막음) */
+  isBlocked(checks: DemoLimitCheck[], now: number): boolean {
+    return checks.some((c) => (this.live(c.key, now)?.failures ?? 0) >= c.max);
   }
 
   /** 틀린 코드 한 번을 모든 열쇠에 센다 */
-  recordFailure(keys: string[], now: number): void {
-    for (const key of keys) {
+  recordFailure(checks: DemoLimitCheck[], now: number): void {
+    for (const { key } of checks) {
       const bucket = this.live(key, now);
       if (bucket) bucket.failures += 1;
       else this.buckets.set(key, { windowStart: now, failures: 1 });
@@ -100,7 +112,7 @@ export class DemoAttemptLimiter {
   }
 }
 
-/** x-forwarded-for의 첫 값(Vercel이 덮어쓴다). 없거나 이상하면 "unknown" — 이 열쇠를 모두가 나눠 쓰게 되어 막는 쪽으로 기운다. */
+/** x-forwarded-for의 첫 값(Vercel이 덮어쓴다). 없거나 이상하면 "unknown" — 그때 IP 한도는 세지 않는다(demoLimitChecks). */
 export function clientIpFrom(forwardedFor: string | null, realIp: string | null = null): string {
   const first = (forwardedFor ?? "").split(",")[0]?.trim() ?? "";
   const candidate = first || (realIp ?? "").trim();

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startDemo } from "../../app/demo/actions";
-import { DEMO_LIMIT_MAX_FAILURES, DEMO_LIMIT_WINDOW_MS, DemoAttemptLimiter } from "../../lib/demo/access";
+import { DEMO_LIMIT_DEVICE_MAX, DEMO_LIMIT_IP_MAX, DEMO_LIMIT_WINDOW_MS, DemoAttemptLimiter, demoLimitChecks } from "../../lib/demo/access";
 import { DemoSeedError, seedDemoData, type DemoSeedCounts } from "../../lib/demo/seed";
 import { startDemoCore, type DemoStartDeps } from "../../lib/demo/start";
 import { parseTodoKey } from "../../lib/todos/crypto";
@@ -13,6 +13,8 @@ const CODE = "TEST-CODE-42";
 const ANON = "33333333-3333-4333-8333-333333333333";
 const REAL = "44444444-4444-4444-8444-444444444444";
 const key = parseTodoKey(randomBytes(32).toString("base64"))!;
+const DEV_A = "0b5f6c1e-3a1b-4c2d-8e9f-00000000000a";
+const DEV_B = "0b5f6c1e-3a1b-4c2d-8e9f-00000000000b";
 const COUNTS: DemoSeedCounts = { categories: 4, todos: 1, eveningLogs: 1, ratios: 4, ratioHistory: 1, weeklyGoals: 1, settings: 1 };
 
 type Claims = { sub: string; is_anonymous?: boolean } | null;
@@ -45,7 +47,7 @@ function deps(over: Partial<DemoStartDeps> = {}, client = fakeAuth(null)) {
   const d: DemoStartDeps = {
     expectedCode: CODE,
     limiter: new DemoAttemptLimiter(),
-    limitKeys: ["ip:1.2.3.4", "device:a"],
+    limitChecks: demoLimitChecks("203.0.113.7", DEV_A),
     now: () => 0,
     getSupabase,
     key,
@@ -77,7 +79,7 @@ describe("체험 코드로 시작 — 서버 순서", () => {
 
   it("체험이 꺼졌으면(코드 환경 변수 없음): 맞는 코드처럼 보내도 거절, 아무것도 부르지 않고 한도도 세지 않는다", async () => {
     const { d, seed, getSupabase } = deps({ expectedCode: null });
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES + 1; i += 1) expect(await startDemoCore(d, CODE)).toEqual({ ok: false, error: "off" });
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX + 1; i += 1) expect(await startDemoCore(d, CODE)).toEqual({ ok: false, error: "off" });
     expect(await startDemoCore(d, "")).toEqual({ ok: false, error: "off" });
     expect(seed).not.toHaveBeenCalled();
     expect(getSupabase).not.toHaveBeenCalled();
@@ -90,10 +92,10 @@ describe("체험 코드로 시작 — 서버 순서", () => {
     expect(await startDemo("")).toEqual({ ok: false, error: "off" });
   });
 
-  it("틀린 코드 5번 뒤에는 맞는 코드도 막히고(로그인 0번), 10분 창이 지나면 맞는 코드가 다시 된다", async () => {
+  it("같은 기기가 틀린 코드 5번 뒤에는 맞는 코드도 막히고(로그인 0번), 10분 창이 지나면 맞는 코드가 다시 된다", async () => {
     let now = 0;
     const { d, seed, client } = deps({ now: () => now });
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES; i += 1) expect((await startDemoCore(d, `WRONG-${i}`)).ok).toBe(false);
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX; i += 1) expect((await startDemoCore(d, `WRONG-${i}`)).ok).toBe(false);
     expect(await startDemoCore(d, CODE)).toEqual({ ok: false, error: "rate_limited" });
     expect(client.auth.signInAnonymously).not.toHaveBeenCalled();
     now = DEMO_LIMIT_WINDOW_MS;
@@ -101,9 +103,30 @@ describe("체험 코드로 시작 — 서버 순서", () => {
     expect(seed).toHaveBeenCalledTimes(1);
   });
 
+  it("같은 IP의 다른 기기는 한 기기가 5번 틀려도 맞는 코드로 들어간다(발표장 Wi-Fi, NAT 뒤)", async () => {
+    const limiter = new DemoAttemptLimiter();
+    const a = deps({ limiter, limitChecks: demoLimitChecks("203.0.113.7", DEV_A) });
+    const b = deps({ limiter, limitChecks: demoLimitChecks("203.0.113.7", DEV_B) });
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX; i += 1) await startDemoCore(a.d, "WRONG");
+    expect(await startDemoCore(a.d, CODE)).toEqual({ ok: false, error: "rate_limited" });
+    expect(await startDemoCore(b.d, CODE)).toEqual({ ok: true });
+    expect(b.seed).toHaveBeenCalledTimes(1);
+  });
+
+  it("같은 IP에서 기기를 바꿔 가며 30번 틀리면 그 IP는 맞는 코드도 막힌다(로그인 0번)", async () => {
+    const limiter = new DemoAttemptLimiter();
+    for (let i = 0; i < DEMO_LIMIT_IP_MAX; i += 1) {
+      const device = "0b5f6c1e-3a1b-4c2d-8e9f-" + String(i).padStart(12, "0");
+      expect((await startDemoCore(deps({ limiter, limitChecks: demoLimitChecks("203.0.113.7", device) }).d, "WRONG")).ok).toBe(false);
+    }
+    const fresh = deps({ limiter, limitChecks: demoLimitChecks("203.0.113.7", DEV_B) });
+    expect(await startDemoCore(fresh.d, CODE)).toEqual({ ok: false, error: "rate_limited" });
+    expect(fresh.client.auth.signInAnonymously).not.toHaveBeenCalled();
+  });
+
   it("한도 전에는 맞는 코드가 통과한다(틀린 코드 4번 뒤)", async () => {
     const { d } = deps();
-    for (let i = 0; i < DEMO_LIMIT_MAX_FAILURES - 1; i += 1) await startDemoCore(d, "WRONG");
+    for (let i = 0; i < DEMO_LIMIT_DEVICE_MAX - 1; i += 1) await startDemoCore(d, "WRONG");
     expect(await startDemoCore(d, CODE)).toEqual({ ok: true });
   });
 

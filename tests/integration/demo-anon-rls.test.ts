@@ -112,10 +112,19 @@ describe("익명(체험) 사용자 둘의 RLS", () => {
     expect(forged.error?.code).toBe("42501");
   });
 
-  it("anon(로그인 안 함)에는 표가 열리지 않는다", async () => {
+  it("anon(로그인 안 함)에는 표가 열리지 않는다 — 빈 결과가 아니라 권한 거절(42501)", async () => {
+    // 양성 대조: 같은 행이 A에게는 보인다(행이 없어서 빈 것이 아님)
+    expect((await a.client.from("todos").select("id").eq("id", a.todoId)).data).toEqual([{ id: a.todoId }]);
     const { url, key } = env();
     const anon = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-    const res = await anon.from("todos").select("id").eq("id", a.todoId);
-    expect(res.data ?? []).toEqual([]);
+    // anon 역할에는 마이그레이션이 grant를 주지 않았다(revoke all) → RLS 전에 표 권한에서 막힌다
+    for (const table of ["todos", "evening_logs", "category_ratios", "categories"] as const) {
+      const res = await anon.from(table).select("user_id").eq("user_id", a.id);
+      expect(res.error?.code, table).toBe("42501");
+      expect(res.data, table).toBeNull();
+    }
+    const insert = await anon.from("todos").insert({ user_id: a.id, day: "2026-10-20", text_encrypted: fakeCipher() }).select("id");
+    expect(insert.error?.code).toBe("42501");
+    expect(insert.data).toBeNull();
   });
 });
