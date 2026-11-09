@@ -515,10 +515,9 @@ button, input { font: inherit; color: inherit; }
 .ratio-row .stepper-input { inline-size: 4em; }
 .evening-dial { margin-top: var(--space-2); }
 /* ---- 원샷 v2 고침5: 오늘 기록 나누기 칩 줄·줄 고름 ---- */
-/* 칩 줄: 지금 칩(.chip-row·.chip)을 그대로 쓰고 한 줄로만, 넘치면 옆으로 민다(「‹ ›」 넘김 부품은 B가 만들고 합칠 때 끼운다) */
-.evening-chips { flex-wrap: nowrap; max-height: none; overflow-x: auto; overflow-y: hidden; }
+/* 칩 줄: ChipScroller(한 줄 · 옆으로 넘김 · 「‹ ›」)가 .chip-row를 그린다. 아래는 이 줄의 고른 칩 모양만(테두리 2px이 늘린 높이는 margin-block -1px으로 되돌려 고른 칩과 안 고른 칩의 높이가 글자 200%에서도 같다) */
 /* 고른 칩 = 체크 + 2px 먹남색 테두리(명세 ④-2). 같은 칩 규칙이 전역으로 오면 이 줄은 지운다 */
-.evening-chips .chip[aria-pressed="true"] .chip-face { background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-primary); padding: 0 calc(var(--space-3) - 1px); }
+.evening-chips .chip[aria-pressed="true"] .chip-face { background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-primary); padding: 0 calc(var(--space-3) - 1px); margin-block: -1px; }
 .evening-chips .chip[aria-pressed="true"]:active .chip-face { background: var(--color-notice-bg); border-color: var(--color-primary-pressed); }
 /* 칩·줄의 분야 색 점: 1px 윤곽(분야 색이 흰 바탕 3:1 미만) */
 .chip-dot { flex: none; display: inline-block; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }

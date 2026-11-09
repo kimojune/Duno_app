@@ -15,6 +15,7 @@ import { rescaleSplit } from "../lib/ratio-dial-calc";
 import { categoryColorValue } from "../lib/category-color";
 import { RatioDial, type DialSlice } from "./ratio-dial";
 import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
+import { ChipScroller } from "./chip-scroller";
 import { Stepper } from "./stepper";
 import { categoryDuplicateText, categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -581,7 +582,7 @@ export function EveningRecord({
                 </div>
               </div>
             ) : (
-              <div className="chip-row evening-chips" role="group" aria-labelledby="evening-category-label">
+              <ChipScroller className="evening-chips" aria-labelledby="evening-category-label">
                 {catalog.map((c) => {
                   const pressed = has(perCategory, c.id);
                   return (
@@ -593,7 +594,6 @@ export function EveningRecord({
                       aria-label={EVENING_TEXT.chip(c.name)}
                       data-chip-id={c.id}
                       onClick={() => toggleChip(c.id)}
-                      onFocus={(e) => e.currentTarget.scrollIntoView?.({ inline: "nearest", block: "nearest" })}
                     >
                       <span className="chip-face">
                         {pressed && <CheckIcon />}
@@ -608,13 +608,12 @@ export function EveningRecord({
                   id="evening-add-category-chip"
                   className="chip chip-add"
                   onClick={openNewCategory}
-                  onFocus={(e) => e.currentTarget.scrollIntoView?.({ inline: "nearest", block: "nearest" })}
                 >
                   <span className="chip-face">
                     <span className="chip-label">{TODO_TEXT.addCategoryChip}</span>
                   </span>
                 </button>
-              </div>
+              </ChipScroller>
             )}
             <p id="evening-category-help" className="input-help" role="status">
               {newCatHelp}

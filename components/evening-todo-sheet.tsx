@@ -11,6 +11,7 @@ import type { AddedTodo, TodoDoneState, TodoItem, TodoResult } from "../lib/todo
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
+import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, CategoryTag, helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
@@ -448,12 +449,11 @@ function EveningTodoSheet({
               <span id="evening-todo-category-label" className="sheet-label sheet-category-label">
                 {TODO_TEXT.categoryLabel}
               </span>
-              {/* 칩 줄: 지금 앱 칩 그대로(합칠 때 칩 한 줄 부품으로 바꾼다) */}
-              <div className="chip-row" role="group" aria-labelledby="evening-todo-category-label">
+              <ChipScroller aria-labelledby="evening-todo-category-label">
                 {chips.map((chip) => (
                   <CategoryChip key={chip.id} chip={chip} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
                 ))}
-              </div>
+              </ChipScroller>
             </form>
           ) : (
             <TextButton id="evening-todo-add" className="evening-todo-add" onClick={openForm}>

@@ -527,6 +527,30 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
       await page.getByRole("button", { name: "다음" }).click();
     },
   },
+  // 고침 5바퀴 이음매: 오늘 기록 나누기(E1)와 오늘 할 일 시트(E2)의 칩 줄도 같은 부품(ChipScroller)이다
+  {
+    id: "evening-split",
+    state: "evening-split-many",
+    group: "분야 · 여러 개",
+    prepare: async (page) => {
+      await page.locator("#dev-open-window").click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByLabel("시간", { exact: true }).fill("2");
+      await page.getByRole("button", { name: "분야마다 나누기" }).click();
+      await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
+    },
+  },
+  {
+    id: "evening-todo-sheet",
+    state: "evening-todo-many",
+    group: "분야 (고르지 않으면 기타)",
+    prepare: async (page) => {
+      await page.getByRole("button", { name: /^오늘 할 일 2\/4/ }).click();
+      const sheet = page.getByRole("dialog", { name: "오늘 할 일" });
+      await expect(sheet).toBeVisible();
+      await sheet.getByRole("button", { name: "+ 할 일" }).click();
+    },
+  },
 ];
 for (const c of CHIP_ROW_CASES) {
   for (const size of ["360x800", "text200-sim"] as SizeTag[]) {

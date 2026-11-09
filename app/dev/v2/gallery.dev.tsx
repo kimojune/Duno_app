@@ -294,7 +294,7 @@ function Opener({ render }: { render: (close: () => void) => ReactNode }) {
 }
 
 export function V2Gallery({ id }: { id: string }) {
-  if (id === "evening-todo") return <EveningTodoGallery />; // 고침 5바퀴: 오늘 기록의 「오늘 할 일」 줄·시트
+  if (id === "evening-todo" || id === "evening-todo-many") return <EveningTodoGallery many={id === "evening-todo-many"} />; // 고침 5바퀴: 오늘 기록의 「오늘 할 일」 줄·시트
   if (id === "tabbar") {
     return (
       <Shell>
