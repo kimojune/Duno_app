@@ -21,6 +21,7 @@ import {
   categoryAddedText,
   categoryDuplicateText,
   categoryOverLimitText,
+  dayText,
   loadedText,
   overLimitText,
   savedOtherDayText,
@@ -30,7 +31,9 @@ import {
   type NewCategoryHelp,
   type RowView,
 } from "./todo-view";
+import { categoryColorValue } from "../lib/category-color";
 import { CarryOver } from "./carry-over";
+import { CloseConfirm } from "./close-confirm";
 import { PAST_DAYS_TEXT, PastDays } from "./past-days";
 import { Notice, TextButton } from "./ui";
 import { TodoDetail, type DetailCategoryAdd } from "./todo-detail";
@@ -204,6 +207,10 @@ export function TodoScreen({
     initialCategories?.ok ? initialCategories.data.categories.map(toEntry) : [],
   );
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const selectedCategoryRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategoryId;
+  }, [selectedCategoryId]);
   const [categoryNotice, setCategoryNotice] = useState("");
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryDraft, setNewCategoryDraft] = useState("");
@@ -229,6 +236,10 @@ export function TodoScreen({
   const sheetMarkRef = useRef<string | null>(null);
   /** 「닫기」·Esc가 부른 history.back() 가운데 아직 popstate가 오지 않은 수 */
   const pendingBacksRef = useRef(0);
+  /** 고침9 O-3: 확인을 띄우며 부른 history.forward() 가운데 아직 popstate가 오지 않은 수(사용자의 앞으로 가기로 읽지 않게) */
+  const pendingForwardsRef = useRef(0);
+  /** 고침9 O-3(Figma 133:2): 적는 창에 적던 글이 있을 때 「닫기」·Esc·뒤로 가기가 띄우는 확인 */
+  const [sheetConfirm, setSheetConfirm] = useState(false);
   /** 이번 화면에서 더한 분야: 그 전에 떠난 다시 읽기 응답이 늦게 와도 칩을 지우지 않게 */
   const addedCategoryIdsRef = useRef(new Set<string>());
   const categoryAttemptRef = useRef<CategoryAttempt | null>(null);
@@ -490,9 +501,29 @@ export function TodoScreen({
     (newCategoryOpen ? newCategoryInputRef : inputRef).current?.focus();
   }
 
+  /** 적는 창을 바꿨나: 할 일 칸·새 분야 칸에 글이 있거나(띄어쓰기만이면 없음) 분야를 기타가 아닌 것으로 골랐다(PM d-150 가, 23 133:2) */
+  function sheetHasDraft(): boolean {
+    return draftRef.current.trim() !== "" || newCategoryDraftRef.current.trim() !== "" || selectedCategoryRef.current !== null;
+  }
+  /** 고침9 O-3: 「닫기」·Esc. 바꾼 것이 있으면 확인(「저장하지 않고 나갈까요?」), 없으면 바로 닫는다 */
+  function requestCloseSheet(via: "button" | "esc") {
+    if (sheetHasDraft()) setSheetConfirm(true);
+    else closeSheet(via);
+  }
+  const sheetHasDraftRef = useRef(sheetHasDraft);
+  useEffect(() => {
+    sheetHasDraftRef.current = sheetHasDraft;
+  });
+
   // 뒤로 가기: 창이 열려 있으면 창만 닫는다(글은 남김). 창이 닫혀 있으면 아무것도 하지 않는다.
+  // 고침9 O-3: 적던 글이 있으면 닫지 않고 확인을 띄운 뒤 history.forward()로 창의 칸에 돌아간다(새 칸을 쌓지 않는다 — Chrome history 개입).
+  // 「계속 적기」 뒤 뒤로 가기를 다시 누르면 같은 확인이 다시 뜬다.
   useEffect(() => {
     function onPopState() {
+      if (pendingForwardsRef.current > 0) {
+        pendingForwardsRef.current -= 1;
+        return;
+      }
       if (pendingBacksRef.current > 0) {
         // 「닫기」·Esc가 부른 back()이 이제 도착했다(사용자의 뒤로 가기가 아니다).
         pendingBacksRef.current -= 1;
@@ -514,6 +545,12 @@ export function TodoScreen({
       if (!sheetOpenRef.current) return;
       // 아직 이번에 연 창의 칸이면(앞으로 가기로 돌아옴 등) 그대로. 옛 표시가 붙은 칸은 이번 창의 칸이 아니다.
       if (currentHistoryState()[SHEET_HISTORY_MARK] === sheetMarkRef.current) return;
+      if (sheetHasDraftRef.current()) {
+        setSheetConfirm(true);
+        pendingForwardsRef.current += 1;
+        window.history.forward();
+        return;
+      }
       closeSheet("popstate");
     }
     window.addEventListener("popstate", onPopState);
@@ -1138,6 +1175,14 @@ export function TodoScreen({
     return categoryState === "ready" ? TODO_TEXT.unreadableCategory : null;
   }
 
+  /** 분야 점 색(Figma 50:52): 이름을 읽을 수 있는 분야의 만든 순서 자리 → 분야 색. 모르는 분야는 점 없음(이름만) */
+  const readableOrder = new Map(categories.filter((c) => c.name !== null).map((c, i) => [c.id, i]));
+  function categoryColorOf(categoryId: string | null): string | undefined {
+    if (!categoryId) return undefined;
+    const order = readableOrder.get(categoryId);
+    return order === undefined ? undefined : categoryColorValue(order);
+  }
+
   const rowViews: RowView[] = rows.map((r) => ({
     id: r.id,
     text: r.text,
@@ -1148,6 +1193,7 @@ export function TodoScreen({
     queued: r.status === "queued",
     checkFailed: r.checkFailed,
     category: categoryText(r.categoryId),
+    categoryColor: categoryColorOf(r.categoryId),
     hasNotes: r.status === "saved" && r.hasNotes === true,
   }));
   const chips: ChipView[] = categories.filter((c): c is ChipView => c.name !== null);
@@ -1210,7 +1256,7 @@ export function TodoScreen({
       inputRef={inputRef}
       newCategoryInputRef={newCategoryInputRef}
       onOpenSheet={openSheet}
-      onCloseSheet={closeSheet}
+      onCloseSheet={requestCloseSheet}
       onDraftChange={changeDraft}
       onSubmit={submit}
       onToggleChip={toggleChip}
@@ -1243,7 +1289,15 @@ export function TodoScreen({
         ) : undefined
       }
       overlay={
-        manage && pastOpen && day ? (
+        sheetConfirm ? (
+          <CloseConfirm
+            onKeep={() => setSheetConfirm(false)}
+            onClose={() => {
+              setSheetConfirm(false);
+              closeSheet("button"); // 창만 닫는다. 적던 글은 지우지 않는다(단추 「적던 글 이어 적기」로 이어 적기 — C8 그대로)
+            }}
+          />
+        ) : manage && pastOpen && day ? (
           <PastDays api={manage} today={day.date} onClose={() => setPastOpen(false)} />
         ) : manage && detailRow ? (
           <TodoDetail
@@ -1265,6 +1319,9 @@ export function TodoScreen({
             onAddCategory={addCategoryFromDetail}
             categoryLimitReached={categories.length >= CATEGORY_LIMIT}
             onNotesChange={onNotesChange}
+            done={detailRow.done}
+            onToggleDone={() => toggle(detailRow.id)}
+            dayLabel={day ? dayText(day) : undefined}
           />
         ) : undefined
       }

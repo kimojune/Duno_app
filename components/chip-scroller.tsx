@@ -3,7 +3,6 @@
 import {
   Children,
   isValidElement,
-  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -30,6 +29,16 @@ export const CHIP_SCROLLER_TEXT = {
   collapse: "분야 접기",
   collapseFace: "접기",
 } as const;
+
+/**
+ * 칩 줄 이름(aria-labelledby·aria-label)마다 마지막으로 그린 칩 키. 「+ 분야」는 칩 줄 자리에 새 분야 칸을 띄워 칩 줄이 다시 그려지므로
+ * (새로 마운트), 컴포넌트 안 ref만으로는 「방금 생긴 칩」을 알 수 없다 — 같은 이름의 칩 줄이 다시 그려질 때 이 기록과 견준다.
+ */
+const lastKeysByRow = new Map<string, Set<string>>();
+/** 시험 사이에 기록을 비운다(시험 전용) */
+export function resetChipRowMemory() {
+  lastKeysByRow.clear();
+}
 
 /** 접혔을 때 보이는 줄 수 */
 export const CHIP_MAX_ROWS = 2;
@@ -95,11 +104,33 @@ export function ChipScroller({ children, className, prevLabel, nextLabel, ...nam
   const focusAfter = useRef<"revealed" | "more" | null>(null);
   const revealedIndex = useRef(0);
   const lastWidth = useRef(-1);
+  /** 다시 재기를 강제하는 값. shown이 이미 null이면 setShown(null)은 다시 그리지 않아 effect가 안 돈다(폭이 줄어 넘치게 될 때) */
+  const [tick, setTick] = useState(0);
+  /** 지난 그리기의 칩 키(새로 생긴 칩을 가리려고) */
+  const prevKeys = useRef<Set<string> | null>(null);
+  /** 방금 생기며 골라진 칩(「+ 분야」로 더한 분야)의 키 — 접혀 숨으면 펼쳐 보이고 그 칩으로 초점 */
+  const revealKey = useRef<string | null>(null);
+  /** 펼친 뒤 초점을 줄 새 칩의 자리(그리기가 끝난 뒤 — 부르는 쪽의 초점 옮김보다 뒤에 돈다) */
+  const revealFocus = useRef<number | null>(null);
 
-  const remeasure = useCallback(() => {
-    phase.current = "all";
-    setShown(null);
-  }, []);
+
+  // 새로 생긴 칩 가운데 골라진 것(방금 더한 분야)을 기억한다. 같은 이름의 칩 줄을 처음 그릴 때는 없다
+  const keys = items.map((item, i) => (isValidElement(item) && item.key !== null ? String(item.key) : `#${i}`));
+  const rowName = name["aria-labelledby"] ?? name["aria-label"] ?? "";
+  useLayoutEffect(() => {
+    const before = prevKeys.current ?? lastKeysByRow.get(rowName) ?? null;
+    const now = new Set(keys);
+    prevKeys.current = now;
+    if (rowName) lastKeysByRow.set(rowName, now);
+    if (!before) return;
+    const added = items.findIndex((item, i) => !before.has(keys[i]) && isPressed(item));
+    if (added < 0) return;
+    if (expanded) {
+      revealFocus.current = added; // 이미 펼쳐 있으면 새 칩은 보인다 — 초점만 옮긴다
+      return;
+    }
+    revealKey.current = keys[added];
+  });
 
   // 칩 수·칩 모양(고름으로 체크가 붙어 폭이 바뀜)이 바뀌면 다시 잰다. 그리기 전에(layout) 끝나 깜박이지 않는다.
   // 그려진 칩의 자리를 재고 그 결과로 보일 칩 수를 정하는 일이라 effect 안에서 상태를 바꾼다(배치 재기 — 그리기 전 layout effect의 쓰임새).
@@ -116,12 +147,24 @@ export function ChipScroller({ children, className, prevLabel, nextLabel, ...nam
       }
     }
     const chips = [...el.children].filter((c) => !c.hasAttribute("data-chip-more")) as HTMLElement[];
-    const tops = chips.map((c) => c.getBoundingClientRect().top);
+    // 줄은 칩의 세로 가운데로 가른다(.chip-row align-items:center — 글자 200%에서 칩 높이가 달라도 같은 줄의 가운데는 같다)
+    const middle = (r: DOMRect) => r.top + r.height / 2;
+    const tops = chips.map((c) => middle(c.getBoundingClientRect()));
     const rows = rowIndexes(tops);
     if (phase.current === "all") {
       const fits = rows.filter((r) => r < CHIP_MAX_ROWS).length;
+      const reveal = revealKey.current;
+      revealKey.current = null;
       if (fits >= total) {
         phase.current = "done";
+        return;
+      }
+      // 분야를 더한 직후: 새 칩이 「+n」 뒤로 숨게 되면 접지 않고 펼친 채로 두고 새 칩으로 초점(펼친 뒤 초점 규칙과 같게)
+      const revealAt = reveal === null ? -1 : keys.indexOf(reveal);
+      if (revealAt >= 0 && revealAt >= fits - 1) {
+        phase.current = "done";
+        revealFocus.current = revealAt;
+        setExpanded(true);
         return;
       }
       // 두 줄에 든 칩까지 보이고 「+n」을 붙여 본다. 「+n」이 셋째 줄로 밀리면 하나씩 줄인다
@@ -135,15 +178,25 @@ export function ChipScroller({ children, className, prevLabel, nextLabel, ...nam
       phase.current = "done";
       return;
     }
-    const allTops = [...tops, more.getBoundingClientRect().top];
+    const allTops = [...tops, middle(more.getBoundingClientRect())];
     const moreRow = rowIndexes(allTops)[allTops.length - 1];
     if (moreRow >= CHIP_MAX_ROWS && shown > 1) {
       setShown(shown - 1);
       return;
     }
     phase.current = "done";
-  }, [children, expanded, shown, total]);
+  }, [keys, expanded, shown, total, tick]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 분야를 더한 직후 펼친 새 칩으로 초점. layout effect가 아니라 effect라 부르는 쪽(할 일 칸으로 초점)보다 뒤에 돈다
+  useEffect(() => {
+    const at = revealFocus.current;
+    const el = row.current;
+    if (at === null || !el) return;
+    revealFocus.current = null;
+    const chips = [...el.children].filter((c) => !c.hasAttribute("data-chip-more")) as HTMLElement[];
+    chips[at]?.focus();
+  });
 
   // 폭이 바뀌면(화면 돌림·창 크기·글자 크기) 다시 잰다. 높이만 바뀐 것(펼침)으로는 다시 재지 않는다
   useEffect(() => {
@@ -153,11 +206,14 @@ export function ChipScroller({ children, className, prevLabel, nextLabel, ...nam
       const width = el.clientWidth;
       if (width === lastWidth.current) return;
       lastWidth.current = width;
-      if (!expanded) remeasure();
+      if (expanded) return;
+      phase.current = "all";
+      setShown(null);
+      setTick((t) => t + 1); // shown이 이미 null이어도 다시 그려 잰다(좁아져 넘치게 될 때)
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [expanded, remeasure]);
+  }, [expanded]);
 
   // 펼침·접기 뒤 초점
   useLayoutEffect(() => {

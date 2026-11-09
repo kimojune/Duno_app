@@ -85,6 +85,60 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("고침9 O-3 이번 주 목표 시트: 바꾼 뒤 닫기·Esc·뒤로 가기는 확인", () => {
+  const goal: Renderer = (onClose) => (
+    <GoalEditor api={goalApi as never} categories={[{ id: "c1", name: "어학" }]} goal={null} onClose={onClose} onSaved={() => {}} />
+  );
+  const confirm = () => screen.queryByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
+
+  it("안 바꿨으면 「닫기」로 바로 닫힌다(확인 없음)", () => {
+    const onClosed = vi.fn();
+    render(<Harness renderWindow={goal} onClosed={onClosed} />);
+    fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(confirm()).toBeNull();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("바꾼 뒤 「닫기」 → 확인(첫 포커스 「계속 적기」), 「계속 적기」는 값 그대로, Esc도 확인, 「나가기」는 저장 없이 닫힘", () => {
+    const onClosed = vi.fn();
+    render(<Harness renderWindow={goal} onClosed={onClosed} />);
+    fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(confirm()).not.toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "계속 적기" }));
+    fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
+    expect(confirm()).toBeNull();
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "이번 주 목표" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("heading", { name: "이번 주 목표" }), { key: "Escape" });
+    expect(confirm()).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(goalApi.save).not.toHaveBeenCalled();
+  });
+
+  it("바꾼 뒤 뒤로 가기 → 확인, 칸은 그대로(index 1), 「계속 적기」 뒤 다시 뒤로 가기 → 같은 확인", () => {
+    const onClosed = vi.fn();
+    render(<Harness renderWindow={goal} onClosed={onClosed} />);
+    fireEvent.click(screen.getByRole("button", { name: "창 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "어학 1시간 늘리기" }));
+    expect(history.index).toBe(1);
+    history.userBack();
+    history.flush();
+    expect(confirm()).not.toBeNull();
+    expect(history.index).toBe(1);
+    expect(onClosed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
+    history.userBack();
+    history.flush();
+    expect(confirm()).not.toBeNull();
+    expect(history.index).toBe(1);
+    expect(history.leftApp).toBe(false);
+  });
+});
+
 describe("고침9 PM 3 할 일 페이지 위 분야 고르기 시트", () => {
   const detail: Renderer = (onClose) => (
     <TodoDetail

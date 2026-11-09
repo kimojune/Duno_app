@@ -47,7 +47,7 @@ export const TODO_TEXT = {
   queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절). 고침9: 줄에는 보이지 않고 16px 도는 원(SavePending) + 숨은 글 「저장 대기」
   /** 고침9(PM 16:2x, 23 Figma 128:87): 저장 대기 원의 화면 읽기 글 */
   pending: "저장 대기",
-  liveQueued: "연결되면 저장할게요",
+  liveQueued: "저장 대기", // 고침9 O-8: 줄의 도는 원과 같은 말(polite 한 곳)
   retry: "다시",
   remove: "빼기",
   checkFailed: "끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.",
@@ -175,6 +175,8 @@ export type RowView = {
   category?: string | null;
   /** 작업 기록이 하나라도 있으면 true: 할 일 글 바로 뒤에 종이 아이콘(고침9 PM 2-B) */
   hasNotes?: boolean;
+  /** 분야 색(분야 점, Figma 50:52). 없으면 점 없이 이름만 */
+  categoryColor?: string;
 };
 
 /** 칩 하나(풀 수 있는 이름만. 풀 수 없는 분야는 칩에 보이지 않는다, 12-7) */
@@ -353,9 +355,11 @@ export function SavePending({ id }: { id?: string }) {
 }
 
 /** 목록 줄의 분야 표시. 기타(분야 없음)는 붙이지 않는다. 화면 읽기용으로 앞에 「분야 」 */
-export function CategoryTag({ id, name }: { id: string; name: string }) {
+export function CategoryTag({ id, name, color }: { id: string; name: string; color?: string }) {
   return (
     <div className="category-tag-line">
+      {/* 고침9 Figma 50:52: 분야 점(10, 1px 윤곽) + 이름 12 보조. 색만으로 가르지 않는다(이름이 늘 함께) */}
+      {color && <span className="category-tag-dot" style={{ background: color }} aria-hidden="true" />}
       <span id={id} className="category-tag">
         <span className="sr-only">{TODO_TEXT.categoryPrefix}</span>
         {name}
@@ -398,7 +402,7 @@ function Row({
           {row.hasNotes && <NoteIcon id={noteId} />}
         </p>
         {/* C-D6: 저장 중 줄에도 분야 표시를 바로 그린다 */}
-        {row.category && <CategoryTag id={tagId} name={row.category} />}
+        {row.category && <CategoryTag id={tagId} name={row.category} color={row.categoryColor} />}
         {/* 늘 그린다(체크 칸 aria-describedby가 가리킨다). 처음 SAVING_HINT_DELAY_MS 동안은 화면 읽기용으로만 있다 */}
         {row.saving && (
           <p id={statusId} className={row.savingSlow ? "todo-sub" : "todo-sub sr-only"}>
@@ -414,7 +418,8 @@ function Row({
         )}
         {row.failed && (
           <>
-            <p id={statusId} role="status" className="todo-sub">
+            {/* 고침9 O-8: 저장 상태는 화면 한 곳(LiveRegion, polite)에서만 알린다 — 줄의 글은 보이는 글·체크 칸 설명이고 따로 낭독하지 않는다 */}
+            <p id={statusId} className="todo-sub">
               {TODO_TEXT.saveFailed}
             </p>
             <div className="row-actions">
@@ -424,18 +429,18 @@ function Row({
           </>
         )}
         {row.checkFailed && (
-          <p role="status" className="todo-sub">
+          <p className="todo-sub">
             {TODO_TEXT.checkFailed}
           </p>
         )}
       </div>
       {/* 고침9: 저장 대기는 할 일 글 줄 세로 가운데, 줄 오른쪽에 16px 도는 원(글 「연결되면 저장해요」 대신) */}
       {row.queued && <SavePending id={statusId} />}
-      {/* 저장된 줄에만, 줄 오른쪽의 작은 단추로(B16). 보이는 글은 작아도 누르는 면은 48px 이상. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
+      {/* 저장된 줄에만, 줄 오른쪽 「›」(고침9 Figma 50:52 — 할 일 페이지로). 누름 48. 그림 글자라 접근 이름은 「자세히 보기: 할 일 글」 */}
       {onOpenDetail && !notSaved && (
         <div className="row-actions row-detail">
           <TextButton className="row-detail-btn" aria-label={`자세히 보기: ${row.text ?? TODO_TEXT.unreadable}`} onClick={() => onOpenDetail(row.id)}>
-            자세히
+            <span aria-hidden="true">›</span>
           </TextButton>
         </div>
       )}

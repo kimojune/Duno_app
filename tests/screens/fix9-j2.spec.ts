@@ -209,8 +209,49 @@ test("S2-b 할 일 페이지(51:55) · S2-b′ 분야 고르기 시트(77:18): �
   expect(lineBox.dotW, "색 원 12").toBe(12);
   expect(lineBox.dotBorder, "1px 윤곽").toBe("1px");
   expect(lineBox.go).toBe("›");
+  // 고침9 Figma 51:55 머리·큰 제목: 왼쪽 「‹ 할 일」 · 오른쪽 「⋯」(누름 48) · 큰 제목 24 Bold = 할 일 글 · 「고치기」 없음
+  const back = dialog.getByRole("button", { name: "할 일로 돌아가기" });
+  await expect(back).toHaveText("‹ 할 일");
+  const more = dialog.getByRole("button", { name: "더 보기" });
+  const head = await page.evaluate(() => {
+    const b = document.querySelector(".detail-back")!.getBoundingClientRect();
+    const m = document.getElementById("detail-more")!.getBoundingClientRect();
+    const t = getComputedStyle(document.getElementById("detail-text")!);
+    return { backLeft: b.left, moreRight: m.right, moreW: m.width, moreH: m.height, titleSize: t.fontSize, titleWeight: t.fontWeight, vw: window.innerWidth };
+  });
+  expect(head.backLeft, "「‹ 할 일」은 왼쪽 위").toBeLessThan(40);
+  expect(head.moreRight, "「⋯」는 오른쪽 위").toBeGreaterThan(head.vw - 40);
+  expect(head.moreW).toBeGreaterThanOrEqual(48);
+  expect(head.moreH).toBeGreaterThanOrEqual(48);
+  expect(head.titleSize).toBe("24px");
+  expect(head.titleWeight).toBe("700");
+  await expect(dialog.getByRole("button", { name: "고치기" })).toHaveCount(0);
+  await expect(dialog.getByText("하는 날")).toHaveCount(0); // 갤러리에는 하는 날을 넘기지 않음(앱은 넘김 — 단위 시험)
   await noOverflow(page);
   await photo(page, "S2-b-할일페이지(51-55)");
+
+  // ⋯ 메뉴(58:92): 위로·아래로·지우기, Esc는 메뉴만 닫음
+  await more.click();
+  const menu = dialog.getByRole("menu", { name: "할 일 메뉴" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText(["위로", "아래로", "지우기"]);
+  const menuBox = await menu.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { right: r.right, bg: getComputedStyle(el).backgroundColor, radius: getComputedStyle(el).borderTopLeftRadius };
+  });
+  expect(menuBox.bg).toBe("rgb(255, 255, 255)");
+  expect(menuBox.radius).toBe("16px");
+  expect(menuBox.right).toBeLessThanOrEqual(360 + 0.5);
+  await photo(page, "S2-b-메뉴(58-92)");
+  // 지우기 확인(66:12): 가운데 카드, 초점 「취소」
+  await menu.getByRole("menuitem", { name: "지우기" }).click();
+  const confirm = page.getByRole("alertdialog", { name: "이 할 일을 지울까요? 작업 기록도 함께 지워져요." });
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "취소" })).toBeFocused();
+  await photo(page, "S2-b-지우기확인(66-12)");
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  await expect(dialog).toBeVisible();
 
   await line.click();
   const sheet = page.getByRole("dialog", { name: "분야 고르기" });

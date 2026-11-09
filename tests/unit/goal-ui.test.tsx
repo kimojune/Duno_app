@@ -95,8 +95,19 @@ describe("이번 주 목표 정하기 창", () => {
     render(<GoalEditor api={api} categories={categories} goal={[{ categoryId: C1, minutes: 300 }]} onClose={vi.fn()} onSaved={onSaved} />);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("5");
     expect((screen.getByLabelText("포트폴리오") as HTMLInputElement).value).toBe("0");
+    // 고침9 ④-2(Figma 51:48): 「목표 없애기」는 확인 한 단계 — 「그대로」면 아무것도 안 함, 「없애기」면 없앤다
     await press("목표 없애기");
-    expect(api.clear).toHaveBeenCalled();
+    expect(api.clear).not.toHaveBeenCalled();
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("이번 주 목표를 없앨까요?");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "그대로" }));
+    await press("그대로");
+    expect(screen.queryByText("이번 주 목표를 없앨까요?")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "목표 없애기" }));
+    expect(api.clear).not.toHaveBeenCalled();
+    await press("목표 없애기");
+    await press("없애기");
+    expect(api.clear).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalled();
   });
 

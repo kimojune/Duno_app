@@ -238,13 +238,18 @@ describe("적기 (T6, T7, T11, D4)", () => {
     expect(box.checked).toBe(false);
   });
 
-  it("T7 저장 실패: 글이 남고 안내는 role=status, 「빼기」는 그 줄을 치운다", async () => {
+  it("T7 저장 실패: 글이 남고 안내는 polite 알림 한 곳(LiveRegion — 고침9 O-8, 줄 글은 따로 낭독하지 않음), 「빼기」는 그 줄을 치운다", async () => {
     await renderLoaded([]);
     addTodo.mockResolvedValue(fail("unavailable"));
     write("못 저장한 글");
     press();
-    const status = await findOneVisible("저장하지 못했어요.");
-    expect(status.getAttribute("role")).toBe("status");
+    const status = await screen.findByText("저장하지 못했어요.", { selector: "p.todo-sub" });
+    expect(status.getAttribute("role")).toBeNull();
+    const live = document.querySelector(".sr-only[role=status]") as HTMLElement;
+    expect(live.getAttribute("aria-live") ?? "polite").toBe("polite");
+    await waitFor(() => expect(live.textContent).toBe("저장하지 못했어요."));
+    expect(document.querySelectorAll("[role=status], [role=alert]").length, "알림 자리는 LiveRegion 하나(+ 화면에 이미 있던 것)").toBeGreaterThan(0);
+    expect([...document.querySelectorAll("[role=status]")].filter((el) => el.textContent === "저장하지 못했어요.")).toEqual([live]);
     expect(screen.getByText("못 저장한 글")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
     expect(screen.queryByText("못 저장한 글")).toBeNull();

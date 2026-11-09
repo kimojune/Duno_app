@@ -11,8 +11,9 @@ import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { categoryColorValue } from "../lib/category-color";
 import { BottomActions } from "./back-header";
+import { CloseConfirm } from "./close-confirm";
 import { Stepper } from "./stepper";
-import { Notice, PrimaryButton, TextButton } from "./ui";
+import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 이번 주 목표(PRD 7-7, ⑥). 한 주(월~일) 동안 분야마다 쓰려는 시간이다. 쓴 시간이 쌓이는 것을 숫자로 보며 성취감을 느끼게 한다(D-085).
@@ -34,6 +35,10 @@ export const GOAL_TEXT = {
   save: "저장",
   saving: "저장하는 중",
   clear: "목표 없애기",
+  // 고침9 ④-2 · Figma 51:48: 되돌릴 수 없는 동작이라 확인 한 단계(USE-03·05)
+  clearConfirm: "이번 주 목표를 없앨까요?",
+  clearYes: "없애기",
+  clearNo: "그대로",
   close: "닫기",
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
@@ -95,13 +100,43 @@ export function GoalEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
+  // 고침9 O-3(Figma 133:2 꼴, PM d-135 글): 시간을 바꾼 뒤 「닫기」·Esc·뒤로 가기는 확인 「저장하지 않고 나갈까요?」. 안 바꿨으면 그냥 닫힘
+  const [confirmClose, setConfirmClose] = useState(false);
+  const changedRef = useRef(false);
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose, {
+    holdBack: () => {
+      if (!changedRef.current) return false;
+      setConfirmClose(true);
+      return true;
+    },
+  });
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
   const online = useOnline() || api.localFirst === true;
-  const [hours, setHours] = useState<Record<string, number>>(() =>
+  const [initialHours] = useState<Record<string, number>>(() =>
     Object.fromEntries((goal ?? []).flatMap((g) => (g.categoryId ? [[g.categoryId, Math.round(g.minutes / 60)]] : []))),
   );
+  const [hours, setHours] = useState<Record<string, number>>(initialHours);
+  const changed = categories.some((c) => (hours[c.id] ?? 0) !== (initialHours[c.id] ?? 0));
+  useEffect(() => {
+    changedRef.current = changed;
+  }, [changed]);
+  function requestClose() {
+    if (changed) setConfirmClose(true);
+    else onClose();
+  }
   const [busy, setBusy] = useState<"save" | "clear" | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const clearAsked = useRef(false);
+  useEffect(() => {
+    // 확인이 뜨면 「그대로」로, 「그대로」로 닫으면 「목표 없애기」로 초점을 돌려준다
+    if (confirmClear) {
+      clearAsked.current = true;
+      document.getElementById("goal-clear-keep")?.focus();
+    } else if (clearAsked.current) {
+      clearAsked.current = false;
+      document.getElementById("goal-clear")?.focus();
+    }
+  }, [confirmClear]);
   const [message, setMessage] = useState("");
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
@@ -145,7 +180,7 @@ export function GoalEditor({
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape" && !composing(event)) {
       event.preventDefault();
-      onClose();
+      requestClose();
     }
   }
 
@@ -157,7 +192,7 @@ export function GoalEditor({
           <h2 id="goal-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {GOAL_TEXT.title}
           </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
+          <TextButton className="btn-flush-end text-tap" onClick={requestClose}>
             {GOAL_TEXT.close}
           </TextButton>
         </div>
@@ -199,13 +234,28 @@ export function GoalEditor({
           <PrimaryButton busy={busy === "save"} disabled={!canSave} onClick={() => void save()}>
             {busy === "save" ? GOAL_TEXT.saving : GOAL_TEXT.save}
           </PrimaryButton>
-          {goal && goal.length > 0 && (
-            <TextButton disabled={busy !== null || !online} onClick={() => void clear()}>
+          {goal && goal.length > 0 && !confirmClear && (
+            <TextButton id="goal-clear" className="text-tap" disabled={busy !== null || !online} onClick={() => setConfirmClear(true)}>
               {GOAL_TEXT.clear}
             </TextButton>
           )}
+          {/* 고침9 ④-2 · Figma 51:48: 「목표 없애기」 → 흰 카드 「이번 주 목표를 없앨까요?」 + 「없애기」(테두리) · 「그대로」. 초점은 되돌릴 수 있는 「그대로」 */}
+          {goal && goal.length > 0 && confirmClear && (
+            <div className="card-box goal-clear-confirm" role="alert">
+              <p className="goal-clear-title">{GOAL_TEXT.clearConfirm}</p>
+              <div className="goal-clear-actions">
+                <SecondaryButton busy={busy === "clear"} disabled={busy !== null || !online} onClick={() => void clear()}>
+                  {GOAL_TEXT.clearYes}
+                </SecondaryButton>
+                <TextButton id="goal-clear-keep" className="text-tap" disabled={busy !== null} onClick={() => setConfirmClear(false)}>
+                  {GOAL_TEXT.clearNo}
+                </TextButton>
+              </div>
+            </div>
+          )}
         </BottomActions>
       </div>
+      {confirmClose && <CloseConfirm onKeep={() => setConfirmClose(false)} onClose={onClose} />}
     </div>
   );
 }

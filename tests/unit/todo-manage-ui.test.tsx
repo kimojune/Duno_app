@@ -17,7 +17,7 @@ vi.mock("../../lib/read-client", () => ({
 vi.mock("../../app/actions", () => ({ signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { addCategory } from "../../app/todos/actions";
+import { addCategory, setTodoDone } from "../../app/todos/actions";
 import { TodoScreen } from "../../components/todo-screen";
 
 const DAY: TodoDay = { date: "2026-11-07", year: 2026, month: 11, dayOfMonth: 7, weekday: 6 };
@@ -68,92 +68,100 @@ describe("manage가 없으면 기존 화면 그대로", () => {
   });
 });
 
-describe("할 일 자세히 (0번)", () => {
-  it("줄의 「자세히」가 대화상자를 열고, 닫으면 그 줄의 「자세히」로 포커스가 돌아온다", async () => {
+/** 고침9 Figma 58:92: 「⋯」(더 보기) 메뉴를 연다 */
+function openMenu(dialog: HTMLElement) {
+  fireEvent.click(within(dialog).getByRole("button", { name: "더 보기" }));
+  return within(dialog).getByRole("menu", { name: "할 일 메뉴" });
+}
+
+describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 58:92 · 66:12 · 66:76)", () => {
+  it("줄의 「자세히」가 대화상자를 열고, 머리 「‹ 할 일」로 닫으면 그 줄의 「자세히」로 포커스가 돌아온다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
     const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(api.fetchNotes).toHaveBeenCalledWith(A);
-    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    const back = within(dialog).getByRole("button", { name: "할 일로 돌아가기" });
+    expect(back.textContent).toBe("‹ 할 일"); // 보이는 글 「할 일」이 이름 안에(2.5.3)
+    // 큰 제목 = 할 일 글, 속성 줄 끝냄·분야·하는 날
+    expect((within(dialog).getByLabelText("할 일 글") as HTMLInputElement).value).toBe("이력서");
+    expect(within(dialog).getByRole("checkbox", { name: "끝냄" })).toBeTruthy();
+    expect(within(dialog).getByText("11월 7일 토요일")).toBeTruthy();
+    fireEvent.click(back);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
   });
 
-  it("글을 고치면 api로 바뀐 것만 보내고 목록 글이 바뀐다", async () => {
+  it("큰 제목 글을 고치고 엔터면 api로 바뀐 것만 보내고(「고치기」 단추 없음), 머리에 「저장됨」, 목록 글이 바뀐다. 안 바꾼 채 칸을 떠나면 보내지 않는다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
-    const save = await screen.findByRole("button", { name: "고치기" });
-    expect((save as HTMLButtonElement).disabled).toBe(true); // 바뀐 것이 없다
-    fireEvent.change(screen.getByLabelText("할 일 글"), { target: { value: "이력서 고치기" } });
-    expect((save as HTMLButtonElement).disabled).toBe(false);
-    await act(async () => fireEvent.click(save));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    expect(within(dialog).queryByRole("button", { name: "고치기" })).toBeNull();
+    const title = within(dialog).getByLabelText("할 일 글");
+    fireEvent.blur(title);
+    expect(api.editTodo).not.toHaveBeenCalled();
+    fireEvent.change(title, { target: { value: "이력서 고치기" } });
+    await act(async () => fireEvent.keyDown(title, { key: "Enter" }));
+    expect(api.editTodo).toHaveBeenCalledTimes(1);
     expect(api.editTodo).toHaveBeenCalledWith(A, { text: "이력서 고치기" });
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(dialog.querySelector(".detail-status")!.textContent).toBe("저장됨");
+    expect(dialog.querySelector(".sr-only[role=status]")!.textContent).toBe("저장됨"); // O-8 알림 한 곳
+    await act(async () => fireEvent.blur(title)); // 이미 저장한 글이면 다시 보내지 않는다
+    expect(api.editTodo).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
     expect(screen.getByRole("checkbox", { name: "이력서 고치기" })).toBeTruthy();
   });
 
-  it("분야를 고르면 분야만 보내고, 기타로 돌릴 수 있다(고침9 PM 3: 시트에서 고르면 바로 저장)", async () => {
-    const api = fakeApi();
-    render(<TodoScreen initial={initial([item(A, "단어 외우기")])} manage={api} />);
-    fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 단어 외우기" }));
-    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
-    // 칩 줄은 없고, 고른 분야 한 줄(없으면 「기타」)
-    expect(within(dialog).queryByRole("group", { name: "분야" })).toBeNull();
-    const line = within(dialog).getByRole("button", { name: "분야 기타" });
-    fireEvent.click(line);
-    const sheet = screen.getByRole("dialog", { name: "분야 고르기" });
-    await act(async () => fireEvent.click(within(sheet).getByRole("button", { name: "어학" })));
-    expect(api.editTodo).toHaveBeenCalledTimes(1);
-    expect(api.editTodo).toHaveBeenCalledWith(A, { categoryId: CAT });
-    expect(screen.queryByRole("dialog", { name: "분야 고르기" })).toBeNull(); // 고르면 바로 닫힘(저장 단추 없음)
-    expect(within(dialog).getByRole("button", { name: "분야 어학" })).toBeTruthy();
-    // 다시 열어 「기타」로 돌린다: 저장 인자 분야 없음(null)
-    fireEvent.click(within(dialog).getByRole("button", { name: "분야 어학" }));
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "분야 고르기" })).getByRole("button", { name: "기타" })));
-    expect(api.editTodo).toHaveBeenLastCalledWith(A, { categoryId: null });
-    expect(api.editTodo).toHaveBeenCalledTimes(2);
-    expect(addCategory).not.toHaveBeenCalled(); // 「기타」는 분야 행을 만들지 않는다
-    expect(within(dialog).getByRole("button", { name: "분야 기타" })).toBeTruthy();
-  });
-
-  it("고치기가 실패하면 안내를 보이고 글은 그대로 둔다", async () => {
-    const api = fakeApi({ editTodo: vi.fn(async () => ({ ok: false as const, error: "unavailable" as const })) });
+  it("고치기가 실패하면 머리에 「저장 안 됨 · 다시 시도」(Figma 66:76), 글은 그대로, 누르면 같은 값으로 다시 보낸다", async () => {
+    const editTodo = vi.fn(async () => ({ ok: false as const, error: "unavailable" as const }));
+    const api = fakeApi({ editTodo });
     render(<TodoScreen initial={initial([item(A, "이력서")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
-    fireEvent.change(await screen.findByLabelText("할 일 글"), { target: { value: "새 글" } });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "고치기" })));
-    expect(screen.getByText("고치지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
+    const title = await screen.findByLabelText("할 일 글");
+    fireEvent.change(title, { target: { value: "새 글" } });
+    await act(async () => fireEvent.keyDown(title, { key: "Enter" }));
+    const retry = screen.getByRole("button", { name: "저장 안 됨 · 다시 시도" });
     expect((screen.getByLabelText("할 일 글") as HTMLInputElement).value).toBe("새 글");
+    await act(async () => fireEvent.click(retry));
+    expect(editTodo).toHaveBeenCalledTimes(2);
+    expect(editTodo.mock.calls[1]).toEqual([A, { text: "새 글" }]);
   });
 
-  it("지우기는 한 번 더 확인하고, 지우면 줄이 없어진다", async () => {
+  it("「⋯」 → 지우기는 확인 창(Figma 66:12, 초점 「취소」)을 띄우고, 확인 창의 「지우기」로 지우면 줄이 없어진다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "이력서"), item(B, "면접 준비")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 이력서" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "지우기" }));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    expect(within(dialog).queryByRole("button", { name: "지우기" }), "지우기는 메뉴 안에만").toBeNull();
+    fireEvent.click(within(openMenu(dialog)).getByRole("menuitem", { name: "지우기" }));
     expect(api.deleteTodo).not.toHaveBeenCalled();
-    expect(within(dialog).getByText(/작업 기록도 함께 지워져요/)).toBeTruthy();
-    await act(async () => fireEvent.click(within(dialog).getAllByRole("button", { name: "지우기" })[0]));
+    const confirm = screen.getByRole("alertdialog", { name: "이 할 일을 지울까요? 작업 기록도 함께 지워져요." });
+    expect(document.activeElement).toBe(within(confirm).getByRole("button", { name: "취소" }));
+    fireEvent.click(within(confirm).getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(api.deleteTodo).not.toHaveBeenCalled();
+    fireEvent.click(within(openMenu(dialog)).getByRole("menuitem", { name: "지우기" }));
+    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "지우기" })));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api.deleteTodo).toHaveBeenCalledWith(A);
     expect(screen.queryByRole("checkbox", { name: "이력서" })).toBeNull();
     expect(screen.getByRole("checkbox", { name: "면접 준비" })).toBeTruthy();
   });
 
-  it("위로·아래로: 순서를 서버에 보내고, 맨 위·맨 아래에서는 막힌다", async () => {
+  it("「⋯」 위로·아래로: 순서를 서버에 보내고, 맨 위·맨 아래에서는 막힌다", async () => {
     const api = fakeApi();
     render(<TodoScreen initial={initial([item(A, "첫째"), item(B, "둘째")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
-    const dialog = await screen.findByRole("dialog");
-    expect((within(dialog).getByRole("button", { name: "위로" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "아래로" })));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    const menu = openMenu(dialog);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["위로", "아래로", "지우기"]);
+    expect((within(menu).getByRole("menuitem", { name: "위로" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "아래로" })));
     expect(api.reorderTodos).toHaveBeenCalledWith([B, A]);
-    expect((within(dialog).getByRole("button", { name: "아래로" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    expect((within(openMenu(dialog)).getByRole("menuitem", { name: "아래로" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
     const boxes = screen.getAllByRole("checkbox").map((el) => el.getAttribute("aria-labelledby"));
     expect(boxes).toEqual([`todo-text-${B}`, `todo-text-${A}`]);
   });
@@ -162,21 +170,54 @@ describe("할 일 자세히 (0번)", () => {
     const api = fakeApi({ reorderTodos: vi.fn(async () => ({ ok: false as const, error: "unavailable" as const })) });
     render(<TodoScreen initial={initial([item(A, "첫째"), item(B, "둘째")])} manage={api} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
-    const dialog = await screen.findByRole("dialog");
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "아래로" })));
-    expect(within(dialog).getByText("순서를 바꾸지 못했어요.")).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    const menu = openMenu(dialog);
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "아래로" })));
+    expect(dialog.querySelector(".detail-message")!.textContent).toBe("순서를 바꾸지 못했어요.");
+    expect(dialog.querySelector(".sr-only[role=status]")!.textContent).toBe("순서를 바꾸지 못했어요."); // O-8 알림 한 곳
+    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
     expect(screen.getAllByRole("checkbox").map((el) => el.getAttribute("aria-labelledby"))).toEqual([`todo-text-${A}`, `todo-text-${B}`]);
   });
 
-  it("오프라인이면 고치기·지우기·순서 단추가 막히고 안내가 보인다", async () => {
+  it("오프라인이면 메뉴의 순서·지우기가 막히고 안내가 보인다", async () => {
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
     render(<TodoScreen initial={initial([item(A, "첫째"), item(B, "둘째")])} manage={fakeApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
     expect(within(dialog).getByText("인터넷에 연결되면 고치거나 지울 수 있어요.")).toBeTruthy();
-    expect((within(dialog).getByRole("button", { name: "아래로" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((within(dialog).getByRole("button", { name: "지우기" }) as HTMLButtonElement).disabled).toBe(true);
+    const menu = openMenu(dialog);
+    expect((within(menu).getByRole("menuitem", { name: "아래로" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(menu).getByRole("menuitem", { name: "지우기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(dialog).getByRole("button", { name: /^분야 / }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("「⋯」 메뉴: aria-expanded·첫 항목 초점, Esc는 메뉴만 닫고(페이지는 남음) 초점은 「더 보기」", async () => {
+    render(<TodoScreen initial={initial([item(A, "첫째"), item(B, "둘째")])} manage={fakeApi()} />);
+    fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    const more = within(dialog).getByRole("button", { name: "더 보기" });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    const menu = openMenu(dialog);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(within(menu).getByRole("menuitem", { name: "아래로" })); // 첫 쓸 수 있는 항목(위로는 막힘)
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(within(dialog).queryByRole("menu")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "할 일 자세히" })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(more));
+  });
+
+  it("「끝냄」 줄을 누르면 목록 줄의 끝냄 체크와 같이 바뀐다(같은 길 — setTodoDone(id, true))", async () => {
+    vi.mocked(setTodoDone).mockResolvedValue({ ok: true, data: { id: A, done: true } } as never);
+    render(<TodoScreen initial={initial([item(A, "첫째")])} manage={fakeApi()} />);
+    fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
+    const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
+    const done = within(dialog).getByRole("checkbox", { name: "끝냄" }) as HTMLInputElement;
+    expect(done.checked).toBe(false);
+    await act(async () => fireEvent.click(done));
+    expect((within(dialog).getByRole("checkbox", { name: "끝냄" }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
+    expect((screen.getByRole("checkbox", { name: "첫째" }) as HTMLInputElement).checked).toBe(true);
+    expect(setTodoDone).toHaveBeenCalledWith(A, true);
   });
 
   it("Esc로 닫힌다", async () => {
@@ -311,7 +352,7 @@ describe("고침9 PM 3 분야 고르기 시트(Figma 77:18)", () => {
     await act(async () => fireEvent.click(within(sheet()!).getByRole("button", { name: "어학" })));
     expect(api.editTodo).toHaveBeenCalledWith(A, { categoryId: CAT });
     expect(within(dialog).getByRole("button", { name: "분야 기타" })).toBeTruthy();
-    expect(within(dialog).getByText("고치지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "저장 안 됨 · 다시 시도" })).toBeTruthy(); // 고침9 Figma 66:76 머리 글
   });
 
   it("「+ 분야」: 지금 분야 더하기 길(addCategory)로 만들고 바로 골라 저장·닫힘. 분야 이름 HTML은 글자 그대로", async () => {
@@ -356,6 +397,23 @@ describe("고침9 PM 3 분야 고르기 시트(Figma 77:18)", () => {
     expect(within(sheet()!).queryByLabelText("새 분야 이름")).toBeNull();
     expect(within(sheet()!).getByText("분야는 50개까지 둘 수 있어요.")).toBeTruthy();
     expect(addCategory).not.toHaveBeenCalled();
+  });
+});
+
+describe("고침9 S2 목록 줄 꼴(Figma 50:52)", () => {
+  it("분야 점(분야 색) + 이름, 기타는 표시 없음, 줄 오른쪽 「›」(이름 「자세히 보기: 글」), 저장 대기 줄에는 「›」 대신 도는 원 자리", () => {
+    render(<TodoScreen initial={initial([item(A, "단어", CAT), item(B, "기타 할 일")])} manage={fakeApi()} />);
+    const rowA = document.getElementById(`row-${A}`)!;
+    const dot = rowA.querySelector<HTMLElement>(".category-tag-dot")!;
+    expect(dot.style.background).toBe("var(--color-category-1)");
+    expect(dot.getAttribute("aria-hidden")).toBe("true");
+    expect(rowA.querySelector(".category-tag")!.textContent).toBe("분야 어학");
+    const go = within(rowA).getByRole("button", { name: "자세히 보기: 단어" });
+    expect(go.textContent).toBe("›");
+    expect(rowA.closest("ul")!.classList.contains("todo-list")).toBe(true);
+    const rowB = document.getElementById(`row-${B}`)!;
+    expect(rowB.querySelector(".category-tag-line")).toBeNull();
+    expect(rowB.querySelector(".category-tag-dot")).toBeNull();
   });
 });
 

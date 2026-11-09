@@ -6,11 +6,11 @@ import { NOTE_MAX_LENGTH_PUBLIC, countNoteChars } from "../lib/notes/public";
 import type { NoteItem } from "../lib/notes/types";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
-import { useOverlayWindow } from "../lib/use-overlay-window";
+import { inertOutside, useOverlayWindow } from "../lib/use-overlay-window";
 import { categoryColorValue } from "../lib/category-color";
 import { CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
 import { categoryOverLimitText, TODO_TEXT } from "./todo-view";
-import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Notice, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 할 일 자세히(PRD 6절 0번 고치기·지우기·순서, 0-1번 작업 기록). 할 일 한 줄의 「자세히」 단추가 연다.
@@ -33,16 +33,24 @@ export const DETAIL_TEXT = {
   newCategoryAdd: "더하기",
   newCategoryAdding: "더하는 중",
   newCategoryCancel: "취소",
-  save: "고치기",
-  saving: "고치는 중",
-  saved: "고쳤어요",
-  saveFailed: "고치지 못했어요. 다시 눌러 주세요.",
+  // 고침9 Figma 51:55 · 58:92 · 66:12 · 66:76: 페이지 머리 「‹ 할 일」 · 저장 상태 · 「⋯」 메뉴
+  back: "할 일",
+  backName: "할 일로 돌아가기",
+  more: "더 보기",
+  menuName: "할 일 메뉴",
+  doneLabel: "끝냄",
+  dayLabel: "하는 날",
+  saving: "저장 중",
+  saved: "저장됨",
+  saveFailedShort: "저장 안 됨",
+  saveFailedRetry: "저장 안 됨 · 다시 시도",
+  removeCancel: "취소",
   offline: "인터넷에 연결되면 고치거나 지울 수 있어요.",
   moveUp: "위로",
   moveDown: "아래로",
   moveFailed: "순서를 바꾸지 못했어요.",
   remove: "지우기",
-  removeConfirm: "이 할 일을 지울까요? 이 할 일에 남긴 작업 기록도 함께 지워져요.",
+  removeConfirm: "이 할 일을 지울까요? 작업 기록도 함께 지워져요.", // Figma 66:12
   removeYes: "지우기",
   removeFailed: "지우지 못했어요. 다시 눌러 주세요.",
   notesTitle: "작업 기록",
@@ -91,6 +99,11 @@ export type TodoDetailProps = {
   categoryLimitReached?: boolean;
   /** 작업 기록이 있는지가 바뀌면(불러옴·남김·지움) 알린다 — 할 일 줄 아이콘(고침9 PM 2-B) */
   onNotesChange?: (todoId: string, hasNotes: boolean) => void;
+  /** 고침9 Figma 51:55 「끝냄」 줄: 끝냈나와 바꾸기(할 일 줄 체크와 같은 길). 없으면 줄을 그리지 않는다 */
+  done?: boolean;
+  onToggleDone?: () => void;
+  /** 「하는 날」 줄의 글(예: 11월 13일 목요일). 없으면 줄을 그리지 않는다 */
+  dayLabel?: string;
 };
 
 function composing(event: KeyboardEvent): boolean {
@@ -109,12 +122,19 @@ export function TodoDetail({
   onAddCategory,
   categoryLimitReached = false,
   onNotesChange,
+  done,
+  onToggleDone,
+  dayLabel,
 }: TodoDetailProps) {
   const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const [text, setText] = useState(todo.text ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(todo.categoryId);
-  const [busy, setBusy] = useState<"save" | "remove" | "move" | "category" | null>(null);
+  const [busy, setBusy] = useState<"save" | "remove" | "move" | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  /** 머리의 저장 상태(Figma 58:92 「저장됨」 · 66:76 「저장 안 됨 · 다시 시도」) */
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const lastPatchRef = useRef<{ text?: string; categoryId?: string | null } | null>(null);
   const [message, setMessage] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [notes, setNotes] = useState<NoteItem[]>([]);
@@ -166,20 +186,36 @@ export function TodoDetail({
   const changedText = todo.text !== null && checked.ok && checked.text !== todo.text;
   const canSave = online && busy === null && checked.ok && changedText;
 
-  async function save(event?: FormEvent) {
-    event?.preventDefault();
-    if (!canSave || !checked.ok) return;
-    const patch: { text?: string } = { text: checked.text };
+  /** 고치기 하나를 보낸다(글·분야 같은 길 api.editTodo — 기기 먼저 저장이면 기기에 먼저). 머리 저장 상태를 바꾼다 */
+  async function send(patch: { text?: string; categoryId?: string | null }): Promise<boolean> {
+    lastPatchRef.current = patch;
     setBusy("save");
-    setMessage(DETAIL_TEXT.saving);
+    setSaveState("saving");
+    setMessage("");
     const res = await api.editTodo(todo.id, patch);
     setBusy(null);
     if (res.ok) {
-      setMessage(DETAIL_TEXT.saved);
+      setSaveState("saved");
       onEdited(res.data.todo);
-    } else {
-      setMessage(DETAIL_TEXT.saveFailed);
+      return true;
     }
+    setSaveState("failed");
+    return false;
+  }
+
+  /** 큰 제목(할 일 글)을 엔터·칸 떠남에 저장. 바뀐 것이 없으면 아무것도 안 한다 */
+  async function save() {
+    if (!canSave || !checked.ok) return;
+    await send({ text: checked.text });
+  }
+
+  /** 「저장 안 됨 · 다시 시도」: 마지막 고치기를 같은 값으로 다시 보낸다 */
+  async function retrySave() {
+    const patch = lastPatchRef.current;
+    if (!patch || busy !== null) return;
+    if (patch.categoryId !== undefined) setCategoryId(patch.categoryId);
+    const ok = await send(patch);
+    if (!ok && patch.categoryId !== undefined) setCategoryId(todo.categoryId);
   }
 
   /**
@@ -191,17 +227,8 @@ export function TodoDetail({
     if (next === categoryId || busy !== null || !online) return;
     const before = categoryId;
     setCategoryId(next);
-    setBusy("category");
-    setMessage(DETAIL_TEXT.saving);
-    const res = await api.editTodo(todo.id, { categoryId: next });
-    setBusy(null);
-    if (res.ok) {
-      setMessage(DETAIL_TEXT.saved);
-      onEdited(res.data.todo);
-    } else {
-      setCategoryId(before);
-      setMessage(DETAIL_TEXT.saveFailed);
-    }
+    const ok = await send({ categoryId: next });
+    if (!ok) setCategoryId(before);
   }
 
   async function remove() {
@@ -266,123 +293,210 @@ export function TodoDetail({
     }
   }
 
+  // ⋯ 메뉴(Figma 58:92): 열면 첫 항목으로, Esc·항목 고르기로 닫히고 「⋯」로 초점이 돌아온다
+  useEffect(() => {
+    if (menuOpen) document.querySelector<HTMLButtonElement>("#detail-menu [role=menuitem]:not([disabled])")?.focus();
+  }, [menuOpen]);
+  function closeMenu(focusMore = true) {
+    setMenuOpen(false);
+    if (focusMore) requestAnimationFrame(() => document.getElementById("detail-more")?.focus());
+  }
+  function onMenuKeyDown(event: KeyboardEvent<HTMLUListElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation(); // 메뉴만 닫는다(할 일 페이지는 남는다)
+      closeMenu();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not([disabled])")];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = items[(at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length];
+    next?.focus();
+  }
+
+  const failed = saveState === "failed";
+  const statusText = saveState === "saving" ? DETAIL_TEXT.saving : saveState === "saved" ? DETAIL_TEXT.saved : failed ? DETAIL_TEXT.saveFailedShort : "";
+
   return (
     <div
       ref={rootRef}
-      className="detail"
+      className="detail detail-page"
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-title"
       onKeyDown={onKeyDown}
     >
       <div className="detail-inner">
-        <div className="detail-head">
-          <h2 id="detail-title" className="detail-title" tabIndex={-1} ref={titleRef}>
-            {DETAIL_TEXT.title}
-          </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
-            {DETAIL_TEXT.close}
+        {/* 고침9 Figma 51:55 머리(A1): 왼쪽 「‹ 할 일」(돌아가기) · 오른쪽 저장 상태 · 「⋯」 */}
+        <div className="detail-page-head">
+          <TextButton className="detail-back text-tap" aria-label={DETAIL_TEXT.backName} onClick={onClose}>
+            <span aria-hidden="true">‹ </span>
+            {DETAIL_TEXT.back}
           </TextButton>
+          <div className="detail-page-tools">
+            {failed ? (
+              <TextButton className="detail-status-retry text-tap" onClick={() => void retrySave()}>
+                {DETAIL_TEXT.saveFailedRetry}
+              </TextButton>
+            ) : (
+              <span className="detail-status" aria-hidden="true">
+                {statusText}
+              </span>
+            )}
+            {/* O-8: 저장 상태는 이 한 곳(polite)에서 한 문장. 초점은 옮기지 않는다 */}
+            <span className="sr-only" role="status">
+              {statusText || message}
+            </span>
+            <div className="detail-menu-wrap">
+              <button
+                type="button"
+                id="detail-more"
+                className="detail-more"
+                aria-label={DETAIL_TEXT.more}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-controls="detail-menu"
+                onClick={() => setMenuOpen((v) => !v)}
+              >
+                <span aria-hidden="true">⋯</span>
+              </button>
+              {menuOpen && (
+                <ul id="detail-menu" className="detail-menu" role="menu" aria-label={DETAIL_TEXT.menuName} onKeyDown={onMenuKeyDown}>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!todo.canMoveUp || busy !== null || !online}
+                      onClick={() => {
+                        closeMenu();
+                        void move(-1);
+                      }}
+                    >
+                      {DETAIL_TEXT.moveUp}
+                    </button>
+                  </li>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!todo.canMoveDown || busy !== null || !online}
+                      onClick={() => {
+                        closeMenu();
+                        void move(1);
+                      }}
+                    >
+                      {DETAIL_TEXT.moveDown}
+                    </button>
+                  </li>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="detail-menu-danger"
+                      disabled={busy !== null || !online}
+                      onClick={() => {
+                        closeMenu(false);
+                        setConfirmRemove(true);
+                      }}
+                    >
+                      {DETAIL_TEXT.remove}
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
+
+        <h2 id="detail-title" className="sr-only" tabIndex={-1} ref={titleRef}>
+          {DETAIL_TEXT.title}
+        </h2>
 
         {!online && <Notice role="status">{DETAIL_TEXT.offline}</Notice>}
 
-        <form className="detail-section" onSubmit={save} noValidate>
-          <label htmlFor="detail-text" className="input-label">
-            {DETAIL_TEXT.editLabel}
-          </label>
-          {todo.text === null ? (
-            <p className="todo-sub">{DETAIL_TEXT.unreadableTodo}</p>
-          ) : (
-            <input
-              id="detail-text"
-              className="input"
-              type="text"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setMessage("");
-              }}
-              aria-invalid={over ? true : undefined}
-              aria-describedby="detail-help"
-              autoComplete="off"
-              enterKeyHint="done"
-            />
+        {/* 큰 제목 = 할 일 글(24 Bold). 고치면 엔터·칸을 떠날 때 저장(「고치기」 단추 없음 — 노션처럼 페이지, d-106) */}
+        {todo.text === null ? (
+          <p className="detail-big-title">{DETAIL_TEXT.unreadableTodo}</p>
+        ) : (
+          <input
+            id="detail-text"
+            className="detail-big-title detail-title-input"
+            type="text"
+            aria-label={DETAIL_TEXT.editLabel}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setMessage("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || composing(e)) return;
+              e.preventDefault();
+              void save();
+            }}
+            onBlur={() => void save()}
+            aria-invalid={over ? true : undefined}
+            aria-describedby="detail-help"
+            autoComplete="off"
+            enterKeyHint="done"
+          />
+        )}
+        <p id="detail-help" className="input-help">
+          {over ? `${TODO_TEXT_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${countTodoChars(text)}자예요.` : ""}
+        </p>
+        {message && <p className="todo-sub detail-message">{message}</p>}
+
+        {/* 속성 줄(Figma 51:55): 끝냄 · 분야 · 하는 날. 이름표 12 보조, 줄 사이 1px 선 */}
+        <div className="detail-props">
+          {onToggleDone && (
+            <div className="detail-prop">
+              <span id="detail-done-label" className="detail-prop-label">
+                {DETAIL_TEXT.doneLabel}
+              </span>
+              <label className="check-hit detail-done">
+                <input type="checkbox" checked={done === true} onChange={onToggleDone} aria-labelledby="detail-done-label" />
+                <span className="check-box" aria-hidden="true" />
+              </label>
+            </div>
           )}
-          <p id="detail-help" className="input-help">
-            {over ? `${TODO_TEXT_MAX_LENGTH}자까지 적을 수 있어요. 지금 ${countTodoChars(text)}자예요.` : ""}
-          </p>
-          <div className="detail-actions">
-            <PrimaryButton type="submit" busy={busy === "save"} disabled={!canSave}>
-              {busy === "save" ? DETAIL_TEXT.saving : DETAIL_TEXT.save}
-            </PrimaryButton>
-          </div>
-          <p className="input-help" role="status">
-            {message}
-          </p>
-        </form>
-
-        {/* 고침9 PM 3: 분야 = 고른 분야 한 줄(Figma 51:55 「분야 · ● 어학 ›」). 줄 전체가 단추(누름 48), 누르면 분야 고르기 시트 */}
-        <div className="detail-section detail-prop">
-          <span id="detail-category-label" className="detail-prop-label">
-            {DETAIL_TEXT.categoryLabel}
-          </span>
-          <button
-            type="button"
-            id="detail-category-line"
-            className="detail-prop-value detail-category-line"
-            aria-labelledby="detail-category-label detail-category-name"
-            aria-describedby="detail-category-hint"
-            aria-haspopup="dialog"
-            disabled={!online || busy !== null}
-            onClick={() => setSheetOpen(true)}
-          >
-            <span className="detail-category-dot" style={{ background: currentColor }} aria-hidden="true" />
-            <span id="detail-category-name" className="detail-category-name">
-              {currentName}
+          {/* 고침9 PM 3: 분야 = 고른 분야 한 줄(Figma 51:55 「분야 · ● 어학 ›」). 줄 전체가 단추(누름 48), 누르면 분야 고르기 시트 */}
+          <div className="detail-prop">
+            <span id="detail-category-label" className="detail-prop-label">
+              {DETAIL_TEXT.categoryLabel}
             </span>
-            <span className="detail-category-go" aria-hidden="true">
-              ›
-            </span>
-            <span id="detail-category-hint" className="sr-only">
-              {DETAIL_TEXT.categoryChange}
-            </span>
-          </button>
-        </div>
-
-        <div className="detail-section">
-          <div className="detail-actions">
-            <SecondaryButton disabled={!todo.canMoveUp || busy !== null || !online} onClick={() => void move(-1)}>
-              {DETAIL_TEXT.moveUp}
-            </SecondaryButton>
-            <SecondaryButton disabled={!todo.canMoveDown || busy !== null || !online} onClick={() => void move(1)}>
-              {DETAIL_TEXT.moveDown}
-            </SecondaryButton>
-            {!confirmRemove && (
-              <TextButton disabled={busy !== null || !online} onClick={() => setConfirmRemove(true)}>
-                {DETAIL_TEXT.remove}
-              </TextButton>
-            )}
-          </div>
-          {confirmRemove && (
-            <Notice
-              role="alert"
-              actions={
-                <>
-                  <SecondaryButton busy={busy === "remove"} disabled={busy !== null || !online} onClick={() => void remove()}>
-                    {DETAIL_TEXT.removeYes}
-                  </SecondaryButton>
-                  <TextButton onClick={() => setConfirmRemove(false)}>취소</TextButton>
-                </>
-              }
+            <button
+              type="button"
+              id="detail-category-line"
+              className="detail-prop-value detail-category-line"
+              aria-labelledby="detail-category-label detail-category-name"
+              aria-describedby="detail-category-hint"
+              aria-haspopup="dialog"
+              disabled={!online || busy !== null}
+              onClick={() => setSheetOpen(true)}
             >
-              {DETAIL_TEXT.removeConfirm}
-            </Notice>
+              <span className="detail-category-dot" style={{ background: currentColor }} aria-hidden="true" />
+              <span id="detail-category-name" className="detail-category-name">
+                {currentName}
+              </span>
+              <span className="detail-category-go" aria-hidden="true">
+                ›
+              </span>
+              <span id="detail-category-hint" className="sr-only">
+                {DETAIL_TEXT.categoryChange}
+              </span>
+            </button>
+          </div>
+          {dayLabel && (
+            <div className="detail-prop">
+              <span className="detail-prop-label">{DETAIL_TEXT.dayLabel}</span>
+              <span className="detail-prop-value detail-day">{dayLabel}</span>
+            </div>
           )}
         </div>
 
-        <section className="detail-section" aria-labelledby="notes-title">
-          <h3 id="notes-title" className="detail-sub-title">
+        <section className="detail-section detail-notes" aria-labelledby="notes-title">
+          <h3 id="notes-title" className="detail-prop-label detail-notes-title">
             {DETAIL_TEXT.notesTitle}
           </h3>
           {notesState === "loading" && (
@@ -401,7 +515,7 @@ export function TodoDetail({
                 <li key={note.id} className="note-item">
                   <p className="todo-sub">{note.day}</p>
                   <p className="note-text">{note.readable ? note.text : DETAIL_TEXT.unreadable}</p>
-                  <TextButton className="btn-flush-start" aria-label={`${DETAIL_TEXT.noteDelete}: ${note.day} 기록`} onClick={() => void removeNote(note.id)}>
+                  <TextButton className="btn-flush-start text-tap" aria-label={`${DETAIL_TEXT.noteDelete}: ${note.day} 기록`} onClick={() => void removeNote(note.id)}>
                     {DETAIL_TEXT.noteDelete}
                   </TextButton>
                 </li>
@@ -409,12 +523,12 @@ export function TodoDetail({
             </ul>
           )}
           <form onSubmit={addNote} noValidate>
-            <label htmlFor="note-input" className="input-label">
+            <label htmlFor="note-input" className="sr-only">
               {DETAIL_TEXT.noteLabel}
             </label>
             <textarea
               id="note-input"
-              className="input note-input"
+              className="note-input detail-note-input"
               rows={3}
               value={noteDraft}
               onChange={(e) => {
@@ -430,13 +544,23 @@ export function TodoDetail({
                 : noteMessage}
             </p>
             <div className="detail-actions">
-              <PrimaryButton type="submit" busy={noteBusy} disabled={noteBusy || !noteChecked || noteOver || !online}>
+              <SecondaryButton type="submit" busy={noteBusy} disabled={noteBusy || !noteChecked || noteOver || !online}>
                 {noteBusy ? DETAIL_TEXT.noteAdding : DETAIL_TEXT.noteAdd}
-              </PrimaryButton>
+              </SecondaryButton>
             </div>
           </form>
         </section>
       </div>
+      {confirmRemove && (
+        <RemoveConfirm
+          busy={busy === "remove"}
+          onCancel={() => {
+            setConfirmRemove(false);
+            requestAnimationFrame(() => document.getElementById("detail-more")?.focus());
+          }}
+          onRemove={() => void remove()}
+        />
+      )}
       {sheetOpen && (
         <CategorySheet
           chips={chips}
@@ -447,6 +571,46 @@ export function TodoDetail({
           limitReached={categoryLimitReached}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * 고침9 Figma 66:12 지우기 확인: 닫기 전 확인(close-confirm)과 같은 꼴의 가운데 흰 카드(role alertdialog). 글은 지우기 확인 글.
+ * 처음 초점은 되돌릴 수 있는 「취소」, Esc·바깥 누름 = 취소. 떠 있는 동안 밖은 inert.
+ */
+function RemoveConfirm({ busy, onCancel, onRemove }: { busy: boolean; onCancel: () => void; onRemove: () => void }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    const inerted = root ? inertOutside(root) : [];
+    root?.querySelector<HTMLButtonElement>("[data-remove-cancel]")?.focus();
+    return () => {
+      for (const el of inerted) el.removeAttribute("inert");
+    };
+  }, []);
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    onCancel();
+  }
+  return (
+    <div ref={rootRef} className="close-confirm-layer" onKeyDown={onKeyDown}>
+      <div className="close-confirm-backdrop" aria-hidden="true" onClick={onCancel} />
+      <div className="close-confirm detail-remove-confirm" role="alertdialog" aria-modal="true" aria-labelledby="detail-remove-title">
+        <p id="detail-remove-title" className="detail-remove-title">
+          {DETAIL_TEXT.removeConfirm}
+        </p>
+        <div className="detail-remove-actions">
+          <SecondaryButton busy={busy} disabled={busy} onClick={onRemove}>
+            {DETAIL_TEXT.removeYes}
+          </SecondaryButton>
+          <TextButton className="text-tap" data-remove-cancel="" disabled={busy} onClick={onCancel}>
+            {DETAIL_TEXT.removeCancel}
+          </TextButton>
+        </div>
+      </div>
     </div>
   );
 }

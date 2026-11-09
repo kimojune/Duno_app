@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHIP_MAX_ROWS, ChipScroller, CHIP_SCROLLER_TEXT, rowIndexes } from "../../components/chip-scroller";
+import { CHIP_MAX_ROWS, ChipScroller, CHIP_SCROLLER_TEXT, resetChipRowMemory, rowIndexes } from "../../components/chip-scroller";
 import { Onboarding } from "../../components/onboarding";
 import { TimerScreen } from "../../components/timer-screen";
 import { TodoDetail } from "../../components/todo-detail";
@@ -32,7 +32,7 @@ function Row({ names = NAMES, pressed = null }: { names?: string[]; pressed?: st
 }
 
 /** 가짜 배치: 칩 줄 폭 ROW_W, 칩 폭 = 글자 수 × 14 + 32(「+n」은 56), 칩 사이 8, 줄 높이 36 + 줄 사이 8 */
-const ROW_W = 320;
+let ROW_W = 320;
 function chipWidth(el: Element): number {
   if (el.hasAttribute("data-chip-more")) return 56;
   return (el.textContent ?? "").length * 14 + 32;
@@ -62,6 +62,7 @@ function linesNow(): number {
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  resetChipRowMemory(); // 칩 줄 이름마다의 「마지막 칩」 기록은 모듈에 남는다 — 시험마다 비운다
 });
 afterEach(() => {
   cleanup();
@@ -177,6 +178,104 @@ describe("ChipScroller: 두 줄까지 감쌈 + 「+n」 · 펼침 · 「접기�
     const kids = [...group().children] as HTMLElement[];
     expect(kids.every((k) => k.tagName === "BUTTON" && k.getAttribute("tabindex") === null)).toBe(true);
     expect(kids[kids.length - 1]).toBe(moreBtn());
+  });
+});
+
+describe("고침9 검토 MEDIUM: 폭이 바뀌면 다시 잰다(좁아져 넘칠 때도)", () => {
+  /** 가짜 ResizeObserver: 콜백을 모아 두었다가 「폭이 바뀜」을 흉내 낼 때 부른다 */
+  function installRO() {
+    const callbacks: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: () => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("chip-row") ? ROW_W : 0;
+    });
+    return () => act(() => callbacks.forEach((cb) => cb()));
+  }
+  afterEach(() => {
+    ROW_W = 320;
+    vi.unstubAllGlobals();
+  });
+
+  it("넓음(두 줄 안, 「+n」 없음) → 좁음: 「+n」이 생기고 n = 숨은 칩 수 → 다시 넓음: 「+n」이 사라지고 모두 보임", () => {
+    installFlow();
+    ROW_W = 2000;
+    const resize = installRO();
+    render(<Row />);
+    resize(); // 처음 폭을 잰다
+    expect(moreBtn()).toBeNull();
+    expect(chipNames()).toEqual(NAMES);
+    ROW_W = 320;
+    resize();
+    const more = moreBtn();
+    expect(more, "좁아져 세 줄로 넘치면 「+n」").not.toBeNull();
+    const hidden = NAMES.length - chipNames().length;
+    expect(hidden).toBeGreaterThan(0);
+    expect(more!.textContent).toBe(`+${hidden}`);
+    expect(linesNow()).toBe(2);
+    ROW_W = 2000;
+    resize();
+    expect(moreBtn()).toBeNull();
+    expect(chipNames()).toEqual(NAMES);
+  });
+});
+
+describe("고침9 K: 분야를 더한 직후에는 펼친 채(새 칩이 「+n」 뒤로 숨지 않게)", () => {
+  it("두 줄을 넘는 줄에 골라진 새 칩이 생기면 펼친 채 두고(「접기」 aria-expanded true) 새 칩이 보이고 초점이 간다", () => {
+    installFlow();
+    const { rerender } = render(<Row />);
+    expect(moreBtn(), "더하기 전에는 접혀 있다").not.toBeNull();
+    rerender(<Row names={[...NAMES, "새 분야"]} pressed="새 분야" />);
+    expect(moreBtn()).toBeNull();
+    const collapse = collapseBtn()!;
+    expect(collapse.getAttribute("aria-expanded")).toBe("true");
+    expect(chipNames()).toEqual([...NAMES, "새 분야"]);
+    const fresh = within(group()).getByRole("button", { name: "새 분야" });
+    expect(fresh.getAttribute("aria-pressed")).toBe("true");
+    expect(document.activeElement).toBe(fresh);
+  });
+
+  it("두 줄 안이면 펼치지 않고 초점도 옮기지 않는다. 골라지지 않은 새 칩(다른 기기에서 더함)은 접힌 채", () => {
+    installFlow();
+    const { rerender } = render(<Row names={["운동", "영어"]} />);
+    const before = document.activeElement;
+    rerender(<Row names={["운동", "영어", "독서"]} pressed="독서" />);
+    expect(collapseBtn()).toBeNull();
+    expect(document.activeElement).toBe(before);
+    cleanup();
+    const second = render(<Row />);
+    second.rerender(<Row names={[...NAMES, "남이 더함"]} />);
+    expect(collapseBtn()).toBeNull();
+    expect(moreBtn()).not.toBeNull();
+    expect(chipNames()).not.toContain("남이 더함");
+  });
+
+  it("이미 펼친 줄에 새 칩이 생기면 그대로 펼친 채 새 칩으로 초점", () => {
+    installFlow();
+    const { rerender } = render(<Row />);
+    act(() => moreBtn()!.click());
+    rerender(<Row names={[...NAMES, "새 분야"]} pressed="새 분야" />);
+    expect(collapseBtn()).not.toBeNull();
+    expect(document.activeElement).toBe(within(group()).getByRole("button", { name: "새 분야" }));
+  });
+
+  it("칩 줄이 새로 그려져도(「+ 분야」 칸이 칩 줄 자리를 잠시 차지했다 돌아옴) 방금 생긴 골라진 칩이면 펼친 채", () => {
+    installFlow();
+    const first = render(<Row />);
+    expect(moreBtn()).not.toBeNull();
+    first.unmount(); // 새 분야 칸이 칩 줄 자리에
+    render(<Row names={[...NAMES, "새 분야"]} pressed="새 분야" />);
+    expect(collapseBtn()).not.toBeNull();
+    expect(moreBtn()).toBeNull();
+    expect(document.activeElement).toBe(within(group()).getByRole("button", { name: "새 분야" }));
   });
 });
 
