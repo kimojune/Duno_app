@@ -635,13 +635,13 @@ describe("예전 방식(기기 먼저 저장 꺼짐): 할 일 탭과 같은 GET�
 
 // ── PM d-126: 「닫기」로 입력 잃음 막기(오늘 기록 · 오늘 할 일 시트가 같은 확인 부품을 쓴다) ──
 describe("닫기 전 확인(PM d-126)", () => {
-  const confirmBox = () => screen.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
+  const confirmBox = () => screen.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   const confirms = () => screen.queryAllByRole("alertdialog");
   const recordDialog = () => screen.queryByRole("dialog", { name: /몇 시간 썼어요\?|분야마다 나눠 주세요|저장했어요/ });
   const headClose = () => within(recordDialog()!).getAllByRole("button", { name: "닫기" })[0];
   const plusHour = () => act(async () => fireEvent.click(screen.getByRole("button", { name: "시간 1시간 늘리기" })));
   const keep = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "계속 적기" })));
-  const closeInConfirm = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "닫기" })));
+  const closeInConfirm = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "나가기" })));
 
   /** 오늘 기록을 열고 닫는 바깥(진짜 앱처럼 onClose가 창을 내린다) */
   function Host({ api, todos, onClosed }: { api: EveningApi; todos?: EveningTodos; onClosed: () => void }) {
@@ -691,11 +691,11 @@ describe("닫기 전 확인(PM d-126)", () => {
     await act(async () => fireEvent.click(close));
     const box = confirmBox();
     expect(box.getAttribute("aria-modal")).toBe("true");
-    expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 닫을까요?");
+    expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 나갈까요?"); // PM d-135
     const keepButton = within(box).getByRole("button", { name: "계속 적기" });
     expect(keepButton.className).toContain("btn-primary"); // 주 단추(먹남색)
     expect(document.activeElement).toBe(keepButton);
-    expect(within(box).getAllByRole("button").map((b) => b.textContent)).toEqual(["계속 적기", "닫기"]);
+    expect(within(box).getAllByRole("button").map((b) => b.textContent)).toEqual(["계속 적기", "나가기"]);
     // 확인 밖(오늘 기록의 나머지)은 inert
     expect(close.closest("[inert]")).not.toBeNull();
     expect(onClosed).not.toHaveBeenCalled();
@@ -710,7 +710,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(api.save).not.toHaveBeenCalled();
   });
 
-  it("오늘 기록: 확인에서 「닫기」면 닫힌다 — 저장 호출 0", async () => {
+  it("오늘 기록: 확인에서 「나가기」면 닫힌다 — 저장 호출 0", async () => {
     const { onClosed, api } = await mountHost();
     await plusHour();
     await act(async () => fireEvent.click(headClose()));
@@ -784,7 +784,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
 
-  it("오늘 기록 + 뒤로 가기(FakeHistory): 바꾼 것이 있으면 같은 확인을 타고 자기 칸으로 돌아간다. 「계속 적기」 뒤 뒤로 가기를 다시 누르면 다시 확인, 「닫기」면 닫히고 앱은 나가지 않는다", async () => {
+  it("오늘 기록 + 뒤로 가기(FakeHistory): 바꾼 것이 있으면 같은 확인을 타고 자기 칸으로 돌아간다. 「계속 적기」 뒤 뒤로 가기를 다시 누르면 다시 확인, 「나가기」면 닫히고 앱은 나가지 않는다", async () => {
     const { onClosed, api } = await mountHost();
     expect(history.entries).toHaveLength(2);
     expect(history.index).toBe(1);
@@ -845,7 +845,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(screen.queryByRole("dialog", { name: "오늘 할 일" })).toBeNull();
   });
 
-  it("시트: 글을 썼으면 「닫기」·Esc·바깥 누름이 같은 확인. 「계속 적기」면 글 그대로, 「닫기」면 시트만 닫히고 적기 호출 0", async () => {
+  it("시트: 글을 썼으면 「닫기」·Esc·바깥 누름이 같은 확인. 「계속 적기」면 글 그대로, 「나가기」면 시트만 닫히고 적기 호출 0", async () => {
     const local = await makeLocal();
     const { onClosed } = await mountHost(eveningApi(), { local });
     const input = await openForm();
@@ -875,7 +875,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(sent).toEqual([]);
   });
 
-  it("시트 + 뒤로 가기(FakeHistory): 시트 확인만 뜬다(오늘 기록 확인과 겹치지 않음). 「계속 적기」 뒤 다시 뒤로 가기 → 다시 시트 확인, 「닫기」면 시트만 닫힌다", async () => {
+  it("시트 + 뒤로 가기(FakeHistory): 시트 확인만 뜬다(오늘 기록 확인과 겹치지 않음). 「계속 적기」 뒤 다시 뒤로 가기 → 다시 시트 확인, 「나가기」면 시트만 닫힌다", async () => {
     const local = await makeLocal();
     const { onClosed } = await mountHost(eveningApi(), { local });
     await plusHour(); // 오늘 기록에도 바꾼 것이 있다

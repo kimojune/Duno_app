@@ -9,11 +9,11 @@ import type { NotifySettings, SettingsData } from "../../lib/settings/types";
 import { FakeHistory } from "./fake-history";
 
 /**
- * 고침6 ③: 내 정보 첫 카드(이루고 싶은 것 · 목표 한 문장 20 Bold · 「›」, 카드 전체가 단추 하나)와 S8-b 「목표」 겹침 화면.
+ * 고침6 ③: 내 정보 첫 카드(이름표 「목표」(PM d-136) · 목표 한 문장 20 Bold · 「›」, 카드 전체가 단추 하나)와 S8-b 「목표」 겹침 화면.
  * - 카드 글·없앤 것(글 칸·「목표 한 문장」 라벨·「목표 저장」)·빈 목표 꼴
  * - S8-b: 열기·미리 채움·머리 「‹」(이름 「이전」)·이름표 「목표」·칸 아래 예시·단계 표시/건너뛰기 없음
  * - 저장: 내 정보가 쓰던 길 그대로(api.saveSettings({ goal }) — checkGoal 정리 결과, 길이 상한), 성공하면 닫히고 카드가 바뀜, 실패하면 열린 채 안내
- * - 바꾸고 「‹」·Esc·뒤로 가기 → 확인(「저장하지 않고 나갈까요?」 · 「나가기」/「저장」), 안 바꿨으면 바로 닫힘, 포커스는 카드로
+ * - 바꾸고 「‹」·Esc·뒤로 가기 → 앱 공통 확인(「저장하지 않고 나갈까요?」 · 「계속 적기」/「나가기」, PM d-135), 안 바꿨으면 바로 닫힘, 포커스는 카드로
  * 악용: 상한+1자 거절(저장 호출 0)·상한 통과, HTML 글은 글자 그대로
  */
 
@@ -66,12 +66,12 @@ const type = (value: string) => act(async () => fireEvent.change(field(), { targ
 const pressIn = (root: HTMLElement, name: string) => act(async () => fireEvent.click(within(root).getByRole("button", { name })));
 
 describe("내 정보 첫 카드(고침6 ③)", () => {
-  it("이름표 「이루고 싶은 것」 + 목표 한 문장 + 「›」. 카드 전체가 단추 하나이고 화면 읽기 이름은 「이루고 싶은 것, {문장}, 고치기」", () => {
+  it("이름표 「목표」(PM d-136) + 목표 한 문장 + 「›」. 카드 전체가 단추 하나이고 화면 읽기 이름은 「목표, {문장}, 고치기」", () => {
     mount();
-    const btn = screen.getByRole("button", { name: "이루고 싶은 것, 토익 900점 넘기기, 고치기" });
+    const btn = screen.getByRole("button", { name: "목표, 토익 900점 넘기기, 고치기" });
     expect(btn).toBe(card());
     expect(btn.tagName).toBe("BUTTON");
-    expect(btn.querySelector(".me-goal-label")?.textContent).toBe("이루고 싶은 것");
+    expect(btn.querySelector(".me-goal-label")?.textContent).toBe("목표");
     expect(btn.querySelector(".me-goal-text")?.textContent).toBe("토익 900점 넘기기");
     expect(btn.querySelector(".me-goal-chevron")?.textContent).toBe("›");
     expect(btn.querySelector(".me-goal-chevron")?.getAttribute("aria-hidden")).toBe("true");
@@ -95,8 +95,8 @@ describe("내 정보 첫 카드(고침6 ③)", () => {
 
   it("목표가 비었으면 이름표 + 「목표 적기」 + 「›」", () => {
     mount(settings({ goal: null }));
-    const btn = screen.getByRole("button", { name: "이루고 싶은 것, 목표 적기" });
-    expect(btn.querySelector(".me-goal-label")?.textContent).toBe("이루고 싶은 것");
+    const btn = screen.getByRole("button", { name: "목표, 목표 적기" });
+    expect(btn.querySelector(".me-goal-label")?.textContent).toBe("목표");
     expect(btn.querySelector(".me-goal-empty")?.textContent).toBe("목표 적기");
     expect(btn.querySelector(".me-goal-text")).toBeNull();
     expect(btn.querySelector(".me-goal-chevron")?.textContent).toBe("›");
@@ -140,7 +140,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(api.saveSettings).toHaveBeenCalledWith({ goal: "포트폴리오 끝내기" });
     expect(onChanged).toHaveBeenCalledWith({ goal: "포트폴리오 끝내기" });
     expect(editor()).toBeNull();
-    expect(card().getAttribute("aria-label")).toBe("이루고 싶은 것, 포트폴리오 끝내기, 고치기");
+    expect(card().getAttribute("aria-label")).toBe("목표, 포트폴리오 끝내기, 고치기");
     expect(card().querySelector(".me-goal-text")?.textContent).toBe("포트폴리오 끝내기");
     expect(document.activeElement).toBe(card());
     history.flush();
@@ -154,7 +154,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     await pressIn(editor()!, "저장");
     expect(api.saveSettings).toHaveBeenCalledWith({ goal: null });
     expect(onChanged).toHaveBeenCalledWith({ goal: null });
-    expect(screen.getByRole("button", { name: "이루고 싶은 것, 목표 적기" })).toBe(card());
+    expect(screen.getByRole("button", { name: "목표, 목표 적기" })).toBe(card());
   });
 
   it("Enter로도 저장한다(한글 조합 중 Enter는 저장하지 않는다)", async () => {
@@ -178,9 +178,9 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     await act(async () => fireEvent.click(save));
     await act(async () => fireEvent.keyDown(field(), { key: "Enter" }));
     expect(api.saveSettings).not.toHaveBeenCalled();
-    // 바꾼 채 나가며 확인의 「저장」을 골라도 저장 호출 0(같은 검사)
+    // 바꾼 채 「‹」 → 확인 → 「계속 적기」: 저장 호출 0, 열린 채
     await pressIn(editor()!, "이전");
-    await pressIn(confirmBox()!, "저장");
+    await pressIn(confirmBox()!, "계속 적기");
     expect(api.saveSettings).not.toHaveBeenCalled();
     expect(editor()).not.toBeNull();
     await type("가".repeat(GOAL_MAX_LENGTH));
@@ -216,7 +216,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(api.saveSettings).not.toHaveBeenCalled();
   });
 
-  it("바꾸고 「‹」 → 확인(alertdialog, 처음 포커스 「저장」). 「나가기」면 저장 호출 0으로 닫힘, 포커스는 카드로", async () => {
+  it("바꾸고 「‹」 → 앱 공통 확인(alertdialog, PM d-135 글, 처음 포커스 「계속 적기」). 「나가기」면 저장 호출 0으로 닫힘, 포커스는 카드로", async () => {
     const { api } = mount();
     card().focus();
     await open();
@@ -226,7 +226,8 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(box).not.toBeNull();
     expect(box.getAttribute("aria-modal")).toBe("true");
     const buttons = within(box).getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual(["저장", "나가기"]);
+    expect(box.querySelector("h2")?.textContent).toBe("저장하지 않고 나갈까요?");
+    expect(buttons.map((b) => b.textContent)).toEqual(["계속 적기", "나가기"]);
     expect(buttons[0].className).toContain("btn-primary");
     expect(document.activeElement).toBe(buttons[0]);
     await pressIn(box, "나가기");
@@ -236,12 +237,19 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(document.activeElement).toBe(card());
   });
 
-  it("바꾸고 「‹」 → 확인의 「저장」이면 저장 호출 1(같은 인자)로 닫힘", async () => {
+  it("바꾸고 「‹」 → 확인의 「계속 적기」면 확인만 닫히고 S8-b는 열린 채(값 그대로, 저장 호출 0, 포커스는 「‹」). 그 뒤 「저장」이면 저장 호출 1(같은 인자)로 닫힘", async () => {
     const { api } = mount();
     await open();
     await type(" 바꾼  목표 ");
+    within(editor()!).getByRole("button", { name: "이전" }).focus();
     await pressIn(editor()!, "이전");
-    await pressIn(confirmBox()!, "저장");
+    await pressIn(confirmBox()!, "계속 적기");
+    expect(confirmBox()).toBeNull();
+    expect(editor()).not.toBeNull();
+    expect(field().value).toBe(" 바꾼  목표 ");
+    expect(api.saveSettings).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(within(editor()!).getByRole("button", { name: "이전" }));
+    await pressIn(editor()!, "저장");
     expect(api.saveSettings).toHaveBeenCalledTimes(1);
     expect(api.saveSettings).toHaveBeenCalledWith({ goal: "바꾼 목표" });
     expect(editor()).toBeNull();
@@ -262,7 +270,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(document.activeElement).toBe(within(editor()!).getByRole("button", { name: "이전" }));
   });
 
-  it("뒤로 가기(FakeHistory): 바꾼 것이 없으면 바로 닫힘. 바꿨으면 확인을 띄우고 자기 칸으로 돌아감 — 확인을 닫고 다시 뒤로 가기 → 다시 확인. 「저장」 실패면 열린 채, 다시 뒤로 가기 → 다시 확인, 「나가기」면 닫히고 앱은 나가지 않는다", async () => {
+  it("뒤로 가기(FakeHistory): 바꾼 것이 없으면 바로 닫힘. 바꿨으면 확인을 띄우고 자기 칸으로 돌아감 — 확인을 닫고(Esc·「계속 적기」) 다시 뒤로 가기 → 다시 확인. 저장 실패면 열린 채, 다시 뒤로 가기 → 다시 확인, 「나가기」면 닫히고 앱은 나가지 않는다", async () => {
     const save = vi.fn(async () => ({ ok: false as const, error: "unavailable" as const }));
     mount(settings(), fakeApi({ saveSettings: save }));
     await open();
@@ -290,8 +298,12 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     expect(confirmBox()).not.toBeNull();
     history.flush();
     expect(history.index).toBe(1);
-    // 「저장」 → 실패: 열린 채, 안내
-    await pressIn(confirmBox()!, "저장");
+    // 「계속 적기」 → S8-b의 「저장」 → 실패: 열린 채, 안내
+    await pressIn(confirmBox()!, "계속 적기");
+    expect(confirmBox()).toBeNull();
+    history.flush();
+    expect(history.index).toBe(1);
+    await pressIn(editor()!, "저장");
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith({ goal: "바꾼 목표" });
     expect(editor()).not.toBeNull();
@@ -313,7 +325,7 @@ describe("S8-b 「목표」(고침6 ③)", () => {
     const evil = "<img src=x onerror=alert(1)>";
     mount(settings({ goal: evil }));
     expect(card().querySelector(".me-goal-text")?.textContent).toBe(evil);
-    expect(card().getAttribute("aria-label")).toBe(`이루고 싶은 것, ${evil}, 고치기`);
+    expect(card().getAttribute("aria-label")).toBe(`목표, ${evil}, 고치기`);
     await open();
     expect(field().value).toBe(evil);
     expect(document.querySelector("img")).toBeNull();

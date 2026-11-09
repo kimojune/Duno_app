@@ -273,14 +273,14 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(onClose).not.toHaveBeenCalled();
     // 손잡이에서 Esc: 바꾼 값이 있으니 확인이 뜬다(창은 아직 닫히지 않는다). 확인에서 Esc = 계속 적기
     fireEvent.keyDown(handle("start"), { key: "Escape" });
-    const confirm = screen.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
+    const confirm = screen.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(confirm, { key: "Escape" });
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(stepper("포트폴리오")).toBe(60);
-    // 다이얼에서 Esc: 다시 같은 확인 → 「닫기」면 창이 닫힌다
+    // 다이얼에서 Esc: 다시 같은 확인 → 「나가기」면 창이 닫힌다(PM d-135 글)
     fireEvent.keyDown(svg, { key: "Escape" });
-    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "닫기" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "나가기" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

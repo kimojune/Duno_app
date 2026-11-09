@@ -7,7 +7,7 @@ import path from "node:path";
  * 개발 갤러리(/dev/v2)의 화면이다(진짜 로그인 앱 화면 아님 — 컴포넌트는 앱과 같은 것, 데이터만 가짜). 개발 서버(3200)에서 돈다: npm run screens
  * - ① 목표 없는 주에 처음 열면 「목표 비율」 탭 · ② 「이번 주 목표」 탭 카드: 이름표 → 막대 → 보조 줄 → 단추(간격 16·6·12·16·16, 단추 폭 = 카드 안쪽 폭)
  * - ④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n시간 더」, 「채울」 없음
- * - ③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확인 · 진짜 브라우저 뒤로 가기(page.goBack)
+ * - ③ 내 정보 첫 카드(이름표 「목표」, PM d-136 — 목표 있음·없음) · S8-b · 나가기 확인(PM d-135 글) · 진짜 브라우저 뒤로 가기(page.goBack)
  */
 const OUT = path.resolve(__dirname, "../../docs/oneshot-v2/고침6");
 
@@ -126,7 +126,7 @@ test("④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n�
 
 test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확인", async ({ page }) => {
   await open(page, "me-goal");
-  const card = page.getByRole("button", { name: "이루고 싶은 것, 올해 안에 토익 900점 넘기고 포트폴리오 끝내기, 고치기" });
+  const card = page.getByRole("button", { name: "목표, 올해 안에 토익 900점 넘기고 포트폴리오 끝내기, 고치기" });
   await expect(card).toBeVisible();
   const c = await card.evaluate((btn) => {
     const text = btn.querySelector(".me-goal-text")!;
@@ -178,15 +178,18 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   await back.click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button")).toHaveText(["저장", "나가기"]);
-  await expect(confirm.getByRole("button", { name: "저장" })).toBeFocused();
+  await expect(confirm.getByRole("button")).toHaveText(["계속 적기", "나가기"]); // PM d-135: 앱 공통 확인 글
+  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
   await photo(page, "S8-b-나가기확인");
-  await confirm.getByRole("button", { name: "저장" }).click();
+  await confirm.getByRole("button", { name: "계속 적기" }).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(field).toHaveValue("포트폴리오 끝내기");
+  await dlg.getByRole("button", { name: "저장" }).click();
   await expect(dlg).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "이루고 싶은 것, 포트폴리오 끝내기, 고치기" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "목표, 포트폴리오 끝내기, 고치기" })).toBeFocused();
 
   await open(page, "me-goal-empty");
-  const empty = page.getByRole("button", { name: "이루고 싶은 것, 목표 적기" });
+  const empty = page.getByRole("button", { name: "목표, 목표 적기" });
   await expect(empty).toBeVisible();
   const e = await empty.evaluate((btn) => {
     const s = getComputedStyle(btn.querySelector(".me-goal-empty")!);
@@ -197,7 +200,7 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   await photo(page, "내정보-첫카드-목표없음");
 });
 
-test("③ S8-b 진짜 브라우저 뒤로 가기(page.goBack): 안 바꿨으면 닫힘 · 바꿨으면 확인, 확인을 닫고 다시 뒤로 → 다시 확인, 저장 실패면 열린 채, 「나가기」면 닫히고 갤러리에 남음", async ({ page }) => {
+test("③ S8-b 진짜 브라우저 뒤로 가기(page.goBack): 안 바꿨으면 닫힘 · 바꿨으면 확인, 확인을 닫고(Esc·「계속 적기」) 다시 뒤로 → 다시 확인, 저장 실패면 열린 채, 「나가기」면 닫히고 갤러리에 남음", async ({ page }) => {
   await open(page, "me-goal-fail");
   const url = page.url();
   const card = page.locator(".me-goal-card");
@@ -220,7 +223,9 @@ test("③ S8-b 진짜 브라우저 뒤로 가기(page.goBack): 안 바꿨으면 
   await expect(dlg.getByRole("textbox", { name: "목표" })).toHaveValue("바꾼 목표");
   await page.goBack();
   await expect(confirm).toBeVisible();
-  await confirm.getByRole("button", { name: "저장" }).click(); // 이 갤러리는 저장이 늘 실패한다
+  await confirm.getByRole("button", { name: "계속 적기" }).click();
+  await expect(confirm).toHaveCount(0);
+  await dlg.getByRole("button", { name: "저장" }).click(); // 이 갤러리는 저장이 늘 실패한다
   await expect(dlg.getByRole("alert")).toHaveText("저장하지 못했어요. 다시 눌러 주세요.");
   await expect(dlg).toBeVisible();
   await page.goBack();
@@ -229,5 +234,5 @@ test("③ S8-b 진짜 브라우저 뒤로 가기(page.goBack): 안 바꿨으면 
   await expect(dlg).toHaveCount(0);
   await expect(card).toBeFocused();
   expect(page.url()).toBe(url);
-  await expect(page.getByRole("button", { name: /^이루고 싶은 것, 올해 안에 토익/ })).toBeVisible(); // 저장하지 않았다
+  await expect(page.getByRole("button", { name: /^목표, 올해 안에 토익/ })).toBeVisible(); // 저장하지 않았다
 });

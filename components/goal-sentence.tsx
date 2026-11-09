@@ -13,8 +13,8 @@ import { Notice, PrimaryButton } from "./ui";
  * - 머리 왼쪽 위 「‹」(화면 읽기 「이전」) · 이름표 「목표」 · 칸(지금 목표로 미리 채움) · 칸 아래 예시 · 주 단추 「저장」. 단계 표시·「건너뛰기」·아래 탭 없음.
  * - 저장은 내 정보가 쓰던 길 그대로: api.saveSettings({ goal }) — 같은 검사(checkGoal: 앞뒤·겹친 띄어쓰기 정리, 길이 상한), 기기 먼저 저장이면 끊겨도 막지 않음.
  *   성공하면 onSaved(새 값, 비웠으면 null) 뒤 닫힌다. 실패하면 닫지 않고 「저장하지 못했어요. 다시 눌러 주세요.」.
- * - 바꾸고 저장하지 않은 채 「‹」·Esc·기기 뒤로 가기: 확인 「저장하지 않고 나갈까요?」(「나가기」·「저장」). 안 바꿨으면 그냥 닫힌다.
- *   뒤로 가기는 useOverlayWindow holdBack 길(확인을 띄우고 자기 칸으로 돌아간다 — 「저장」이 실패해 열린 채면 다시 뒤로 가기 → 다시 확인).
+ * - 바꾸고 저장하지 않은 채 「‹」·Esc·기기 뒤로 가기: 앱 공통 확인 「저장하지 않고 나갈까요?」(「계속 적기」 = 확인만 닫고 S8-b는 열린 채 · 「나가기」 = 저장 없이 닫힘,
+ *   PM d-135). 안 바꿨으면 그냥 닫힌다. 뒤로 가기는 useOverlayWindow holdBack 길(확인을 띄우고 자기 칸으로 돌아간다 — 「계속 적기」 뒤 다시 뒤로 가기 → 다시 확인).
  * 글은 React 텍스트로만 그린다.
  */
 export const GOAL_SENTENCE_TEXT = {
@@ -133,16 +133,7 @@ export function GoalSentenceEditor({
           </PrimaryButton>
         </div>
       </div>
-      {confirm && (
-        <CloseConfirm
-          onKeep={() => setConfirm(false)}
-          onClose={onClose}
-          onSave={() => {
-            setConfirm(false);
-            void save();
-          }}
-        />
-      )}
+      {confirm && <CloseConfirm onKeep={() => setConfirm(false)} onClose={onClose} />}
     </div>
   );
 }

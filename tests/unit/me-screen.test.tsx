@@ -54,7 +54,7 @@ describe("내 정보 탭", () => {
     const api = fakeApi();
     const onChanged = vi.fn();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} onChanged={onChanged} />);
-    await press("이루고 싶은 것, 토익 900점, 고치기");
+    await press("목표, 토익 900점, 고치기");
     const input = screen.getByRole("textbox", { name: "목표" }) as HTMLInputElement;
     expect(input.value).toBe("토익 900점");
     fireEvent.change(input, { target: { value: "  포트폴리오   완성 " } });
@@ -62,19 +62,19 @@ describe("내 정보 탭", () => {
     expect(api.saveSettings).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
     expect(onChanged).toHaveBeenCalledWith({ goal: "포트폴리오 완성" });
     expect(screen.queryByRole("dialog", { name: "목표" })).toBeNull();
-    expect(screen.getByRole("button", { name: "이루고 싶은 것, 포트폴리오 완성, 고치기" })).toBeTruthy();
-    await press("이루고 싶은 것, 포트폴리오 완성, 고치기");
+    expect(screen.getByRole("button", { name: "목표, 포트폴리오 완성, 고치기" })).toBeTruthy();
+    await press("목표, 포트폴리오 완성, 고치기");
     fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "  " } });
     await press("저장");
     expect(api.saveSettings).toHaveBeenLastCalledWith({ goal: null });
     expect(onChanged).toHaveBeenLastCalledWith({ goal: null });
-    expect(screen.getByRole("button", { name: "이루고 싶은 것, 목표 적기" }).textContent).toBe("이루고 싶은 것목표 적기›");
+    expect(screen.getByRole("button", { name: "목표, 목표 적기" }).textContent).toBe("목표목표 적기›");
   });
 
   it("목표가 100자를 넘으면 저장이 막힌다. 저장 실패는 안내만(S8-b는 닫히지 않는다)", async () => {
     const api = fakeApi({ saveSettings: vi.fn(async () => ({ ok: false as const, error: "unavailable" as const })) });
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
-    await press(/^이루고 싶은 것/);
+    await press(/^목표, /);
     fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "가".repeat(101) } });
     expect(screen.getByText("100자까지 적을 수 있어요. 지금 101자예요.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
@@ -223,7 +223,7 @@ describe("내 정보 탭", () => {
     expect(screen.getAllByText("인터넷에 연결되면 저장할 수 있어요.").length).toBeGreaterThan(0);
     for (const name of ["비율 저장", "알림 설정 저장"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
     // 목표는 S8-b의 「저장」이 막힌다(고침6)
-    await press(/^이루고 싶은 것/);
+    await press(/^목표, /);
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
   });
 

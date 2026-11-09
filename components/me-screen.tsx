@@ -13,7 +13,7 @@ import { Notice, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 내 정보 탭(PRD 부록 B): 처음 설정에서 정한 것을 고치는 곳과 알림 설정. 이번 틀의 내용은 임시다(임시값 목록).
- * - 첫 카드 = 목표 한 문장(고침6 ③): 이름표 「이루고 싶은 것」 + 문장(20/28 Bold, 두 줄까지 낱말 단위 감쌈) + 「›」. 카드 전체가 단추 하나 → S8-b 「목표」
+ * - 첫 카드 = 목표 한 문장(고침6 ③): 이름표 「목표」(PM d-136) + 문장(20/28 Bold, 두 줄까지 낱말 단위 감쌈) + 「›」. 카드 전체가 단추 하나 → S8-b 「목표」
  *   (components/goal-sentence.tsx)에서 고친다. 내 정보에는 목표 글 칸·저장 단추가 없다. 비었으면 「목표 적기」.
  * - 목표 비율 고치기(처음 설정과 같은 −/+ 5% 단추. 「고칠 자리와 때」, PRD 7-1 열림), 알림 둘의 켜기·시각.
  * - 알림 켜기는 알림 허락 → 푸시 구독 저장이다. 푸시 서명 공개 키가 설정에 없으면 켜지 않고 안내한다(보내는 쪽 설정은 PM이 서버 설정에 둔다).
@@ -23,9 +23,9 @@ import { Notice, SecondaryButton, TextButton } from "./ui";
 
 export const ME_TEXT = {
   title: "내 정보",
-  goalHeading: "이루고 싶은 것", // 첫 카드 이름표(12 Medium 보조)
+  goalHeading: "목표", // 첫 카드 이름표(12 Medium 보조, PM d-136 — 옛 「이루고 싶은 것」)
   goalEmpty: "목표 적기", // 목표가 비었을 때 카드 글(16 Medium)
-  goalCardName: (goal: string | null) => (goal ? `이루고 싶은 것, ${goal}, 고치기` : "이루고 싶은 것, 목표 적기"), // 카드 단추의 화면 읽기 이름
+  goalCardName: (goal: string | null) => (goal ? `목표, ${goal}, 고치기` : "목표, 목표 적기"), // 카드 단추의 화면 읽기 이름
   ratioHeading: "목표 비율",
   ratioSave: "비율 저장",
   ratioEmpty: "분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.",
