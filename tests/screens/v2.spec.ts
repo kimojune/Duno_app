@@ -528,6 +528,19 @@ for (const w of WINDOWS) {
 // ---- 고침4 2단계: 원형 다이얼 (처음 정한 비율·내 정보 비율 고치기·저녁 기록 나누기) ----
 // 측정: 가로 넘침 없음(문서·비율 줄·다이얼), 손잡이 누르는 자리 48 이상, 합계 100%, 저녁 창에서 뒤로 가기는 창만 닫는다.
 
+/** 고침9: 「합계 100%」 줄은 없앴다(합은 늘 100). 보이는 비율 숫자 칸(하나 이상)의 합이 100인지 본다 */
+async function expectRatioSum100(page: Page) {
+  const values = await page.$$eval("input.ratio-field", (els) => els.map((e) => Number((e as HTMLInputElement).value)));
+  expect(values.length, "비율 숫자 칸이 있다").toBeGreaterThan(0);
+  expect(values.reduce((s, v) => s + v, 0), "숫자 칸 합 100").toBe(100);
+  await expect(page.getByText(/^합계 \d+%$/)).toHaveCount(0);
+}
+/** 고침9(PM 6): 내 정보 「목표 비율」 카드를 눌러 S8-a를 연다 */
+async function openRatioSettings(page: Page) {
+  await page.getByRole("button", { name: /^목표 비율, / }).click();
+  await expect(page.getByRole("dialog", { name: "목표 비율" })).toBeVisible();
+}
+
 /** 다이얼 둘레의 측정: 다이얼이 화면 안에 있고, 손잡이 누르는 자리(보이지 않는 원)가 48 이상 */
 async function measureDial(page: Page, dialId: string) {
   const svg = page.locator(`svg.dial`).first();
@@ -556,7 +569,7 @@ for (const many of [false, true]) {
       await open(page, `ratio-onboarding${tag}`, size);
       await page.getByRole("button", { name: "다음" }).click();
       await page.getByRole("button", { name: "다음" }).click();
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       await measureDial(page, "ratio-dial");
       await noRowOverflow(page);
       await shot(page, `ratio-onboarding${tag}-${size}`);
@@ -565,18 +578,19 @@ for (const many of [false, true]) {
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("Tab");
       await page.keyboard.press("PageUp");
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       if (many) {
         const fills = await page.$$eval(".dial-slice", (els) => els.map((e) => getComputedStyle(e).fill));
         expect(fills.length, "분야 9개 이상이 조각으로 그려진다").toBeGreaterThanOrEqual(9);
       }
     });
 
-    test(`me-ratio${tag} ${size}: 내 정보 비율 고치기 다이얼, 저장값 30·30이 합 100으로 열린다, 가로 넘침 없음`, async ({ page }) => {
+    test(`me-ratio${tag} ${size}: 내 정보 목표 비율 카드 → S8-a 다이얼, 저장값 30·30이 합 100으로 열린다, 가로 넘침 없음`, async ({ page }) => {
       await open(page, `me-ratio${tag}`, size);
+      await openRatioSettings(page);
       const dial = page.locator("svg.dial");
       await dial.scrollIntoViewIfNeeded();
-      await expect(page.getByText("합계 100%")).toBeVisible();
+      await expectRatioSum100(page);
       await measureDial(page, "ratio-dial");
       await noRowOverflow(page);
       await shot(page, `me-ratio${tag}-${size}`);
