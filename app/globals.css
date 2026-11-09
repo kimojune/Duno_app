@@ -854,3 +854,89 @@ button.after-save-line:active { background: var(--color-notice-bg); }
    막대 채움(.growth-goal-fill)은 1px 테두리(분야 색 위 윤곽색)를 스스로 가진다. */
 .chart-outline, .growth-dot { box-shadow: inset 0 0 0 1px var(--color-chart-outline); }
 .chart-outline-svg, .dial-slice, .growth-pie-slice { stroke: var(--color-chart-outline); stroke-width: 1; }
+
+/* ---- 원샷 v2 고침9: 공통 부품(Figma 정합 A1~A4 · 확인 창 98:278). 값은 기존 토큰만 쓴다(새 토큰 없음) ---- */
+/* A1 화면 머리(components/back-header.tsx BackHeader): 한 줄 48 = 「‹」(누름 48) · 가운데 화면 이름 16 Bold · 오른쪽 「닫기」 14 보조(누름 48).
+   「‹」·「닫기」의 누름 틀이 화면 안쪽 여백(16) 밖으로 12 나가 보이는 아이콘·글이 안쪽 끝에 맞는다. 큰 제목(24 Bold)은 머리 밖(아래) */
+.screen-head { margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3); }
+.screen-head-row { display: flex; align-items: center; min-height: var(--tap-min); }
+.screen-head-no-back .screen-head-row { padding-inline-start: var(--space-3); }
+.screen-head-slot { flex: none; inline-size: var(--tap-min); }
+.screen-head-title { flex: 1 1 auto; min-width: 0; margin: 0; text-align: center; font: var(--font-body); font-weight: 700; color: var(--color-text); overflow-wrap: anywhere; }
+.screen-head-close { flex: none; min-width: var(--tap-min); font: var(--font-sub); color: var(--color-text-sub); }
+.screen-head-step { flex: 1 1 auto; margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); } /* 12 보조 */
+.overlay-back + .screen-head-step { margin-inline-start: calc(-1 * var(--space-2)); } /* 「‹」 바로 옆(누름 틀 안쪽 여백만큼 당김) */
+.screen-head-progress { display: flex; gap: var(--space-2); margin: var(--space-1) var(--space-3) 0; } /* 진행 막대 넷: 높이 4, 사이 8 */
+.screen-head-bar { flex: 1 1 0; block-size: 4px; border-radius: 2px; background: var(--color-divider); }
+.screen-head-bar.is-done { background: var(--color-primary); }
+.overlay-back:disabled { opacity: 0.4; cursor: default; }
+/* A2 아래 주 단추 자리(BottomActions): 폭 가득 · 높이 48 · 아래 여백 36 · 세로 쌓기. 부모(.screen-fill)가 세로 flex라 내용이 짧아도 화면 아래로 밀린다 */
+.screen-fill { display: flex; flex-direction: column; min-height: 100%; }
+.detail-inner.screen-fill { padding-bottom: 0; }
+.onboarding.screen-fill { min-height: 100dvh; padding-bottom: 0; }
+.screen-fill-body { flex: 1 0 auto; display: flex; flex-direction: column; }
+.bottom-actions {
+  position: sticky; bottom: var(--bottom-actions-offset, 0px); z-index: 1; margin-top: auto;
+  display: grid; gap: var(--space-2); padding: var(--space-4) 0 calc(36px + env(safe-area-inset-bottom)); background: var(--color-bg);
+}
+.bottom-actions > .btn { width: 100%; min-height: var(--tap-min); }
+/* A3 −/+ 단추와 숫자 칸: 보이는 원 32(1px 먹남색 테두리, 흰 면) · 누름 틀 48. 숫자 칸은 테두리 안에 숫자 + 단위(폭 80 · 비율 54 · 높이 32, 16 Medium) */
+.step-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; inline-size: var(--tap-min); block-size: var(--tap-min);
+  padding: 0; border: 0; background: transparent; color: var(--color-text); cursor: pointer;
+}
+.step-btn-face {
+  display: inline-flex; align-items: center; justify-content: center; inline-size: 32px; block-size: 32px; border-radius: 50%;
+  border: 1px solid var(--color-text); background: var(--color-surface); font: var(--font-body); line-height: 1;
+}
+.step-btn:active .step-btn-face { background: var(--color-notice-bg); }
+.step-btn:disabled { cursor: default; }
+.step-btn:disabled .step-btn-face { opacity: 0.4; }
+.stepper-control, .ratio-control { gap: 0; }
+.num-field {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 1px; inline-size: 80px; min-block-size: 32px;
+  padding: 0 var(--space-1); border: 1px solid var(--color-border-input); border-radius: var(--radius-control); background: var(--color-surface);
+}
+.num-field-ratio { inline-size: 54px; }
+.num-field:focus-within { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.num-field .stepper-input, .ratio-row .num-field .stepper-input {
+  inline-size: 3ch; min-width: 0; min-height: 0; padding: 0; border: 0; background: transparent; outline: none;
+  text-align: end; font: 500 1rem/1.5rem var(--font-family); color: var(--color-text); -moz-appearance: textfield; appearance: textfield;
+}
+.num-field .stepper-input::-webkit-outer-spin-button, .num-field .stepper-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num-field .stepper-unit { min-width: 0; font: 500 1rem/1.5rem var(--font-family); color: var(--color-text); }
+/* A4 흰 카드로 묶기: radius 16 · 안 여백 16 */
+.card-box { background: var(--color-surface); border-radius: var(--radius-card, 16px); padding: var(--space-4); }
+/* 목표 비율 줄 카드(S1-3 · S8-a): 줄 사이 1px 선, 카드 안쪽 위아래는 줄 높이로 */
+.ratio-list.card-box { padding-block: var(--space-1); }
+.ratio-list.card-box .ratio-row:last-child { border-bottom: 0; }
+.ratio-row { gap: var(--space-2); justify-content: flex-start; }
+.ratio-row .ratio-name-btn { flex: 1 1 auto; font: var(--font-sub); color: var(--color-text); }
+.ratio-row .chip-dot { inline-size: 12px; block-size: 12px; }
+.ratio-foot { justify-content: center; }
+.ratio-foot .btn-text { font: 500 0.875rem/1.25rem var(--font-family); color: var(--color-text); } /* 글 단추: 밑줄 없음, 14 Medium(④-2) */
+/* 확인 창 꼴(Figma 98:278): 종이색 바탕 · 폭 312 · 안 여백 위 28 / 옆 24 / 아래 24 · 제목 18 Bold(토큰에 18이 없어 글자 값으로 — 보고에 적음) */
+.close-confirm { max-width: 312px; padding: 28px var(--space-6) var(--space-6); background: var(--color-bg); }
+.close-confirm-title { font: 700 1.125rem/1.625rem var(--font-family); }
+/* 처음 설정·내 정보 고침9(Figma 49:178·49:194·49:232·50:4·50:641): 이름표 제목 24 Bold · 보조 한 줄 14 · 목표 비율 이름표 옆 작은 글 */
+.onboarding-title-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); margin-bottom: var(--space-3); }
+.onboarding-title-row .onboarding-title { margin: 0; }
+.onboarding-sub { margin: calc(-1 * var(--space-2)) 0 var(--space-4); font: var(--font-sub); color: var(--color-text-sub); overflow-wrap: anywhere; }
+/* 알림 줄: 이름(16 Bold) · 오른쪽 스위치(44×26, 켬 = 먹남색 · 끔 = 선 색). 체크 상자는 그대로 두고(이름이 접근성 이름) 위에 투명하게 겹친다 */
+.notify-card { padding-block: var(--space-2); }
+.notify-card .notify-row { margin-top: 0; padding-block: var(--space-2); }
+.notify-card .notify-row + .notify-row { border-top: 1px solid var(--color-divider); }
+.notify-toggle { position: relative; justify-content: space-between; }
+.notify-toggle .notify-switch-input { position: absolute; inset-inline-end: 0; inline-size: 44px; block-size: var(--tap-min); margin: 0; opacity: 0; cursor: pointer; }
+.notify-switch { position: relative; flex: none; inline-size: 44px; block-size: 26px; border-radius: 13px; background: var(--color-border-input); pointer-events: none; }
+.notify-switch::after { content: ""; position: absolute; inset-block-start: 3px; inset-inline-start: 3px; inline-size: 20px; block-size: 20px; border-radius: 50%; background: var(--color-surface); transition: transform 0.15s; }
+.notify-switch-input:checked + .notify-switch { background: var(--color-primary); }
+.notify-switch-input:checked + .notify-switch::after { transform: translateX(18px); }
+.notify-switch-input:focus-visible + .notify-switch { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .notify-switch::after { transition: none; } }
+.notify-preview { margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; } /* 12 보조 */
+.notify-time { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+.notify-time-label { font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 32px; font: 500 0.8125rem/1.25rem var(--font-family); }
+/* 확인 창 뒤 어두운 막(Figma 121:389·121:449): 먹남색 45%(새 토큰 없이 --color-text를 섞는다) */
+.close-confirm-backdrop { background: color-mix(in srgb, var(--color-text) 45%, transparent); }

@@ -46,9 +46,7 @@ export const ME_TEXT = {
   unreadableGoal: "목표를 읽을 수 없어요. 새로 적으면 바뀌어요.",
   loadFailed: "내 정보를 불러오지 못했어요. 앱을 다시 열어 주세요.",
   eveningName: "오늘 기록 알림",
-  eveningDesc: "저녁에 오늘 쓴 시간을 남기도록 알려 드려요.",
   morningName: "아침 알림",
-  morningDesc: "아침에 앱을 열도록 알려 드려요.",
 } as const;
 
 type Entry = { id: string; name: string };
@@ -268,7 +266,6 @@ function MeBody({
           <NotifyRow
             id="me-evening"
             name={ME_TEXT.eveningName}
-            desc={ME_TEXT.eveningDesc}
             on={eveningOn}
             minute={eveningMinute}
             onToggle={(v) => {
@@ -280,7 +277,6 @@ function MeBody({
           <NotifyRow
             id="me-morning"
             name={ME_TEXT.morningName}
-            desc={ME_TEXT.morningDesc}
             on={morningOn}
             minute={morningMinute}
             onToggle={(v) => {
