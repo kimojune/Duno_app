@@ -301,20 +301,20 @@ describe("처음 설정 (7-1, ①)", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("알림 줄은 시각을 고르지 않고(Figma 50:4) 처음 시각을 미리 보기로 보인다. 아침만 끄면 저녁만 켜진 채 처음 시각 그대로 저장한다", async () => {
+  it("알림 시각을 바꿀 수 있고, 끈 알림은 시각을 못 고른다(PM d-157 ① 되살림)", async () => {
     const api = fakeApi();
     mount(api);
     click("다음");
     click("다음");
     click("다음");
-    expect(screen.queryByLabelText("오늘 기록 알림 시각")).toBeNull();
-    expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.getByText("오후 7:30 · “오늘 몇 시간 썼는지 적어 둘까요?”")).toBeTruthy();
+    expect(screen.getAllByRole("combobox")).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(21 * 60) } });
     fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" }));
+    expect((screen.getByLabelText("아침 알림 시각") as HTMLSelectElement).disabled).toBe(true);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.requestPermission).toHaveBeenCalledTimes(1); // 저녁이 켜져 있어 묻는다
     expect(api.saveSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } }),
+      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1260, morningEnabled: false, morningMinute: 600 } }),
     );
   });
 

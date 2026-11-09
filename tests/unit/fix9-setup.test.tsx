@@ -202,36 +202,44 @@ describe("처음 설정 ⑬ 글 · 이름표", () => {
     expect(document.querySelector("ul.ratio-list")?.classList.contains("card-box")).toBe(true);
   });
 
-  it("4단계: 이름표 「알림」, 줄마다 시각 + 실제 알림 글 미리 보기(글은 lib/push/next.ts에서). 아침은 고른 첫 분야, 첫 분야를 풀면 다음 분야", () => {
+  it("4단계(PM d-157 · 명세 ⑲): 이름표 「알림」, 줄마다 이름 아래 시각 칸(처음 값 오후 7:30 · 오전 10:00) → 그 아래 실제 알림 글 미리 보기. 아침은 제목 그대로(분야 이름 없음)", () => {
     mountOnboarding();
-    click("다음");
-    click("포트폴리오"); // 풀었다가 다시 고르면 고른 차례가 어학 → 포트폴리오
-    click("포트폴리오");
-    click("다음");
-    click("다음");
+    toStep4();
     expect(screen.getByRole("heading", { name: "알림" })).toBeTruthy();
-    const evening = `오후 7:30 · “${NOTIFY_ITEMS.evening.body}”`;
-    expect(evening).toBe("오후 7:30 · “오늘 몇 시간 썼는지 적어 둘까요?”");
-    expect(screen.getByText(evening)).toBeTruthy();
-    expect(screen.getByText(`오전 10:00 · “${NOTIFY_ITEMS.morning.title} · 어학”`)).toBeTruthy();
-    expect(screen.getByText("오전 10:00 · “오늘 먼저 할 일 · 어학”")).toBeTruthy();
-    // 미리 보기는 스위치의 설명(aria-describedby)
+    const eveningTime = screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement;
+    const morningTime = screen.getByLabelText("아침 알림 시각") as HTMLSelectElement;
+    expect(eveningTime.selectedOptions[0].textContent).toBe("오후 7:30");
+    expect(morningTime.selectedOptions[0].textContent).toBe("오전 10:00");
+    expect(screen.getByText("“오늘 몇 시간 썼는지 적어 둘까요?”")).toBeTruthy();
+    expect(screen.getByText("“오늘 먼저 할 일”")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/오늘 먼저 할 일 · /); // 분야 이름을 붙이지 않는다
+    // 순서: 이름(스위치) → 시각 칸 → 미리 보기. 보이는 「시각」 글은 없다(화면 읽기 이름에만)
     const sw = screen.getByRole("checkbox", { name: "오늘 기록 알림" });
-    expect(document.getElementById(sw.getAttribute("aria-describedby")!)?.textContent).toBe(evening);
+    const preview = document.getElementById(sw.getAttribute("aria-describedby")!)!;
+    expect(preview.textContent).toBe("“오늘 몇 시간 썼는지 적어 둘까요?”");
+    expect(sw.compareDocumentPosition(eveningTime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(eveningTime.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector("label[for='evening-time']")?.classList.contains("sr-only")).toBe(true);
     for (const gone of ["정한 시각에 알려 드려요", "저녁에 오늘 쓴 시간을 남기도록", "아침에 앱을 열도록", "알림을 받을까요"]) {
       expect(document.body.textContent).not.toContain(gone);
     }
-    // 첫 분야(어학)를 풀면 아침 미리 보기는 포트폴리오
-    click("이전");
-    click("이전");
-    click("어학");
-    click("다음");
-    click("다음");
-    expect(screen.getByText("오전 10:00 · “오늘 먼저 할 일 · 포트폴리오”")).toBeTruthy();
   });
 
-  it("고른 분야가 없을 때 아침 미리 보기의 분야 자리는 「분야」(22 판단)", () => {
-    expect(ONBOARDING_TEXT.morningPreview(600, null)).toBe("오전 10:00 · “오늘 먼저 할 일 · 분야”");
+  it("미리 보기 = 실제 알림 글: 두 글은 lib/push/next.ts NOTIFY_ITEMS 한 원본에서 나온다(원본을 바꾸면 미리 보기도 바뀐다)", () => {
+    expect(ONBOARDING_TEXT.eveningPreview()).toBe(`“${NOTIFY_ITEMS.evening.body}”`);
+    expect(ONBOARDING_TEXT.morningPreview()).toBe(`“${NOTIFY_ITEMS.morning.title}”`);
+    const items = NOTIFY_ITEMS as unknown as Record<"evening" | "morning", { title: string; body: string }>;
+    const saved = { body: items.evening.body, title: items.morning.title };
+    try {
+      items.evening.body = "원본 저녁 글 시험";
+      items.morning.title = "원본 아침 제목 시험";
+      expect(ONBOARDING_TEXT.eveningPreview()).toBe("“원본 저녁 글 시험”");
+      expect(ONBOARDING_TEXT.morningPreview()).toBe("“원본 아침 제목 시험”");
+    } finally {
+      items.evening.body = saved.body;
+      items.morning.title = saved.title;
+    }
+    expect(NOTIFY_ITEMS.morning.title).toBe("오늘 먼저 할 일");
   });
 });
 
@@ -445,7 +453,7 @@ describe("내 정보 「목표 비율」 줄 → S8-a (PM 6 · Figma 50:641 · 8
     expect(api.saveRatios).toHaveBeenCalledTimes(0);
   });
 
-  it("내 정보 알림 줄: 설명 글 둘이 없고 시각 값이 보인다(「시각」 고르기 — 접근 이름 「… 시각」)", () => {
+  it("내 정보 알림 줄: 설명 글 둘이 없고 시각 값이 보인다(「시각」 고르기 — 접근 이름 「… 시각」, 보이는 「시각」 글 있음)", () => {
     mountMe();
     expect(document.body.textContent).not.toMatch(/저녁에 오늘 쓴 시간을 남기도록|아침에 앱을 열도록/);
     expect((screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement).selectedOptions[0].textContent).toBe("오후 7:30");
@@ -521,5 +529,58 @@ describe("스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-15
     expect(CSS).toMatch(/@keyframes duno-fade-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/);
     expect(CSS).toMatch(/\.detail, \.evening-todo-sheet, \.close-confirm, \.close-confirm-backdrop, \.evening-todo-backdrop \{ animation: duno-fade-in 160ms ease-out; \}/);
     expect(CSS).not.toMatch(/@keyframes duno-overlay-in/); // 자리를 옮기는 나타남은 두지 않는다
+  });
+});
+
+describe("PM d-157 ①: 처음 설정 알림 시각 고르기", () => {
+  it("고른 시각이 처음 설정 저장 인자(notify.eveningMinute·morningMinute)로 간다. 끈 알림은 시각을 못 고른다", async () => {
+    const { api } = mountOnboarding();
+    toStep4();
+    fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(21 * 60) } });
+    fireEvent.change(screen.getByLabelText("아침 알림 시각"), { target: { value: String(8 * 60 + 30) } });
+    expect((screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement).selectedOptions[0].textContent).toBe("오후 9:00");
+    await act(async () => click("시작하기"));
+    expect(api.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1260, morningEnabled: true, morningMinute: 510 }, completeOnboarding: true }),
+    );
+  });
+
+  it("끈 알림의 시각 칸은 막힌다. 고르지 않으면 처음 값(1170 · 600) 그대로 저장", async () => {
+    const { api } = mountOnboarding();
+    toStep4();
+    fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" }));
+    expect((screen.getByLabelText("아침 알림 시각") as HTMLSelectElement).disabled).toBe(true);
+    await act(async () => click("시작하기"));
+    expect(api.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } }),
+    );
+  });
+});
+
+describe("내 정보 알림: 저장 중에도 키보드 포커스가 남는다(검토 LOW)", () => {
+  it("저장 응답 전 스위치·시각은 disabled가 아니라 aria-disabled. 포커스는 스위치에 남고, 다시 바꿔도 저장은 한 번", async () => {
+    let resolve: (v: { ok: true; data: { goal: null; goalReadable: true; onboardingDone: true; notify: NotifySettings } }) => void = () => {};
+    const api = fakeApi({ saveSettings: vi.fn(() => new Promise((r) => (resolve = r as typeof resolve))) as unknown as SettingsApi["saveSettings"] });
+    const pushOn: PushApi = { ...push, permission: () => "granted", subscribed: async () => true };
+    await act(async () => {
+      render(<MeScreen settings={meSettings({ notify: { ...NOTIFY, eveningEnabled: true } })} categories={CATS} api={api} push={pushOn} />);
+    });
+    const sw = screen.getByRole("checkbox", { name: "아침 알림" }) as HTMLInputElement;
+    sw.focus();
+    await act(async () => fireEvent.click(sw));
+    expect(api.saveSettings).toHaveBeenCalledTimes(1);
+    expect(sw.disabled).toBe(false);
+    expect(sw.getAttribute("aria-disabled")).toBe("true");
+    expect(document.activeElement).toBe(sw);
+    const time = screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement;
+    expect(time.disabled).toBe(false);
+    expect(time.getAttribute("aria-disabled")).toBe("true");
+    await act(async () => fireEvent.click(sw)); // 저장 중 다시 눌러도
+    await act(async () => fireEvent.change(time, { target: { value: String(20 * 60) } }));
+    expect(api.saveSettings).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(true); // 바뀐 값 그대로(되돌리지 않음)
+    await act(async () => resolve({ ok: true, data: { goal: null, goalReadable: true, onboardingDone: true, notify: NOTIFY } }));
+    expect(sw.getAttribute("aria-disabled")).toBeNull();
+    expect(document.activeElement).toBe(sw);
   });
 });

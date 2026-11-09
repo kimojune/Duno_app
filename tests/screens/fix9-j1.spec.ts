@@ -24,6 +24,8 @@ async function open(page: Page, s: string) {
 }
 async function photo(page: Page, name: string) {
   fs.mkdirSync(OUT, { recursive: true });
+  // O-11: 겹친 창·확인 창이 서서히 나타나는 중(불투명도)에 찍지 않게, 도는 애니메이션이 끝날 때까지 기다린다
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: false });
 }
 async function noOverflow(page: Page) {
@@ -108,9 +110,23 @@ test("S1-1~S1-4 처음 설정: 「‹」(2~4단계) · 진행 막대 · 이름�
   // S1-4
   await page.getByRole("button", { name: "다음" }).click();
   await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
-  await expect(page.getByText("오후 7:30 · “오늘 몇 시간 썼는지 적어 둘까요?”")).toBeVisible();
-  await expect(page.getByText(/^오전 10:00 · “오늘 먼저 할 일 · .+”$/)).toBeVisible();
-  await expect(page.getByRole("combobox")).toHaveCount(0);
+  // PM d-157 · 명세 ⑲(Figma 50:4 고침): 이름 아래 시각 칸 → 그 아래 실제 알림 글 미리 보기
+  const eveningTime = page.getByLabel("오늘 기록 알림 시각");
+  await expect(eveningTime).toHaveValue("1170");
+  await expect(page.getByLabel("아침 알림 시각")).toHaveValue("600");
+  await expect(page.getByText("“오늘 몇 시간 썼는지 적어 둘까요?”")).toBeVisible();
+  await expect(page.getByText("“오늘 먼저 할 일”", { exact: true })).toBeVisible();
+  const timeBox = await eveningTime.evaluate((e) => {
+    const s = getComputedStyle(e);
+    const r = e.getBoundingClientRect();
+    return { h: Math.round(r.height), bw: s.borderTopWidth, radius: s.borderTopLeftRadius, bg: s.backgroundColor, w: r.width };
+  });
+  expect(timeBox).toMatchObject({ h: 32, bw: "1px", radius: "8px", bg: rgb(COLOR_TOKENS["--color-surface"]) });
+  expect(timeBox.w, "시각 칸은 글 폭만큼").toBeLessThan(160);
+  const nameY = (await page.locator(".notify-name", { hasText: "오늘 기록 알림" }).boundingBox())!.y;
+  const timeY = (await eveningTime.boundingBox())!.y;
+  const previewY = (await page.getByText("“오늘 몇 시간 썼는지 적어 둘까요?”").boundingBox())!.y;
+  expect(nameY < timeY && timeY < previewY, "이름 → 시각 칸 → 미리 보기").toBe(true);
   for (const name of ["오늘 기록 알림", "아침 알림"]) await expect(page.getByRole("checkbox", { name })).toBeChecked();
   const sw = (await page.locator(".notify-switch").first().boundingBox())!;
   expect([Math.round(sw.width), Math.round(sw.height)], "스위치 44×26").toEqual([44, 26]);
@@ -216,6 +232,10 @@ test("S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창(같은 꼴), 
   await expect(dlg).toBeVisible();
   await checkBack(page, dlg);
   await checkBottomPrimary(page, "저장", dlg);
+  // 목표 칸은 한 줄 칸 높이(세로 flex에 늘어나지 않음 — Figma 102:314 칸 56)
+  const fieldH = (await dlg.getByRole("textbox", { name: "목표" }).boundingBox())!.height;
+  expect(fieldH, "목표 칸 높이 48~56").toBeGreaterThanOrEqual(48);
+  expect(fieldH).toBeLessThanOrEqual(56);
   await noOverflow(page);
   await photo(page, "S8-b 목표 고치기");
   await dlg.getByRole("textbox", { name: "목표" }).fill("포트폴리오 끝내기");

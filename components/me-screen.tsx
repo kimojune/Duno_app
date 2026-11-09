@@ -302,7 +302,8 @@ function MeBody({
             name={ME_TEXT.eveningName}
             on={eveningOn}
             minute={eveningMinute}
-            disabled={notifyBusy || !online}
+            disabled={!online}
+            busy={notifyBusy}
             onToggle={(v) => void changeNotify({ eveningEnabled: v })}
             onMinute={(m) => void changeNotify({ eveningMinute: m })}
           />
@@ -311,7 +312,8 @@ function MeBody({
             name={ME_TEXT.morningName}
             on={morningOn}
             minute={morningMinute}
-            disabled={notifyBusy || !online}
+            disabled={!online}
+            busy={notifyBusy}
             onToggle={(v) => void changeNotify({ morningEnabled: v })}
             onMinute={(m) => void changeNotify({ morningMinute: m })}
           />

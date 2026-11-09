@@ -1169,3 +1169,9 @@ select.input { appearance: auto; }
    다이얼 조각 나옴·빛은 components/ratio-dial.tsx가 이미 「동작 줄이기」면 바로 보인다 */
 @keyframes duno-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .detail, .evening-todo-sheet, .close-confirm, .close-confirm-backdrop, .evening-todo-backdrop { animation: duno-fade-in 160ms ease-out; }
+/* PM d-157 · 명세 ⑲: 시각 칸(처음 설정·내 정보 같은 꼴) — 흰 바탕 · 1px 테두리 · radius 8 · 높이 32 · 글 폭만큼. 처음 설정은 이름 아래에 칸, 그 아래 미리 보기 */
+.notify-time .input.notify-time-select { width: auto; flex: none; min-height: 32px; padding: 0 var(--space-2); font: 500 0.8125rem/1.25rem var(--font-family); border-radius: var(--radius-control); background: var(--color-surface); }
+.notify-card .notify-time { margin-top: var(--space-1); }
+.notify-card .notify-preview { margin-top: var(--space-2); }
+/* .screen-fill(세로 flex) 바로 안의 글 칸이 .input의 flex: 1로 세로로 늘어나지 않게(S8-b 목표 칸 — 고침9 아래 단추 자리에서 생긴 결함) */
+.screen-fill > .input, .screen-fill-body > .input { flex: none; }
