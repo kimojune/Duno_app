@@ -28,7 +28,7 @@ function demoCode(): string {
 }
 
 /** 사진 하나: 실패하면 「찍지 못함」으로 남기고 다음으로 간다 */
-async function take(name: string, node: string, opts: { suffix?: string; note?: string; fake?: boolean; data?: string }, body: () => Promise<Page>) {
+async function take(name: string, node: string, opts: { suffix?: string; note?: string; fake?: boolean; data?: string; skipIdle?: boolean }, body: () => Promise<Page>) {
   try {
     const page = await body();
     await shot(page, name, node, opts);
@@ -526,16 +526,28 @@ test("QA1 다시: S0 시작 중(체험 들어가기 0번 — 고정 가짜 글, 
     // 칸에는 실제 코드가 아니라 고정 가짜 글 8자를 넣는다. 칸 글자는 점으로 보인다(8개, 길이는 실제 코드와 무관)
     await page.locator("input.demo-input").fill("XXXXXXXX");
     await page.addStyleTag({ content: "input.demo-input { -webkit-text-security: disc; }" });
-    // 시작 요청은 서버로 보내지 않고 붙잡아 둔다 → 「시작 중」 상태가 그대로 보인다
+    // 시작 요청은 서버로 보내지 않고 20초 붙잡아 둔다(사진은 그 안에 찍는다) → 「시작 중」 상태가 그대로 보인다
     await page.route("**/*", async (route) => {
-      if (route.request().method() === "POST") await new Promise((r) => setTimeout(r, 4000));
+      if (route.request().method() === "POST") await new Promise((r) => setTimeout(r, 20_000));
       await route.abort();
     });
     await page.locator("button.demo-start").click();
-    await take("S0-체험코드 시작 중", "141:31", { note: "고정 가짜 글 8자(점 8개) · 시작 요청은 서버에 보내지 않고 가로채 붙잡음 — 체험 들어가기 0번", data: "로그인 전 화면 · 데이터 없음" }, async () => {
-      await expect(page.locator("button.demo-start")).toContainText("시작 중", { timeout: 5_000 });
+    const start = page.locator("button.demo-start");
+    const google = page.locator(".google-btn");
+    const assertBusy = async () => {
+      await expect(start).toHaveText("시작 중");
+      await expect(start).toBeDisabled();
+      await expect(start).toHaveAttribute("aria-busy", "true");
+      await expect(google).toBeDisabled();
+      await expect(page.locator(".demo-error")).toHaveCount(0);
+    };
+    await assertBusy(); // 찍기 직전
+    // skipIdle: networkidle을 기다리면 그 사이 붙잡힌 요청이 끝나 「시작 중」이 풀린다(앞서 그렇게 「시작」 + 오류 사진이 찍혔다)
+    await take("S0-체험코드 시작 중", "141:31", { skipIdle: true, note: "고정 가짜 글 8자(점 8개) · 시작 요청은 서버에 보내지 않고 20초 붙잡음(찍기 직전·직후 「시작 중」 · aria-busy · 두 단추 막힘을 단언) — 체험 들어가기 0번", data: "로그인 전 화면 · 데이터 없음" }, async () => {
+      await assertBusy();
       return page;
     });
+    await assertBusy(); // 찍은 직후
   } finally {
     await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
     await context.close();
@@ -707,9 +719,14 @@ test("QA1 다시: 시험 계정 A — 고침 1~9 화면 · d-180 · 보류 · �
       const day = todayOf(snap);
       return { ...snap, sessions: [], todos: [mkTodo(snap, 1, "토익 단어 50개", day, false, cats[0]?.id ?? null), mkTodo(snap, 2, "글 한 편 초고 쓰기", day, false, cats[1]?.id ?? null), mkTodo(snap, 3, "빨래", day, false, null)] };
     });
-    await take("S4 타이머 · 고르기(처음 — 첫 줄만 골라짐, 나머지 안 고름)", "50:390", { suffix: AF, data: "타이머 없음 · 오늘 할 일 3개(분야 A · 분야 B · 기타) · 처음 값 = 첫 할 일" }, async () => {
+    await take("S4 타이머 · 고르기(안 고름 — 할 일 줄 셋이 빈 원)", "50:390", { suffix: AF, data: "타이머 없음 · 오늘 할 일 3개(분야 A · 분야 B · 기타) · 시험 계정 A의 실제 추천(분야 A 30분)이 있어 처음 값이 「할 일 없이 시작」 → 할 일 줄 셋은 모두 안 고른 빈 원(테두리 1.5 회색)" }, async () => {
       await tab(page, "타이머");
       await expect(page.getByRole("heading", { name: "무엇을 할까요?" })).toBeVisible({ timeout: 20_000 });
+      // 안 고른 줄이 실제로 보이는 상태인지 단언한다: 할 일 라디오 셋이 모두 꺼져 있다
+      const radios = page.getByRole("radio");
+      await expect(radios.nth(0)).not.toBeChecked();
+      await expect(radios.nth(1)).not.toBeChecked();
+      await expect(radios.nth(2)).not.toBeChecked();
       return page;
     });
     await take("S4 타이머 · 고르기(둘째 줄 고름)", "50:390", { suffix: AF, data: "위와 같음(둘째 할 일을 고름)" }, async () => {
@@ -792,6 +809,45 @@ test("QA1 다시: 시험 계정 A — 고침 1~9 화면 · d-180 · 보류 · �
     const now = await ids(c.client, "todos");
     await removeTodos(c.client, [...now].filter((id) => !before.has(id)));
     await c.context.close();
+  }
+});
+
+// ============================================================ PM 13: 체험 첫 화면 예시 기록 (체험 들어가기 1번 — 창구 d-210 가)
+test("체험 계정 PM 13: 첫 화면 예시 기록(체험 들어가기 1번, 쓰기 없음)", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const code = demoCode();
+  const context = await browser.newContext({ viewport: { width: 360, height: 800 }, deviceScaleFactor: PHOTO_SCALE });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    await expect(page.locator("input.demo-input")).toBeVisible({ timeout: 30_000 });
+    await page.locator("input.demo-input").fill(code);
+    await page.locator("button.demo-start").click(); // 맞는 코드 — 체험 들어가기 1번(틀린 코드는 쓰지 않는다)
+    await expect(page.getByRole("button", { name: "할 일 적기" })).toBeVisible({ timeout: 60_000 });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    // 이 사진 시험은 쓰기를 하지 않는다 — 보이는 값은 체험 시드(예시 기록)뿐이다. 그날 데이터는 앱의 읽기(/mirror)에서 얻는다
+    const snap = await page.evaluate(async () => {
+      const res = await fetch("/mirror");
+      return (await res.json()) as { ok: boolean; data?: { serverNow: string; logs: { targetDay: string; totalMinutes: number; items: { categoryId: string | null; minutes: number }[] }[]; sessions: { day: string; categoryId: string | null; elapsedSeconds: number | null; plannedMinutes: number }[]; todos: { day: string; done: boolean }[] } };
+    });
+    let data = "(읽지 못함)";
+    if (snap.ok && snap.data) {
+      const day = todoDayFor(new Date(snap.data.serverNow));
+      const todayLogs = snap.data.logs.filter((l) => l.targetDay === day);
+      const todaySessions = snap.data.sessions.filter((x) => x.day === day);
+      const timerOther = todaySessions.filter((x) => x.categoryId === null).reduce((a, x) => a + Math.round((x.elapsedSeconds ?? x.plannedMinutes * 60) / 60), 0);
+      const timerCat = todaySessions.filter((x) => x.categoryId !== null).reduce((a, x) => a + Math.round((x.elapsedSeconds ?? x.plannedMinutes * 60) / 60), 0);
+      data = `체험 시드 그대로(이 시험은 쓰기 없음) · 오늘 기록 ${todayLogs.length}줄${todayLogs[0] ? `(합계 ${todayLogs[0].totalMinutes}분, 분야 ${todayLogs[0].items.length}칸)` : ""} · 오늘 타이머 분야별 합 ${timerCat}분 · 분야 없는 타이머 ${timerOther}분 · 기록 있는 날 ${snap.data.logs.length}일치 · 오늘 할 일 ${snap.data.todos.filter((t) => t.day === day).length}개(끝냄 ${snap.data.todos.filter((t) => t.day === day && t.done).length})`;
+    }
+    await shot(page, "체험 첫 화면 · 예시 기록이 보이는 첫 화면(PM 13)", "50:52", { suffix: DEMO, data, note: "체험 들어가기 직후 · 아무것도 쓰지 않은 첫 화면" });
+    const dialog = page.getByRole("dialog", { name: "오늘 기록" });
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
+    await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/이미 남긴 기록이 있어요/)).toHaveCount(0);
+    await shot(page, "체험 오늘 기록 첫 화면 · 예시 기록이 이미 있는 날(PM 13 · d-174 ②)", "49:5", { suffix: DEMO, data, note: "저장하지 않고 닫는다" });
+    await dialog.getByRole("button", { name: "이전" }).click();
+  } finally {
+    await context.close();
   }
 });
 

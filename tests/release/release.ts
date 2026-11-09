@@ -37,16 +37,18 @@ export function fileName(name: string, fake: boolean): string {
 }
 
 /** 360×800 사진(나타남 애니메이션은 끝낸 뒤) + 사진 목록 줄 */
-export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string; suffix?: string; data?: string } = {}) {
+export async function shot(page: Page, name: string, node: string, opts: { fake?: boolean; note?: string; suffix?: string; data?: string; /** 붙잡힌 요청이 있는 순간을 찍는 사진: networkidle·불러오는 중 기다림을 건너뛴다(기다리면 그 사이 상태가 풀린다) */ skipIdle?: boolean } = {}) {
   const fake = opts.fake ?? false;
   const file = fileName(name, fake).replace(/\.png$/, `${opts.suffix ?? ""}.png`);
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
   // 불러오는 중이 사진에 남지 않게: 글이 사라질 때까지 기다린다(23이 기타 페이지 121:468을 이 까닭으로 못 봤다). 끝까지 남으면 그 사실을 줄에 적는다
   let loadingLeft = false;
-  await page.waitForFunction(() => !document.body.innerText.includes("불러오는 중"), undefined, { timeout: 15_000 }).catch(() => {
-    loadingLeft = true;
-  });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
+  if (!opts.skipIdle) {
+    await page.waitForFunction(() => !document.body.innerText.includes("불러오는 중"), undefined, { timeout: 15_000 }).catch(() => {
+      loadingLeft = true;
+    });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+  }
   await page.screenshot({ path: path.join(PHOTO_DIR, file), animations: "disabled" });
   // 23 제안: 사진과 함께 그 화면의 계산된 글꼴·굵기·상자 크기를 JSON으로 남긴다(눈대중을 줄인다). 사진과 같은 이름 + .json
   try {
