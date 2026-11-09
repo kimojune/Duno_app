@@ -224,6 +224,17 @@ const TODO_STATES: Record<string, Partial2> = {
     sheetOpen: true,
   },
   T7: { list: "ready", rows: [...BASIC, row("f1", "저장하지 못한 할 일", { failed: true, category: "운동" })], sheetOpen: false },
+  // 고침9: 저장 대기 줄(16px 도는 원)과 저장 못 한 줄(글 그대로)을 한 화면에
+  "T-pending": {
+    list: "ready",
+    rows: [
+      row("r1", "토익 단어 50개", { category: "어학" }),
+      row("q1", "포트폴리오 2장 고치기", { queued: true, category: "포트폴리오" }),
+      row("f1", "저장하지 못한 할 일", { failed: true, category: "운동" }),
+    ],
+    sheetOpen: false,
+    online: false,
+  },
   T8: { list: "ready", rows: [row("c1", "이력서 파일 이름 바꾸기", { checkFailed: true }), ...BASIC.slice(1)], sheetOpen: false },
   T11: { list: "ready", rows: BASIC, sheetOpen: true, draft: OVER_DRAFT },
   T13: {

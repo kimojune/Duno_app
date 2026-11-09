@@ -759,9 +759,11 @@ export const EVENING_ENTRY_LABEL = `${EVENING_TEXT.title} 남기기`;
 export function EveningEntry({ onOpen }: { evening?: boolean; onOpen: () => void }) {
   return (
     <section className="entry-card" aria-label={EVENING_TEXT.title}>
-      <p className="entry-title">{EVENING_TEXT.title}</p>
-      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만) */}
-      <p className="todo-sub">{EVENING_TEXT.askToday}</p>
+      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만). 두 줄 글은 한 묶음, 단추는 오른쪽 한 줄 */}
+      <div className="entry-text">
+        <p className="entry-title">{EVENING_TEXT.title}</p>
+        <p className="todo-sub entry-ask">{EVENING_TEXT.askToday}</p>
+      </div>
       <SecondaryButton onClick={onOpen}>{EVENING_ENTRY_LABEL}</SecondaryButton>
     </section>
   );

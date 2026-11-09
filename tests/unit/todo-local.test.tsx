@@ -105,6 +105,7 @@ describe("적기·끝냄: 누르면 서버 응답 없이 바로 바뀐다", () =
     expect(todoInput().value).toBe("");
     expect(screen.queryByText("저장하는 중")).toBeNull();
     expect(screen.queryByText("연결되면 저장해요")).toBeNull();
+    expect(screen.queryByText("저장 대기")).toBeNull();
     expect(screen.getByText("2개 중 0개 끝냄", { exact: false })).toBeTruthy();
     expect(addTodo).not.toHaveBeenCalled(); // 화면이 서버 Action을 직접 부르지 않는다
     expect(runtime.pendingOps().map((o) => o.op)).toEqual([expect.objectContaining({ kind: "todo.add", text: "새로 적은 글", categoryId: null })]);

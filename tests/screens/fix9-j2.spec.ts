@@ -116,6 +116,55 @@ test("S2 할 일 · 목록 있음(50:52): 작업 기록 아이콘 = 할 일 글 
   await photo(page, "S2-목록(50-52)");
 });
 
+test("S2 할 일 · 저장 대기(50:52 · 128:87): 16px 도는 원(글 줄 세로 가운데), 동작 줄이기면 멈춤, 숨은 글 「저장 대기」, 실패 글은 그대로", async ({ page }) => {
+  await open(page, "/dev/states?s=T-pending");
+  const mark = page.locator("#row-q1 .save-pending");
+  await expect(mark).toHaveCount(1);
+  await expect(page.locator(".save-pending")).toHaveCount(1); // 저장된 줄·실패 줄에는 없다
+  await expect(mark.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(mark.locator(".sr-only")).toHaveText("저장 대기");
+  await expect(page.getByText("연결되면 저장해요")).toHaveCount(0);
+  const geo = await page.locator("#row-q1").evaluate((li) => {
+    const svg = li.querySelector(".save-pending svg")!;
+    const text = li.querySelector("#todo-text-q1")!.getBoundingClientRect();
+    // 도는 원의 상자는 돌면서 커진다 — 돌지 않는 감싸개(.save-pending)로 잰다
+    const r = li.querySelector(".save-pending")!.getBoundingClientRect();
+    const arc = getComputedStyle(li.querySelector(".save-pending-arc")!);
+    const track = getComputedStyle(li.querySelector(".save-pending-track")!);
+    return {
+      w: r.width,
+      h: r.height,
+      midDiff: Math.abs(r.top + r.height / 2 - (text.top + text.height / 2)),
+      right: r.left > text.right,
+      animation: getComputedStyle(svg).animationName,
+      duration: getComputedStyle(svg).animationDuration,
+      timing: getComputedStyle(svg).animationTimingFunction,
+      arcStroke: arc.stroke,
+      arcWidth: arc.strokeWidth,
+      trackStroke: track.stroke,
+    };
+  });
+  expect(geo.w).toBe(16);
+  expect(geo.h).toBe(16);
+  expect(geo.midDiff, "할 일 글 줄 세로 가운데").toBeLessThanOrEqual(2);
+  expect(geo.right, "글 오른쪽").toBe(true);
+  expect(geo.animation).toBe("save-pending-spin");
+  expect(geo.duration).toBe("1s");
+  expect(geo.timing).toBe("linear");
+  expect(geo.arcStroke, "호 = 먹남색").toBe(await tokenColor(page, "--color-text"));
+  expect(geo.arcWidth).toBe("2px");
+  expect(geo.trackStroke, "바탕 고리 = --color-divider").toBe(await tokenColor(page, "--color-divider"));
+  // 실패 줄은 글 그대로
+  await expect(page.locator("#row-f1")).toContainText("저장하지 못했어요.");
+  await expect(page.locator("#row-f1").getByRole("button", { name: "다시" })).toBeVisible();
+  await noOverflow(page);
+  await photo(page, "S2-목록-저장대기(128-87)");
+  // 동작 줄이기: 돌지 않는다(계산값 animation none)
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const still = await mark.locator("svg").evaluate((el) => getComputedStyle(el).animationName);
+  expect(still).toBe("none");
+});
+
 test("S2-a 적는 창(50:103): 이름표 「분야」, 맨 앞 「기타」 골라짐(흰 면 + 2px 테두리 + 체크), 칩에 색 점", async ({ page }) => {
   await open(page, "/dev/states?s=C5");
   await expect(page.locator("#category-label")).toHaveText("분야");

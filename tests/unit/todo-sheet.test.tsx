@@ -1203,25 +1203,19 @@ describe("고침 5바퀴: 분야 칩 줄은 한 줄이고 넘치면 옆으로 �
     return "";
   };
 
-  it("CSS: 한 줄(nowrap), 가로로 넘김(overflow-x auto), 세로로는 밀지 않음(overflow-y hidden), 높이 상한 없음(칩 하나 높이), 띠 24px", () => {
+  it("CSS(고침9 칩 두 줄): 감쌈(wrap), 칩 사이·줄 사이 8, 가로 넘김·옅어지는 띠·「‹ ›」 규칙 없음, 칩 높이 36, 높이 상한 없음(줄 수는 부품이 둘로 접는다)", () => {
     const row = rule(".chip-row");
     expect(row, ".chip-row 규칙을 읽었다").toContain("display: flex");
-    expect(row).toMatch(/flex-wrap:\s*nowrap/);
-    expect(row, "두 줄 감싸기가 남지 않았다").not.toMatch(/flex-wrap:\s*wrap/);
-    expect(row).toMatch(/overflow-x:\s*auto/);
-    expect(row).toMatch(/overflow-y:\s*hidden/);
-    expect(row, "옛 두 줄 높이 상한이 남지 않았다").not.toMatch(/max-height/);
-    // 키보드로 옮긴 칩이 옅어지는 띠(24px) 밖으로 나오게
-    expect(row).toMatch(/scroll-padding-inline:\s*24px/);
-    // 넘친 쪽 끝 24px이 옅어진다(오른쪽만 · 왼쪽만 · 양쪽)
-    const fadeEnd = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/\.chip-scroller\[data-more-end\]\s*>\s*\.chip-row\s*\{([^}]*)\}/);
-    expect(fadeEnd, "오른쪽 띠 규칙이 있다").not.toBeNull();
-    expect(fadeEnd![1]).toMatch(/(^|[^-])mask-image:\s*linear-gradient\(to right, black calc\(100% - 24px\), transparent\)/);
-    // 「‹」「›」 누름 48 · 보이는 면 32
-    expect(rule(".chip-nav")).toMatch(/inline-size:\s*var\(--tap-min\)/);
-    expect(rule(".chip-nav")).toMatch(/block-size:\s*var\(--tap-min\)/);
-    expect(rule(".chip-nav-face")).toMatch(/inline-size:\s*32px/);
-    expect(rule(".chip-nav-face")).toMatch(/block-size:\s*32px/);
+    expect(row).toMatch(/flex-wrap:\s*wrap/);
+    expect(row).not.toMatch(/nowrap/);
+    expect(row).toMatch(/gap:\s*var\(--space-2\)/);
+    expect(row, "가로로 넘기지 않는다").not.toMatch(/overflow-x/);
+    expect(row, "높이 상한으로 자르지 않는다").not.toMatch(/max-height/);
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(stripped, "옅어지는 띠 규칙이 남지 않았다").not.toMatch(/data-more-(start|end)/);
+    expect(stripped, "「‹ ›」 규칙이 남지 않았다").not.toMatch(/\.chip-nav/);
+    expect(rule(".chip-row > .chip > .chip-face")).toMatch(/min-height:\s*36px/);
+    expect(rule(".chip-collapse")).toMatch(/border:\s*0/);
     // 칩은 줄 폭을 넘지 않고, 긴 이름은 칩 글에서 한 줄 말줄임(C23)
     expect(rule(".chip")).toMatch(/max-width:\s*100%/);
     expect(rule(".chip")).not.toContain("--chip-max-gap");

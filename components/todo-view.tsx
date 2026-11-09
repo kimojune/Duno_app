@@ -44,7 +44,9 @@ export const TODO_TEXT = {
   hasNotes: "작업 기록 있음",
   saving: "저장하는 중",
   saveFailed: "저장하지 못했어요.",
-  queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절)
+  queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절). 고침9: 줄에는 보이지 않고 16px 도는 원(SavePending) + 숨은 글 「저장 대기」
+  /** 고침9(PM 16:2x, 23 Figma 128:87): 저장 대기 원의 화면 읽기 글 */
+  pending: "저장 대기",
   liveQueued: "연결되면 저장할게요",
   retry: "다시",
   remove: "빼기",
@@ -333,6 +335,23 @@ export function TodoExamples() {
   );
 }
 
+/**
+ * 고침9 「저장 대기」 = 16px 도는 원(23 그림 Figma 50:52 · 128:87): 바탕 고리(--color-divider) 위 먹남색 호 1/4(끝 둥글게), 선 2px,
+ * 1초 한 바퀴 linear, 동작 줄이기면 멈춤(CSS). 원은 화면 읽기에서 숨기고 같은 자리 숨은 글 「저장 대기」를 읽힌다(줄 설명으로 이어짐).
+ * 올라가면(저장됨) 부르는 쪽이 그리지 않아 원과 숨은 글이 함께 사라진다. 저장 대기를 보이는 자리는 모두 이 부품 하나를 쓴다.
+ */
+export function SavePending({ id }: { id?: string }) {
+  return (
+    <span id={id} className="save-pending">
+      <svg className="save-pending-ring" width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle className="save-pending-track" cx="8" cy="8" r="7" fill="none" strokeWidth="2" />
+        <path className="save-pending-arc" d="M8 1A7 7 0 0 1 15 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <span className="sr-only">{TODO_TEXT.pending}</span>
+    </span>
+  );
+}
+
 /** 목록 줄의 분야 표시. 기타(분야 없음)는 붙이지 않는다. 화면 읽기용으로 앞에 「분야 」 */
 export function CategoryTag({ id, name }: { id: string; name: string }) {
   return (
@@ -388,9 +407,6 @@ function Row({
         )}
         {row.queued && (
           <>
-            <p id={statusId} className="todo-sub">
-              {TODO_TEXT.queued}
-            </p>
             <div className="row-actions">
               <TextButton onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
             </div>
@@ -413,6 +429,8 @@ function Row({
           </p>
         )}
       </div>
+      {/* 고침9: 저장 대기는 할 일 글 줄 세로 가운데, 줄 오른쪽에 16px 도는 원(글 「연결되면 저장해요」 대신) */}
+      {row.queued && <SavePending id={statusId} />}
       {/* 저장된 줄에만, 줄 오른쪽의 작은 단추로(B16). 보이는 글은 작아도 누르는 면은 48px 이상. 접근 이름에 보이는 글자 「자세히」가 들어 있다(2.5.3) */}
       {onOpenDetail && !notSaved && (
         <div className="row-actions row-detail">
