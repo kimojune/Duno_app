@@ -121,7 +121,10 @@ test("S1-1~S1-4 처음 설정: 「‹」(2~4단계) · 진행 막대 · 이름�
     const r = e.getBoundingClientRect();
     return { h: Math.round(r.height), bw: s.borderTopWidth, radius: s.borderTopLeftRadius, bg: s.backgroundColor, w: r.width };
   });
-  expect(timeBox).toMatchObject({ h: 32, bw: "1px", radius: "8px", bg: rgb(COLOR_TOKENS["--color-surface"]) });
+  expect(timeBox).toMatchObject({ bw: "1px", radius: "8px", bg: rgb(COLOR_TOKENS["--color-surface"]) });
+  // 이음매(22 팀장, 명세 ⑲ 「누름 44」): 시각 칸 높이 = 누름 44(전에 32). 하한 44 · 글 한 줄 칸이 늘어나지 않게 상한 48
+  expect(timeBox.h, "시각 칸 누름 44 이상").toBeGreaterThanOrEqual(44);
+  expect(timeBox.h, "시각 칸이 늘어나지 않음").toBeLessThanOrEqual(48);
   expect(timeBox.w, "시각 칸은 글 폭만큼").toBeLessThan(160);
   const nameY = (await page.locator(".notify-name", { hasText: "오늘 기록 알림" }).boundingBox())!.y;
   const timeY = (await eveningTime.boundingBox())!.y;

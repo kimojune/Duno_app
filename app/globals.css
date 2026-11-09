@@ -1130,7 +1130,7 @@ select.input { appearance: auto; }
 .notify-preview { margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; } /* 12 보조 */
 .notify-time { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
 .notify-time-label { font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
-.me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 32px; font: 500 0.8125rem/1.25rem var(--font-family); }
+.me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 44px; font: 500 0.8125rem/1.25rem var(--font-family); }
 /* 확인 창 뒤 어두운 막(Figma 121:389·121:449): 먹남색 45%(새 토큰 없이 --color-text를 섞는다) */
 .close-confirm-backdrop { background: color-mix(in srgb, var(--color-text) 45%, transparent); }
 /* 내 정보(S8, Figma 50:641): 카드 사이 16. 목표 비율 카드 = 「목표 비율」 16 Bold + 「›」 + 작은 띠(높이 8, 칸마다 분야 색 + 1px 윤곽, 칸 사이 2, 숫자 없음). 카드 전체가 단추 하나 */
@@ -1169,8 +1169,9 @@ select.input { appearance: auto; }
    다이얼 조각 나옴·빛은 components/ratio-dial.tsx가 이미 「동작 줄이기」면 바로 보인다 */
 @keyframes duno-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .detail, .evening-todo-sheet, .close-confirm, .close-confirm-backdrop, .evening-todo-backdrop { animation: duno-fade-in 160ms ease-out; }
-/* PM d-157 · 명세 ⑲: 시각 칸(처음 설정·내 정보 같은 꼴) — 흰 바탕 · 1px 테두리 · radius 8 · 높이 32 · 글 폭만큼. 처음 설정은 이름 아래에 칸, 그 아래 미리 보기 */
-.notify-time .input.notify-time-select { width: auto; flex: none; min-height: 32px; padding: 0 var(--space-2); font: 500 0.8125rem/1.25rem var(--font-family); border-radius: var(--radius-control); background: var(--color-surface); }
+/* PM d-157 · 명세 ⑲: 시각 칸(처음 설정·내 정보 같은 꼴) — 흰 바탕 · 1px 테두리 · radius 8 · 높이 44(아래 이음매 줄) · 글 폭만큼. 처음 설정은 이름 아래에 칸, 그 아래 미리 보기 */
+/* 이음매(22 팀장, 명세 ⑲ 「누름 44」): 처음 설정·내 정보가 같이 쓰는 알림 시각 칸은 누름 44 = 보이는 높이 44(그림 32와 다름 — 23 확인). --tap-min은 이 앱에서 48이라 O-1·O-2처럼 44를 글자 값으로 */
+.notify-time .input.notify-time-select { width: auto; flex: none; min-height: 44px; padding: 0 var(--space-2); font: 500 0.8125rem/1.25rem var(--font-family); border-radius: var(--radius-control); background: var(--color-surface); }
 .notify-card .notify-time { margin-top: var(--space-1); }
 .notify-card .notify-preview { margin-top: var(--space-2); }
 /* .screen-fill(세로 flex) 바로 안의 글 칸이 .input의 flex: 1로 세로로 늘어나지 않게(S8-b 목표 칸 — 고침9 아래 단추 자리에서 생긴 결함) */
