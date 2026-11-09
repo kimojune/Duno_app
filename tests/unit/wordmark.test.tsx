@@ -93,6 +93,29 @@ describe("워드마크(명세 ② L1 · 고침9 — Figma 50:139·50:140·60:2)"
     expect(css).toMatch(/\.login-name \.wordmark-text \{ font: inherit; \}/);
   });
 
+  it("고침10 D(54:14·54:15): 로그인 머리에 큰 L1 고리 — 지름 120 · 두께 24 · 살구 조각 8px 바깥 + 빛 번짐, 장식(화면 읽기에서 숨김), 가운데 정렬", () => {
+    const { container } = render(<LoginLayout>{null}</LoginLayout>);
+    const svg = container.querySelector("svg.login-ring")!;
+    expect(svg.getAttribute("width")).toBe("120");
+    expect(svg.getAttribute("height")).toBe("120");
+    expect(svg.getAttribute("aria-hidden")).toBe("true");
+    expect(svg.querySelector(".login-ring-body")?.getAttribute("stroke-width")).toBe("24");
+    expect(svg.querySelector(".login-ring-piece")).not.toBeNull();
+    expect(svg.querySelector(".login-ring-glow")?.getAttribute("filter")).toContain("url(#login-ring-glow)");
+    const m = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(svg.querySelector("g")?.getAttribute("transform") ?? "");
+    expect(Math.hypot(Number(m![1]), Number(m![2]))).toBeCloseTo(8, 2); // 8px 바깥(오른쪽 위 45°)
+    expect(Number(m![1])).toBeGreaterThan(0);
+    expect(Number(m![2])).toBeLessThan(0);
+    // 큰 고리는 제목 밖(h1은 하나, 「두노」)
+    expect(container.querySelector("h1 svg.login-ring")).toBeNull();
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    expect(css).toMatch(/\.login-ring \{[^}]*inline-size: 120px; block-size: 120px;[^}]*margin-bottom: 48px;/);
+    expect(css).toMatch(/\.login-ring-piece \{ stroke: var\(--color-accent\); \}/);
+    expect(css).toMatch(/\.login-head \{[^}]*align-items: center; text-align: center;/);
+    expect(css).toMatch(/\.login-name \{ font: 700 32px\/38px var\(--font-family\); \}/);
+    expect(css).toMatch(/\.login-sentence \{[^}]*inline-size: 320px;[^}]*font: var\(--font-sub\); color: var\(--color-text-sub\);/);
+  });
+
   it("로그인 화면: 제목은 h1 하나이고 이름이 「두노」다", () => {
     render(<LoginLayout>{null}</LoginLayout>);
     const headings = screen.getAllByRole("heading");

@@ -150,13 +150,19 @@ button, input { font: inherit; color: inherit; }
   margin: 0 auto;
   padding: 0 var(--page-x);
 }
-.login-head { margin-top: 30dvh; }
-.login-name { font: var(--font-name); }
-/* 로그인 h1 안의 워드마크: 큰 L1(지름 120 · 살구 조각)은 다음 판이라 작은 고리는 숨기고 글자 「duno」만 h1 글꼴로(Figma 49:169의 큰 「duno」) */
+/* 고침10 D(Figma 49:169 · 360×760): 큰 L1 고리 윗면 y 236(가운데 x) → 「duno」 32 Bold(y 404, 고리 아래 48) → 안내 14 Regular 보조색(y 452, 폭 320) 모두 가운데.
+   작은 화면에서는 위 여백만 줄여 아래 단추가 밀리지 않게 한다 */
+.login-head { margin-top: clamp(24px, calc(100dvh - 524px), 236px); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.login-ring { display: block; flex: none; inline-size: 120px; block-size: 120px; overflow: visible; margin-bottom: 48px; }
+.login-ring-body { stroke: var(--color-text); }
+.login-ring-piece { stroke: var(--color-accent); }
+.login-ring-glow { stroke: var(--color-accent); opacity: 0.6; }
+.login-name { font: 700 32px/38px var(--font-family); }
+/* 로그인 h1 안의 워드마크: 작은 고리는 숨기고 글자 「duno」만 h1 글꼴로(큰 고리는 위 .login-ring) */
 .login-name .wordmark { display: inline; color: inherit; }
 .login-name .wordmark-ring { display: none; }
 .login-name .wordmark-text { font: inherit; }
-.login-sentence { margin-top: var(--space-2); font: var(--font-body); color: var(--color-text-sub); }
+.login-sentence { margin-top: 10px; inline-size: 320px; max-inline-size: 100%; font: var(--font-sub); color: var(--color-text-sub); }
 .login-actions {
   margin-top: auto;
   display: flex;
