@@ -4,6 +4,7 @@ import { z } from "zod";
 import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
 import { decryptTodoText, encryptTodoText, type TodoKey } from "../todos/crypto";
+import { recordRatioHistory } from "./ratio-history";
 import type { NotifySettings, RatioItem, SettingsData, SettingsPatch } from "./types";
 import { checkGoal, checkRatios, DEFAULT_NOTIFY, notifyPatchSchema } from "./validation";
 
@@ -95,6 +96,7 @@ export async function readSettingsForUser(deps: SettingsDeps): Promise<RecordRes
  * 처음 정한 비율을 통째로 바꾼다(처음 설정과 「비율 고치기」가 같이 쓴다). 받은 목록에 없는 분야의 비율은 지운다.
  * categoryId가 null인 항목은 기타다: 0보다 크면 user_settings.ratio_other_percent에 두고, 없거나 0이면 비운다(열이 없는 DB에서는 건드리지 않는다).
  * 남의 분야·없는 분야면 not_found(DB 복합 외래 키가 거절). 같은 요청을 여러 번 보내도 결과가 같다.
+ * 저장이 성공하면 바뀐 기록(category_ratio_history)에 한 줄 남긴다(같은 묶음이면 안 남김, 기록 실패는 저장 결과를 바꾸지 않음 — ratio-history.ts).
  */
 export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Promise<RecordResult<{ ratios: RatioItem[] }>> {
   try {
@@ -127,6 +129,10 @@ export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Pro
       const write = await deps.supabase.from("user_settings").upsert({ user_id: user.data, ratio_other_percent: wantedOther }, { onConflict: "user_id" }).select("user_id");
       if (write.error) return recordFail(mapRecordDbError(write.error));
     }
+
+    // 바뀐 기록(고침 9바퀴): 위 저장이 모두 성공한 뒤에만 한 줄. 직전 기록과 같은 묶음이면 안 쓴다.
+    // 실패해도 비율 저장은 이미 끝났으니 성공으로 돌려준다(로그만). 트랜잭션으로 묶지 않는다: 위 저장 자체가 여러 요청이라 이미 트랜잭션이 없다.
+    await recordRatioHistory(deps.supabase, user.data, checked.ratios);
     return { ok: true, data: { ratios: checked.ratios } };
   } catch {
     return recordFail("unavailable");

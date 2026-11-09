@@ -16,7 +16,9 @@ import { loadIntegrationEnv } from "./load-env";
  *     delete from public.focus_sessions where day < '2001-01-01';
  *     delete from public.todo_offers where day < '2001-01-01';
  *     delete from public.weekly_goals where week_start < '2001-01-01';
- *   (user_settings·category_ratios·push_subscriptions는 계정마다 시험 값이 하나씩 남는다. 시험 계정 둘의 행만 지운다.)
+ *     delete from public.category_ratio_history where user_id in ('<시험 계정 A id>', '<시험 계정 B id>');
+ *   (user_settings·category_ratios·push_subscriptions는 계정마다 시험 값이 하나씩 남는다. 시험 계정 둘의 행만 지운다.
+ *    category_ratio_history는 고침 9바퀴 표로, 시험은 ratio-history-rls.test.ts에 있다. 날짜로 가를 수 없어(서버 시각) 시험 계정 둘의 행을 지운다.)
  * - 양성 대조(A는 자기 행이 보인다)를 먼저 단언하고 그 뒤에 「B에게 안 보임·거절」을 통과로 삼는다.
  */
 

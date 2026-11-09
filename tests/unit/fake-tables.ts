@@ -381,6 +381,12 @@ export function v2Rules(): Record<string, TableRule> {
       updateColumns: ["user_id", "category_id", "percent"],
       fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
     },
+    // 마이그레이션 20261109150000_category_ratio_history.sql: 쌓기만(update·delete 권한 없음), recorded_at은 DB 기본값만
+    category_ratio_history: {
+      insertColumns: ["user_id", "ratios"],
+      defaults: (_row, store) => ({ recorded_at: store.nextTimestamp() }),
+      limit: { count: 1000, hint: "category_ratio_history_limit" },
+    },
     todos: {
       allowDelete: true,
       updateColumns: ["done", "text_encrypted", "category_id", "position"],
