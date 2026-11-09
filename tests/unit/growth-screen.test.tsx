@@ -87,11 +87,6 @@ async function mount(api: GrowthApi, props: Partial<React.ComponentProps<typeof 
   await ratioPanel();
   return { onOpenCategory, ...view };
 }
-/** 기간 칩 하나(고침9)를 열고 기간을 고른다 */
-function pickPeriod(name: string) {
-  fireEvent.click(screen.getByRole("button", { name: /^기간, / }));
-  fireEvent.click(screen.getByRole("menuitemradio", { name }));
-}
 
 beforeEach(() => {
   recordViewAction.mockReset();
