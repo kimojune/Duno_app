@@ -142,11 +142,14 @@ function BandView(props: StatusViewProps) {
   );
 }
 
+/** 기록 없음(이 기간 0시간) 보기들이 받는 값 */
+export type EmptyViewProps = { chart: StatusChart; text: GrowthViewText; periodName: string; zeroText: string };
+
 /**
  * 기록 없음 빈 상태(창구 덧붙임 11-09 11:3x, Figma 50:598): 글 대신 예시 값 — 목표 비율 띠 한 줄(점선 윤곽, 칸에 %) + 기간 빈 띠 「0시간」.
  * 목표 비율이 없으면 그리지 않는다(화면은 단추만 둔다). 그림이라 글로 읽지 않는다(숨은 요약이 준다)
  */
-export function EmptyBands({ chart, text, periodName, zeroText }: { chart: StatusChart; text: GrowthViewText; periodName: string; zeroText: string }) {
+export function EmptyBands({ chart, text, periodName, zeroText }: EmptyViewProps) {
   if (chart.ratioEmpty) return null;
   return (
     <div className="growth-graph" aria-hidden="true">
@@ -205,6 +208,36 @@ function Pie({ chart, line, empty, caption, text }: { chart: StatusChart; line: 
   );
 }
 
+/**
+ * 빈 고리 색(고침7 ③): 새 토큰 없이 있는 토큰에서 고른다. 명세의 「--color-border」는 이 앱에 없어 입력 칸 테두리 회색
+ * --color-border-input(흰 바탕 3.80:1, 그림 경계 3:1 넘음 — WCAG 1.4.11)을 쓴다
+ */
+export const EMPTY_RING = "var(--color-border-input)";
+
+/**
+ * 기록 없음 빈 상태의 원그래프(고침7 ③, PM 15:1x): 왼쪽 「목표 비율」 원은 데이터 있는 판과 같고, 오른쪽 기간 원 = 회색 빈 고리 1px + 가운데 「0시간」.
+ * 목표 비율이 없으면 그리지 않는다(띠와 같은 규칙). 그림이라 글로 읽지 않는다(숨은 요약이 준다)
+ */
+export function EmptyPies({ chart, text, periodName, zeroText }: EmptyViewProps) {
+  if (chart.ratioEmpty) return null;
+  return (
+    <div className="growth-graph" aria-hidden="true">
+      <div className="growth-pies">
+        <Pie chart={chart} line={chart.ratio} empty={false} caption={text.ratioLine} text={text} />
+        <div className="growth-pie-box">
+          <span className="growth-line-caption">{periodName}</span>
+          <svg className="growth-pie" viewBox={`${-PIE_BOX} ${-PIE_BOX} ${2 * PIE_BOX} ${2 * PIE_BOX}`} focusable="false" data-line="spent">
+            <circle r={PIE_RADIUS} className="growth-pie-ring" fill="none" stroke={EMPTY_RING} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <text x={0} y={0} textAnchor="middle" dominantBaseline="central" className="growth-pie-text growth-pie-zero">
+              {zeroText}
+            </text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 원그래프: 원 둘 나란히(왼쪽 「목표 비율」 · 오른쪽 기간), 같은 크기, 조각마다 실선 1px 윤곽(점선 없음), 조각마다 %. 튀어나옴 없음 */
 function PieView(props: StatusViewProps) {
   const { chart, text, periodName } = props;
@@ -226,12 +259,14 @@ export type StatusViewEntry = {
   /** 지금 이 보기일 때 다른 보기로 바꾸는 글 단추의 글 열쇠(D-049, 칩 아님) */
   switchLabel: "toPie" | "toBand";
   Component: ComponentType<StatusViewProps>;
+  /** 이 기간에 기록이 없을 때(0시간) 같은 보기의 빈 상태(고침7: 빈 상태에서도 보기 바꾸기 단추가 있다) */
+  Empty: ComponentType<EmptyViewProps>;
 };
 
 /** 목표 비율 뷰의 보기 방식 목록(첫 줄이 처음 보기 = 띠그래프, PM d-102). 글 단추가 다음 보기로 돌린다 */
 export const STATUS_VIEWS: StatusViewEntry[] = [
-  { id: "band", switchLabel: "toPie", Component: BandView },
-  { id: "pie", switchLabel: "toBand", Component: PieView },
+  { id: "band", switchLabel: "toPie", Component: BandView, Empty: EmptyBands },
+  { id: "pie", switchLabel: "toBand", Component: PieView, Empty: EmptyPies },
 ];
 
 // ── 이번 주 목표 뷰 ─────────────────────────────────────────────────────────

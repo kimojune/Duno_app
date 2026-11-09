@@ -5,6 +5,7 @@ import { minutesOf } from "../lib/growth/logic";
 import { buildGoalChart, buildStatusChart, fillTimeFor, type ChartCategoryId, type GoalChart, type StatusChart } from "../lib/growth/status-chart";
 import {
   DEFAULT_STATUS_PREF,
+  initialStatusPeriod,
   initialStatusTab,
   parseStatusPref,
   STATUS_PERIODS,
@@ -19,7 +20,7 @@ import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import type { ViewEntry } from "../lib/views/core-types";
 import { EVENING_TEXT } from "./evening-record";
 import { GOAL_TEXT } from "./goal";
-import { EmptyBands, GoalBars, GoalExample, ratioOf, STATUS_VIEWS } from "./growth-views";
+import { GoalBars, GoalExample, ratioOf, STATUS_VIEWS } from "./growth-views";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -29,6 +30,7 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  *   처음 탭은 이번 주 목표를 세운 주 → 이번 주 목표, 세우지 않은 주 → 목표 비율. 고른 탭은 그 주 동안 이 기기·이 사용자에 기억한다(api.viewPref).
  * - 이번 주 목표 뷰: 흰 카드 「목표 15시간 중 12시간」(lib/goals goalProgress) + 분야별 막대. 칩 없음, 기간은 이번 주만. 목표가 없는 주는 카드 안에 예시 → 보조 줄 → 「이번 주 목표 정하기」(고침6).
  * - 목표 비율 뷰: 흰 카드 합계 · 기간 칩(이번 주 / 총 시간 / 비교) · 글 단추 하나로 띠그래프 ↔ 원그래프(D-049). 「비교」는 D-093의 옛 보기(결정 대기).
+ *   빈 상태(고침7, PM 15:1x)도 같은 머리(합계 · 칩 · 글 단추)를 둔다. 이번 주 0시간이고 쌓인 시간이 있으면 「총 시간」으로 시작해 머리 아래 「이번 주 0시간」.
  * - 「채울 시간」 카드·놓친 분야 문장·「쌓인 것」·살구 강조는 없다(PM 8). 재촉·평가·경고 색 없이 숫자로(D-141).
  * - 카드 앞에 숨은 요약 한 줄(화면 읽기, INF-05). 분야 줄을 누르면 그 분야의 페이지로 간다(G13-a).
  * - 화면이 그려지면 본 것을 한 번 남긴다(입구별: 탭으로 연 것 self, 오늘 기록 저장 직후의 한 줄 after_save, G8).
@@ -69,6 +71,7 @@ export const GROWTH_TEXT = {
   goalSetHint: "분야마다 시간 · 1시간 단위", // 목표 없는 주 카드: 예시 막대 아래 · 단추 바로 위(고침6 ②)
   example: "예시",
   zero: "0시간",
+  weekZero: "이번 주 0시간", // 목표 비율 뷰가 이번 주 0시간이라 「총 시간」으로 견줄 때 머리 아래 한 줄(고침7 ①)
   // 화면 읽기 요약(카드 앞 숨은 글 하나, 순서는 화면 줄 순서와 같다)
   goalSummaryHead: (target: number, done: number) => `이번 주 목표 ${goalHours(target)} 중 ${goalHours(done)}.`,
   goalSummaryRow: (name: string, spent: number, goal: number | null, remaining: number, other: boolean) =>
@@ -80,6 +83,7 @@ export const GROWTH_TEXT = {
           ? `${name} ${formatMinutes(spent)}, 목표 ${formatMinutes(goal)}, ${formatMinutes(remaining)} 더.`
           : `${name} ${formatMinutes(spent)}, 목표 ${formatMinutes(goal)}.`,
   ratioSummaryHead: (period: string, total: number) => `목표 비율과 견준 ${period}. ${goalHours(total)}.`,
+  ratioSummaryWeekZero: "이번 주 0시간.",
   ratioSummaryRow: (name: string, spent: number, ratio: number | null) => (ratio === null ? `${name} ${spent}%.` : `${name} ${spent}%, 목표 ${ratio}%.`),
   // 비교(D-093의 옛 보기, 결정 대기 — 꼴은 그대로, 「쌓인 것」은 기간 이름 「총 시간」으로)
   thisWeek: "이번 주",
@@ -315,10 +319,14 @@ export function goalSummary(chart: GoalChart, nameOf: (id: ChartCategoryId) => s
   ].join(" ");
 }
 
-/** 목표 비율 뷰의 화면 읽기 요약(줄 순서 = 화면 줄 순서) */
-export function ratioSummary(chart: StatusChart, periodName: string, nameOf: (id: ChartCategoryId) => string): string {
+/**
+ * 목표 비율 뷰의 화면 읽기 요약(줄 순서 = 화면 줄 순서)
+ * @param weekZero 이번 주 0시간이라 「총 시간」으로 견주는가(머리 아래 「이번 주 0시간」 줄과 같이 읽는다)
+ */
+export function ratioSummary(chart: StatusChart, periodName: string, nameOf: (id: ChartCategoryId) => string, weekZero = false): string {
   return [
     GROWTH_TEXT.ratioSummaryHead(periodName, chart.spentTotalMinutes),
+    ...(weekZero ? [GROWTH_TEXT.ratioSummaryWeekZero] : []),
     ...chart.rows.map((r) => GROWTH_TEXT.ratioSummaryRow(nameOf(r.categoryId), r.spentPercent, ratioOf(chart, r.categoryId))),
   ].join(" ");
 }
@@ -380,7 +388,13 @@ function GoalPanel({
   );
 }
 
-/** 목표 비율 뷰: 카드 머리(합계 · 기간 칩 · 보기 바꾸기 글 단추) + 띠/원 + 목록. 「비교」는 옛 보기 */
+/**
+ * 목표 비율 뷰: 카드 머리(합계 · 기간 칩 · 보기 바꾸기 글 단추) + 띠/원 + 목록. 「비교」는 옛 보기.
+ * 빈 상태는 셋(고침7, PM 15:1x · 23 S6 빈 상태):
+ * 1) 이번 주 0시간 + 쌓인 시간 있음 → 「총 시간」으로 시작(칩에서 이번 주를 고르지 않았다면), 머리 아래 「이번 주 0시간」, 카드 끝 「오늘 기록」
+ * 2) 고른 기간에 기록 0 → 같은 머리(「0시간」 · 칩 셋 · 글 단추) + 예시 값(목표 비율 띠 + 빈 띠 「0시간」) + 안내 글 + 「오늘 기록」
+ * 3) 2)에서 원그래프 → 왼쪽 목표 비율 원 + 오른쪽 회색 빈 고리 「0시간」. 1)의 원그래프는 오른쪽이 「총 시간」 원
+ */
 function RatioPanel({
   data,
   pref,
@@ -394,24 +408,32 @@ function RatioPanel({
   onOpenCategory: (id: string | null, name: string) => void;
   onOpenEvening?: () => void;
 }) {
-  const period = pref.period;
+  const categoryIds = data.categories.map((c) => c.id);
+  // 두 기간의 그림 값(지금 앱의 이번 주 · 총 시간 계산 그대로). 처음 기간은 두 합계로 정한다
+  const weekChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.thisWeek });
+  const totalChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.cumulative });
+  const period = initialStatusPeriod(pref, data.weekStart, { week: weekChart.spentTotalMinutes, total: totalChart.spentTotalMinutes });
   const compare = period === "compare";
   const week = period === "week";
-  const categoryIds = data.categories.map((c) => c.id);
-  const chart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: week ? data.thisWeek : data.cumulative });
+  const chart = week ? weekChart : totalChart;
   const viewIndex = Math.max(0, STATUS_VIEWS.findIndex((v) => v.id === pref.view));
   const view = STATUS_VIEWS[viewIndex];
   const nextView = STATUS_VIEWS[(viewIndex + 1) % STATUS_VIEWS.length];
   const nameOf = (id: ChartCategoryId) => nameFor(data, id);
   const periodName = GROWTH_TEXT[PERIOD_LABEL[period]];
   const View = view.Component;
-  // 기록 없음(이 기간에 쓴 시간 0): 글 대신 예시 값 — 목표 비율 띠 + 빈 띠 「0시간」 + 「오늘 기록」 단추. 목표 비율이 없으면 띠 없이 단추만(창구 덧붙임 11-09 11:3x)
+  const Empty = view.Empty;
+  // 기록 없음(이 기간에 쓴 시간 0): 글 대신 예시 값 — 목표 비율 띠/원 + 빈 띠/빈 고리 「0시간」 + 「오늘 기록」 단추. 목표 비율이 없으면 그림 없이 단추만(창구 덧붙임 11-09 11:3x)
   const empty = !compare && chart.spentTotalMinutes === 0;
+  // 이번 주는 비었는데 쌓인 시간으로 견주는 중(경우 1): 머리 아래 「이번 주 0시간」, 카드 끝 「오늘 기록」
+  const weekZero = period === "total" && !empty && weekChart.spentTotalMinutes === 0;
+  // 보기 바꾸기 단추는 빈 상태에도 같은 자리에. 다만 그릴 그림이 없으면(목표 비율도 기록도 없음) 바꿀 것이 없어 두지 않는다
+  const canSwitch = !compare && !(empty && chart.ratioEmpty);
   return (
     <>
       <h2 className="growth-sub-title growth-period-title">{compare ? GROWTH_TEXT.compareHeading : week ? GROWTH_TEXT.weekHeading : GROWTH_TEXT.totalHeading}</h2>
       <p className="todo-sub growth-days">{GROWTH_TEXT.days(week ? data.loggedDaysThisWeek : data.loggedDaysTotal)}</p>
-      {!compare && <p className="sr-only">{ratioSummary(chart, periodName, nameOf)}</p>}
+      {!compare && <p className="sr-only">{ratioSummary(chart, periodName, nameOf, weekZero)}</p>}
       <div className="growth-card">
         <div className="growth-card-head">
           {!compare && (
@@ -421,26 +443,32 @@ function RatioPanel({
           )}
           <div className="growth-periods" role="group" aria-label={GROWTH_TEXT.periodGroup}>
             {STATUS_PERIODS.map((p) => (
-              <button key={p} type="button" className="growth-period" aria-pressed={period === p} onClick={() => choose({ ...pref, period: p })}>
+              <button key={p} type="button" className="growth-period" aria-pressed={period === p} onClick={() => choose({ ...pref, period: p, periodWeek: data.weekStart })}>
                 <span className="growth-period-face">{GROWTH_TEXT[PERIOD_LABEL[p]]}</span>
               </button>
             ))}
           </div>
         </div>
-        {!compare && !empty && (
+        {canSwitch && (
           <div className="growth-switch">
             <TextButton onClick={() => choose({ ...pref, view: nextView.id })}>{GROWTH_TEXT[view.switchLabel]}</TextButton>
           </div>
         )}
+        {weekZero && (
+          <p className="growth-week-zero" aria-hidden="true">
+            {GROWTH_TEXT.weekZero}
+          </p>
+        )}
         {compare ? (
           <CompareView data={data} onOpenCategory={onOpenCategory} />
         ) : empty ? (
-          <EmptyBands chart={chart} text={GROWTH_TEXT} periodName={periodName} zeroText={GROWTH_TEXT.zero} />
+          <Empty chart={chart} text={GROWTH_TEXT} periodName={periodName} zeroText={GROWTH_TEXT.zero} />
         ) : (
           <View chart={chart} text={GROWTH_TEXT} periodName={periodName} nameOf={nameOf} onOpenCategory={onOpenCategory} />
         )}
+        {weekZero && <EveningButton onOpenEvening={onOpenEvening} />}
       </div>
-      {!compare && chart.spentTotalMinutes === 0 && (
+      {empty && (
         <>
           <p className="todo-sub growth-empty">{week ? GROWTH_TEXT.empty : GROWTH_TEXT.emptyTotal}</p>
           <EveningButton onOpenEvening={onOpenEvening} />

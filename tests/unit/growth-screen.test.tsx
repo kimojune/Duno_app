@@ -128,10 +128,14 @@ describe("상태보기 (7-4, ③)", () => {
     expect(items.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 없음", "목표 2시간", "목표 없음"]);
   });
 
-  it("이번 주 기록이 없으면 안내 글(「오늘 기록」으로)과 목표 비율 띠 + 빈 띠 「0시간」", async () => {
-    await mount(fakeApi(growth({ thisWeek: [], loggedDaysThisWeek: 0 })));
+  it("기록이 하나도 없으면 안내 글(「오늘 기록」으로)과 목표 비율 띠 + 빈 띠 「0시간」, 머리는 「0시간」 · 칩 셋 · 「원그래프로 보기」(고침7 ②)", async () => {
+    // 고침7: 쌓인 시간이 있으면 「총 시간」으로 시작하므로(경우 1, growth-views 시험) 여기는 쌓인 시간도 0인 사람(경우 2)
+    await mount(fakeApi(growth({ thisWeek: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0 })));
     expect(screen.getByText("아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.")).toBeTruthy();
     expect(document.querySelector(".growth-band.is-empty")?.textContent).toBe("0시간");
+    expect(document.querySelector(".growth-card-total")?.textContent).toBe("0시간");
+    expect(within(screen.getByRole("group", { name: "기간" })).getAllByRole("button").map((b) => b.textContent)).toEqual(["이번 주", "총 시간", "비교"]);
+    expect(screen.getByRole("button", { name: "원그래프로 보기" })).toBeTruthy();
     expect(Array.from(document.querySelectorAll(".growth-band-cell")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
     expect(document.body.textContent).not.toContain("채울");
   });
