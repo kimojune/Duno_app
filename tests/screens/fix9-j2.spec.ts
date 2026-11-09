@@ -312,7 +312,7 @@ test("S2-d 이번 주 목표 시트(50:332): 「1시간 단위 · 0시간은 목
   await photo(page, "S2-d-이번주목표시트(50-332)");
 });
 
-test("S4 타이머 · 고르기(50:390): 이름표 「분야」 + 맨 앞 「기타」 골라짐, 「오늘 시작한 타이머 0개」", async ({ page }) => {
+test("S4 타이머 · 고르기(50:390): 이름표 「분야」 + 맨 앞 「기타」 골라짐, 「오늘 시작한 타이머」 없음 · 둥근 단추 24", async ({ page }) => {
   await open(page, "/dev/v2?s=timer-many");
   await expect(page.locator("#timer-category-label")).toHaveText("분야");
   await expect(page.getByText(/고르지 않으면 기타/)).toHaveCount(0);
@@ -325,15 +325,25 @@ test("S4 타이머 · 고르기(50:390): 이름표 「분야」 + 맨 앞 「기
   await expect(chips.first()).toHaveAttribute("aria-pressed", "false");
   await chips.nth(1).click();
   await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
-  const records = page.locator(".timer-records");
-  await expect(records.getByRole("heading", { name: "오늘 시작한 타이머" })).toBeVisible();
-  await expect(records.locator("p.todo-sub")).toHaveText("0개");
-  const sameLine = await records.evaluate((el) => {
-    const h = el.querySelector("h2")!.getBoundingClientRect();
-    const p = el.querySelector("p")!.getBoundingClientRect();
-    return Math.abs(h.top + h.height / 2 - (p.top + p.height / 2)) < 10 && p.left > h.right;
+  // 고침10 G(d-172): 「오늘 시작한 타이머」 제목·「0개」·목록이 없다. 머리는 워드마크
+  await expect(page.getByText("오늘 시작한 타이머")).toHaveCount(0);
+  await expect(page.getByText("0개")).toHaveCount(0);
+  await expect(page.locator(".timer-records")).toHaveCount(0);
+  await expect(page.locator("#timer-title")).toHaveClass(/sr-only/);
+  await expect(page.locator(".timer .wordmark")).toBeVisible();
+  // 할 일 고르기 둥근 단추: 지름 24, 고른 것은 먹남색 채움, 안 고른 것은 흰 바탕 빈 원
+  const radios = page.locator(".timer-option input");
+  expect(await radios.count()).toBeGreaterThan(0);
+  const first = radios.first();
+  const box = await first.boundingBox();
+  expect(Math.round(box!.width)).toBe(24);
+  expect(Math.round(box!.height)).toBe(24);
+  const style = await first.evaluate((el) => {
+    const c = getComputedStyle(el);
+    return { appearance: c.appearance, radius: c.borderRadius, shadow: c.boxShadow };
   });
-  expect(sameLine, "「0개」는 제목 옆 한 줄").toBe(true);
+  expect(style.appearance).toBe("none");
+  expect(style.radius).toBe("50%");
   await noOverflow(page);
   await photo(page, "S4-타이머-고르기(50-390)");
 });
