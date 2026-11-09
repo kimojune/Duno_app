@@ -149,6 +149,7 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     await expect(group.getByRole("button", { name: cat1 })).toHaveAttribute("aria-pressed", "true"); // 시나리오 기대(앱 C7은 적은 뒤 고름을 푼다)
   });
   await step(S, "③ 칩 없이 「빨래」 → 기타", "8-2 AC1", async () => {
+    if (!(await input.isVisible())) await page.getByRole("button", { name: "할 일 적기" }).click(); // 앞 단계 실패로 창이 닫혔으면 다시 연다
     await input.fill(T2);
     await page.getByRole("button", { name: "적기", exact: true }).click();
     await input.fill(T3);
