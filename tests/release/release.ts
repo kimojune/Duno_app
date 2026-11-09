@@ -53,6 +53,11 @@ export function logStep(row: StepRow) {
 
 export type Session = { context: BrowserContext; page: Page; client: SupabaseClient; userId: string };
 
+/** 로그아웃 시험처럼 A의 세션이 서버에서 끝난 뒤에는 캐시한 쿠키가 쓸모없다 — 다음 openA가 다시 로그인하게 비운다 */
+export function forgetSession() {
+  cached = null;
+}
+
 let cached: { cookies: Awaited<ReturnType<typeof sessionCookies>>; client: SupabaseClient; userId: string } | null = null;
 
 /** A로 로그인한 360×800 창. fake가 있으면 GET /mirror 응답의 data를 그 함수로 바꾼다 */

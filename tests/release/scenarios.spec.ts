@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { MirrorSnapshot } from "../../lib/local/types";
+import { todoDayFor } from "../../lib/todos/day";
 import { ids, logStep, openA, openHome, pickSplitChip, pressedSplitChips, removeGoal, removeTodos, tab, type Session } from "./release";
 
 /**
@@ -21,7 +22,7 @@ async function step(scenario: string, label: string, ac: string, body: () => Pro
     await body();
     logStep({ scenario, step: label, ac, pass: true });
   } catch (e) {
-    const note = String((e as Error).message).split("\n").filter(Boolean).slice(0, 2).join(" ").slice(0, 220);
+    const note = String((e as Error).message).split("\n").filter(Boolean).slice(0, 14).join(" ").slice(0, 900);
     logStep({ scenario, step: label, ac, pass: false, note });
     fails.push(`${scenario} ${label}`);
     // 다음 단계가 앞 단계의 남은 창에 막히지 않게 같은 창을 다시 연다(기기 저장소·보낼 줄은 그대로)
@@ -119,7 +120,7 @@ test("S-01 첫날 ②~⑤(가짜 응답: 처음 설정 전)", async ({ browser }
   });
   await step(S, "⑤ 상태보기 맨 위에 목표 한 줄", "8-1 AC6", async () => {
     await tab(page, "상태보기");
-    await expect(page.getByText("글 한 편 끝내고 토익 800점 넘기기")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".growth-goal-line")).toContainText("글 한 편 끝내고 토익 800점 넘기기", { timeout: 20_000 }); // getByText는 내 정보 탭의 같은 글까지 잡는다
   });
   finish();
 });
@@ -164,8 +165,8 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     await expect(page.getByRole("dialog").getByRole("button", { name: /타이머/ })).toHaveCount(0); // 할 일 페이지에 타이머 단추 없음
     const note = page.getByRole("textbox", { name: /작업 기록/ });
     await note.fill("Day 12까지");
-    await note.press("Enter");
-    await expect(page.getByText("Day 12까지")).toBeVisible();
+    await page.getByRole("button", { name: "남기기", exact: true }).click(); // 작업 기록 칸은 여러 줄이라 Enter는 줄바꿈이다 — 「남기기」 단추(147:58)
+    await expect(page.locator("li.note-item", { hasText: "Day 12까지" })).toBeVisible();
     await page.getByRole("dialog", { name: "할 일 자세히" }).getByRole("button", { name: "이전" }).click(); // 고침10 A: 왼쪽 위 「‹」
     await expect(page.locator("li.todo-row", { hasText: T1 }).getByRole("img", { name: "작업 기록 있음" })).toBeVisible();
   });
@@ -208,8 +209,23 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
 // ---------------------------------------------------------------- S-03 · S-04
 test("S-03 저녁 — 오늘 기록부터 상태보기까지(이번 주 목표 있음)", async ({ browser }) => {
   const S = "S-03";
-  await reopen(browser);
-  await home();
+  // 준비 (C): 오늘 타이머 첫 분야 30분. 실제 타이머를 30분 돌릴 수 없어 GET /mirror 가짜 응답에 끝난 세션 하나를 더한다(쓰기 길은 그대로).
+  // home()은 가짜 응답(route)을 지우므로 쓰지 않는다
+  await reopen(browser, (snap) => {
+    const first = snap.categories?.find((c) => c.readable) ?? snap.categories?.[0];
+    if (!first) return snap;
+    const now = new Date(snap.serverNow);
+    return {
+      ...snap,
+      // 오늘 이미 남긴 기록이 있으면 시간 단계의 「타이머 n」 띠가 없다(state.existing) — 이전 실행이 쌓은 오늘 기록은 가짜 응답에서 뺀다
+      logs: (snap.logs ?? []).filter((l) => l.targetDay !== todoDayFor(now)),
+      sessions: [
+        ...(snap.sessions ?? []),
+        { id: "00000000-0000-4000-8000-0000000000a3", startedAt: new Date(now.getTime() - 31 * 60_000).toISOString(), day: todoDayFor(now), plannedMinutes: 30, endedAt: snap.serverNow, elapsedSeconds: 1800, todoId: null, categoryId: first.id, offerId: null, surface: "timer_tab", oppositeByGoal: null, oppositeByRatio: null },
+      ],
+    };
+  });
+  await openHome(s);
   // 준비: 이번 주 목표(첫 분야 5시간), 할 일 하나 끝냄
   const goalOpen = page.getByRole("button", { name: /^이번 주 목표/ }).first();
   await goalOpen.click();
@@ -218,7 +234,14 @@ test("S-03 저녁 — 오늘 기록부터 상태보기까지(이번 주 목표 �
   for (let i = 0; i < 5; i++) await gPlus.first().click();
   await g.getByRole("button", { name: "저장" }).click();
   await expect(g).toBeHidden({ timeout: 20_000 });
-  await page.getByRole("checkbox", { name: T2 }).check().catch(() => undefined);
+  // 준비 (C): 오늘 할 일 둘 — 하나는 끝냄, 하나는 남김(② 시트에서 하나 더 체크). S-02가 돌지 않아도 이 시나리오 혼자 선다
+  for (const t of ["저녁 시트 줄 하나", "저녁 시트 줄 둘"]) {
+    await page.getByRole("button", { name: "할 일 적기" }).click();
+    await page.getByRole("textbox", { name: "할 일 적기" }).fill(t);
+    await page.getByRole("button", { name: "적기", exact: true }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click();
+  }
+  await page.getByRole("checkbox", { name: "저녁 시트 줄 하나" }).check({ force: true }); // 저장 대기 줄은 aria-disabled라 force
   const dialog = page.getByRole("dialog", { name: "오늘 기록" });
   await step(S, "① 「오늘 기록」 → 시간 단계(49:5) · 휠 2시간 30분 · 「타이머 n」 띠", "8-3 AC1", async () => {
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
@@ -244,6 +267,9 @@ test("S-03 저녁 — 오늘 기록부터 상태보기까지(이번 주 목표 �
   await step(S, "③④ 「분야마다 나누기」(87:2) · 처음 값 = 타이머·끝낸 할 일 분야 칩 켜짐 + 기타", "8-3 AC3 · AC9", async () => {
     await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
     await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
+    // 시험 계정 A는 분야가 많아 칩이 「+n」 뒤에 접혀 있다 — 펼친 뒤에 켜진 칩을 센다
+    const more = dialog.getByRole("group", { name: "분야 · 여러 개" }).getByRole("button", { name: /^분야 \d+개 더 보기$/ });
+    if (await more.isVisible()) await more.click();
     expect(await pressedSplitChips(dialog).count()).toBeGreaterThanOrEqual(1);
     await expect(dialog.getByText("기타", { exact: true }).first()).toBeVisible();
   });
@@ -263,7 +289,7 @@ test("S-03 저녁 — 오늘 기록부터 상태보기까지(이번 주 목표 �
     await dialog.getByRole("button", { name: /상태보기에서 보기/ }).click();
     await expect(page.getByRole("tab", { name: "이번 주 목표" })).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
     await page.getByRole("tab", { name: "목표 비율" }).click();
-    const names = await page.locator(".growth-item .growth-name, .growth-item > button").allTextContents();
+    const names = await page.locator(".growth-item > button").allTextContents(); // 줄마다 한 번만 센다(이름 칸과 단추를 같이 고르면 두 번 세어진다)
     expect(names.length).toBeGreaterThan(0);
     expect(names.findIndex((n) => n.includes("기타"))).toBe(names.length - 1);
   });
@@ -313,8 +339,11 @@ test("S-04 실수 — 나누다 닫기 · 합 넘침 · 나누지 않고 저장"
     await expect(dialog.getByRole("button", { name: /^기타 .*(늘리기|줄이기)$/ })).toHaveCount(0);
   });
   await step(S, "⑥ 시간 단계에서 「나누지 않고 저장」 → 저장", "8-3 AC5", async () => {
-    await dialog.press("Escape");
-    if (await confirm.isVisible()) await confirm.getByRole("button", { name: "나가기" }).click();
+    // ⑤가 실패해 창이 이미 닫혔을 수 있다(step이 실패 때 화면을 다시 연다): 창이 열려 있을 때만 닫고 다시 들어간다
+    if (await dialog.isVisible()) {
+      await dialog.press("Escape");
+      if (await confirm.isVisible()) await confirm.getByRole("button", { name: "나가기" }).click();
+    }
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 20_000 });
@@ -381,16 +410,16 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
     await page.getByRole("tab", { name: "목표 비율" }).click();
   };
   await reopen(browser, (snap) => ({ ...snap, logs: [], sessions: [], goal: null }));
-  await home();
+  await openHome(s); // home()은 가짜 응답(route)을 지우므로 쓰지 않는다
   await step(S, "(가) 기록 없음(가짜 응답): 기간 칩 · 「원그래프로 보기」가 같은 자리(50:598)", "8-4 AC6", async () => {
     await growth();
     await expect(page.getByRole("button", { name: /^기간, / })).toBeVisible();
     await expect(page.getByRole("button", { name: "원그래프로 보기" })).toBeVisible();
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
-    await expect(page.getByText("0시간").first()).toBeVisible(); // 121:240 빈 고리 가운데
+    await expect(page.getByText("0시간").locator("visible=true").first()).toBeVisible(); // 121:240 빈 고리 가운데(화면 읽기 전용 글은 눈에 안 보이니 뺀다)
   });
   await reopen(browser, (snap) => ({ ...snap, logs: (snap.logs ?? []).filter((l) => l.targetDay < weekStartOf(snap)), sessions: [], goal: null }));
-  await home();
+  await openHome(s); // home()은 가짜 응답(route)을 지우므로 쓰지 않는다
   await step(S, "(나) 이번 주 0시간 + 지난 기록(가짜 응답): 「총 시간」으로 시작 · 「이번 주 0시간」 · 「오늘 기록」(111:79)", "8-4 AC6", async () => {
     await growth();
     await expect(page.getByRole("button", { name: /^기간, 총 시간/ })).toBeVisible();
@@ -458,7 +487,7 @@ test("S-07 내 정보 — 목표·목표 비율 고치기 · 알림", async ({ b
     await g.getByRole("button", { name: "저장" }).click();
     await expect(g).toBeHidden({ timeout: 20_000 });
     await tab(page, "상태보기");
-    await expect(page.getByText(newGoal)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".growth-goal-line")).toContainText(newGoal, { timeout: 20_000 }); // getByText는 내 정보 탭의 같은 글(me-goal-text)까지 잡아 strict 오류가 난다
     await tab(page, "내 정보");
   });
   await step(S, "② 목표 비율 › → 「균등 배분」 → 「‹」 → 「나가기」(121:389) → 값 그대로", "8-1 AC7", async () => {
@@ -518,7 +547,12 @@ test("S-08 오프라인 — 저장 대기 원", async ({ browser }) => {
     await expect(row).toBeVisible();
     await expect(row.locator(".save-pending")).toHaveCount(1);
     await expect(row.locator(".save-pending .sr-only")).toHaveText("저장 대기");
-    const visibleText = await row.evaluate((el) => (el as HTMLElement).innerText);
+    // 화면 읽기 전용(.sr-only)은 눈에 보이는 글이 아니다 — 빼고 읽는다(innerText는 1px로 잘린 sr-only 글도 돌려준다)
+    const visibleText = await row.evaluate((el) => {
+      const copy = el.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll(".sr-only").forEach((n) => n.remove());
+      return copy.textContent ?? "";
+    });
     expect(visibleText).not.toContain("저장 대기");
   });
   await step(S, "③ 연결 되살림 → 원 사라짐 · 서버에 남음", "8-2 AC6", async () => {
@@ -533,7 +567,7 @@ test("S-08 오프라인 — 저장 대기 원", async ({ browser }) => {
     await page.getByRole("button", { name: `자세히 보기: ${text}` }).click();
     const note = page.getByRole("textbox", { name: /작업 기록/ });
     await note.fill("끊긴 채 쓴 기록");
-    await note.press("Enter");
+    await page.getByRole("button", { name: "남기기", exact: true }).click(); // 작업 기록 칸은 여러 줄이라 Enter는 줄바꿈이다
     await expect(page.getByRole("button", { name: /저장 안 됨/ })).toBeVisible({ timeout: 10_000 });
   });
   finish();
