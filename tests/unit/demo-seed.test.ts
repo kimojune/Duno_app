@@ -43,7 +43,7 @@ async function seed(s = store, user = USER) {
 }
 
 describe("예시 데이터 모양", () => {
-  it("지난 3주(오늘 포함 21일) — 날짜마다 할 일 2~4개, 지난날마다 오늘 기록 하나", async () => {
+  it("지난 3주(오늘 포함 21일) — 날짜마다 할 일 2~4개, 오늘 포함 날마다 오늘 기록 하나", async () => {
     const counts = await seed();
     const todos = store.table("todos");
     expect(todos.length).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ describe("예시 데이터 모양", () => {
     expect(todos.some((t) => t.day === TODAY && t.done === false)).toBe(true);
 
     const logs = store.table("evening_logs");
-    expect(logs.map((l) => l.target_day).sort()).toEqual(days.filter((d) => d !== TODAY));
+    expect(logs.map((l) => l.target_day).sort()).toEqual(days); // 오늘 줄 포함(PM 13)
     expect(counts).toMatchObject({ categories: 4, todos: todos.length, eveningLogs: logs.length, ratios: 4, ratioHistory: 1, weeklyGoals: 1, settings: 1 });
   });
 
@@ -90,6 +90,18 @@ describe("예시 데이터 모양", () => {
       expect(log.save_mode).toBe("edited");
     }
     expect(sawOther).toBe(true);
+  });
+
+  it("PM 13: 오늘 날짜 기록이 한 줄 든다 — 두 번 돌려도 1개, 다른 사용자 것과 섞이지 않는다", async () => {
+    await seed();
+    await seed();
+    const mine = store.table("evening_logs").filter((l) => l.target_day === TODAY && l.user_id === USER);
+    expect(mine.length).toBe(1);
+    expect(mine[0].id).toBe(demoUuid(USER, "evening", TODAY));
+    expect(mine[0].save_mode).toBe("edited");
+    await seed(store, OTHER);
+    expect(store.table("evening_logs").filter((l) => l.target_day === TODAY).length).toBe(2);
+    expect(store.table("evening_logs").filter((l) => l.target_day === TODAY && l.user_id === USER).length).toBe(1);
   });
 
   it("목표 비율: 분야 몫 + 기타 몫 = 100, 비율 기록 한 줄도 합 100(기타 포함)", async () => {
@@ -199,7 +211,7 @@ describe("다시 넣어도 중복 없음", () => {
     const retry = await seed();
     expect(retry.todos).toBe(0); // 이미 들어간 할 일은 건너뜀
     expect(store.table("todos").length).toBe(todosAfterFail);
-    expect(retry.eveningLogs).toBe(DEMO_SPAN_DAYS);
+    expect(retry.eveningLogs).toBe(DEMO_SPAN_DAYS + 1); // 오늘 줄 포함(PM 13)
     expect(store.table("user_settings")[0].onboarding_done_at).toBe(fixedNow().toISOString());
   });
 

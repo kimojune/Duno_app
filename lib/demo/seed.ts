@@ -135,8 +135,8 @@ export function buildDemoPlan(userId: string, today: string): DemoPlan {
       });
     }
 
-    // 오늘 기록: 지난날마다 하나(오늘은 아직 저녁 전이라 없음). 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
-    if (!isToday) {
+    // 오늘 기록: 날마다 하나(오늘 포함, PM 13 — 시연 화면이 「이미 남긴 기록」 상태로도 열리게). 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
+    {
       const parts = 2 + pick(`parts|${day}`, 2);
       const first = pick(`first|${day}`, DEMO_CATEGORIES.length);
       const items: { categoryIndex: number | null; minutes: number }[] = [];
