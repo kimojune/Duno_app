@@ -483,10 +483,27 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
-    const 어학 = () => Number((screen.getByRole("spinbutton", { name: "어학" }) as HTMLInputElement).value);
-    expect(어학()).toBeGreaterThan(0);
-    expect(어학()).toBeLessThanOrEqual(60);
-    expect(Number((screen.getByRole("spinbutton", { name: "포트폴리오" }) as HTMLInputElement).value)).toBe(0);
+    // 오늘 기록 나누기(E1) 규칙: 체크한 할 일의 분야 = 기타에서 30분. 60분에서 어학 30분, 남은 기타 30분(합 60)
+    const stepperValue = (name: string) => Number((screen.getByRole("spinbutton", { name }) as HTMLInputElement).value);
+    const otherValue = () => document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent;
+    expect(stepperValue("어학")).toBe(30);
+    expect(screen.queryByRole("spinbutton", { name: "포트폴리오" }), "고르지 않은 분야는 줄이 없다(E1: 칩으로 고른 분야만 다이얼·줄에)").toBeNull();
+    expect(otherValue()).toBe("30분");
+    expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: /^포트폴리오, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("오늘 기록에 이어진다: 기타가 30분보다 적으면 남은 만큼만 들어간다(쓴 시간 15분 → 어학 15분, 기타 0분)", async () => {
+    const local = await makeLocal();
+    await mountEvening({ local });
+    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("분"), { target: { value: "15" } });
+    await openSheet();
+    await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    expect(Number((screen.getByRole("spinbutton", { name: "어학" }) as HTMLInputElement).value)).toBe(15);
+    expect(document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent).toBe("0분");
   });
 
   it("체크하지 않으면 그 분야는 나누기 처음 값에 없다(위 시험의 대조)", async () => {
@@ -494,7 +511,23 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
     await mountEvening({ local });
     fireEvent.change(screen.getByLabelText("시간"), { target: { value: "1" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
-    expect(Number((screen.getByRole("spinbutton", { name: "어학" }) as HTMLInputElement).value)).toBe(0);
+    expect(screen.queryByRole("spinbutton", { name: "어학" }), "체크하지 않으면 줄이 없다").toBeNull();
+    expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent).toBe("1시간");
+  });
+
+  it("체크했다가 되돌리면 나누기 처음 값에서 빠진다(기타가 1시간 그대로)", async () => {
+    const local = await makeLocal();
+    await mountEvening({ local });
+    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "1" } });
+    await openSheet();
+    await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
+    await act(async () => fireEvent.click(sheetCheck("단어 외우기"))); // 되돌림
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
+    expect(screen.queryByRole("spinbutton", { name: "어학" })).toBeNull();
+    expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(document.querySelector('.ratio-list [data-row-key="other"] .ratio-value')!.textContent).toBe("1시간");
   });
 });
 
