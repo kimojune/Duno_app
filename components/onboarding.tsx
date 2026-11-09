@@ -8,6 +8,7 @@ import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { checkGoal, countGoalChars, evenRatios, GOAL_MAX_LENGTH } from "../lib/settings/validation";
 import { formatClock } from "../lib/time-format";
 import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
+import { ChipScroller } from "./chip-scroller";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -328,7 +329,7 @@ export function Onboarding({
               {ONBOARDING_TEXT.categoryHeading}
             </h1>
             <p className="todo-sub">{ONBOARDING_TEXT.categoryHint}</p>
-            <div className="detail-chips" role="group" aria-label={ONBOARDING_TEXT.categoryGroup}>
+            <ChipScroller aria-label={ONBOARDING_TEXT.categoryGroup}>
               {catalog.map((c) => (
                 <button key={c.id} type="button" className="chip" aria-pressed={selected.includes(c.id)} onClick={() => toggleCategory(c.id)}>
                   <span className="chip-face">
@@ -336,9 +337,9 @@ export function Onboarding({
                   </span>
                 </button>
               ))}
-            </div>
+            </ChipScroller>
             {examples.length > 0 && (
-              <div className="detail-chips" role="group" aria-label={ONBOARDING_TEXT.exampleGroup}>
+              <ChipScroller aria-label={ONBOARDING_TEXT.exampleGroup}>
                 {examples.map((name) => (
                   <button key={name} type="button" className="chip chip-add" onClick={() => void addNamed(name)} disabled={addingName !== null}>
                     <span className="chip-face">
@@ -346,7 +347,7 @@ export function Onboarding({
                     </span>
                   </button>
                 ))}
-              </div>
+              </ChipScroller>
             )}
             <label htmlFor="new-category-input" className="input-label sheet-todo-label">
               {ONBOARDING_TEXT.newCategoryLabel}

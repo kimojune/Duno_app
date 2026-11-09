@@ -12,6 +12,7 @@ import { CATEGORY_LIMIT, CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "..
 import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
+import { ChipScroller } from "./chip-scroller";
 import { LiveRegion, Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 import { Wordmark } from "./wordmark";
 
@@ -427,12 +428,12 @@ export function CategoryChipRow(
     );
   }
   return (
-    <div className="chip-row" role="group" aria-labelledby="category-label">
+    <ChipScroller aria-labelledby="category-label">
       {props.chips.map((chip) => (
         <CategoryChip key={chip.id} chip={chip} pressed={chip.id === props.selectedCategoryId} onToggle={props.onToggleChip} />
       ))}
       <AddCategoryChip onOpen={props.onOpenNewCategory} />
-    </div>
+    </ChipScroller>
   );
 }
 

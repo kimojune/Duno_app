@@ -1155,7 +1155,7 @@ describe("C-D11 scroll-padding-bottom을 창 높이에 맞춰 다시 잰다(Todo
   });
 });
 
-describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 감싼다", () => {
+describe("고침 5바퀴: 분야 칩 줄은 한 줄이고 넘치면 옆으로 넘긴다(두 줄 감싸기를 대신한다, 명세 ⑦-1)", () => {
   const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
   /** `선택자 { … }` 규칙 하나의 안쪽(주석 제외, 그 선택자만 단독으로 쓴 첫 규칙) */
   const rule = (selector: string) => {
@@ -1167,14 +1167,25 @@ describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 �
     return "";
   };
 
-  it("CSS: 감싸기(flex-wrap), 가로 넘침 없음(overflow-x hidden), 높이 상한은 두 줄 + 16, 넘으면 세로로 밀기", () => {
+  it("CSS: 한 줄(nowrap), 가로로 넘김(overflow-x auto), 세로로는 밀지 않음(overflow-y hidden), 높이 상한 없음(칩 하나 높이), 띠 24px", () => {
     const row = rule(".chip-row");
     expect(row, ".chip-row 규칙을 읽었다").toContain("display: flex");
-    expect(row).toMatch(/flex-wrap:\s*wrap/);
-    expect(row).toMatch(/overflow-x:\s*hidden/);
-    expect(row).toMatch(/overflow-y:\s*auto/);
-    expect(row).toMatch(/max-height:\s*calc\(var\(--tap-min\)\s*\*\s*2\s*\+\s*var\(--space-4\)\)/);
-    expect(row, "옛 가로 밀기가 남지 않았다").not.toMatch(/overflow-x:\s*auto/);
+    expect(row).toMatch(/flex-wrap:\s*nowrap/);
+    expect(row, "두 줄 감싸기가 남지 않았다").not.toMatch(/flex-wrap:\s*wrap/);
+    expect(row).toMatch(/overflow-x:\s*auto/);
+    expect(row).toMatch(/overflow-y:\s*hidden/);
+    expect(row, "옛 두 줄 높이 상한이 남지 않았다").not.toMatch(/max-height/);
+    // 키보드로 옮긴 칩이 옅어지는 띠(24px) 밖으로 나오게
+    expect(row).toMatch(/scroll-padding-inline:\s*24px/);
+    // 넘친 쪽 끝 24px이 옅어진다(오른쪽만 · 왼쪽만 · 양쪽)
+    const fadeEnd = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/\.chip-scroller\[data-more-end\]\s*>\s*\.chip-row\s*\{([^}]*)\}/);
+    expect(fadeEnd, "오른쪽 띠 규칙이 있다").not.toBeNull();
+    expect(fadeEnd![1]).toMatch(/(^|[^-])mask-image:\s*linear-gradient\(to right, black calc\(100% - 24px\), transparent\)/);
+    // 「‹」「›」 누름 48 · 보이는 면 32
+    expect(rule(".chip-nav")).toMatch(/inline-size:\s*var\(--tap-min\)/);
+    expect(rule(".chip-nav")).toMatch(/block-size:\s*var\(--tap-min\)/);
+    expect(rule(".chip-nav-face")).toMatch(/inline-size:\s*32px/);
+    expect(rule(".chip-nav-face")).toMatch(/block-size:\s*32px/);
     // 칩은 줄 폭을 넘지 않고, 긴 이름은 칩 글에서 한 줄 말줄임(C23)
     expect(rule(".chip")).toMatch(/max-width:\s*100%/);
     expect(rule(".chip")).not.toContain("--chip-max-gap");
@@ -1182,9 +1193,10 @@ describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 �
     expect(rule(".chip-label")).toContain("white-space: nowrap");
   });
 
-  it("구조: 칩 줄 바로 아래 자식이 칩 단추들뿐이고(안쪽 가로 밀이 칸 없음), 「+ 분야」가 맨 끝이다", () => {
+  it("구조: 칩 줄 바로 아래 자식이 칩 단추들뿐이고(넘김 단추는 칩 줄 밖), 「+ 분야」가 맨 끝이다", () => {
     renderScreen();
     open();
+    expect(chipGroup().parentElement!.classList.contains("chip-scroller")).toBe(true);
     const kids = [...chipGroup().children];
     expect(kids.every((el) => el.tagName === "BUTTON" && el.classList.contains("chip"))).toBe(true);
     expect(kids.map((el) => el.textContent)).toEqual(["취업 준비", "운동", "CS 공부", "+ 분야"]);
@@ -1202,7 +1214,7 @@ describe("고침 4바퀴: 분야 칩 줄은 가로 밀기 대신 두 줄까지 �
       expect((el as HTMLButtonElement).disabled).toBe(false);
       expect(el.hasAttribute("hidden")).toBe(false);
     }
-    // 포커스를 받으면 그 칩이 줄 안에서 보이게 밀린다(세로 감싸기에서도 같은 호출: block·inline nearest)
+    // 포커스를 받으면 그 칩이 줄 안에서 보이게 옆으로 넘어간다(block·inline nearest)
     const scroll = vi.mocked(Element.prototype.scrollIntoView);
     scroll.mockClear();
     fireEvent.focus(buttons[49]);
@@ -1253,7 +1265,7 @@ describe("고침 4바퀴: 목록 위 카드는 한 줄 줄(CSS)", () => {
 });
 
 describe("고침 4바퀴 시나리오 ① 처음 쓰는 사람: 분야가 하나", () => {
-  it("칩은 그 분야 하나와 「+ 분야」뿐이고, 창을 열면 포커스는 글 칸, 탭은 글 칸 → 적기 → 칩 → + 분야다. 칩 줄은 감싸는 줄 하나다", () => {
+  it("칩은 그 분야 하나와 「+ 분야」뿐이고, 창을 열면 포커스는 글 칸, 탭은 글 칸 → 적기 → 칩 → + 분야다. 칩 줄은 한 줄 하나다", () => {
     renderScreen(read([], [cat(CAT_WORK, "취업 준비")]));
     open();
     expect(document.activeElement).toBe(todoInput());
