@@ -47,7 +47,7 @@ export const TODO_TEXT = {
   queued: "연결되면 저장해요", // 오프라인으로 적어 기기에 둔 줄(PRD 10절). 고침9: 줄에는 보이지 않고 16px 도는 원(SavePending) + 숨은 글 「저장 대기」
   /** 고침9(PM 16:2x, 23 Figma 128:87): 저장 대기 원의 화면 읽기 글 */
   pending: "저장 대기",
-  liveQueued: "연결되면 저장할게요",
+  liveQueued: "저장 대기", // 고침9 O-8: 줄의 도는 원과 같은 말(polite 한 곳)
   retry: "다시",
   remove: "빼기",
   checkFailed: "끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.",
@@ -414,17 +414,18 @@ function Row({
         )}
         {row.failed && (
           <>
-            <p id={statusId} role="status" className="todo-sub">
+            {/* 고침9 O-8: 저장 상태는 화면 한 곳(LiveRegion, polite)에서만 알린다 — 줄의 글은 보이는 글·체크 칸 설명이고 따로 낭독하지 않는다 */}
+            <p id={statusId} className="todo-sub">
               {TODO_TEXT.saveFailed}
             </p>
             <div className="row-actions">
-              <TextButton onClick={() => onRetry(row.id)}>{TODO_TEXT.retry}</TextButton>
-              <TextButton onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
+              <TextButton className="text-tap" onClick={() => onRetry(row.id)}>{TODO_TEXT.retry}</TextButton>
+              <TextButton className="text-tap" onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
             </div>
           </>
         )}
         {row.checkFailed && (
-          <p role="status" className="todo-sub">
+          <p className="todo-sub">
             {TODO_TEXT.checkFailed}
           </p>
         )}

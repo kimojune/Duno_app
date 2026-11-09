@@ -11,6 +11,7 @@ import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { categoryColorValue } from "../lib/category-color";
 import { BottomActions } from "./back-header";
+import { CloseConfirm } from "./close-confirm";
 import { Stepper } from "./stepper";
 import { Notice, PrimaryButton, TextButton } from "./ui";
 
@@ -95,12 +96,30 @@ export function GoalEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
+  // 고침9 O-3(Figma 133:2 꼴, PM d-135 글): 시간을 바꾼 뒤 「닫기」·Esc·뒤로 가기는 확인 「저장하지 않고 나갈까요?」. 안 바꿨으면 그냥 닫힘
+  const [confirmClose, setConfirmClose] = useState(false);
+  const changedRef = useRef(false);
+  const rootRef = useOverlayWindow<HTMLDivElement>(onClose, {
+    holdBack: () => {
+      if (!changedRef.current) return false;
+      setConfirmClose(true);
+      return true;
+    },
+  });
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 저장을 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
   const online = useOnline() || api.localFirst === true;
-  const [hours, setHours] = useState<Record<string, number>>(() =>
+  const [initialHours] = useState<Record<string, number>>(() =>
     Object.fromEntries((goal ?? []).flatMap((g) => (g.categoryId ? [[g.categoryId, Math.round(g.minutes / 60)]] : []))),
   );
+  const [hours, setHours] = useState<Record<string, number>>(initialHours);
+  const changed = categories.some((c) => (hours[c.id] ?? 0) !== (initialHours[c.id] ?? 0));
+  useEffect(() => {
+    changedRef.current = changed;
+  }, [changed]);
+  function requestClose() {
+    if (changed) setConfirmClose(true);
+    else onClose();
+  }
   const [busy, setBusy] = useState<"save" | "clear" | null>(null);
   const [message, setMessage] = useState("");
   const titleRef = useRef<HTMLHeadingElement | null>(null);
@@ -145,7 +164,7 @@ export function GoalEditor({
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape" && !composing(event)) {
       event.preventDefault();
-      onClose();
+      requestClose();
     }
   }
 
@@ -157,7 +176,7 @@ export function GoalEditor({
           <h2 id="goal-title" className="detail-title" tabIndex={-1} ref={titleRef}>
             {GOAL_TEXT.title}
           </h2>
-          <TextButton className="btn-flush-end" onClick={onClose}>
+          <TextButton className="btn-flush-end text-tap" onClick={requestClose}>
             {GOAL_TEXT.close}
           </TextButton>
         </div>
@@ -200,12 +219,13 @@ export function GoalEditor({
             {busy === "save" ? GOAL_TEXT.saving : GOAL_TEXT.save}
           </PrimaryButton>
           {goal && goal.length > 0 && (
-            <TextButton disabled={busy !== null || !online} onClick={() => void clear()}>
+            <TextButton className="text-tap" busy={busy === "clear"} disabled={busy !== null || !online} onClick={() => void clear()}>
               {GOAL_TEXT.clear}
             </TextButton>
           )}
         </BottomActions>
       </div>
+      {confirmClose && <CloseConfirm onKeep={() => setConfirmClose(false)} onClose={onClose} />}
     </div>
   );
 }

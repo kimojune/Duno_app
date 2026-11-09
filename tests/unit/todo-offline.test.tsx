@@ -92,8 +92,8 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     expect(addTodo).not.toHaveBeenCalled();
     expect(screen.getByText("지하철에서 적은 글")).toBeTruthy();
     // 고침9: 보이는 글 대신 원(aria-hidden) + 숨은 글 「저장 대기」. 체크 칸 설명으로 이어진다
-    const pending = screen.getByText("저장 대기");
-    expect(pending.className).toBe("sr-only");
+    const pending = document.querySelector(".save-pending .sr-only") as HTMLElement;
+    expect(pending.textContent).toBe("저장 대기");
     const mark = pending.closest(".save-pending")!;
     expect(mark.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
     expect(mark.querySelector("svg")!.getAttribute("width")).toBe("16");
@@ -120,7 +120,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     expect(addTodo).toHaveBeenCalledWith(queued.id, "나중에 올릴 글", null, queued.writtenAt);
     expect(screen.queryByText("연결되면 저장해요")).toBeNull();
     // 올라가면 원과 숨은 글이 함께 사라진다(「저장됨」 같은 글을 줄에 남기지 않음)
-    expect(screen.queryByText("저장 대기")).toBeNull();
+    expect(document.querySelector(".save-pending .sr-only")).toBeNull();
     expect(document.querySelector(".save-pending")).toBeNull();
     expect(box.stored()).toEqual([]);
   });
@@ -167,7 +167,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     const box = memoryOutbox([{ id: ID_OLD, text: "남은 글", categoryId: null, writtenAt: "2026-11-07T01:00:00.000Z" }]);
     await mount(box);
     expect(screen.getByText("남은 글")).toBeTruthy();
-    expect(screen.getByText("저장 대기")).toBeTruthy();
+    expect(document.querySelector(".save-pending .sr-only")!.textContent).toBe("저장 대기");
     expect(document.querySelectorAll(".save-pending")).toHaveLength(1);
     expect(addTodo).not.toHaveBeenCalled();
     expect(box.stored()).toHaveLength(1);
@@ -243,7 +243,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     expect(screen.getByText("인터넷에 연결되면 적을 수 있어요. 적은 글은 그대로 있어요.")).toBeTruthy();
     expect((screen.getByRole("textbox", { name: "할 일 적기" }) as HTMLInputElement).value).toBe("못 적는 글");
     expect(screen.queryByText("연결되면 저장해요")).toBeNull();
-    expect(screen.queryByText("저장 대기")).toBeNull();
+    expect(document.querySelector(".save-pending")).toBeNull();
   });
 
   it("글은 글자 그대로 보인다(꺾쇠가 요소가 되지 않는다)", async () => {

@@ -449,6 +449,8 @@ button, input { font: inherit; color: inherit; }
 /* 타이머 「오늘 시작한 타이머 0개」: 기록이 없으면 제목 옆 한 줄(Figma 50:390) */
 .timer-records.is-empty { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); }
 .timer-records.is-empty > .todo-sub { margin: 0; }
+/* O-10: 타이머 시간·개수는 고정폭 숫자(시계 .timer-clock은 이미) */
+.timer-records { font-variant-numeric: tabular-nums; }
 /* ---- 고침9 S2-d 이번 주 목표(Figma 50:332): 제목 아래 12 보조 한 줄 · 흰 카드 목록(.card-box) · 합계 오른쪽 16 Bold · 「목표 없애기」 가운데 ---- */
 .goal-hint { margin-top: var(--space-1); }
 .goal-list { margin-top: var(--space-6); }
