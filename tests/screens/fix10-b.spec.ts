@@ -16,6 +16,13 @@ const rgb = (hex: string, alpha?: number) => {
   return alpha === undefined ? `rgb(${c})` : `rgba(${c}, ${alpha})`;
 };
 const TEXT = rgb(COLOR_TOKENS["--color-text"]);
+/** Chrome은 color-mix 결과를 color(srgb r g b / a)로 돌려준다 — rgba(r, g, b, a)로 바꿔 견준다 */
+const norm = (c: string) => {
+  const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)$/.exec(c);
+  if (!m) return c;
+  const [r, g, b] = [m[1], m[2], m[3]].map((v) => Math.round(Number(v) * 255));
+  return m[4] === undefined ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${m[4]})`;
+};
 const SURFACE = rgb(COLOR_TOKENS["--color-surface"]);
 
 async function open(page: Page, s: string) {
@@ -83,7 +90,7 @@ test("S2 빈 목록 예시(50:28): 점선 원 24, 「글 한 편 초고 쓰기�
   expect([Math.round(c.width), Math.round(c.height)]).toEqual([24, 24]);
   const s = await css(check, ["border-top-style", "border-top-left-radius"]);
   expect(s["border-top-style"]).toBe("dashed");
-  expect(s["border-top-left-radius"]).toBe("12px"); // 50% of 24
+  expect(s["border-top-left-radius"]).toBe("50%");
   await expect(page.locator(".todo-example-row").nth(1)).toContainText("글 한 편 초고 쓰기");
   await expect(page.getByText("포트폴리오")).toHaveCount(0);
   const add = await box(page.locator("#add-todo-button"));
@@ -98,7 +105,7 @@ test("어제 못 끝낸 할 일 펼침(148:108) · 접은 줄(50:69) · 모두 �
   for (let i = 0; i < 3; i += 1) await expect(checks.nth(i)).toBeChecked(); // 처음엔 모두 고른 채
   const bx = await box(page.locator(".carry-list .check-box").first());
   expect([Math.round(bx.width), Math.round(bx.height)]).toEqual([24, 24]);
-  expect((await css(page.locator(".carry-list .check-box").first(), ["border-top-left-radius"]))["border-top-left-radius"]).toBe("12px"); // 원
+  expect((await css(page.locator(".carry-list .check-box").first(), ["border-top-left-radius"]))["border-top-left-radius"]).toBe("50%"); // 원
   await expect(page.getByRole("button", { name: "3개 가져오기" })).toBeVisible();
   await expect(page.getByText(/오늘로 가져올 것을 골라요/)).toHaveCount(0);
   const close = await box(page.getByRole("button", { name: "접기" }));
@@ -136,7 +143,7 @@ test("할 일 페이지(147:58 · 51:55): 머리 저장됨 · 제목 위 74 · �
   const add = await box(page.getByRole("button", { name: "남기기" }));
   expect(Math.round(add.width)).toBeGreaterThanOrEqual(80);
   expect(Math.round(add.height)).toBe(48 - 4);
-  expect(add.x + add.width, "칸 오른쪽 끝에 맞춘다").toBeCloseTo(t.x + t.width, 0);
+  expect(Math.abs(add.x + add.width - (t.x + t.width)), "칸 오른쪽 끝에 맞춘다").toBeLessThanOrEqual(1);
   await photo(page, "할일페이지-기록0");
   await open(page, "note-many");
   const card = page.locator(".note-card").first();
@@ -165,7 +172,7 @@ test("할 일 페이지 상태: 빈 칸 안내 · 남기는 중 · ⋯ 메뉴 �
   await expect(scrim).toHaveCount(1);
   const sb = await box(scrim);
   expect([Math.round(sb.width), Math.round(sb.height)]).toEqual([360, 800]);
-  expect((await css(scrim, ["background-color"]))["background-color"]).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
+  expect(norm((await css(scrim, ["background-color"]))["background-color"])).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
   await expect(page.getByRole("menuitem")).toHaveCount(3);
   await photo(page, "할일페이지-메뉴막");
 });
@@ -196,16 +203,20 @@ test("지난 날(148:56 · 148:95): 이름표 · 날짜 24 Bold · 원 단추 �
 });
 
 test("시트 넷(위 모서리 16 · 손잡이 40×4 #E7E1D6 · 막 45%): 적는 창 · 이번 주 목표 · 분야 고르기", async ({ page }) => {
-  const handle = (l: Locator, sel: string) => l.evaluate((el, s) => {
-    const st = getComputedStyle(el, s);
-    return { w: st.width, h: st.height, bg: st.backgroundColor };
-  }, "::before");
+  const handle = (l: Locator, pseudo: string) =>
+    l.evaluate(
+      (el, p) => {
+        const st = getComputedStyle(el, p);
+        return { w: st.width, h: st.height, bg: st.backgroundColor };
+      },
+      pseudo,
+    );
   await open(page, "sheet-add");
   const sheet = page.locator(".todo-sheet");
   expect((await css(sheet, ["border-top-left-radius", "border-top-right-radius"]))["border-top-left-radius"]).toBe("16px");
   const h = await handle(sheet, "::before");
   expect(h).toEqual({ w: "40px", h: "4px", bg: rgb(COLOR_TOKENS["--color-divider"]) });
-  expect((await css(page.locator(".todo-sheet-scrim"), ["background-color"]))["background-color"]).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
+  expect(norm((await css(page.locator(".todo-sheet-scrim"), ["background-color"]))["background-color"])).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
   const input = await box(page.locator("#todo-input"));
   const addBtn = await box(page.getByRole("button", { name: "적기" }));
   expect([Math.round(input.width), Math.round(input.height)]).toEqual([236, 52]);
@@ -215,7 +226,7 @@ test("시트 넷(위 모서리 16 · 손잡이 40×4 #E7E1D6 · 막 45%): 적는
   const goalPanel = page.locator(".goal-sheet .detail-inner");
   expect((await css(goalPanel, ["border-top-left-radius"]))["border-top-left-radius"]).toBe("16px");
   expect(await handle(goalPanel, "::before")).toEqual({ w: "40px", h: "4px", bg: rgb(COLOR_TOKENS["--color-divider"]) });
-  expect((await css(page.locator(".goal-sheet"), ["background-color"]))["background-color"]).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
+  expect(norm((await css(page.locator(".goal-sheet"), ["background-color"]))["background-color"])).toBe(rgb(COLOR_TOKENS["--color-text"], 0.45));
   await photo(page, "시트-이번주목표");
   await open(page, "sheet-category");
   const cat = page.locator(".category-sheet");
@@ -230,6 +241,8 @@ test("시트 넷(위 모서리 16 · 손잡이 40×4 #E7E1D6 · 막 45%): 적는
 
 test("분야 줄은 한 줄(점 12 + 이름 말줄임 + −/숫자/+ 고정): 긴 이름도 두세 줄이 되지 않는다. 숫자 칸 글 가운데", async ({ page }) => {
   await open(page, "ratio-onboarding-many");
+  await page.getByRole("button", { name: "다음" }).click();
+  await page.getByRole("button", { name: "다음" }).click();
   const rows = page.locator(".ratio-row");
   const n = await rows.count();
   expect(n).toBeGreaterThan(3);

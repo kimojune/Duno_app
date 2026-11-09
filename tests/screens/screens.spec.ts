@@ -230,7 +230,7 @@ for (const state of C_STATES) {
           const btn = page.locator(".add-todo-btn");
           const box = (await btn.boundingBox())!;
           measurements[`${name}-add-button`] = box;
-          expect(box.height).toBeGreaterThanOrEqual(56);
+          expect(box.height).toBeGreaterThanOrEqual(48); // 고침10 E(50:93): 「+ 할 일 적기」 144×48(옛 56)
           expect(box.width).toBeGreaterThanOrEqual(48);
           expect(box.x + box.width).toBeLessThanOrEqual(vw);
           expect(box.y + box.height).toBeLessThanOrEqual(vh);
@@ -432,7 +432,7 @@ for (const state of C_STATES) {
           await expect(page.getByText("200자까지 적을 수 있어요. 지금 230자예요.")).toBeVisible();
           await expect(page.locator("#todo-input")).toHaveAttribute("aria-describedby", "todo-help");
           expect(await page.locator("#todo-input").getAttribute("maxlength")).toBeNull();
-          if (size === "320x640") expect((await page.locator("#todo-input").boundingBox())!.width).toBeGreaterThanOrEqual(216);
+          if (size === "320x640") expect((await page.locator("#todo-input").boundingBox())!.width).toBeGreaterThanOrEqual(196); // 고침10 J(50:109~116): 칸 + 간격 16 + 「적기」 76 → 320 폭에서 288 − 92 = 196(옛 216 = 간격 8 + 단추 64)
         }
         if (state.id === "T7") {
           await expect(page.getByRole("checkbox", { name: "저장하지 못한 할 일" })).toHaveAttribute("aria-disabled", "true");

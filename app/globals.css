@@ -1271,6 +1271,7 @@ select.input { appearance: auto; }
 .detail-page .screen-head { margin-block-end: 0; } /* 제목 위 74: 머리 10~58 + 16 */
 .detail-page .detail-big-title { margin-top: var(--space-4); }
 .note-cards { margin-bottom: var(--space-3); }
+textarea.detail-note-input { resize: none; } /* 크기 조절 손잡이 없음(뒤의 .note-input resize 규칙보다 앞서게) */
 .note-card { margin: 0 0 var(--space-2); padding: var(--space-3) var(--space-4); border: 0; border-radius: 12px; background: var(--color-surface); }
 .note-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .note-day { margin: 0; font: 500 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
@@ -1287,6 +1288,7 @@ select.input { appearance: auto; }
 .past-date-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: var(--space-1) 0 var(--space-4); }
 .past-date { margin: 0; min-width: 0; font: var(--font-title); overflow-wrap: anywhere; }
 .past-nav { display: flex; flex: none; margin-inline-end: -8px; }
+.today-past-btn, .past-nav .step-btn { inline-size: var(--tap-min); block-size: var(--tap-min); } /* 누름 48(공통 .step-btn은 44) */
 .past-card { margin: 0 0 var(--space-3); }
 .past-todos { list-style: none; padding: var(--space-1) var(--space-4); border-radius: var(--radius-card); background: var(--color-surface); }
 .past-todo { display: flex; align-items: flex-start; gap: var(--space-3); min-block-size: 48px; padding: var(--space-3) 0; font: var(--font-body); }

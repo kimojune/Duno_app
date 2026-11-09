@@ -277,7 +277,7 @@ test("S2-b 할 일 페이지(51:55) · S2-b′ 분야 고르기 시트(77:18): �
     return { bottom: r.bottom, w: r.width, radius: getComputedStyle(el).borderTopLeftRadius };
   });
   expect(sheetBox.bottom, "아래에서 올라온 판").toBeGreaterThanOrEqual(799);
-  expect(sheetBox.radius).toBe("24px");
+  expect(sheetBox.radius).toBe("16px"); // 고침10 J: 시트 위 모서리 16(옛 24)
   await noOverflow(page);
   await photo(page, "S2-b′-분야고르기시트(77-18)");
 

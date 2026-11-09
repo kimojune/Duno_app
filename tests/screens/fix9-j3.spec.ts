@@ -220,12 +220,13 @@ test("S5-2 나누기 · 칩 하나 고른 상태 — 87:96", async ({ page }) =>
   const dialog = await openSplit(page, 3);
   await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click();
   await splitShape(page, dialog, "합계 3시간");
-  await expect(dialog.locator(".dial-center-big")).toHaveText("30분");
+  // 고침10 PM d-180: 칩 하나 = 남은 시간 전부(3시간 = 180분), 옛 「기타에서 30분」이 아니다
+  await expect(dialog.locator(".dial-center-big")).toHaveText("3시간");
   await expect(dialog.locator(".dial-center-small")).toHaveText("어학");
   const picked = dialog.locator(".ratio-list li.is-picked");
   expect(await style(picked, ["background-color"])).toEqual({ "background-color": "rgb(243, 238, 230)" });
   near((await box(picked.locator(".step-btn-face").first())).width, 32, 0.5, "−/+ 원 32");
-  await expect(picked.locator(".num-field input")).toHaveValue("30"); // 숫자 칸 안에 숫자 + 단위(A3)
+  await expect(picked.locator(".num-field input")).toHaveValue("180"); // 숫자 칸 안에 숫자 + 단위(A3)
   await expect(picked.locator(".num-field .stepper-unit")).toHaveText("분");
   await photo(page, "S5-2 나누기 · 칩 하나 고른 상태");
 });
@@ -236,7 +237,7 @@ test("S5-2 나누기 · 칩 둘 고른 상태 — 49:26", async ({ page }) => {
   await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click();
   await splitShape(page, dialog, "합계 3시간");
   await expect(dialog.locator(".ratio-list li")).toHaveCount(3);
-  await expect(dialog.locator('[data-row-key="other"] .evening-other-value')).toHaveText("2시간");
+  await expect(dialog.locator('[data-row-key="other"] .evening-other-value')).toHaveText("0분"); // 칩 둘 = 3시간을 90분씩, 기타 0분(PM d-180)
   await photo(page, "S5-2 나누기 · 칩 둘 고른 상태");
 });
 
