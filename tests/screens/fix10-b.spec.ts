@@ -255,7 +255,15 @@ test("분야 줄은 한 줄(점 12 + 이름 말줄임 + −/숫자/+ 고정): �
   const clipped = await long.evaluate((el) => ({ over: el.scrollWidth > el.clientWidth, overflow: getComputedStyle(el).textOverflow }));
   expect(clipped).toEqual({ over: true, overflow: "ellipsis" });
   const field = page.locator(".num-field .stepper-input").first();
-  expect((await css(field, ["text-align", "font-size", "font-weight"]))).toEqual({ "text-align": "center", "font-size": "16px", "font-weight": "500" });
+  // 고침10 QA1 ⑨(Fig 49:254): 숫자 + 단위가 한 덩어리로 칸 가운데 — 숫자 칸은 글에 맞춘 폭(field-sizing)이고 덩어리 좌우 여백이 같다
+  expect((await css(field, ["text-align", "font-size", "font-weight"]))).toEqual({ "text-align": "end", "font-size": "16px", "font-weight": "500" });
+  const gaps = await page.locator(".num-field").first().evaluate((el) => {
+    const f = el.getBoundingClientRect();
+    const i = el.querySelector(".stepper-input")!.getBoundingClientRect();
+    const u = el.querySelector(".stepper-unit")!.getBoundingClientRect();
+    return { left: i.left - f.left, right: f.right - u.right };
+  });
+  expect(Math.abs(gaps.left - gaps.right), `숫자+단위 덩어리 좌우 여백 ${JSON.stringify(gaps)}`).toBeLessThanOrEqual(2);
   await noOverflow(page);
   await photo(page, "분야줄-긴이름");
 });

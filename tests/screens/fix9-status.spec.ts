@@ -182,15 +182,20 @@ async function eveningButton(page: Page) {
       face: f.getBoundingClientRect().toJSON(),
       border: `${fc.borderTopWidth} ${fc.borderTopStyle} ${fc.borderTopColor}`,
       btnShadow: getComputedStyle(b).boxShadow,
+      btnWeight: getComputedStyle(b).fontWeight,
       after: card.nextElementSibling?.className ?? null,
     };
   });
   expect(m.last).toBe(true);
-  expect(Math.round(m.face.height)).toBe(40);
-  expect(m.btn.height).toBeGreaterThanOrEqual(48);
-  expect(Math.round(m.face.width)).toBe(Math.round(m.card.width - 32));
-  expect(m.border).toBe(`1px solid ${await tokenColor(page, "--color-border-input")}`);
-  expect(m.btnShadow, "바깥 누름 틀에 보조 단추 선(안쪽 그림자)이 번지지 않는다 — 선은 안쪽 면 1px뿐").toBe("none");
+  // 고침10 QA1 ⑧: 보조 단추 꼴 그대로 — 높이 48 · 폭 가득 · 선 1.5 #1C2340(안쪽 그림자 한 겹) · Bold. 겹선 없음(안 글 .growth-evening-face는 선을 안 가짐)
+  expect(Math.round(m.btn.height)).toBe(48);
+  expect(Math.round(m.btn.width)).toBe(Math.round(m.card.width - 32));
+  expect(m.border).toBe("0px none " + (await page.locator(".growth-evening-face").evaluate((el) => getComputedStyle(el).borderTopColor)));
+  const primary = await tokenColor(page, "--color-primary");
+  expect(m.btnShadow, "보조 단추 선 한 겹(1.5 먹남색)").toContain("1.5px");
+  expect(m.btnShadow).toContain("inset");
+  expect(m.btnShadow).toContain(primary.replace(/^rgb\(/, "rgb(").replace(/\s+/g, " "));
+  expect(m.btnWeight).toBe("700");
   // 카드 밖 안내 글 없음(카드 다음은 연속 기록 줄이거나 없음)
   expect(m.after === null || m.after === "growth-streak").toBe(true);
   await expect(page.getByText(/아직 (이번 주 )?오늘 기록이 없어요/)).toHaveCount(0);

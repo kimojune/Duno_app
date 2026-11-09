@@ -89,6 +89,18 @@ test("S0 체험 코드 D2 틀린 코드(141:13): 칸 테두리 2px · 값 남음
   await photo(page, "S0-D2-체험코드-틀림");
 });
 
+test("고침10 QA1 ① 틀린 코드: 오류가 나와도 칸·Google 단추가 안 움직이고 오류 글은 12 Medium 한 줄", async ({ page }) => {
+  await open(page, "/dev/states?s=D1");
+  const baseInput = (await page.locator(".demo-input").boundingBox())!.y;
+  const baseGoogle = (await page.locator(".google-btn").boundingBox())!.y;
+  await open(page, "/dev/states?s=D2");
+  expect((await page.locator(".demo-input").boundingBox())!.y, "칸이 밀리지 않는다").toBe(baseInput);
+  expect((await page.locator(".google-btn").boundingBox())!.y, "Google 단추가 밀리지 않는다").toBe(baseGoogle);
+  const error = page.locator(".demo-error");
+  expect(await error.evaluate((el) => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight, height: el.getBoundingClientRect().height }))).toEqual({ size: "12px", weight: "500", height: 16 });
+  await noOverflow(page);
+});
+
 test("S0 체험 코드 D3 시작 중(141:31): 「시작 중」 · 두 단추(시작 · Google) 막힘 흐림 0.45 · aria-busy", async ({ page }) => {
   await open(page, "/dev/states?s=D3");
   const start = page.getByRole("button", { name: "체험 코드로 시작" });
