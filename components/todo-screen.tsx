@@ -153,7 +153,10 @@ export function TodoScreen({
   onBeforeSignOut,
   logoutRequest = 0,
   local,
+  refreshKey = 0,
 }: {
+  /** 고침 5바퀴(선택, 예전 방식): 값이 바뀔 때마다 목록을 조용히 다시 읽는다(오늘 기록의 「오늘 할 일」 시트에서 적거나 체크한 뒤) */
+  refreshKey?: number;
   /** 기기 먼저 저장(고침 3바퀴, 선택): 있으면 쓰기는 기기에 먼저 반영하고 읽기는 기기 거울에서 한다. 없으면 예전 방식 그대로 */
   local?: LocalTodos;
   /** 서버 컴포넌트가 DAL에서 읽은 처음 목록(할 일 + 분야). 없으면 처음에 GET으로 한 번 읽는다. */
@@ -422,6 +425,14 @@ export function TodoScreen({
       window.removeEventListener("pageshow", onPageShow);
     };
   }, [load]);
+
+  // 다른 화면(오늘 기록의 「오늘 할 일」 시트)이 같은 서버 길로 쓴 뒤: 값이 바뀔 때만 다시 읽는다(처음 값은 건너뛴다)
+  const seenRefreshRef = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey === seenRefreshRef.current) return;
+    seenRefreshRef.current = refreshKey;
+    void load("silent");
+  }, [refreshKey, load]);
 
   // T15: 켜 둔 채 새벽 4시를 넘기면 날짜와 목록이 새 하루로 바뀐다(창 상태·고른 분야는 그대로, 12-5)
   useEffect(() => {
