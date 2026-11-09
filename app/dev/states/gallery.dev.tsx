@@ -12,7 +12,7 @@ import {
   type RowView,
   type TodoViewProps,
 } from "../../../components/todo-view";
-import { LOGIN_TEXT } from "../../../lib/login-text";
+import { DEMO_TEXT, LOGIN_TEXT } from "../../../lib/login-text";
 import { describeTodoDay } from "../../../lib/todos/day";
 
 /**
@@ -261,7 +261,14 @@ const LOGIN_STATES: Record<string, { notice: Parameters<typeof LoginActionsView>
   L5: { notice: "offline", busy: false },
 };
 
-export const STATE_IDS: string[] = [...Object.keys(LOGIN_STATES), ...Object.keys(TODO_STATES)];
+/** 체험 코드 칸(23 S0): D1 기본(49:169) · D2 틀린 코드(141:13) · D3 시작 중(141:31) */
+const DEMO_STATES: Record<string, { value: string; notice: "wrong_code" | null; busy: boolean }> = {
+  D1: { value: "", notice: null, busy: false },
+  D2: { value: "DUNO-2025", notice: "wrong_code", busy: false },
+  D3: { value: "DUNO-2026", notice: null, busy: true },
+};
+
+export const STATE_IDS: string[] = [...Object.keys(LOGIN_STATES), ...Object.keys(DEMO_STATES), ...Object.keys(TODO_STATES)];
 
 export function StateGallery({ id, sheet }: { id: string; sheet: "open" | "closed" | null }) {
   if (!STATE_IDS.includes(id)) {
@@ -276,6 +283,21 @@ export function StateGallery({ id, sheet }: { id: string; sheet: "open" | "close
           ))}
         </ul>
       </main>
+    );
+  }
+  const demo = DEMO_STATES[id];
+  if (demo) {
+    return (
+      <LoginLayout>
+        <LoginActionsView
+          notice={null}
+          busy={false}
+          live={demo.busy ? DEMO_TEXT.busy : ""}
+          onClick={noop}
+          googleDisabled={demo.busy}
+          demo={{ value: demo.value, notice: demo.notice, busy: demo.busy, onChange: noop, onSubmit: noop }}
+        />
+      </LoginLayout>
     );
   }
   const login = LOGIN_STATES[id];

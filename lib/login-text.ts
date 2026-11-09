@@ -21,3 +21,27 @@ export function noticeFromErrorParam(error: string | string[] | undefined): Logi
   if (value === "config") return "config";
   return "failed";
 }
+
+/**
+ * 체험 코드(시연, PM d-162 가 · 23 S0 49:169·141:13·141:31). 화면 읽기 이름: 칸 「체험 코드」, 단추 「체험 코드로 시작」.
+ * 오류 종류는 서버 행동(app/demo/actions.ts)의 짧은 코드와 화면이 스스로 정하는 empty·offline.
+ */
+export const DEMO_TEXT = {
+  label: "체험 코드",
+  button: "시작",
+  buttonName: "체험 코드로 시작",
+  busy: "시작 중",
+  empty: "체험 코드를 적어 주세요.",
+  wrong_code: "코드가 맞지 않아요. 받은 코드를 다시 확인해 주세요.",
+  rate_limited: "여러 번 틀려서 잠시 막았어요. 10분 뒤에 다시 해 주세요.",
+  failed: "체험을 시작하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
+  off: "지금은 체험 코드로 시작할 수 없어요.",
+  offline: "인터넷에 연결되면 체험을 시작할 수 있어요.",
+} as const;
+
+export type DemoNotice = "empty" | "wrong_code" | "rate_limited" | "failed" | "off" | "offline";
+
+/** 칸에 쓰는 대로 바꾸기: 대문자로(23 S0). 서버는 이 값을 믿지 않고 같은 규칙으로 다시 맞춘다(lib/demo/access.ts normalizeDemoCode). */
+export function toDemoCodeInput(value: string): string {
+  return value.toUpperCase();
+}

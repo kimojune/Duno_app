@@ -3,6 +3,8 @@ import { LoginButton, LoginLayout } from "../components/login-button";
 import { AppShell } from "../components/app-shell";
 import { LocalAppShell } from "../components/local-app-shell";
 import { getPublicEnv } from "../lib/env";
+import { isDemoEnabled } from "../lib/server-config";
+import { startDemo } from "./demo/actions";
 import { noticeFromErrorParam } from "../lib/login-text";
 import { createClient } from "../lib/supabase/server";
 import { getDeps } from "../lib/deps";
@@ -65,7 +67,8 @@ export default async function Home({
   const initialNotice = fromUrl ?? (getPublicEnv() === null ? "config" : null);
   return (
     <LoginLayout>
-      <LoginButton initialNotice={initialNotice} />
+      {/* 체험 코드(시연): DEMO_ACCESS_CODE가 있을 때만 칸을 그린다. 화면에는 「켜짐 여부」만 가고 코드 값은 가지 않는다 */}
+      <LoginButton initialNotice={initialNotice} startDemo={isDemoEnabled() ? startDemo : null} />
     </LoginLayout>
   );
 }
