@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HomeRead } from "../../lib/home-types";
 import type { TodayRead } from "../../lib/today-types";
@@ -57,7 +57,10 @@ describe("내 정보 탭의 분야 목록 (A15·B12)", () => {
     fetchToday.mockResolvedValue(read([[C1, "어학"], [C2, "새 분야"]]));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
     expect(fetchToday).toHaveBeenCalled();
+    // 고침9: 비율 목록은 S8-a 안에 있다(카드를 눌러 연다)
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: /^목표 비율, / })));
     expect(screen.getAllByText("새 분야").length).toBeGreaterThan(0);
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "목표 비율" })).getByRole("button", { name: "이전" })));
     // 다시 열 때도 다시 읽는다
     const calls = fetchToday.mock.calls.length;
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "할 일" })));
@@ -70,6 +73,7 @@ describe("내 정보 탭의 분야 목록 (A15·B12)", () => {
     await act(async () => {});
     fetchToday.mockResolvedValue({ todos: { ok: false, error: "unavailable" }, categories: { ok: false, error: "unavailable" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "내 정보" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: /^목표 비율, / })));
     expect(screen.getAllByText("어학").length).toBeGreaterThan(0);
   });
 });

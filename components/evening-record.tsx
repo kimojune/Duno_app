@@ -17,6 +17,7 @@ import { RatioDial, type DialSlice } from "./ratio-dial";
 import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { ChipScroller } from "./chip-scroller";
 import { Stepper } from "./stepper";
+import { BackHeader } from "./back-header";
 import { CloseConfirm } from "./close-confirm";
 import { categoryDuplicateText, categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -75,7 +76,6 @@ export const EVENING_TEXT = {
   chip: (name: string) => `${name}, 다이얼에 넣기`,
   // 임시 글, 디자인 확정 뒤: 나누기 다이얼의 가운데 표시(아무 조각도 안 골랐을 때 = 쓴 시간)
   dialCenter: (m: number) => formatMinutes(m),
-  back: "이전",
   save: "저장",
   saving: "저장하는 중",
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
@@ -500,15 +500,28 @@ export function EveningRecord({
   return (
     <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" onKeyDown={onKeyDown}>
       <div className="detail-inner">
-        <div className="detail-head">
-          <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
-            {phase === "split" ? EVENING_TEXT.splitHeading : phase === "saved" ? EVENING_TEXT.saved : ask}
-          </h2>
-          <TextButton className="btn-flush-end" onClick={requestClose}>
-            {EVENING_TEXT.close}
-          </TextButton>
-        </div>
-        <p className="todo-sub">{EVENING_TEXT.title}</p>
+        {phase === "split" ? (
+          <>
+            {/* 나누기 단계 머리(고침9, PM 1-A · Figma 87:2): 왼쪽 위 「‹」(이름 「이전」, 시간 단계로) · 가운데 「오늘 기록」 · 오른쪽 「닫기」 — components/back-header.tsx.
+                큰 제목은 머리 아래. 아래 단추 줄의 「이전」 글 단추는 없앴다 */}
+            <BackHeader onBack={() => setPhase("time")} backDisabled={saving} title={EVENING_TEXT.title} onClose={requestClose} />
+            <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
+              {EVENING_TEXT.splitHeading}
+            </h2>
+          </>
+        ) : (
+          <>
+            <div className="detail-head">
+              <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
+                {phase === "saved" ? EVENING_TEXT.saved : ask}
+              </h2>
+              <TextButton className="btn-flush-end" onClick={requestClose}>
+                {EVENING_TEXT.close}
+              </TextButton>
+            </div>
+            <p className="todo-sub">{EVENING_TEXT.title}</p>
+          </>
+        )}
 
         {load.status === "loading" && (
           <p className="todo-sub" role="status">
@@ -716,9 +729,6 @@ export function EveningRecord({
               </Notice>
             )}
             <div className="detail-actions">
-              <TextButton disabled={saving} onClick={() => setPhase("time")}>
-                {EVENING_TEXT.back}
-              </TextButton>
               <PrimaryButton busy={saving} disabled={saving} onClick={() => void save(false)}>
                 {saving ? EVENING_TEXT.saving : EVENING_TEXT.save}
               </PrimaryButton>

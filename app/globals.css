@@ -921,3 +921,15 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 32px; font: 500 0.8125rem/1.25rem var(--font-family); }
 /* 확인 창 뒤 어두운 막(Figma 121:389·121:449): 먹남색 45%(새 토큰 없이 --color-text를 섞는다) */
 .close-confirm-backdrop { background: color-mix(in srgb, var(--color-text) 45%, transparent); }
+/* 내 정보(S8, Figma 50:641): 카드 사이 16. 목표 비율 카드 = 「목표 비율」 16 Bold + 「›」 + 작은 띠(높이 8, 칸마다 분야 색 + 1px 윤곽, 칸 사이 2, 숫자 없음). 카드 전체가 단추 하나 */
+.me .growth-body > .detail-section, .me-section { margin-top: var(--space-4); }
+.me-card-title { margin: 0 0 var(--space-2); font: var(--font-body); font-weight: 700; color: var(--color-text); }
+.me-ratio-card { display: flex; flex-direction: column; gap: var(--space-3); width: 100%; min-height: var(--tap-min); border: 0; color: var(--color-text); text-align: start; cursor: pointer; }
+.me-ratio-card:active { background: var(--color-notice-bg); }
+.me-ratio-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.me-ratio-head .me-card-title { margin: 0; }
+.me-chevron { flex: none; font: var(--font-body); color: var(--color-text); }
+.me-ratio-band { display: flex; gap: 2px; block-size: 8px; }
+.me-ratio-cell { flex-basis: 0; min-width: 2px; border: 1px solid var(--color-chart-outline, var(--color-text)); border-radius: 2px; }
+.me .notify-row { margin-top: var(--space-2); }
+.me .notify-name { font: 500 0.875rem/1.25rem var(--font-family); } /* 내 정보 알림 줄 이름 14 Medium */

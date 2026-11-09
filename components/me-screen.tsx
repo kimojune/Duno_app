@@ -6,16 +6,21 @@ import type { PushApi } from "../lib/push/subscribe";
 import type { NotifySettings, RatioItem, SettingsData } from "../lib/settings/types";
 import { evenRatios } from "../lib/settings/validation";
 import { useOnline } from "../lib/use-online";
+import { categoryColorValue } from "../lib/category-color";
 import { GoalSentenceEditor } from "./goal-sentence";
 import { NotifyRow } from "./onboarding";
-import { entriesToRatios, RatioEditor, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
+import { normalizedPercents, OTHER_RATIO_ID, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
+import { RatioSettings } from "./ratio-settings";
 import { Notice, SecondaryButton, TextButton } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /**
  * 내 정보 탭(PRD 부록 B): 처음 설정에서 정한 것을 고치는 곳과 알림 설정. 이번 틀의 내용은 임시다(임시값 목록).
  * - 첫 카드 = 목표 한 문장(고침6 ③): 이름표 「목표」(PM d-136) + 문장(20/28 Bold, 두 줄까지 낱말 단위 감쌈) + 「›」. 카드 전체가 단추 하나 → S8-b 「목표」
  *   (components/goal-sentence.tsx)에서 고친다. 내 정보에는 목표 글 칸·저장 단추가 없다. 비었으면 「목표 적기」.
- * - 목표 비율 고치기(처음 설정과 같은 −/+ 5% 단추. 「고칠 자리와 때」, PRD 7-1 열림), 알림 둘의 켜기·시각.
+ * - 목표 비율(PM 6 · Figma 50:641): 그 자리에서 고치지 않는다. 카드 = 「목표 비율」 + 작은 띠 한 줄(높이 8, 분야 색 칸 1px 윤곽, 숫자 없음) + 「›」, 카드 전체가 단추 하나 →
+ *   S8-a 겹침 화면(components/ratio-settings.tsx, 처음 설정 S1-3 부품을 다시 씀)에서 고치고 저장한다. 저장하면 이 띠가 바뀐다. 띠의 숫자는 화면 읽기 이름에만 있다.
+ * - 알림 둘의 켜기·시각(줄 설명 글 없음 — ⑬ 25). 맨 위는 워드마크 → 「내 정보」 제목(정합 A5).
  * - 알림 켜기는 알림 허락 → 푸시 구독 저장이다. 푸시 서명 공개 키가 설정에 없으면 켜지 않고 안내한다(보내는 쪽 설정은 PM이 서버 설정에 둔다).
  * - 로그아웃은 맨 아래에도 있다(B18). 적던 글이 있을 때 확인은 할 일 탭이 하므로, 누르면 할 일 탭으로 가서 같은 로그아웃 흐름을 시작한다.
  * 모든 글은 React 텍스트로만 그린다.
@@ -27,7 +32,9 @@ export const ME_TEXT = {
   goalEmpty: "목표 적기", // 목표가 비었을 때 카드 글(16 Medium)
   goalCardName: (goal: string | null) => (goal ? `목표, ${goal}, 고치기` : "목표, 목표 적기"), // 카드 단추의 화면 읽기 이름
   ratioHeading: "목표 비율",
-  ratioSave: "비율 저장",
+  /** 목표 비율 카드 단추의 화면 읽기 이름(띠에 숫자가 없어 이름에 싣는다) */
+  ratioCardName: (parts: { name: string; percent: number }[]) =>
+    ["목표 비율", ...parts.map((p) => `${p.name} ${p.percent}%`), "고치기"].join(", "),
   ratioEmpty: "분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.",
   notifyHeading: "알림",
   notifySave: "알림 설정 저장",
@@ -36,7 +43,6 @@ export const ME_TEXT = {
   saving: "저장하는 중",
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
-  ratioNeed: "하나 이상은 0%보다 커야 해요.",
   permissionDenied: "이 기기에서 알림이 허락되지 않았어요. 브라우저 설정에서 바꿀 수 있어요.",
   unsupported: "이 브라우저는 알림을 받을 수 없어요.",
   missingKey: "알림을 보내는 설정이 아직 없어요. 설정이 끝나면 켤 수 있어요.",
@@ -120,7 +126,7 @@ function MeBody({
     return Object.fromEntries(evenRatios(categories.map((c) => c.id)).map((r) => [r.categoryId, r.percent]));
   });
   const [ratioMessage, setRatioMessage] = useState("");
-  const [ratioBusy, setRatioBusy] = useState(false);
+  const [ratioEditorOpen, setRatioEditorOpen] = useState(false);
   // 알림
   const [eveningOn, setEveningOn] = useState(settings.notify.eveningEnabled);
   const [morningOn, setMorningOn] = useState(settings.notify.morningEnabled);
@@ -150,25 +156,17 @@ function MeBody({
     categories.map((c, i) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: i })),
     percents,
   );
-  const ratioTotal = entries.reduce((s, e) => s + e.percent, 0);
+  // 띠 칸: S8-a가 그릴 값(합 100으로 맞춘 값)과 같은 값. 0% 칸은 그리지 않는다
+  const shownPercents = normalizedPercents(entries);
+  const bandCells = entries
+    .map((e, i) => ({ id: e.id, name: e.name, percent: shownPercents[i], color: categoryColorValue(e.id === OTHER_RATIO_ID ? null : (e.colorOrder ?? i)) }))
+    .filter((c) => c.percent > 0);
 
-  async function saveRatios() {
-    if (ratioBusy || !online) return;
-    if (ratioTotal <= 0) {
-      setRatioMessage(ME_TEXT.ratioNeed);
-      return;
-    }
-    setRatioBusy(true);
-    setRatioMessage("");
-    const ratios: RatioItem[] = entriesToRatios(entries);
-    const res = await api.saveRatios(ratios);
-    setRatioBusy(false);
-    if (res.ok) {
-      setRatioMessage(ME_TEXT.saved);
-      onChanged?.({ ratios });
-    } else {
-      setRatioMessage(ME_TEXT.failed);
-    }
+  // S8-a에서 저장이 끝났을 때: 띠를 새 값으로, 다른 화면도 새 값을 쓰게
+  function ratiosSaved(ratios: RatioItem[], next: RatioEntry[]) {
+    setPercents((prev) => ({ ...prev, ...Object.fromEntries(next.map((e) => [e.id, e.percent])) }));
+    setRatioMessage(ME_TEXT.saved);
+    onChanged?.({ ratios });
   }
 
   async function saveNotify() {
@@ -213,6 +211,7 @@ function MeBody({
   return (
     <section className="me" aria-labelledby="me-title">
       <header className="today-header">
+        <Wordmark className="today-wordmark" />
         <h1 id="me-title" className="today-title">
           {ME_TEXT.title}
         </h1>
@@ -233,33 +232,42 @@ function MeBody({
           {!settings.goalReadable && goal === settings.goal && <p className="todo-sub">{ME_TEXT.unreadableGoal}</p>}
         </section>
 
-        <section className="detail-section" aria-labelledby="me-ratio-title">
-          <h2 id="me-ratio-title" className="growth-sub-title">
-            {ME_TEXT.ratioHeading}
-          </h2>
+        <section className="me-section me-ratio">
           {categories.length === 0 ? (
-            <p className="todo-sub">{ME_TEXT.ratioEmpty}</p>
+            <div className="card-box">
+              <h2 className="me-card-title">{ME_TEXT.ratioHeading}</h2>
+              <p className="todo-sub">{ME_TEXT.ratioEmpty}</p>
+            </div>
           ) : (
-            <>
-              <RatioEditor
-                entries={entries}
-                onChange={(next) => {
-                  setRatioMessage("");
-                  setPercents((prev) => ({ ...prev, ...Object.fromEntries(next.map((e) => [e.id, e.percent])) }));
-                }}
-              />
-              <p className="input-help" role="status">
-                {ratioMessage}
-              </p>
-              <SecondaryButton busy={ratioBusy} disabled={ratioBusy || !online} onClick={() => void saveRatios()}>
-                {ratioBusy ? ME_TEXT.saving : ME_TEXT.ratioSave}
-              </SecondaryButton>
-            </>
+            <button
+              type="button"
+              className="me-ratio-card card-box"
+              aria-label={ME_TEXT.ratioCardName(bandCells)}
+              onClick={() => {
+                setRatioMessage("");
+                setRatioEditorOpen(true);
+              }}
+            >
+              <span className="me-ratio-head">
+                <span className="me-card-title">{ME_TEXT.ratioHeading}</span>
+                <span className="me-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </span>
+              <span className="me-ratio-band" aria-hidden="true">
+                {bandCells.map((c) => (
+                  <span key={c.id} className="me-ratio-cell" data-ratio-id={c.id} style={{ flexGrow: c.percent, background: c.color }} />
+                ))}
+              </span>
+            </button>
           )}
+          <p className="input-help" role="status">
+            {ratioMessage}
+          </p>
         </section>
 
-        <section className="detail-section" aria-labelledby="me-notify-title">
-          <h2 id="me-notify-title" className="growth-sub-title">
+        <section className="me-section card-box" aria-labelledby="me-notify-title">
+          <h2 id="me-notify-title" className="me-card-title">
             {ME_TEXT.notifyHeading}
           </h2>
           <p className="todo-sub">{pushOn ? ME_TEXT.enabled : ME_TEXT.notEnabled}</p>
@@ -295,6 +303,7 @@ function MeBody({
         {logout}
       </div>
       {goalEditorOpen && <GoalSentenceEditor initial={goal} api={api} onClose={() => setGoalEditorOpen(false)} onSaved={goalSaved} />}
+      {ratioEditorOpen && <RatioSettings initial={entries} api={api} onClose={() => setRatioEditorOpen(false)} onSaved={ratiosSaved} />}
     </section>
   );
 }
