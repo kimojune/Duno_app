@@ -489,7 +489,7 @@ describe("스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-15
 
   it("O-7: S8-a 저장 응답 전까지 주 단추가 「저장 중」 + 막힘, 두 번 눌러도 저장 호출은 한 번", async () => {
     let resolve: (v: { ok: true; data: { ratios: RatioItem[] } }) => void = () => {};
-    const api = fakeApi({ saveRatios: vi.fn(() => new Promise((r) => (resolve = r))) });
+    const api = fakeApi({ saveRatios: vi.fn(() => new Promise<{ ok: true; data: { ratios: RatioItem[] } }>((r) => (resolve = r))) });
     mountMe(api);
     await openS8a();
     const save = within(dialog()!).getByRole("button", { name: "저장" });
