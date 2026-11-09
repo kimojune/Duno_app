@@ -30,6 +30,15 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 import { AppShell, withCategories } from "../../components/app-shell";
 import { Onboarding } from "../../components/onboarding";
 
+/** 「합계」 줄은 없앴다(합은 늘 100, 정합 대조 B S1-3). 대신 보이는 숫자 칸 값의 합이 100인지 본다(칸이 하나 이상 있어야 한다) */
+function expectFieldSum100() {
+  const fields = [...document.querySelectorAll<HTMLInputElement>("input.ratio-field")];
+  expect(fields.length).toBeGreaterThan(0);
+  expect(fields.reduce((sum, f) => sum + Number(f.value), 0)).toBe(100);
+  expect(document.body.textContent).not.toContain("합계");
+}
+
+
 const NOTIFY: NotifySettings = { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 };
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
@@ -72,20 +81,21 @@ describe("처음 설정 (7-1, ①)", () => {
   it("네 단계가 이어지고, 단계마다 제목으로 포커스가 간다", () => {
     mount(fakeApi());
     expect(screen.getByText("4단계 중 1단계")).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: /한 문장으로/ }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "목표" }));
     click("다음");
     expect(screen.getByText("4단계 중 2단계")).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: /분야를 골라/ }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "분야" }));
     click("다음");
     expect(screen.getByText("4단계 중 3단계")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "목표 비율" }));
     click("다음");
     expect(screen.getByText("4단계 중 4단계")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "알림을 받을까요?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "알림" })).toBeTruthy();
   });
 
   it("목표는 건너뛸 수 있고, 100자를 넘으면 다음으로 못 간다", () => {
     mount(fakeApi());
-    fireEvent.change(screen.getByLabelText("목표"), { target: { value: "가".repeat(101) } });
+    fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "가".repeat(101) } });
     expect(screen.getByText("100자까지 적을 수 있어요. 지금 101자예요.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "다음" }) as HTMLButtonElement).disabled).toBe(true);
     click("건너뛰기");
@@ -147,13 +157,13 @@ describe("처음 설정 (7-1, ①)", () => {
     mount(fakeApi());
     click("다음");
     click("다음");
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
     click("어학 5% 줄이기"); // 줄인 5%는 뒤 줄(포트폴리오)로
     expect(shares("어학", "포트폴리오", "기타")).toEqual([45, 55, 0]);
     click("포트폴리오 5% 늘리기"); // 뒤 줄(기타)이 0이라 앞 줄(어학)에서
     expect(shares("어학", "포트폴리오", "기타")).toEqual([40, 60, 0]);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     click("균등 배분");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
   });
@@ -168,7 +178,7 @@ describe("처음 설정 (7-1, ①)", () => {
     expect((screen.getByRole("button", { name: "포트폴리오 5% 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
     for (let i = 0; i < 20; i++) click("포트폴리오 5% 줄이기");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([0, 0, 100]);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     click("다음");
     expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
     expect(screen.getByText("4단계 중 4단계")).toBeTruthy();
@@ -177,11 +187,11 @@ describe("처음 설정 (7-1, ①)", () => {
   it("끝에서 허락하면 비율과 설정(알림 둘 켜짐, 처음 설정 마침)을 저장하고 결과를 넘긴다", async () => {
     const api = fakeApi();
     const onDone = mount(api);
-    fireEvent.change(screen.getByLabelText("목표"), { target: { value: "토익 900점" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "목표" }), { target: { value: "토익 900점" } });
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.requestPermission).toHaveBeenCalled();
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 50 },
@@ -206,7 +216,7 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.saveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ notify: expect.objectContaining({ eveningEnabled: false, morningEnabled: false }) }),
     );
@@ -221,7 +231,7 @@ describe("처음 설정 (7-1, ①)", () => {
       click("다음");
       click("다음");
       click("다음");
-      await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
       expect(api.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({ notify: expect.objectContaining({ eveningEnabled: false, morningEnabled: false }), completeOnboarding: true }),
       );
@@ -240,18 +250,22 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ completeOnboarding: true }));
     expect(onDone.mock.calls[0][0]).toMatchObject({ pushOutcome: "failed" });
   });
 
-  it("「나중에 하고 시작하기」는 허락을 묻지 않고 알림을 끈 채 시작한다", async () => {
+  it("알림 둘을 다 끄고 「시작하기」를 누르면 허락을 묻지 않고 알림을 끈 채 시작한다(「나중에 하고 시작하기」는 없어졌다 — PM 1)", async () => {
     const api = fakeApi();
     const onDone = mount(api);
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    expect(screen.queryByRole("button", { name: "나중에 하고 시작하기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "허락하고 시작하기" })).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" }));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.requestPermission).not.toHaveBeenCalled();
     expect(api.saveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ notify: expect.objectContaining({ eveningEnabled: false, morningEnabled: false }), completeOnboarding: true }),
@@ -269,10 +283,10 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(screen.getByRole("alert").textContent).toContain("저장하지 못했어요");
     expect(onDone).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
@@ -282,23 +296,25 @@ describe("처음 설정 (7-1, ①)", () => {
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.saveSettings).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("알림 시각을 바꿀 수 있고, 끈 알림은 시각을 못 고른다", async () => {
+  it("알림 줄은 시각을 고르지 않고(Figma 50:4) 처음 시각을 미리 보기로 보인다. 아침만 끄면 저녁만 켜진 채 처음 시각 그대로 저장한다", async () => {
     const api = fakeApi();
     mount(api);
     click("다음");
     click("다음");
     click("다음");
-    fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(21 * 60) } });
+    expect(screen.queryByLabelText("오늘 기록 알림 시각")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByText("오후 7:30 · “오늘 몇 시간 썼는지 적어 둘까요?”")).toBeTruthy();
     fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" }));
-    expect((screen.getByLabelText("아침 알림 시각") as HTMLSelectElement).disabled).toBe(true);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
+    expect(api.requestPermission).toHaveBeenCalledTimes(1); // 저녁이 켜져 있어 묻는다
     expect(api.saveSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1260, morningEnabled: false, morningMinute: 600 } }),
+      expect.objectContaining({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } }),
     );
   });
 
@@ -342,7 +358,7 @@ describe("AppShell의 처음 설정 관문", () => {
     click("다음");
     click("다음");
     // jsdom에는 푸시 지원이 없어 「받을 수 없음」 결과가 나온다
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "허락하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(screen.getByRole("button", { name: "할 일 적기" })).toBeTruthy();
     expect(screen.getByText("이 브라우저는 알림을 받을 수 없어요.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
@@ -368,7 +384,7 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     click("다음");
     expect(screen.getByRole("button", { name: "기타 5% 늘리기" })).toBeTruthy();
     expect((screen.getByRole("button", { name: "기타 5% 줄이기" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]); // 기타만 0%
   });
   it("기타를 올리면 앞 줄에서 떼어 오고(합 100 그대로), 저장 목록에 categoryId null로 실린다. 「균등 배분」은 기타를 0%로 돌린다", async () => {
@@ -379,12 +395,12 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     click("기타 5% 늘리기");
     click("기타 5% 늘리기");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 40, 10]); // 기타는 맨 끝 줄이라 앞 줄(포트폴리오)에서
-    expect(screen.getByText("합계 100%")).toBeTruthy();
+    expectFieldSum100();
     click("균등 배분");
     expect(shares("어학", "포트폴리오", "기타")).toEqual([50, 50, 0]);
     click("기타 5% 늘리기");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 50 },
       { categoryId: C2, percent: 45 },
@@ -397,7 +413,7 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
     click("다음");
     click("다음");
     click("다음");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "나중에 하고 시작하기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "시작하기" })));
     const saved = (api.saveRatios as ReturnType<typeof vi.fn>).mock.calls[0][0] as { categoryId: string | null }[];
     expect(saved.some((r) => r.categoryId === null)).toBe(false);
   });
