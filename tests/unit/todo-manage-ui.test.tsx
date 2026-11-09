@@ -17,7 +17,7 @@ vi.mock("../../lib/read-client", () => ({
 vi.mock("../../app/actions", () => ({ signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { addCategory } from "../../app/todos/actions";
+import { addCategory, setTodoDone } from "../../app/todos/actions";
 import { TodoScreen } from "../../components/todo-screen";
 
 const DAY: TodoDay = { date: "2026-11-07", year: 2026, month: 11, dayOfMonth: 7, weekday: 6 };
@@ -206,7 +206,8 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     await waitFor(() => expect(document.activeElement).toBe(more));
   });
 
-  it("「끝냄」 줄을 누르면 목록 줄의 끝냄 체크와 같이 바뀐다(같은 길)", async () => {
+  it("「끝냄」 줄을 누르면 목록 줄의 끝냄 체크와 같이 바뀐다(같은 길 — setTodoDone(id, true))", async () => {
+    vi.mocked(setTodoDone).mockResolvedValue({ ok: true, data: { id: A, done: true } } as never);
     render(<TodoScreen initial={initial([item(A, "첫째")])} manage={fakeApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "자세히 보기: 첫째" }));
     const dialog = await screen.findByRole("dialog", { name: "할 일 자세히" });
@@ -216,6 +217,7 @@ describe("할 일 자세히 (0번) — 고침9 할 일 페이지(Figma 51:55 · 
     expect((within(dialog).getByRole("checkbox", { name: "끝냄" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(dialog).getByRole("button", { name: "할 일로 돌아가기" }));
     expect((screen.getByRole("checkbox", { name: "첫째" }) as HTMLInputElement).checked).toBe(true);
+    expect(setTodoDone).toHaveBeenCalledWith(A, true);
   });
 
   it("Esc로 닫힌다", async () => {
