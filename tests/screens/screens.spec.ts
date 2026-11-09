@@ -451,7 +451,11 @@ for (const state of C_STATES) {
           await expect(page.getByText(/개 중 \d개 끝냄/)).toHaveCount(0);
         }
         if (state.id === "T16" || state.id === "T16b") {
-          await expect(page.locator(".notice[role=alert]")).toContainText("아직 저장되지 않은 글이 있어요");
+          // 고침10 B: 로그아웃 확인 = 공통 확인 창(147:2 다섯째)
+          const logoutConfirm = page.getByRole("alertdialog", { name: "로그아웃할까요?" });
+          await expect(logoutConfirm).toBeVisible();
+          await expect(logoutConfirm.locator(".close-confirm-desc")).toHaveText("아직 저장되지 않은 기록은 이 기기에서 지워져요.");
+          await expect(logoutConfirm.getByRole("button")).toHaveText(["로그아웃", "계속 쓰기"]);
         }
       });
     }

@@ -155,7 +155,7 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     await input.fill(T3);
     for (const b of await group.getByRole("button", { pressed: true }).all()) if ((await b.textContent())?.trim() !== "기타") await b.click();
     await page.getByRole("button", { name: "적기", exact: true }).click();
-    await page.getByRole("button", { name: /적는 창 닫기/ }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click(); // 고침10 A: 왼쪽 위 「✕」
     await expect(page.locator("li.todo-row", { hasText: T3 })).toBeVisible();
     await expect(page.locator("li.todo-row", { hasText: T3 }).locator(".category-tag")).toHaveCount(0);
   });
@@ -166,7 +166,7 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     await note.fill("Day 12까지");
     await note.press("Enter");
     await expect(page.getByText("Day 12까지")).toBeVisible();
-    await page.getByRole("button", { name: "할 일로 돌아가기" }).click();
+    await page.getByRole("dialog", { name: "할 일 자세히" }).getByRole("button", { name: "이전" }).click(); // 고침10 A: 왼쪽 위 「‹」
     await expect(page.locator("li.todo-row", { hasText: T1 }).getByRole("img", { name: "작업 기록 있음" })).toBeVisible();
   });
   await step(S, "④ 작업 기록이 분야 페이지(50:616) 그날 아래에", "8-6 AC5", async () => {
@@ -175,7 +175,7 @@ test("S-02 낮 — 할 일 적기 · 끝냄 · 작업 기록 · 타이머", asyn
     await page.getByRole("tab", { name: "목표 비율" }).click();
     await page.locator(".growth-item > button", { hasText: cat1 }).first().click();
     await expect(page.getByRole("dialog").getByText("Day 12까지")).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("dialog").getByRole("button", { name: "닫기" }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "이전" }).click(); // 고침10 A: 분야 페이지 「‹」
     await tab(page, "할 일");
   });
   await step(S, "⑤ 체크 → 다시 누름 → 풀림 · 줄 누름 44", "8-2 AC3", async () => {
@@ -278,15 +278,12 @@ test("S-04 실수 — 나누다 닫기 · 합 넘침 · 나누지 않고 저장"
   await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
   await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
   const confirm = page.getByRole("alertdialog");
-  await step(S, "① 칩 고른 뒤 「닫기」 → 확인 창(98:210) · 초점이 제목", "8-3 AC2", async () => {
+  await step(S, "① 칩 고른 뒤 닫기(Esc — 나누기 단계의 머리 「‹」는 시간 단계로) → 확인 창(147:2) · 초점이 제목 · 위 「나가기」 아래 「계속 적기」", "8-3 AC2", async () => {
     await pickSplitChip(dialog);
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    await dialog.press("Escape");
     await expect(confirm).toBeVisible();
-    await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeVisible();
-    await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeVisible();
-    await expect(confirm.getByRole("button", { name: "나가기" })).toBeVisible();
-    const focusedIsTitle = await page.evaluate(() => document.activeElement?.tagName === "H2" || document.activeElement?.getAttribute("role") === "alertdialog");
-    expect(focusedIsTitle, `초점: ${await page.evaluate(() => document.activeElement?.textContent)}`).toBe(true);
+    await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused(); // 고침10 B: 첫 초점 = 제목
+    await expect(confirm.getByRole("button")).toHaveText(["나가기", "계속 적기"]);
   });
   await step(S, "② 「계속 적기」 → 값 그대로", "8-3 AC2", async () => {
     const before = await pressedSplitChips(dialog).count();
@@ -294,15 +291,15 @@ test("S-04 실수 — 나누다 닫기 · 합 넘침 · 나누지 않고 저장"
     await expect(confirm).toBeHidden();
     await expect(pressedSplitChips(dialog)).toHaveCount(before);
   });
-  await step(S, "③ 다시 「닫기」 → 「나가기」 → 닫힘", "8-3 AC2", async () => {
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+  await step(S, "③ 다시 닫기(Esc) → 「나가기」 → 닫힘", "8-3 AC2", async () => {
+    await dialog.press("Escape");
     await confirm.getByRole("button", { name: "나가기" }).click();
     await expect(dialog).toBeHidden();
   });
-  await step(S, "④ 다시 들어가 바꾸지 않고 「닫기」 → 확인 없이 닫힘", "명세 ④-2", async () => {
+  await step(S, "④ 다시 들어가 바꾸지 않고 머리 「‹」 → 확인 없이 닫힘", "명세 ④-2", async () => {
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    await dialog.getByRole("button", { name: "이전" }).click();
     await expect(confirm).toHaveCount(0);
     await expect(dialog).toBeHidden();
   });
@@ -316,12 +313,12 @@ test("S-04 실수 — 나누다 닫기 · 합 넘침 · 나누지 않고 저장"
     await expect(dialog.getByRole("button", { name: /^기타 .*(늘리기|줄이기)$/ })).toHaveCount(0);
   });
   await step(S, "⑥ 시간 단계에서 「나누지 않고 저장」 → 저장", "8-3 AC5", async () => {
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    await dialog.press("Escape");
     if (await confirm.isVisible()) await confirm.getByRole("button", { name: "나가기" }).click();
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
     await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 20_000 });
-    await dialog.getByRole("button", { name: /닫기/ }).last().click();
+    await dialog.getByRole("button", { name: "이전" }).click(); // 저장 뒤 머리 「‹」 = 닫기
   });
   finish();
 });
@@ -422,7 +419,7 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
     const d = page.getByRole("dialog");
     await expect(d.getByText(/^총 /).first()).toBeVisible({ timeout: 20_000 });
     await expect(d.getByText(/^이번 주 /).first()).toBeVisible();
-    await d.getByRole("button", { name: "닫기" }).first().click();
+    await d.getByRole("button", { name: "이전" }).click(); // 고침10 A: 분야 페이지 「‹」
     await expect(d).toBeHidden();
   });
   await step(S, "(다) ⑤ 기타 줄 「›」 → 기타 페이지(121:468) 목표 비율 줄 없음", "⑰", async () => {
@@ -430,7 +427,7 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
     const d = page.getByRole("dialog");
     await expect(d.getByText(/^총 /).first()).toBeVisible({ timeout: 20_000 });
     await expect(d.getByText(/^목표 비율 /)).toHaveCount(0);
-    await d.getByRole("button", { name: "닫기" }).first().click();
+    await d.getByRole("button", { name: "이전" }).click();
   });
   await step(S, "재촉·평가 말 없음", "8-4 AC2", async () => {
     const text = await page.locator("main, body").first().innerText();
@@ -513,7 +510,7 @@ test("S-08 오프라인 — 저장 대기 원", async ({ browser }) => {
     await page.getByRole("button", { name: "할 일 적기" }).click();
     await page.getByRole("textbox", { name: "할 일 적기" }).fill(text);
     await page.getByRole("button", { name: "적기", exact: true }).click();
-    await page.getByRole("button", { name: /적는 창 닫기/ }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click(); // 고침10 A: 왼쪽 위 「✕」
     const row = page.locator("li.todo-row", { hasText: text });
     await expect(row).toBeVisible();
     await expect(row.locator(".save-pending")).toHaveCount(1);
@@ -570,15 +567,15 @@ test("S-09 접근성 ②③ · 대비 · 누름 · aria", async ({ browser }) =>
     expect(names.some((n) => /, 다이얼에 넣기$/.test(n))).toBe(true);
     await expect(dialog.getByRole("button", { name: "이전" })).toBeVisible();
   });
-  await step(S, "② 확인 창이 떠 있는 동안 Tab이 뒤 화면으로 가지 않는다(inert)", "명세 ④-2", async () => {
+  await step(S, "② 확인 창이 떠 있는 동안 Tab이 뒤 화면으로 가지 않는다(inert · 고침10 B Tab 가두기)", "명세 ④-2", async () => {
     await pickSplitChip(dialog);
-    await dialog.getByRole("button", { name: "닫기" }).first().click();
+    await dialog.press("Escape");
     const c = page.getByRole("alertdialog");
     await expect(c).toBeVisible();
-    // 이 앱은 확인 밖에 inert를 단다(components/close-confirm.tsx): 마지막 단추 뒤 Tab은 페이지 밖(body)으로 나가고 뒤 화면 요소에는 닿지 않는다
+    // 확인 밖에는 inert, Tab·Shift+Tab은 창 안 두 단추에서만 돈다(components/close-confirm.tsx)
     for (let i = 0; i < 4; i++) {
       await page.keyboard.press("Tab");
-      expect(await c.evaluate((el) => document.activeElement === document.body || document.activeElement === null || el.contains(document.activeElement))).toBe(true);
+      expect(await c.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     }
     await c.getByRole("button", { name: "나가기" }).click();
   });
@@ -653,7 +650,7 @@ test("S-10 분야가 많을 때 — 칩 「+n」", async ({ browser }) => {
     expect(await more.evaluate((el) => el.querySelector("svg, .chip-check") !== null || /✓/.test(el.textContent ?? ""))).toBe(true);
   });
   await step(S, "⑤ 나누기·타이머에서도 같은 꼴(「+n」)", "명세 ⑱ P-1", async () => {
-    await page.getByRole("button", { name: /적는 창 닫기/ }).click();
+    await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click(); // 고침10 A: 왼쪽 위 「✕」
     if (await page.getByRole("alertdialog").isVisible()) await page.getByRole("alertdialog").getByRole("button", { name: "나가기" }).click();
     await tab(page, "타이머");
     await expect(page.getByRole("button", { name: /^분야 \d+개 더 보기$/ })).toBeVisible({ timeout: 20_000 });

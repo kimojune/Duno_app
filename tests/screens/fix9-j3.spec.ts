@@ -271,7 +271,9 @@ async function afterSave(page: Page, s: string) {
   near(go.x + go.width / 2, 180, 2, "글 단추 가운데");
   expect(go.y).toBeGreaterThan((await box(card)).y + (await box(card)).height - 1);
   await expect(page.locator(".bottom-actions")).toHaveCount(0);
-  await expect(dialog.getByRole("button")).toHaveText(["닫기", "상태보기에서 보기›"]); // 「›」는 글자 사이 4px(꾸밈, 화면 읽기에서 숨김)
+  await expect(dialog.getByRole("button")).toHaveText(["", "상태보기에서 보기›"]); // 머리 「‹」(고침10 A, 아이콘만) · 「›」는 글자 사이 4px(꾸밈, 화면 읽기에서 숨김)
+  await expect(dialog.getByRole("button", { name: "이전" })).toHaveCount(1);
+  await expect(dialog.getByRole("button", { name: "닫기" })).toHaveCount(0);
   // 막대: 높이 16, 빗금 칸은 같은 분야 색 위 사선 빗금
   const hatch = card.locator(".after-save-hatch").first();
   near((await box(hatch)).height, 16, 0.5, "막대 높이");
@@ -311,15 +313,15 @@ test("S5-3 저장 직후 · 분야가 많을 때(큰 순 넷 + 그 밖 n개)", a
   await photo(page, "S5-3 저장 직후 · 분야가 많을 때");
 });
 
-test("확인 창 「저장하지 않고 나갈까요?」 계속 적기 / 나가기 — 98:278(꼴은 J1 공통 부품)", async ({ page }) => {
+test("확인 창 「저장하지 않고 나갈까요?」 나가기 / 계속 적기 — 146:11(고침10 B 공통 부품)", async ({ page }) => {
   await open(page, "evening-todo");
   const dialog = page.getByRole("dialog", { name: "오늘 기록" });
   await dialog.getByRole("button", { name: "+ 5분" }).click();
-  await dialog.locator(".screen-head").getByRole("button", { name: "닫기" }).click();
+  await dialog.locator(".screen-head").getByRole("button", { name: "이전" }).click(); // 고침10 A: 머리 「‹」(시간 단계 = 닫기)
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button")).toHaveText(["계속 적기", "나가기"]);
-  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
+  await expect(confirm.getByRole("button")).toHaveText(["나가기", "계속 적기"]);
+  await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused();
   expect((await box(confirm)).width).toBeLessThanOrEqual(312.5);
   await noOverflow(page);
   await photo(page, "확인 창 · 저장하지 않고 나갈까요");

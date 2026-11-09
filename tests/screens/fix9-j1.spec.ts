@@ -33,16 +33,16 @@ async function noOverflow(page: Page) {
   const s = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   expect(s.sw, "가로 스크롤 없음").toBeLessThanOrEqual(s.cw);
 }
-/** 「‹」: 보이는 자리 48×48, 화면 왼쪽 끝 가까이(누름 틀이 안쪽 여백 밖으로 12 나감), 이름 「이전」 */
+/** 「‹」(고침10 A 머리 단추 146:10): 누름 48×48, 화면 왼쪽 4 · 위 10, 아이콘만(이름 「이전」) */
 async function checkBack(page: Page, scope = page.locator("body")) {
   const back = scope.getByRole("button", { name: "이전" });
   await expect(back).toHaveCount(1);
-  await expect(back).toHaveText("‹");
+  await expect(back).toHaveText("");
   const b = (await back.boundingBox())!;
-  expect(b.width, "「‹」 누름 폭 48").toBeGreaterThanOrEqual(48);
-  expect(b.height, "「‹」 누름 높이 48").toBeGreaterThanOrEqual(48);
-  expect(b.x, "왼쪽 위").toBeLessThanOrEqual(8);
-  expect(b.y, "맨 위 줄").toBeLessThanOrEqual(40);
+  expect(Math.round(b.width), "「‹」 누름 폭 48").toBe(48);
+  expect(Math.round(b.height), "「‹」 누름 높이 48").toBe(48);
+  expect(Math.round(b.x), "화면 왼쪽 4").toBe(4);
+  expect(Math.round(b.y), "화면 위 10").toBe(10);
   return back;
 }
 /** 아래 주 단추: 폭 = 화면 폭 − 좌우 16, 높이 48 이상, 아래 끝이 화면 아래에서 36 위 */
@@ -156,13 +156,11 @@ test("S5-2 나누기 · 들어간 처음: 머리 한 줄 「‹」 · 가운데 
   const back = await checkBack(page, dlg);
   const title = dlg.locator(".screen-head-title");
   await expect(title).toHaveText("오늘 기록");
-  const close = dlg.locator(".screen-head-close");
-  await expect(close).toHaveText("닫기");
-  const [b, t, x, hd] = await Promise.all([back.boundingBox(), title.boundingBox(), close.boundingBox(), heading.boundingBox()]);
+  // 고침10 A: 오른쪽 위 글 「닫기」는 없다(머리 단추 「‹」 하나)
+  await expect(dlg.getByRole("button", { name: "닫기" })).toHaveCount(0);
+  const [b, t, hd] = await Promise.all([back.boundingBox(), title.boundingBox(), heading.boundingBox()]);
   expect(Math.abs(b!.y + b!.height / 2 - (t!.y + t!.height / 2)), "한 줄").toBeLessThanOrEqual(2);
   expect(Math.abs(t!.x + t!.width / 2 - 180), "제목 가운데").toBeLessThanOrEqual(2);
-  expect(x!.x + x!.width, "닫기 오른쪽 끝").toBeGreaterThan(340);
-  expect(x!.height, "닫기 누름 높이 44(O-2)").toBeGreaterThanOrEqual(44);
   expect(hd!.y, "큰 제목은 머리 아래").toBeGreaterThan(b!.y + b!.height - 1);
   expect(await title.evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).fontWeight])).toEqual(["16px", "700"]);
   await expect(dlg.getByRole("button", { name: "이전" })).toHaveCount(1);
@@ -213,14 +211,14 @@ test("S8 내 정보 · S8-a 목표 비율 설정 · 바꾼 뒤 「‹」 → 확
   await dlg.getByRole("button", { name: "이전" }).click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button")).toHaveText(["계속 적기", "나가기"]);
-  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
+  await expect(confirm.getByRole("button")).toHaveText(["나가기", "계속 적기"]); // 고침10 B(PM 9): 위 떠나기 · 아래 안전한 쪽
+  await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused(); // 첫 초점 = 제목
   const box = await confirm.evaluate((e) => {
     const s = getComputedStyle(e);
     const t = getComputedStyle(e.querySelector("h2")!);
     return { w: e.getBoundingClientRect().width, bg: s.backgroundColor, pt: s.paddingTop, pl: s.paddingLeft, pb: s.paddingBottom, fs: t.fontSize, fw: t.fontWeight };
   });
-  expect(box).toEqual({ w: 312, bg: rgb(COLOR_TOKENS["--color-bg"]), pt: "28px", pl: "24px", pb: "24px", fs: "18px", fw: "700" });
+  expect(box).toEqual({ w: 312, bg: rgb(COLOR_TOKENS["--color-surface"]), pt: "28px", pl: "24px", pb: "24px", fs: "18px", fw: "700" }); // 고침10 B 146:11: 흰 바탕
   const scrim = await page.locator(".close-confirm-backdrop").evaluate((e) => getComputedStyle(e).backgroundColor);
   const [r, g, b] = [0x1c, 0x23, 0x40];
   expect(scrim.replace(/\s/g, ""), "뒤 막 = 먹남색 45%").toMatch(new RegExp(`^(rgba\\(${r},${g},${b},0\\.45\\)|color\\(srgb[^)]*0\\.45\\))$`));

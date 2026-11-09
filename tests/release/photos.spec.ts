@@ -140,7 +140,7 @@ test("S2-a 적는 창 · 분야 고르기 · 접힘(+n) · 펼침 · 닫기 확�
     missing("S2-a 적는 창 · 분야 많음 펼침", "131:51", "A의 분야가 두 줄 안이라 접히지 않음");
   }
   // 133:2 적은 글이 있을 때 닫기 → 확인
-  await page.getByRole("button", { name: /적는 창 닫기/ }).click();
+  await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click(); // 고침10 A: 왼쪽 위 「✕」
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toBeVisible();
   await shot(page, "S2-a 적는 창 · 닫기 확인", "133:2");
@@ -153,7 +153,7 @@ test("S2-a 적는 창 · 분야 고르기 · 접힘(+n) · 펼침 · 닫기 확�
     await page.getByRole("button", { name: "적기", exact: true }).click();
     await expect(input).toHaveValue("");
   }
-  await page.getByRole("button", { name: /적는 창 닫기/ }).click();
+  await page.getByRole("form", { name: "할 일 적기" }).getByRole("button", { name: "닫기" }).click(); // 고침10 A: 왼쪽 위 「✕」
   await expect(page.getByText(T3, { exact: true })).toBeVisible();
 });
 
@@ -169,7 +169,7 @@ test("S2-b 할 일 페이지 · 작업 기록 · ⋯ 메뉴 · 지우기 확인 
   await expect(catSheet).toBeVisible();
   await shot(page, "S2-b′ 분야 고르기 시트", "77:18");
   await catSheet.getByRole("button", { name: "닫기" }).click();
-  await page.getByRole("button", { name: "할 일로 돌아가기" }).click();
+  await page.getByRole("dialog", { name: "할 일 자세히" }).getByRole("button", { name: "이전" }).click(); // 고침10 A: 왼쪽 위 「‹」
   // T1에 작업 기록
   await detail(T1).click();
   const noteBox = page.getByRole("textbox", { name: /작업 기록/ });
@@ -181,9 +181,9 @@ test("S2-b 할 일 페이지 · 작업 기록 · ⋯ 메뉴 · 지우기 확인 
   await shot(page, "S2-b 할 일 페이지 · 기록 있음 · ⋯ 메뉴", "58:92");
   await page.getByRole("menuitem", { name: "지우기" }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
-  await shot(page, "S2-b 할 일 페이지 · 지우기 확인", "66:12");
-  await page.getByRole("alertdialog").getByRole("button", { name: "취소" }).click();
-  await page.getByRole("button", { name: "할 일로 돌아가기" }).click();
+  await shot(page, "S2-b 할 일 페이지 · 지우기 확인", "147:2"); // 고침10 B: 66:12 가로 단추 꼴 → 공통 확인 창
+  await page.getByRole("alertdialog").getByRole("button", { name: "그대로 두기" }).click();
+  await page.getByRole("dialog", { name: "할 일 자세히" }).getByRole("button", { name: "이전" }).click(); // 고침10 A: 왼쪽 위 「‹」
   // 하나 끝냄
   await page.getByRole("checkbox", { name: T3 }).check();
   await expect(page.getByRole("checkbox", { name: T3 })).toBeChecked();
@@ -202,7 +202,7 @@ test("S2-e 지난 날 · 이날 기록 / 앞날", async () => {
   await page.getByRole("button", { name: "지난 날 보기" }).click();
   await expect(page.getByRole("dialog", { name: /지난 날/ })).toBeVisible();
   await shot(page, "S2-e 지난 날 · 이날 기록", "57:93");
-  await page.getByRole("dialog", { name: /지난 날/ }).getByRole("button", { name: "닫기" }).click();
+  await page.getByRole("dialog", { name: /지난 날/ }).getByRole("button", { name: "이전" }).click(); // 고침10 A
 });
 
 test("S2-d 이번 주 목표 시트(목표 없애기 확인 포함)", async () => {
@@ -222,9 +222,9 @@ test("S2-d 이번 주 목표 시트(목표 없애기 확인 포함)", async () =
   // 다시 열어 「목표 없애기」 확인
   await page.getByRole("button", { name: /이번 주 목표/ }).first().click();
   await dlg.getByRole("button", { name: "목표 없애기" }).click();
-  await expect(dlg.getByText("이번 주 목표를 없앨까요?")).toBeVisible();
-  await shot(page, "S2-d 이번 주 목표 시트 · 목표 없애기 확인", "50:332");
-  await dlg.getByRole("button", { name: "그대로" }).click();
+  await expect(page.getByRole("alertdialog", { name: "이번 주 목표를 없앨까요?" })).toBeVisible(); // 고침10 B 공통 확인 창(147:2)
+  await shot(page, "S2-d 이번 주 목표 시트 · 목표 없애기 확인", "147:2");
+  await page.getByRole("alertdialog").getByRole("button", { name: "그대로 두기" }).click();
   await dlg.getByRole("button", { name: "닫기" }).click();
 });
 
@@ -280,9 +280,9 @@ test("S5 오늘 기록 · 시간 · 시트 · 나누기 · 확인 · 저장 중 
     await shot(page, "S5-2 나누기 · 「+」 끝까지(기타 0분, 안내 없음)", "49:83", { note: "참고 사진: 49:83 상태 대신 「+」가 막힌 기타 0분" });
     missing("S5-2 나누기 · 나눈 합이 합계보다 많을 때(기타 0분)", "49:83", "「+」가 기타에 남은 만큼까지만 늘어나 나눈 합이 합계를 넘을 수 없다(evening-record.tsx 679, 실행 확인) — 안내 글이 나올 길 없음");
   }
-  await dialog.getByRole("button", { name: "닫기" }).first().click();
+  await dialog.press("Escape"); // 고침10 A: 나누기 단계의 머리 「‹」는 시간 단계로 — 닫기는 Esc
   await expect(page.getByRole("alertdialog")).toBeVisible();
-  await shot(page, "확인 창 「저장하지 않고 나갈까요?」 계속 적기 · 나가기", "98:210");
+  await shot(page, "확인 창 「저장하지 않고 나갈까요?」 나가기 · 계속 적기", "147:2");
   await page.getByRole("alertdialog").getByRole("button", { name: "계속 적기" }).click();
   // 저장 중: 서버 쓰기를 2초 늦춘다(응답은 진짜)
   await page.route("**/*", async (route) => {
@@ -314,12 +314,12 @@ test("S6-2 목표 비율 뷰 · 띠 · 원 · S7 분야 · 기타", async () => 
   await rows.first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await shot(page, "S7 분야 페이지", "50:616");
-  await page.getByRole("dialog").getByRole("button", { name: "닫기" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "이전" }).click(); // 고침10 A: 분야 페이지 「‹」
   const other = page.locator(".growth-item > button", { hasText: "기타" });
   await other.first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await shot(page, "S7 분야 페이지 · 「기타」", "121:468");
-  await page.getByRole("dialog").getByRole("button", { name: "닫기" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "이전" }).click(); // 고침10 A: 분야 페이지 「‹」
 });
 
 test("S6-1 목표 없는 주 · S5-3 저장 직후 목표 없는 주(목표를 없앤 뒤)", async () => {
@@ -329,7 +329,7 @@ test("S6-1 목표 없는 주 · S5-3 저장 직후 목표 없는 주(목표를 �
   const dlg = page.getByRole("dialog", { name: "이번 주 목표" });
   if (await dlg.getByRole("button", { name: "목표 없애기" }).isVisible()) {
     await dlg.getByRole("button", { name: "목표 없애기" }).click();
-    await dlg.getByRole("button", { name: "없애기", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "없애기", exact: true }).click();
   } else await dlg.getByRole("button", { name: "닫기" }).click(); // 이미 목표 없는 주
   await expect(dlg).toBeHidden({ timeout: 20_000 });
   await growthReady();
@@ -341,7 +341,7 @@ test("S6-1 목표 없는 주 · S5-3 저장 직후 목표 없는 주(목표를 �
   await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
   await expect(dialog.getByRole("heading", { name: "저장했어요" })).toBeVisible({ timeout: 20_000 });
   await shot(page, "S5-3 저장 직후 · 목표 없는 주", "59:2");
-  await dialog.getByRole("button", { name: /닫기/ }).last().click();
+  await dialog.getByRole("button", { name: "이전" }).click(); // 고침10 A: 저장 뒤 머리 「‹」 = 닫기
 });
 
 // ---------- 가짜 응답: 빈 기록 ----------
@@ -377,7 +377,7 @@ test("S7 분야 페이지 · 빈 상태(기록 없는 분야)", async () => {
       await shot(page, "S7 분야 페이지 · 빈 상태", "121:527");
       return;
     }
-    await d.getByRole("button", { name: "닫기" }).first().click();
+    await d.getByRole("button", { name: "이전" }).click(); // 고침10 A: 분야 페이지 「‹」
   }
   throw new Error("기록 없는 분야를 찾지 못함");
 });

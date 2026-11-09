@@ -187,8 +187,8 @@ test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확�
   await back.click();
   const confirm = page.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button")).toHaveText(["계속 적기", "나가기"]); // PM d-135: 앱 공통 확인 글
-  await expect(confirm.getByRole("button", { name: "계속 적기" })).toBeFocused();
+  await expect(confirm.getByRole("button")).toHaveText(["나가기", "계속 적기"]); // PM d-135 글 · 고침10 B: 위 떠나기 · 아래 안전한 쪽
+  await expect(confirm.getByRole("heading", { name: "저장하지 않고 나갈까요?" })).toBeFocused(); // 고침10 B: 첫 초점 = 제목
   await photo(page, "S8-b-나가기확인");
   await confirm.getByRole("button", { name: "계속 적기" }).click();
   await expect(confirm).toHaveCount(0);
