@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeScreen } from "../../components/me-screen";
 import type { SettingsApi } from "../../lib/onboarding-api";
@@ -44,6 +44,10 @@ function fakePush(over: Partial<PushApi> = {}): PushApi {
   };
 }
 const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
+/** 고침9(PM 6): 내 정보 「목표 비율」 카드를 눌러 S8-a를 열고, S8-a의 「저장」으로 저장한다(옛 「비율 저장」 단추는 없다) */
+const openRatio = () => press(/^목표 비율, /);
+const ratioDialog = () => screen.getByRole("dialog", { name: "목표 비율" });
+const saveRatio = () => act(async () => fireEvent.click(within(ratioDialog()).getByRole("button", { name: "저장" })));
 
 beforeEach(() => {
   vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(true);
@@ -98,20 +102,25 @@ describe("내 정보 탭", () => {
     expect(screen.getByText("목표를 읽을 수 없어요. 새로 적으면 바뀌어요.")).toBeTruthy();
   });
 
-  it("처음 정한 비율을 −/+ 단추로 고쳐 저장한다. 합은 늘 100이다(줄여도 0이 되지 않고 기타로 간다, PM 확정 11-08)", async () => {
+  it("목표 비율을 S8-a에서 −/+ 단추로 고쳐 저장한다. 합은 늘 100이다(줄여도 0이 되지 않고 기타로 간다, PM 확정 11-08)", async () => {
     const api = fakeApi();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
+    expect(screen.queryByRole("button", { name: "비율 저장" })).toBeNull();
+    expect(document.querySelector("input.ratio-field")).toBeNull(); // 내 정보에서 그 자리에서 고치지 않는다
+    await openRatio();
     expectFieldSum100();
     fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" })); // 60·40·0 → 55·45·0 (뒤 줄로)
     fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" })); // → 55·40·5 (뒤 줄 기타로)
-    await press("비율 저장");
+    await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 55 }, { categoryId: C2, percent: 40 }, { categoryId: null, percent: 5 }]);
+    expect(screen.queryByRole("dialog", { name: "목표 비율" })).toBeNull(); // 저장하면 내 정보로 돌아간다
+    await openRatio();
     for (let i = 0; i < 20; i++) {
       fireEvent.click(screen.getByRole("button", { name: "어학 5% 줄이기" }));
       fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5% 줄이기" }));
     }
     expectFieldSum100();
-    await press("비율 저장");
+    await saveRatio();
     expect(screen.queryByText("하나 이상은 0%보다 커야 해요.")).toBeNull();
     // 0%가 된 분야는 저장 목록에 싣지 않는다(저장 목록에 없는 분야는 0%로 읽는다, 고침4 합치기). 기타 100만 간다
     expect(api.saveRatios).toHaveBeenLastCalledWith([{ categoryId: null, percent: 100 }]);
@@ -120,21 +129,24 @@ describe("내 정보 탭", () => {
   it("저장값의 합이 100이 아니면 열 때 비율을 지켜 합 100의 정수로 맞추고, 그대로 저장하면 그 값이 간다", async () => {
     const api = fakeApi();
     render(<MeScreen settings={settings({ ratios: [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 30 }] })} categories={categories} api={api} push={fakePush()} />);
+    await openRatio();
     expectFieldSum100();
     expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
     expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
-    await press("비율 저장");
+    await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 50 }, { categoryId: C2, percent: 50 }]);
   });
 
-  it("비율이 아직 없으면 고르게 나눈 값으로 열린다. 분야가 없으면 안내", () => {
+  it("비율이 아직 없으면 고르게 나눈 값으로 열린다. 분야가 없으면 안내(카드는 단추가 아니다)", async () => {
     const { unmount } = render(<MeScreen settings={settings({ ratios: [] })} categories={categories} api={fakeApi()} push={fakePush()} />);
+    await openRatio();
     expect((screen.getByLabelText("어학 비율(%)") as HTMLInputElement).value).toBe("50");
     expect((screen.getByLabelText("포트폴리오 비율(%)") as HTMLInputElement).value).toBe("50");
     expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("0");
     unmount();
     render(<MeScreen settings={settings({ ratios: [] })} categories={[]} api={fakeApi()} push={fakePush()} />);
     expect(screen.getByText("분야가 아직 없어요. 할 일을 적을 때 분야를 더해 보세요.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^목표 비율, / })).toBeNull();
   });
 
   it("알림을 켜면 허락 → 구독을 한 뒤 설정을 저장한다", async () => {
@@ -230,7 +242,12 @@ describe("내 정보 탭", () => {
       window.dispatchEvent(new Event("offline"));
     });
     expect(screen.getAllByText("인터넷에 연결되면 저장할 수 있어요.").length).toBeGreaterThan(0);
-    for (const name of ["비율 저장", "알림 설정 저장"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "알림 설정 저장" }) as HTMLButtonElement).disabled).toBe(true);
+    // 목표 비율은 S8-a의 「저장」이 막힌다(고침9)
+    await openRatio();
+    expect((within(ratioDialog()).getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(ratioDialog()).getByText("인터넷에 연결되면 저장할 수 있어요.")).toBeTruthy();
+    await act(async () => fireEvent.click(within(ratioDialog()).getByRole("button", { name: "이전" })));
     // 목표는 S8-b의 「저장」이 막힌다(고침6)
     await press(/^목표, /);
     expect((screen.getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);
@@ -256,11 +273,12 @@ describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
         push={fakePush()}
       />,
     );
+    await openRatio();
     expectFieldSum100();
     expect(screen.getByRole("button", { name: "기타 5% 줄이기" })).toBeTruthy();
     expect((screen.getByLabelText("기타 비율(%)") as HTMLInputElement).value).toBe("10");
     fireEvent.click(screen.getByRole("button", { name: "기타 5% 늘리기" })); // 기타는 맨 끝 줄: 앞 줄(포트폴리오)에서 떼어 온다
-    await press("비율 저장");
+    await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([
       { categoryId: C1, percent: 60 },
       { categoryId: C2, percent: 25 },
@@ -270,7 +288,8 @@ describe("내 정보: 기타 비율 (고침 3바퀴, PM 답 d-69)", () => {
   it("기타를 0%로 두면 저장 목록에 기타가 없다", async () => {
     const api = fakeApi();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush()} />);
-    await press("비율 저장");
+    await openRatio();
+    await saveRatio();
     expect(api.saveRatios).toHaveBeenCalledWith([{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }]);
   });
 });

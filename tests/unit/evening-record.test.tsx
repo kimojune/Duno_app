@@ -124,9 +124,12 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
       saveMode: "not_split",
       clientSavedAt: NOW.toISOString(),
     });
-    // 저장 뒤 판(S5-3): 같은 창에서 「✓ 저장했어요」(포커스) + 「이번 주」 카드. 아래 「닫기」 알약은 없다(닫기는 머리)
+    // 저장 뒤 판(S5-3): 같은 창에서 「✓ 저장했어요」 + 「이번 주」 카드. 아래 「닫기」 알약은 없다(닫기는 머리)
+    // O-8: 저장 상태는 포커스를 옮겨 읽히지 않는다 — 포커스는 창 자체(누른 단추가 사라져도 창 밖으로 빠지지 않음), 알림은 상태 알림 한 곳
     const savedHead = screen.getByRole("heading", { name: "저장했어요" });
-    expect(document.activeElement).toBe(savedHead);
+    expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "오늘 기록" }));
+    expect(savedHead.getAttribute("tabindex")).toBeNull();
+    expect(Array.from(document.querySelectorAll('[role="status"]')).map((e) => e.textContent).filter(Boolean)).toEqual(["저장했어요. 기타 +3시간."]);
     expect(afterSaveRows()).toEqual([["기타", "+3시간"]]); // 모두 기타로 저장한 날에도 값이 있다(상태보기 데이터 없이 바뀐 몫만)
     expect(document.querySelector(".bottom-actions")).toBeNull();
     expect(within(screen.getByRole("dialog")).getAllByRole("button").map((b) => b.textContent)).toEqual(["닫기"]);
@@ -154,6 +157,32 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
       ["포트폴리오", "+30분"],
       ["기타", "+1시간"],
     ]);
+  });
+
+  it("저장 중(O-7, Figma 133:48): 응답 전까지 주 단추가 「저장 중」 + 막힘 + aria-busy, 다른 단추도 막힌다. 응답 뒤 저장 뒤 판", async () => {
+    let resolve!: (v: Awaited<ReturnType<EveningApi["save"]>>) => void;
+    const save = vi.fn(() => new Promise<Awaited<ReturnType<EveningApi["save"]>>>((r) => (resolve = r)));
+    await mount(fakeApi(state(), { save }));
+    setNumber("시간", 1);
+    await press("분야마다 나누기");
+    await press("저장");
+    const busy = screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement;
+    expect([busy.disabled, busy.getAttribute("aria-busy"), busy.closest(".bottom-actions") !== null]).toEqual([true, "true", true]);
+    expect((screen.getByRole("button", { name: "이전" }) as HTMLButtonElement).disabled).toBe(true);
+    await press("저장 중"); // 막혀 있어 두 번 가지 않는다
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      resolve({ ok: true, data: { log: { id: "x", targetDay: "2026-11-07", totalMinutes: 60, items: [{ categoryId: null, minutes: 60 }], saveMode: "prefilled", savedAt: "x" }, delta: [{ categoryId: null, minutes: 60 }] } }),
+    );
+    expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
+    cleanup();
+    // 「나누지 않고 저장」도 같다
+    const save2 = vi.fn(() => new Promise<never>(() => {}));
+    await mount(fakeApi(state(), { save: save2 }));
+    await press("나누지 않고 저장");
+    const skip = screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement;
+    expect([skip.className, skip.disabled, skip.getAttribute("aria-busy")]).toEqual(["btn btn-secondary evening-skip", true, "true"]);
+    expect((screen.getByRole("button", { name: "분야마다 나누기" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("처음 값을 고치면 edited, 남은 시간은 기타", async () => {

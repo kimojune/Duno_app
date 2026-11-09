@@ -251,12 +251,14 @@ describe("읽을 수 없는 분야·보관한 분야가 끼어도 네 화면이 
     expect(fills(".dial-slice", "fill")).toEqual([...WANT, OTHER]);
   });
 
-  it("내 정보 「비율 고치기」 다이얼: 앱이 넘기는 읽을 수 있는 분야 목록이 같은 색 번호", async () => {
+  it("내 정보 목표 비율 띠와 S8-a 다이얼: 앱이 넘기는 읽을 수 있는 분야 목록이 같은 색 번호", async () => {
     const list = (await readableList()).flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : []));
     const settings = { goal: null, goalReadable: true, onboardingDone: true, notify: NOTIFY_OFF, ratios: [] };
     const api: SettingsApi = { addCategory: vi.fn(), saveRatios: vi.fn(), saveSettings: vi.fn(), requestPermission: vi.fn() };
     const push = { permission: vi.fn(() => "default" as const), supported: vi.fn(() => true), hasKey: vi.fn(() => true), subscribed: vi.fn(async () => false), enable: vi.fn(), disable: vi.fn() } as unknown as PushApi;
     render(<MeScreen settings={settings} categories={list} api={api} push={push} />);
+    expect(fills(".me-ratio-cell", "background")).toEqual(WANT); // 내 정보 띠 칸(기타 0%는 칸이 없다)
+    fireEvent.click(screen.getByRole("button", { name: /^목표 비율, / }));
     expect(fills(".dial-slice", "fill")).toEqual(WANT); // 비율이 없으면 분야끼리 고르게 나누고 기타는 0이라 조각이 없다
   });
 

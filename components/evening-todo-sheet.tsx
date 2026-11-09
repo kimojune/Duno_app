@@ -12,6 +12,7 @@ import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todo
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
+import { BACK_HEADER_TEXT } from "./back-header";
 import { ChipScroller } from "./chip-scroller";
 import { helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
@@ -46,7 +47,8 @@ export const EVENING_TODO_TEXT = {
   other: "기타",
   empty: "오늘 적은 할 일이 없어요.",
   loading: "할 일을 불러오는 중",
-  saving: "저장하는 중",
+  /** O-7: 적는 동안 「더하기」 busy + 「저장 중」(공통 글) */
+  saving: BACK_HEADER_TEXT.saving,
 } as const;
 
 /**
@@ -524,7 +526,7 @@ function EveningTodoSheet({
               </PrimaryButton>
             </form>
           ) : (
-            <TextButton id="evening-todo-add" className="evening-todo-add" onClick={openForm}>
+            <TextButton id="evening-todo-add" className="evening-todo-add text-tap" onClick={openForm}>
               {EVENING_TODO_TEXT.add}
             </TextButton>
           ))}

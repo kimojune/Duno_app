@@ -56,7 +56,7 @@ export const ONBOARDING_TEXT = {
   next: "다음",
   skipGoal: "건너뛰기",
   start: "시작하기",
-  saving: "저장하는 중",
+  saving: BACK_HEADER_TEXT.saving, // 「저장 중」(O-7)
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
   denied: "알림이 허락되지 않았어요. 브라우저 설정에서 바꿀 수 있어요.",
   pushUnsupported: "이 브라우저는 알림을 받을 수 없어요.",
@@ -424,6 +424,7 @@ export function Onboarding({
         <BottomActions>
           {step === 1 && (
             <TextButton
+              className="text-tap"
               onClick={() => {
                 setGoal("");
                 setStep(2);

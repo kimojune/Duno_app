@@ -18,7 +18,7 @@ import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { ChipScroller } from "./chip-scroller";
 import { Stepper } from "./stepper";
 import { CloseConfirm } from "./close-confirm";
-import { BackHeader, BottomActions } from "./back-header";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
 import { TimeWheel } from "./time-wheel";
 import { AfterSaveCard, AFTER_SAVE_TEXT } from "./after-save";
 import { categoryDuplicateText, categoryOverLimitText, TODO_TEXT } from "./todo-view";
@@ -82,7 +82,8 @@ export const EVENING_TEXT = {
   // 임시 글, 디자인 확정 뒤: 나누기 다이얼의 가운데 표시(아무 조각도 안 골랐을 때 = 쓴 시간)
   dialCenter: (m: number) => formatMinutes(m),
   save: "저장",
-  saving: "저장하는 중",
+  /** 저장 중(O-7, Figma 133:48): 주 단추 busy(막힘 + aria-busy + 흐림)와 이 글 */
+  saving: BACK_HEADER_TEXT.saving,
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요. 넣은 값은 그대로 있어요.",
   loading: "기록을 불러오는 중",
@@ -240,11 +241,13 @@ export function EveningRecord({
     };
   }, [api, apply]);
 
-  // 단계가 바뀌거나 기록을 다 읽으면 그 단계의 큰 제목(저장 뒤 판은 「저장했어요」)에 포커스. 머리 「오늘 기록」은 창 이름이다
+  // 단계가 바뀌거나 기록을 다 읽으면 그 단계의 큰 제목에 포커스. 머리 「오늘 기록」은 창 이름이다.
+  // 저장 뒤 판(O-8): 저장 상태는 포커스를 옮겨 읽히지 않고 상태 알림 한 곳(「이번 주」 카드의 role=status)이 한 문장으로 알린다.
+  // 누른 단추가 사라지므로 포커스는 창 자체에 둔다(창 밖으로 빠지지 않게). 읽는 동안도 창 자체
   const ready = load.status === "ready";
   useEffect(() => {
-    if (ready) titleRef.current?.focus();
-    else rootRef.current?.focus(); // 읽는 동안은 창 자체(창 밖에 포커스를 두지 않는다)
+    if (ready && phase !== "saved") titleRef.current?.focus();
+    else rootRef.current?.focus();
   }, [phase, ready, rootRef]);
 
   function chooseDay(next: 0 | 1) {
@@ -704,7 +707,7 @@ export function EveningRecord({
 
           {state && phase === "saved" && saved && (
             <>
-              <h2 className="evening-saved" tabIndex={-1} ref={titleRef}>
+              <h2 className="evening-saved">
                 <svg className="evening-saved-icon" width={22} height={22} viewBox="0 0 22 22" aria-hidden="true" focusable="false">
                   <circle cx={11} cy={11} r={10} fill="none" stroke="currentColor" strokeWidth={1.5} />
                   <path d="M6.5 11.5l3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
@@ -713,7 +716,7 @@ export function EveningRecord({
               </h2>
               {renderAfterSave ? renderAfterSave(saved, state) : <AfterSaveCard delta={saved.delta} data={null} fallback={fallbackNames} />}
               {onOpenGrowth && (
-                <TextButton className="evening-open-growth" onClick={onOpenGrowth}>
+                <TextButton className="evening-open-growth text-tap" onClick={onOpenGrowth}>
                   {EVENING_TEXT.openGrowth}
                   <span aria-hidden="true"> ›</span>
                 </TextButton>
@@ -728,14 +731,14 @@ export function EveningRecord({
             <PrimaryButton disabled={saving} onClick={toSplit}>
               {EVENING_TEXT.split}
             </PrimaryButton>
-            <SecondaryButton className="evening-skip" busy={saving} disabled={saving} onClick={() => void save(true)}>
-              {EVENING_TEXT.skipSplit}
+            <SecondaryButton className="evening-skip" busy={saving} onClick={() => void save(true)}>
+              {saving ? EVENING_TEXT.saving : EVENING_TEXT.skipSplit}
             </SecondaryButton>
           </BottomActions>
         )}
         {state && phase === "split" && (
           <BottomActions>
-            <PrimaryButton busy={saving} disabled={saving} onClick={() => void save(false)}>
+            <PrimaryButton busy={saving} onClick={() => void save(false)}>
               {saving ? EVENING_TEXT.saving : EVENING_TEXT.save}
             </PrimaryButton>
           </BottomActions>

@@ -80,7 +80,7 @@ test("처음 설정 목표 비율 · 할 일(적는 창 칩 줄) · 내 정보",
   await open(page, "/dev/v2?s=ratio-onboarding");
   await page.getByRole("button", { name: "다음" }).click();
   await page.getByRole("button", { name: "다음" }).click();
-  await expect(page.getByText("합계 100%")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "목표 비율" })).toBeVisible(); // 고침9: 「합계」 줄 없앰
   await photo(page, "처음설정-목표비율");
   await open(page, "/dev/states?s=C24&sheet=open");
   const row = page.getByRole("group", { name: "분야 (고르지 않으면 기타)" });
@@ -88,7 +88,7 @@ test("처음 설정 목표 비율 · 할 일(적는 창 칩 줄) · 내 정보",
   await noOverflow(page);
   await photo(page, "할일-적는창-칩줄");
   await open(page, "/dev/v2?s=me-ratio");
-  await expect(page.getByRole("heading", { name: "목표 비율" })).toBeVisible();
-  await page.getByRole("heading", { name: "목표 비율" }).scrollIntoViewIfNeeded();
+  await expect(page.locator(".me-ratio-card .me-card-title")).toHaveText("목표 비율"); // 고침9: 카드 단추 → S8-a
+  await page.locator(".me-ratio-card").scrollIntoViewIfNeeded();
   await photo(page, "내정보");
 });

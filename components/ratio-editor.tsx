@@ -197,7 +197,9 @@ export function RatioEditor({
         ))}
       </ul>
       <div className="ratio-foot">
-        <TextButton onClick={even}>{RATIO_TEXT.even}</TextButton>
+        <TextButton className="text-tap" onClick={even}>
+          {RATIO_TEXT.even}
+        </TextButton>
       </div>
     </div>
   );

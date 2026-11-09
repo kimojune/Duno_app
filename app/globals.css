@@ -1009,3 +1009,39 @@ select.input { appearance: auto; }
 .me .input.notify-time-select { width: auto; min-width: 7.5em; min-height: 32px; font: 500 0.8125rem/1.25rem var(--font-family); }
 /* 확인 창 뒤 어두운 막(Figma 121:389·121:449): 먹남색 45%(새 토큰 없이 --color-text를 섞는다) */
 .close-confirm-backdrop { background: color-mix(in srgb, var(--color-text) 45%, transparent); }
+/* 내 정보(S8, Figma 50:641): 카드 사이 16. 목표 비율 카드 = 「목표 비율」 16 Bold + 「›」 + 작은 띠(높이 8, 칸마다 분야 색 + 1px 윤곽, 칸 사이 2, 숫자 없음). 카드 전체가 단추 하나 */
+.me .growth-body > .detail-section, .me-section { margin-top: var(--space-4); }
+.me-card-title { margin: 0 0 var(--space-2); font: var(--font-body); font-weight: 700; color: var(--color-text); }
+.me-ratio-card { display: flex; flex-direction: column; gap: var(--space-3); width: 100%; min-height: var(--tap-min); border: 0; color: var(--color-text); text-align: start; cursor: pointer; }
+.me-ratio-card:active { background: var(--color-notice-bg); }
+.me-ratio-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.me-ratio-head .me-card-title { margin: 0; }
+.me-chevron { flex: none; font: var(--font-body); color: var(--color-text); }
+.me-ratio-band { display: flex; gap: 2px; block-size: 8px; }
+.me-ratio-cell { flex-basis: 0; min-width: 2px; border: 1px solid var(--color-chart-outline, var(--color-text)); border-radius: 2px; }
+.me .notify-row { margin-top: var(--space-2); }
+.me .notify-name { font: 500 0.875rem/1.25rem var(--font-family); } /* 내 정보 알림 줄 이름 14 Medium */
+/* 머리 가운데 제목: 양옆 칸을 같은 폭(1fr, 최소 48)으로 두어 「‹」(48)와 「닫기」(글 폭)가 달라도 제목이 화면 가운데에 온다 */
+.screen-head-row-center { display: grid; grid-template-columns: minmax(var(--tap-min), 1fr) minmax(0, auto) minmax(var(--tap-min), 1fr); }
+.screen-head-row-center > :first-child { justify-self: start; }
+.screen-head-row-center > :last-child:not(:first-child) { justify-self: end; }
+/* 내 정보 머리(Figma 50:641, A5): 워드마크 한 줄 → 그 아래 「내 정보」 제목(왼쪽). 할 일 머리처럼 양끝으로 벌리지 않는다 */
+.me .today-header { display: block; }
+/* 「시각」 고르기 칸은 글 폭만큼(Figma 84 · 32 높이). 내 정보의 글 칸 100% 규칙보다 한 단계 구체적으로 */
+.me .notify-time .input.notify-time-select { width: auto; flex: none; }
+/* 처음 설정 이름표 → 내용 사이(Figma 49:178·50:4: 제목 아래 약 20) */
+.onboarding .onboarding-title { margin-bottom: var(--space-4); }
+.onboarding .onboarding-title-row { margin-bottom: var(--space-4); }
+
+/* ---- 고침9 스킬 검토 공통 몫(명세 ⑭ O-1 · O-2 · O-7 · O-11, PM d-150) ---- */
+/* O-1 −/+ : 보이는 원 32 그대로, 투명 누름 틀 44×44. 줄 간격 48(위아래 틀이 겹치지 않게) — Stepper·목표 비율 줄 한 곳 */
+.step-btn { inline-size: 44px; block-size: 44px; }
+.ratio-row { min-height: 48px; padding-block: 2px; }
+/* O-2 글 단추 누름 틀 높이 44(보이는 글 그대로). 화면마다 글 단추에 .text-tap을 단다(머리 「닫기」·「균등 배분」·「건너뛰기」·「로그아웃」 등) */
+.btn.text-tap, .text-tap { min-height: 44px; min-block-size: 44px; display: inline-flex; align-items: center; justify-content: center; padding-block: 0; }
+/* O-7 저장 중: 응답 전까지 단추를 막고(disabled — components/ui.tsx) 흐리게 */
+.btn[aria-busy="true"] { opacity: 0.45; cursor: progress; }
+/* O-11 겹친 창·시트·확인 창은 서서히 나타난다(불투명도만 160ms — 자리는 움직이지 않는다). 「동작 줄이기」여도 움직임이 없어 같다(명세 O-11 「시트는 서서히 나타남으로」).
+   다이얼 조각 나옴·빛은 components/ratio-dial.tsx가 이미 「동작 줄이기」면 바로 보인다 */
+@keyframes duno-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.detail, .evening-todo-sheet, .close-confirm, .close-confirm-backdrop, .evening-todo-backdrop { animation: duno-fade-in 160ms ease-out; }
