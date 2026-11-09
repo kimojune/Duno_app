@@ -419,8 +419,8 @@ function Row({
               {TODO_TEXT.saveFailed}
             </p>
             <div className="row-actions">
-              <TextButton className="text-tap" onClick={() => onRetry(row.id)}>{TODO_TEXT.retry}</TextButton>
-              <TextButton className="text-tap" onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
+              <TextButton onClick={() => onRetry(row.id)}>{TODO_TEXT.retry}</TextButton>
+              <TextButton onClick={() => onRemove(row.id)}>{TODO_TEXT.remove}</TextButton>
             </div>
           </>
         )}
