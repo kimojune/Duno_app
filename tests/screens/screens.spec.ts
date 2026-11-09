@@ -375,7 +375,7 @@ for (const state of C_STATES) {
           measurements[`${name}-cards`] = cards;
           expect(cards).toHaveLength(2);
           if (size === "360x640" || size === "360x800") {
-            const evening = cards.find((c) => c.label === "오늘 기록")!;
+            const evening = cards.find((c) => c.label === "오늘 기록 남기기")!; // 고침10 E(50:72): 카드 전체가 하나의 단추(이름 「오늘 기록 남기기」)
             const offer = cards.find((c) => c.label === "오늘 먼저 할 일")!;
             expect(evening.height, "오늘 기록 입구는 한 줄").toBeLessThanOrEqual(56 + 0.5);
             expect(offer.height, "먼저 할 일 카드는 두 줄 안").toBeLessThanOrEqual(48 * 2 + 4 * 2 + 4 + 0.5);
