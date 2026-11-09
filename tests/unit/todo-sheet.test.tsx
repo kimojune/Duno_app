@@ -85,6 +85,16 @@ function setOnline(value: boolean) {
   vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(value);
 }
 /** 안드로이드 뒤로 가기: 앞 칸으로 돌아가 popstate가 온다 */
+/** 고침9 O-3: 바꾼 것이 있는 적는 창의 닫기 확인 */
+const confirmDialog = () => screen.queryByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
+/** 확인이 떠 있고(창은 열린 채), 「나가기」를 누른다 */
+function leaveViaConfirm() {
+  expect(confirmDialog(), "바꾼 것이 있으면 닫기 전에 확인").not.toBeNull();
+  expect(screen.queryByRole("form", { name: "할 일 적기" }), "확인이 떠도 창은 열린 채").not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+  expect(confirmDialog()).toBeNull();
+}
+
 function browserBack() {
   act(() => {
     window.history.replaceState(null, "");
@@ -103,6 +113,10 @@ beforeEach(() => {
   window.history.replaceState(null, "");
   pushState = vi.spyOn(window.history, "pushState");
   back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+  // 고침9 O-3: 확인을 띄우며 부르는 forward()는 창의 칸으로 돌아가는 popstate를 낸다(이 파일은 jsdom history라 바로 낸다)
+  vi.spyOn(window.history, "forward").mockImplementation(() => {
+    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+  });
 });
 afterEach(() => {
   cleanup();
@@ -397,6 +411,7 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
     if (how === "button") fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
     else if (how === "esc") fireEvent.keyDown(todoInput(), { key: "Escape" });
     else browserBack();
+    leaveViaConfirm(); // 고침9 O-3: 글·분야를 바꿨으니 확인 → 「나가기」(창만 닫고 글은 남긴다)
   }
 
   for (const how of ["button", "esc", "back"] as const) {
@@ -477,12 +492,14 @@ describe("C8 닫은 뒤 글이 남음 (D-125 ②)·C-D2 뒤로 가기", () => {
     open();
     fireEvent.click(chip("운동"));
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm(); // 고침9 O-3: 분야를 바꾼 것도 확인
     expect(openButton().textContent).toBe("할 일 적기");
     open();
     expect(chip("운동").getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(addCategoryChip());
     typeCategory("자격증");
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm();
     expect(openButton().textContent).toBe("적던 글 이어 적기");
     open();
     expect(document.activeElement).toBe(newCategoryInput()); // 새 분야 줄이 열려 있었으면 새 분야 칸
@@ -739,6 +756,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     pressAdd();
     expect(screen.getByRole("button", { name: "더하는 중" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm(); // 고침9 O-3
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CATEGORY_ADD_TIMEOUT_MS + 100);
     });
@@ -755,6 +773,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     typeCategory("자격증");
     pressAdd();
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm(); // 고침9 O-3
     fail.resolve({ ok: false, error: "unavailable" });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CATEGORY_ADD_TIMEOUT_MS + 100);
@@ -767,6 +786,7 @@ describe("C13·C-D4 시간 제한과 늦은 응답", () => {
     addCategory.mockReturnValueOnce(success.promise);
     pressAdd();
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm();
     const liveBefore = liveText();
     success.resolve(added(addCategory.mock.calls[1][0], "자격증"));
     await act(async () => {
@@ -858,6 +878,7 @@ describe("포커스가 갈 곳·Esc·조합 중 엔터", () => {
     fireEvent.click(addCategoryChip());
     expect(newCategoryInput().value).toBe("");
     fireEvent.keyDown(todoInput(), { key: "Escape" });
+    leaveViaConfirm(); // 고침9 O-3: 글이 있으니 Esc도 확인
     expect(screen.queryByRole("form", { name: "할 일 적기" })).toBeNull();
     open();
     expect(todoInput().value).toBe("남길 글");
@@ -937,6 +958,7 @@ describe("로그아웃 확인이 닫힌 창의 글도 센다 (D-125 ④, C-D9)",
     fireEvent.click(addCategoryChip());
     typeCategory("이름만");
     fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    leaveViaConfirm(); // 고침9 O-3
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.")).toBeTruthy();
     fireEvent.click(within(screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]") as HTMLElement).getByRole("button", { name: "취소" }));
@@ -1040,16 +1062,24 @@ describe("악용 시나리오(화면 쪽)", () => {
     expect(setItem).not.toHaveBeenCalled();
   });
 
-  it("5: 창을 연 채 뒤로 가기를 여러 번 — 창은 한 번 닫히고, 그 뒤 popstate는 아무것도 하지 않으며 history를 더 쌓지 않는다", () => {
+  it("5: 창을 연 채 뒤로 가기를 여러 번 — 글이 있으면 확인 하나만 뜨고 창은 열린 채(history를 더 쌓지 않음), 「나가기」로 한 번 닫히고, 그 뒤 popstate는 아무것도 하지 않는다(고침9 O-3)", () => {
     renderScreen(read([item(ID_A, "글")]));
     open();
     typeTodo("남는 글");
     browserBack();
     browserBack();
     browserBack();
+    expect(screen.getAllByRole("alertdialog")).toHaveLength(1);
+    expect(screen.queryByRole("form", { name: "할 일 적기" }), "확인이 떠 있는 동안 창은 열린 채").not.toBeNull();
+    expect(pushState, "새 칸을 쌓지 않는다(forward로 창의 칸에 돌아감)").toHaveBeenCalledTimes(1);
+    expect(window.history.forward).toHaveBeenCalledTimes(3);
+    leaveViaConfirm();
+    browserBack();
+    browserBack();
+    expect(confirmDialog()).toBeNull();
     expect(screen.queryByRole("form", { name: "할 일 적기" })).toBeNull();
     expect(pushState).toHaveBeenCalledTimes(1);
-    expect(back).not.toHaveBeenCalled();
+    expect(back, "「나가기」가 창의 칸 하나를 거둔다").toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "적던 글 이어 적기" })).toBeTruthy();
     // 앞으로 가기로 창 칸에 돌아와도(state에 표시가 있음) 창을 열지 않고 아무 일도 없다
     act(() => {

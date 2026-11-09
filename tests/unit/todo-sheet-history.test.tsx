@@ -11,6 +11,9 @@ import { FakeHistory } from "./fake-history";
  * (popstate 없는 문서 간 이동 = 글 잃음), 앱 칸을 떠나는 것은 창이 닫힌 뒤다.
  * 받아들인 것: 새로고침·앞으로 가기·「닫기」 직후 다시 열기 뒤에는 창이 닫힌 뒤 앱을 떠나기까지 뒤로 가기를 한 번 더
  * 눌러야 할 수 있다(옛 창 칸이 하나 남는다). 글을 잃는 것보다 낫다(고침 2/2 지시).
+ * 고침9 O-3(PM d-150 가, 23 133:2): 글을 적었거나 분야를 바꾼 창은 「닫기」·Esc·뒤로 가기가 먼저 확인(「저장하지 않고 나갈까요?」)을 띄운다.
+ * 뒤로 가기는 확인을 띄우고 history.forward()로 창의 칸에 돌아간다(칸 index 그대로). 「계속 적기」 뒤 다시 뒤로 가기 → 같은 확인,
+ * 「나가기」 → 창만 닫고(글은 남음 — C8) 창의 칸 하나를 거둔다. 빈 창은 지금처럼 바로 닫힌다(확인 없음).
  */
 
 vi.mock("../../app/todos/actions", () => ({ addTodo: vi.fn(), setTodoDone: vi.fn(), addCategory: vi.fn() }));
@@ -47,6 +50,41 @@ function reload(history: FakeHistory) {
   mount();
 }
 
+const confirm = () => screen.queryByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
+
+/** 고침9 O-3: 바꾼 것이 있는 창의 「닫기」 → 확인 → 「나가기」 */
+function closeWithConfirm() {
+  fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+  expect(confirm(), "바꾼 것이 있으면 「닫기」는 확인").not.toBeNull();
+  expect(sheet(), "확인이 떠도 창은 열린 채").not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+  expect(confirm()).toBeNull();
+}
+
+/**
+ * 고침9 O-3: 바꾼 것이 있는 창에서 뒤로 가기 → 확인이 뜨고 창의 칸으로 돌아온다(index 그대로) → 「계속 적기」 뒤 열린 채 →
+ * 다시 뒤로 가기 → 같은 확인 → 「나가기」 → 창의 칸 하나만 거두고 닫힌다(앱 안)
+ */
+function backConfirmThenLeave(history: FakeHistory) {
+  const at = history.index;
+  history.userBack();
+  history.flush(); // 확인을 띄우며 부른 forward()가 돈다
+  expect(confirm(), "바꾼 것이 있으면 뒤로 가기는 확인").not.toBeNull();
+  expect(sheet(), "확인이 떠도 창은 열린 채").not.toBeNull();
+  expect(history.index, "창의 칸으로 돌아온다").toBe(at);
+  fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
+  expect(confirm()).toBeNull();
+  expect(sheet(), "「계속 적기」 뒤 열린 채").not.toBeNull();
+  history.userBack();
+  history.flush();
+  expect(confirm(), "다시 뒤로 가기 → 같은 확인").not.toBeNull();
+  expect(history.index).toBe(at);
+  fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+  history.flush(); // 「나가기」가 부른 back()
+  expect(history.index, "창의 칸 하나만 거둔다").toBe(at - 1);
+  expect(history.leftApp, "앱 밖으로 나가지 않는다").toBe(false);
+}
+
 /** 창이 닫혀 있고 단추 글이 「적던 글 이어 적기」다(문서를 다시 불러오지 않았다). 같은 글인지는 부르는 쪽이 다시 열어 본다 */
 function expectClosedWithText(history: FakeHistory) {
   expect(history.leftDocument, "문서를 다시 불러오지 않는다(글 잃음 없음)").toBe(0);
@@ -56,12 +94,12 @@ function expectClosedWithText(history: FakeHistory) {
 }
 
 /**
- * 창이 열린 채 뒤로 가기: 첫 뒤로 가기에 창이 닫히고(글 남김, 문서 그대로), 그 뒤 뒤로 가기를 더 누르면 문서를 다시
+ * 창이 열린 채 뒤로 가기(글이 있음): 확인 → 「계속 적기」 → 다시 확인 → 「나가기」로 창이 닫히고(글 남김, 문서 그대로 — 고침9 O-3), 그 뒤 뒤로 가기를 더 누르면 문서를 다시
  * 불러오지 않고(이 시험 안의 칸은 모두 지금 문서의 칸이거나 첫 칸) 결국 앱 칸을 떠난다. 다시 열면 같은 글.
  */
 function expectBackClosesThenLeaves(history: FakeHistory, text: string) {
   expect(sheet()).not.toBeNull();
-  history.userBack();
+  backConfirmThenLeave(history);
   expectClosedWithText(history);
   for (let i = 0; i < 3 && !history.leftApp && history.leftDocument === 0; i += 1) {
     history.userBack();
@@ -93,8 +131,8 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     expect(sheet()).toBeNull();
     open();
     type("새로고침 뒤 글");
-    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
-    history.flush(); // 「닫기」의 back()이 돈다
+    closeWithConfirm(); // 고침9 O-3: 글이 있으니 확인 → 「나가기」
+    history.flush(); // 「나가기」의 back()이 돈다
     expectClosedWithText(history);
     open();
     expect(todoInput().value).toBe("새로고침 뒤 글");
@@ -108,7 +146,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     reload(history);
     open();
     type("새로고침 뒤 글");
-    history.userBack();
+    backConfirmThenLeave(history); // 고침9 O-3: 첫 뒤로 가기는 확인, 「나가기」에 닫힘
     expectClosedWithText(history);
     open();
     expect(todoInput().value).toBe("새로고침 뒤 글");
@@ -129,7 +167,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     mount();
     open();
     type("적던 글");
-    history.userBack();
+    backConfirmThenLeave(history); // 고침9 O-3
     expect(sheet()).toBeNull();
     history.userForward(); // 표시가 붙은 칸으로 돌아옴. 창은 저절로 열리지 않는다
     expect(sheet()).toBeNull();
@@ -144,7 +182,7 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
       mount();
       open();
       type("이어 적을 글");
-      fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+      closeWithConfirm(); // 고침9 O-3
       expect(history.back).toHaveBeenCalledTimes(1);
       open(); // back()이 아직 돌지 않았다
       history.flush(); // 이제야 back()의 popstate가 온다
@@ -157,9 +195,9 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
       mount();
       open();
       type("겹친 글");
-      fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+      closeWithConfirm(); // 고침9 O-3
       open();
-      fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+      closeWithConfirm();
       expect(history.back).toHaveBeenCalledTimes(2);
       history.flush();
       expect(history.leftApp, "둘째 back이 앱 칸을 떠나지 않는다").toBe(false);
@@ -199,6 +237,52 @@ describe("C-D2 history 표시가 칸에 남는 경우", () => {
     const below = history.entries[history.index - 1].state as Record<string, unknown>;
     expect(top[SHEET_HISTORY_MARK]).not.toBe(below[SHEET_HISTORY_MARK]); // 옛 표시는 옮겨 붙이지 않는다
     expect(top.__NA).toBe(true);
+  });
+
+  it("고침9 O-3: 빈 창은 「닫기」·뒤로 가기가 확인 없이 바로 닫힌다(칸 index·포커스 그대로)", () => {
+    const history = new FakeHistory(NEXT_STATE).install();
+    mount();
+    open();
+    expect(history.index).toBe(1);
+    type("   "); // 띄어쓰기만은 바꾼 것이 아니다
+    history.userBack();
+    expect(confirm()).toBeNull();
+    expect(sheet()).toBeNull();
+    expect(history.index).toBe(0);
+    expect(document.activeElement).toBe(openButton());
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "적는 창 닫기" }));
+    expect(confirm()).toBeNull();
+    expect(sheet()).toBeNull();
+    history.flush();
+    expect(history.index).toBe(0);
+    expect(history.leftApp).toBe(false);
+  });
+
+  it("고침9 O-3: 글이 있으면 뒤로 가기 → 확인(초점 「계속 적기」) → 「계속 적기」 → 열린 채·글 그대로 → 다시 뒤로 가기 → 확인 → 「나가기」 → 닫힘·글 남음·앱 안", () => {
+    const history = new FakeHistory(NEXT_STATE).install();
+    mount();
+    open();
+    type("확인 볼 글");
+    expect(history.index).toBe(1);
+    history.userBack();
+    history.flush();
+    expect(confirm()).not.toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "계속 적기" }));
+    expect(history.index).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "계속 적기" }));
+    expect(todoInput().value).toBe("확인 볼 글");
+    history.userBack();
+    history.flush();
+    expect(confirm()).not.toBeNull();
+    expect(history.index).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+    history.flush();
+    expect(history.index).toBe(0);
+    expectClosedWithText(history);
+    expect(history.leftDocument).toBe(0);
+    history.userBack();
+    expect(history.leftApp, "창이 닫힌 뒤의 뒤로 가기는 앱을 떠난다").toBe(true);
   });
 
   it("「닫기」로 닫으면 back()으로 연 칸을 거두고, 그 popstate가 와도 창은 닫힌 채·앱은 그대로", () => {
