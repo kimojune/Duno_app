@@ -77,11 +77,13 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await expect(page.getByText(`${marker} 끊긴 채 적음`, { exact: true })).toBeVisible({ timeout: 2_000 });
     await expect(input).toHaveValue("");
     await expect(page.getByText("저장하는 중")).toHaveCount(0);
-    // 방금 적은 줄도 바로 끝냄 표시를 할 수 있다
-    const box = page.getByRole("checkbox", { name: `${marker} 끊긴 채 적음` });
-    await box.check();
-    await expect(box).toBeChecked();
+    // 고침10: 적는 창은 시트 + 막(모달)이라 열려 있는 동안 뒤 목록은 눌리지 않는다 — 닫은 뒤 방금 적은 줄에 바로 끝냄 표시를 한다
     await input.press("Escape");
+    await expect(page.getByRole("form", { name: "할 일 적기" })).toHaveCount(0);
+    const box = page.getByRole("checkbox", { name: `${marker} 끊긴 채 적음` });
+    // 저장 대기 줄(128:87)은 체크 칸이 aria-disabled라 Playwright가 「눌릴 수 없음」으로 본다. 사람은 눌러서 끝냄 표시를 할 수 있으니 force로 같은 확인을 한다(본 것: 보고 20절)
+    await box.check({ force: true });
+    await expect(box).toBeChecked();
 
     // 저녁 기록: 끊겨도 열리고(기기에서 읽는다) 저장되며 「바뀐 분야별 시간」이 보인다
     await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
@@ -335,7 +337,7 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(칩으로 넣고 Ste
     await expect(categoryRows).toHaveCount(1);
     const fields = categoryRows.locator("input.stepper-input");
     await expect(fields).toHaveCount(1);
-    await expect(fields.first()).toHaveValue("30"); // 새 칩 = 기타에서 30분
+    await expect(fields.first()).toHaveValue(String(total)); // PM d-180: 고른 분야 하나 = 남은 시간(쓴 시간 전부)
     await fields.first().fill(String(piece));
     await expect(fields.first()).toHaveValue(String(piece));
     await dialog.getByRole("button", { name: "저장", exact: true }).click();

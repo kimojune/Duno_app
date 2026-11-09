@@ -14,7 +14,7 @@ import { pollUntil } from "./helpers";
  */
 
 const PORT = Number(process.env.E2E_PORT || "3100");
-const DEMO_TODO = /토익|영어 단어|섀도잉|오픽|회고|표지|케이스 스터디|자기소개|기출|오답 노트|데이터베이스|요약 노트|헬스장|걷기|스트레칭|러닝|은행 서류|방 정리|장보기/;
+const DEMO_TODO = /토익|영어 단어|섀도잉|오픽|회고 글|글 첫 문단|블로그 글|자기소개 글|기출|오답 노트|데이터베이스|요약 노트|헬스장|걷기|스트레칭|러닝|은행 서류|방 정리|장보기/;
 
 function demoCode(): string {
   const file = path.resolve(__dirname, "../../.env.local");
