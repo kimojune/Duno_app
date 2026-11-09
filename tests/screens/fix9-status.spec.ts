@@ -181,6 +181,7 @@ async function eveningButton(page: Page) {
       btn: b.getBoundingClientRect().toJSON(),
       face: f.getBoundingClientRect().toJSON(),
       border: `${fc.borderTopWidth} ${fc.borderTopStyle} ${fc.borderTopColor}`,
+      btnShadow: getComputedStyle(b).boxShadow,
       after: card.nextElementSibling?.className ?? null,
     };
   });
@@ -189,6 +190,7 @@ async function eveningButton(page: Page) {
   expect(m.btn.height).toBeGreaterThanOrEqual(48);
   expect(Math.round(m.face.width)).toBe(Math.round(m.card.width - 32));
   expect(m.border).toBe(`1px solid ${await tokenColor(page, "--color-border-input")}`);
+  expect(m.btnShadow, "바깥 누름 틀에 보조 단추 선(안쪽 그림자)이 번지지 않는다 — 선은 안쪽 면 1px뿐").toBe("none");
   // 카드 밖 안내 글 없음(카드 다음은 연속 기록 줄이거나 없음)
   expect(m.after === null || m.after === "growth-streak").toBe(true);
   await expect(page.getByText(/아직 (이번 주 )?오늘 기록이 없어요/)).toHaveCount(0);

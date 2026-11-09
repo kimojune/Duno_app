@@ -905,7 +905,7 @@ select.input { appearance: auto; }
 .growth-week-zero { margin: var(--space-1) 0 0; font: 500 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
 /* 빈 상태 「오늘 기록」(고침9, Figma 51:24·111:149): 카드 안 끝, 폭 가득 보조 단추 — 보이는 면 높이 40(테두리 --color-border-input, 14 Medium), 누름 영역 48 */
 .growth-evening { margin-top: var(--space-3); }
-.btn.growth-evening-button { width: 100%; padding: 0; border: 0; background: transparent; }
+.btn.growth-evening-button { width: 100%; padding: 0; border: 0; box-shadow: none; background: transparent; } /* 고침10: 보조 단추 선(안쪽 그림자)을 받지 않는다 — 선은 안쪽 면(1px)만 */
 .btn.growth-evening-button:active { background: transparent; }
 .growth-evening-face {
   display: flex; align-items: center; justify-content: center; width: 100%; min-height: 40px; padding: 0 var(--space-4);
