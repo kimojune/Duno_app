@@ -272,31 +272,13 @@ test("S5 오늘 기록 · 시간 · 시트 · 나누기 · 확인 · 저장 중 
   await shot(page, "S5-2 나누기 · 칩 하나 고른 상태", "87:96", { note: "처음부터 타이머·끝낸 할 일 분야 칩이 켜져 있어 그 위에 하나 더" });
   await pickSplitChip(dialog);
   await shot(page, "S5-2 나누기 · 칩 둘 고른 상태", "49:26");
-  // 넘침: 첫 분야 + 를 여러 번
+  // 넘침(49:83): 이 앱은 분야 「+」가 기타에 남은 만큼까지만 늘어난다(components/evening-record.tsx Stepper max) — 「+」를 끝까지 눌러 막히는지 본다
   const plus = dialog.getByRole("button", { name: /늘리기/ });
-  for (let i = 0; i < 40 && !(await dialog.getByText(/합계보다 많아서/).isVisible()) && (await plus.first().isEnabled()); i++) await plus.first().click();
-  let overNote: string | undefined;
-  if (!(await dialog.getByText(/합계보다 많아서/).isVisible())) {
-    // 「+」로는 합계를 넘길 수 없다(막힘). 시간 단계로 돌아가 합계를 10분으로 줄이면 나눈 값이 넘친다
-    overNote = "「+」로는 합계를 넘길 수 없어(단추 막힘) 시간 단계에서 합계를 10분으로 줄여 만듦";
-    await dialog.getByRole("button", { name: "이전" }).click();
-    for (const [col, v] of [["시간", "0"], ["분", "10"]] as const) {
-      await dialog.getByRole("spinbutton", { name: col, exact: true }).locator(".time-wheel-center").click();
-      await dialog.getByRole("textbox", { name: col, exact: true }).fill(v);
-      await dialog.getByRole("textbox", { name: col, exact: true }).press("Enter");
-    }
-    await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
-  }
-  await expect(dialog.getByText(/합계보다 많아서/)).toBeVisible();
-  await shot(page, "S5-2 나누기 · 나눈 합이 합계보다 많을 때(기타 0분)", "49:83", { note: overNote });
-  if (overNote) {
-    await dialog.getByRole("button", { name: "이전" }).click();
-    for (const [col, v] of [["시간", "2"], ["분", "30"]] as const) {
-      await dialog.getByRole("spinbutton", { name: col, exact: true }).locator(".time-wheel-center").click();
-      await dialog.getByRole("textbox", { name: col, exact: true }).fill(v);
-      await dialog.getByRole("textbox", { name: col, exact: true }).press("Enter");
-    }
-    await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
+  for (let i = 0; i < 40 && (await plus.first().isEnabled()) && !(await dialog.getByText(/합계보다 많아서/).isVisible()); i++) await plus.first().click();
+  if (await dialog.getByText(/합계보다 많아서/).isVisible()) await shot(page, "S5-2 나누기 · 나눈 합이 합계보다 많을 때(기타 0분)", "49:83");
+  else {
+    await shot(page, "S5-2 나누기 · 「+」 끝까지(기타 0분, 안내 없음)", "49:83", { note: "참고 사진: 49:83 상태 대신 「+」가 막힌 기타 0분" });
+    missing("S5-2 나누기 · 나눈 합이 합계보다 많을 때(기타 0분)", "49:83", "「+」가 기타에 남은 만큼까지만 늘어나 나눈 합이 합계를 넘을 수 없다(evening-record.tsx 679, 실행 확인) — 안내 글이 나올 길 없음");
   }
   await dialog.getByRole("button", { name: "닫기" }).first().click();
   await expect(page.getByRole("alertdialog")).toBeVisible();

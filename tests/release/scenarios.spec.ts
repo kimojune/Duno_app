@@ -24,6 +24,10 @@ async function step(scenario: string, label: string, ac: string, body: () => Pro
     const note = String((e as Error).message).split("\n").filter(Boolean).slice(0, 2).join(" ").slice(0, 220);
     logStep({ scenario, step: label, ac, pass: false, note });
     fails.push(`${scenario} ${label}`);
+    // 다음 단계가 앞 단계의 남은 창에 막히지 않게 같은 창을 다시 연다(기기 저장소·보낼 줄은 그대로)
+    await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
+    await s.context.setOffline(false).catch(() => undefined);
+    await openHome(s).catch(() => undefined);
   }
 }
 
@@ -96,13 +100,18 @@ test("S-01 첫날 ②~⑤(가짜 응답: 처음 설정 전)", async ({ browser }
     const sum = async () => (await fields.evaluateAll((els) => els.map((e) => Number((e as HTMLInputElement).value)))).reduce((a, b) => a + b, 0);
     expect(await fields.count()).toBeGreaterThan(1);
     await page.getByRole("button", { name: /% 늘리기$/ }).first().click();
-    await page.getByRole("button", { name: /% 줄이기$/ }).nth(1).click();
+    await page.getByRole("button", { name: /% 줄이기$/ }).first().click();
     expect(await sum()).toBe(100); // 이 앱은 합을 늘 100으로 지킨다(합이 100이 아닌 상태를 만들 수 없음 — 시나리오의 「오류 글」은 나타날 자리가 없다)
     await page.getByRole("button", { name: "다음" }).click();
     await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
   });
   await step(S, "⑤ 알림 둘 켠 채 「시작하기」 → 할 일 탭 빈 목록(50:28)", "8-1 AC6 · 8-7 AC1", async () => {
-    for (const n of ["오늘 기록 알림", "아침 알림"]) await expect(page.getByRole("checkbox", { name: n })).toBeChecked();
+    // 시작 상태(새 계정)는 둘 다 켜짐이 기본이다. A의 알림 설정을 읽어 오므로 꺼져 있으면 켠다(시나리오 「켠 채」)
+    for (const n of ["오늘 기록 알림", "아침 알림"]) {
+      const c = page.getByRole("checkbox", { name: n });
+      if (!(await c.isChecked())) await c.check();
+      await expect(c).toBeChecked();
+    }
     await page.getByRole("button", { name: "시작하기" }).click();
     await expect(page.getByRole("button", { name: "할 일 적기" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("예시", { exact: true })).toBeVisible();
@@ -373,20 +382,20 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
     await tab(page, "상태보기");
     await page.getByRole("tab", { name: "목표 비율" }).click();
   };
-  await reopen(browser, (snap) => ({ ...snap, logs: [], sessions: [] }));
+  await reopen(browser, (snap) => ({ ...snap, logs: [], sessions: [], goal: null }));
   await home();
   await step(S, "(가) 기록 없음(가짜 응답): 기간 칩 · 「원그래프로 보기」가 같은 자리(50:598)", "8-4 AC6", async () => {
     await growth();
-    await expect(page.getByRole("button", { name: /이번 주 ▾|기간/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^기간, / })).toBeVisible();
     await expect(page.getByRole("button", { name: "원그래프로 보기" })).toBeVisible();
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
     await expect(page.getByText("0시간").first()).toBeVisible(); // 121:240 빈 고리 가운데
   });
-  await reopen(browser, (snap) => ({ ...snap, logs: (snap.logs ?? []).filter((l) => l.targetDay < weekStartOf(snap)), sessions: [] }));
+  await reopen(browser, (snap) => ({ ...snap, logs: (snap.logs ?? []).filter((l) => l.targetDay < weekStartOf(snap)), sessions: [], goal: null }));
   await home();
   await step(S, "(나) 이번 주 0시간 + 지난 기록(가짜 응답): 「총 시간」으로 시작 · 「이번 주 0시간」 · 「오늘 기록」(111:79)", "8-4 AC6", async () => {
     await growth();
-    await expect(page.getByRole("button", { name: /총 시간/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^기간, 총 시간/ })).toBeVisible();
     await expect(page.getByText("이번 주 0시간").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "오늘 기록" })).toBeVisible();
   });
@@ -394,13 +403,11 @@ test("S-06 상태보기 — 두 뷰 · 기간 · 빈 상태 · 분야 페이지"
   await home();
   await step(S, "(다) ② 기간 칩 「이번 주 ▾」 → 「총 시간」 → 「비교」", "8-4 AC4", async () => {
     await growth();
-    for (const p of ["총 시간", "비교"]) {
-      await page.getByRole("button", { name: /▾/ }).first().click();
-      await page.getByRole("menuitemradio", { name: p }).or(page.getByRole("menuitem", { name: p })).or(page.getByRole("option", { name: p })).first().click();
-      await expect(page.getByRole("button", { name: new RegExp(p) }).first()).toBeVisible();
+    for (const p of ["총 시간", "비교", "이번 주"]) {
+      await page.getByRole("button", { name: /^기간, / }).click();
+      await page.getByRole("menuitemradio", { name: p }).click();
+      await expect(page.getByRole("button", { name: new RegExp(`^기간, ${p}`) })).toBeVisible();
     }
-    await page.getByRole("button", { name: /▾/ }).first().click();
-    await page.getByRole("menuitemradio", { name: "이번 주" }).or(page.getByRole("menuitem", { name: "이번 주" })).or(page.getByRole("option", { name: "이번 주" })).first().click();
   });
   await step(S, "(다) ③ 원그래프 ↔ 띠그래프 · 그래프는 화면 읽기에서 숨음", "8-4 AC5", async () => {
     await page.getByRole("button", { name: "원그래프로 보기" }).click();
@@ -439,7 +446,7 @@ test("S-07 내 정보 — 목표·목표 비율 고치기 · 알림", async ({ b
   await tab(page, "내 정보");
   await expect(page.getByRole("heading", { name: "내 정보" })).toBeVisible({ timeout: 20_000 });
   const confirm = page.getByRole("alertdialog");
-  const newGoal = "포트폴리오 끝내고 토익 850점 넘기기";
+  const newGoal = `포트폴리오 끝내고 토익 ${800 + (Date.now() % 100)}점 넘기기`;
   await step(S, "① 목표 카드 › → 고침 → 「‹」 → 확인(121:449) 「계속 적기」 → 「저장」 → 상태보기 맨 위 줄", "8-1 AC7", async () => {
     await page.getByRole("button", { name: /^목표,/ }).first().click();
     const g = page.getByRole("dialog", { name: "목표" });
@@ -474,6 +481,11 @@ test("S-07 내 정보 — 목표·목표 비율 고치기 · 알림", async ({ b
   });
   await step(S, "④⑤ 알림 시각 바꿈 · 아침 알림 끔 → 단추 없이 바로 저장 + 「저장했어요」 · 「알림 설정 저장」 단추 없음", "8-8 AC2", async () => {
     await expect(page.getByRole("button", { name: "알림 설정 저장" })).toHaveCount(0);
+    const evening = page.getByRole("checkbox", { name: "오늘 기록 알림" });
+    if (!(await evening.isChecked())) {
+      await evening.click(); // 시작 상태 「알림 둘 켬」 — 꺼져 있으면 켠다(시각 칸은 켰을 때만 고를 수 있다)
+      await expect(page.getByText(/저장했어요/).first()).toBeVisible({ timeout: 20_000 });
+    }
     const sel = page.getByLabel("오늘 기록 알림 시각");
     const opts = await sel.locator("option").evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value));
     const cur = await sel.inputValue();
@@ -633,7 +645,8 @@ test("S-10 분야가 많을 때 — 칩 「+n」", async ({ browser }) => {
     await expect(page.getByRole("button", { name: "+ 분야" })).toBeVisible();
   });
   await step(S, "③④ 숨어 있던 분야 고름 → 「접기」 → 「✓ +n」", "명세 ⑱ P-1", async () => {
-    await group.getByRole("button", { pressed: false }).last().click();
+    const unpressed = group.getByRole("button", { pressed: false });
+    await unpressed.nth(Math.min(5, (await unpressed.count()) - 1)).click();
     await page.getByRole("button", { name: "분야 접기" }).click();
     await expect(more).toBeVisible();
     expect(await more.evaluate((el) => el.querySelector("svg, .chip-check") !== null || /✓/.test(el.textContent ?? ""))).toBe(true);
