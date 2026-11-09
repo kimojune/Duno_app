@@ -454,6 +454,8 @@ function MainShell({
           entry={growthEntry}
           onOpenCategory={(id, name) => setCategory({ id, name })}
           onOpenEvening={() => setEveningOpen(true)}
+          onOpenGoal={(d) => setGoalEditor({ weekStart: d.weekStart, goal: d.goal?.items ?? null, thisWeek: d.thisWeek, categories: d.categories })}
+          refreshKey={goalVersion}
         />
       </div>
       <div hidden={tab !== "todo"}>

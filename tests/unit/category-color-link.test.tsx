@@ -6,10 +6,11 @@ vi.mock("../../app/offers/actions", () => ({ requestOffer: vi.fn(), dismissOffer
 vi.mock("../../lib/push/subscribe", () => ({ defaultPushApi: { enable: vi.fn(async () => "ok") } }));
 
 import { EveningRecord } from "../../components/evening-record";
-import { STATUS_VIEWS, type GrowthViewText } from "../../components/growth-views";
+import { GoalBars, STATUS_VIEWS, type GrowthViewText } from "../../components/growth-views";
+import { GROWTH_TEXT as GOAL_VIEW_TEXT } from "../../components/growth-screen";
 import { RatioEditor, type RatioEntry } from "../../components/ratio-editor";
 import { categoryColorValue } from "../../lib/category-color";
-import { buildStatusChart } from "../../lib/growth/status-chart";
+import { buildGoalChart, buildStatusChart } from "../../lib/growth/status-chart";
 import type { EveningApi } from "../../lib/evening-api";
 import type { EveningState } from "../../lib/evening/types";
 import { COLOR_TOKENS, CATEGORY_COLOR_TOKENS } from "../../lib/design-tokens";
@@ -64,33 +65,35 @@ describe("다이얼과 상태보기가 같은 분야에 같은 색을 준다", (
     expect(fills(".dial-slice", "fill")).toEqual(["var(--color-category-2)", "var(--color-category-3)", OTHER]);
   });
 
-  it("상태보기 띠·원·분야 줄 막대·색점: 같은 분야 목록이면 다이얼과 같은 색 변수다", () => {
+  it("상태보기 띠·원·분야별 막대·색점: 같은 분야 목록이면 다이얼과 같은 색 변수다", () => {
     const chart = buildStatusChart({
       categoryIds: IDS,
       ratios: IDS.map((categoryId) => ({ categoryId, percent: 10 })),
       totals: [...IDS.map((categoryId) => ({ categoryId, minutes: 60 })), { categoryId: null, minutes: 30 }],
     });
-    const text: GrowthViewText = {
-      ratioLine: "처음",
-      spentLine: "쓴 시간",
-      lineSummary: (l, p) => `${l} ${p.join(" ")}`,
-      lineNone: (l) => `${l} 없음`,
-      piece: (n, p) => `${n} ${p}%`,
-      diff: (d) => String(d),
-    };
-    const props = { chart, text, nameOf: (id: string | null) => (id === null ? "기타" : NAMES[IDS.indexOf(id)]), onOpenCategory: () => {} };
+    const text: GrowthViewText = { ratioLine: "목표 비율", ratioValue: (w, r) => `${w}/${r}`, percent: (n) => `${n}%` };
+    const nameOf = (id: string | null) => (id === null ? "기타" : NAMES[IDS.indexOf(id)]);
+    const props = { chart, text, periodName: "이번 주", nameOf, onOpenCategory: () => {} };
     const want = [...EXPECTED, OTHER];
+    expect(STATUS_VIEWS.map((v) => v.id)).toEqual(["band", "pie"]);
     for (const view of STATUS_VIEWS) {
       const { unmount } = render(<view.Component {...props} />);
       expect(fills(".growth-dot", "background"), `${view.id} 색점`).toEqual(want);
-      if (view.id === "rows") expect(fills(".growth-bar-fill", "background"), "줄 막대").toEqual(want);
       if (view.id === "band") {
-        // 처음 정한 비율 줄은 분야만(기타 0), 쓴 시간 줄은 기타까지
-        expect(fills(".growth-band-seg", "background")).toEqual([...EXPECTED, ...want]);
+        // 목표 비율 줄은 분야만(기타 0), 이번 주 줄은 기타까지
+        expect(fills(".growth-band-cell", "background")).toEqual([...EXPECTED, ...want]);
       }
       if (view.id === "pie") expect(fills("svg.growth-pie path", "fill")).toEqual([...EXPECTED, ...want]);
       unmount();
     }
+    // 이번 주 목표 뷰의 분야별 막대(만든 순서 자리 = colorOrder)
+    const goal = buildGoalChart({
+      categoryIds: IDS,
+      goalItems: IDS.map((categoryId) => ({ categoryId, minutes: 120 })),
+      totals: [...IDS.map((categoryId) => ({ categoryId, minutes: 60 })), { categoryId: null, minutes: 30 }],
+    });
+    render(<GoalBars chart={goal} text={GOAL_VIEW_TEXT} colorOrder={(id) => IDS.indexOf(id)} nameOf={nameOf} onOpenCategory={() => {}} />);
+    expect(fills(".growth-goal-fill", "background"), "분야별 막대").toEqual(want);
   });
 
   it("저녁 나누기 다이얼: 같은 분야 목록이면 처음 정한 비율 다이얼과 같은 색 변수다", async () => {
@@ -210,7 +213,7 @@ describe("읽을 수 없는 분야·보관한 분야가 끼어도 네 화면이 
     expect(READABLE.length).toBeGreaterThan(8); // 9번째부터 돌려 쓰는 것까지 본다
   });
 
-  it("상태보기: 서버가 읽은 분야(readGrowthForUser)로 그린 색점·막대가 순서대로 1~8, 다시 1…", async () => {
+  it("상태보기: 서버가 읽은 분야(readGrowthForUser)로 그린 색점·분야별 막대가 순서대로 1~8, 다시 1…", async () => {
     const res = await readGrowthForUser(deps());
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -220,10 +223,15 @@ describe("읽을 수 없는 분야·보관한 분야가 끼어도 네 화면이 
       ratios: res.data.ratios,
       totals: res.data.categories.map((c) => ({ categoryId: c.id, minutes: 60 })),
     });
-    const text: GrowthViewText = { ratioLine: "처음", spentLine: "쓴 시간", lineSummary: (l, p) => `${l} ${p.join(" ")}`, lineNone: (l) => `${l} 없음`, piece: (n, p) => `${n} ${p}%`, diff: (d) => String(d) };
-    const rows = STATUS_VIEWS.find((v) => v.id === "rows")!;
-    render(<rows.Component chart={chart} text={text} nameOf={(id) => (id === null ? "기타" : id)} onOpenCategory={() => {}} />);
+    const text: GrowthViewText = { ratioLine: "목표 비율", ratioValue: (w, r) => `${w}/${r}`, percent: (n) => `${n}%` };
+    const band = STATUS_VIEWS.find((v) => v.id === "band")!;
+    const { unmount } = render(<band.Component chart={chart} text={text} periodName="이번 주" nameOf={(id) => (id === null ? "기타" : id)} onOpenCategory={() => {}} />);
     expect(fills(".growth-dot", "background")).toEqual([...WANT, OTHER]);
+    unmount();
+    const ids = res.data.categories.map((c) => c.id);
+    const goal = buildGoalChart({ categoryIds: ids, goalItems: [], totals: ids.map((categoryId) => ({ categoryId, minutes: 60 })) });
+    render(<GoalBars chart={goal} text={GOAL_VIEW_TEXT} colorOrder={(id) => ids.indexOf(id)} nameOf={(id) => (id === null ? "기타" : id)} onOpenCategory={() => {}} />);
+    expect(fills(".growth-goal-fill", "background")).toEqual(WANT);
   });
 
   it("저녁 나누기 다이얼: 서버가 읽은 분야(readEveningState)가 같은 색 번호", async () => {

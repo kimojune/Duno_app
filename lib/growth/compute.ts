@@ -19,6 +19,8 @@ export function computeGrowth(args: {
   categories: NamedCategory[];
   ratios: RatioItem[];
   goalItems: CategoryMinutes[] | null;
+  /** 목표 한 문장(상태보기 맨 위 한 줄). 없으면 null */
+  goalText?: string | null;
 }): GrowthData {
   const weekStart = weekStartFor(args.today);
   const lastWeekStart = addDays(weekStart, -7);
@@ -39,6 +41,7 @@ export function computeGrowth(args: {
     loggedDaysThisWeek: countLoggedDays(args.logs, weekStart, weekEnd),
     loggedDaysTotal: countLoggedDays(args.logs),
     goal: args.goalItems ? { weekStart, items: args.goalItems } : null,
+    goalText: args.goalText ?? null,
   };
 }
 

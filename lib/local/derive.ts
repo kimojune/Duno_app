@@ -115,6 +115,7 @@ export function deriveGrowth(m: Mirror, nowMs: number): RecordResult<GrowthData>
       categories: readableCategories(m),
       ratios: m.settings?.ratios ?? [],
       goalItems: m.goals[weekStartFor(today)] ?? null,
+      goalText: m.settings?.goal ?? null,
     }),
   };
 }

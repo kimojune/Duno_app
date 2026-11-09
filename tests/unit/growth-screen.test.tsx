@@ -64,6 +64,7 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     loggedDaysThisWeek: 2,
     loggedDaysTotal: 10,
     goal: null,
+    goalText: null,
     ...over,
   };
 }
@@ -93,16 +94,14 @@ afterEach(() => {
 });
 
 describe("상태보기 (7-4, ③)", () => {
-  it("맨 위는 이번 주 분야별 시간: 분야마다 한 줄(0분도), 기타도 한 줄, 숫자가 보인다", async () => {
+  it("목표가 없는 주는 목표 비율 뷰: 분야마다 한 줄(0분도), 기타도 한 줄, 이번 주 몫(%)과 목표 비율이 숫자로 보인다", async () => {
     await mount(fakeApi());
+    expect(screen.getByRole("tab", { name: "목표 비율" }).getAttribute("aria-selected")).toBe("true");
     const items = screen.getAllByRole("listitem").filter((li) => li.className === "growth-item");
-    // 고침 4바퀴 2단계: 분야 줄에 처음 정한 비율과의 차이 글이 더해졌다(전체 180분 → 어학 108분·포트폴리오 72분이 처음 정한 비율만큼)
-    expect(items.map((li) => li.textContent)).toEqual([
-      "어학30분처음 정한 비율보다 −1시간 18분",
-      "포트폴리오0분처음 정한 비율보다 −1시간 12분",
-      "기타2시간 30분처음 정한 비율보다 +2시간 30분",
-    ]);
-    expect(screen.getByText("저녁 기록 2일")).toBeTruthy();
+    // 고침5: 분야 줄 = 이번 주 몫 / 목표 비율(전체 180분 → 어학 30분 17%, 기타 150분 83%). 기타는 목표 비율에 없어 %만
+    expect(items.map((li) => li.textContent)).toEqual(["어학17% / 목표 60%", "포트폴리오0% / 목표 40%", "기타83%"]);
+    expect(document.querySelector(".growth-card-total")?.textContent).toBe("3시간");
+    expect(screen.getByText("오늘 기록 2일")).toBeTruthy();
   });
 
   it("「역량」·경고 말이 화면에 없다", async () => {
@@ -110,35 +109,50 @@ describe("상태보기 (7-4, ③)", () => {
     expect(document.body.textContent).not.toMatch(/역량|부족|편향|쏠림|경고|밀렸/);
   });
 
-  it("채울 시간: 처음 정한 비율보다 덜 한 분야를 숫자로, 기준 이름과 함께", async () => {
+  it("「채울 시간」 카드·기준 이름·놓친 분야 문장이 없다(PM 8, 고침5에서 없앰)", async () => {
     await mount(fakeApi());
-    expect(screen.getByRole("heading", { name: "채울 시간" })).toBeTruthy();
-    expect(screen.getByText("처음 정한 비율 기준")).toBeTruthy();
-    // 이번 주 전체 180분 → 어학 108분 중 30분 → 78분, 포트폴리오 72분
-    expect(screen.getByText("어학 1시간 18분")).toBeTruthy();
-    expect(screen.getByText("포트폴리오 1시간 12분")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "채울 시간" })).toBeNull();
+    for (const gone of ["처음 정한 비율 기준", "이번 주 목표 기준", "어학 1시간 18분", "시간을 채울 수 있어요"]) expect(screen.queryByText(new RegExp(gone))).toBeNull();
+    expect(document.body.textContent).not.toContain("채울");
+    expect(document.querySelectorAll(".growth-item").length).toBe(3); // 화면은 그려져 있다
   });
 
-  it("이번 주 목표가 있는 주는 목표 기준으로 보인다", async () => {
-    await mount(fakeApi(growth({ goal: { weekStart: "2026-11-02", items: [{ categoryId: C2, minutes: 120 }] } })));
-    expect(screen.getByText("이번 주 목표 기준")).toBeTruthy();
-    expect(screen.getByText("포트폴리오 2시간")).toBeTruthy();
-    expect(screen.queryByText("어학 1시간 18분")).toBeNull();
+  it("이번 주 목표가 있는 주는 이번 주 목표 뷰로 열린다: 「목표 2시간 중 0시간」, 분야마다 쓴 시간과 남은 시간", async () => {
+    render(<GrowthScreen api={fakeApi(growth({ goal: { weekStart: "2026-11-02", items: [{ categoryId: C2, minutes: 120 }] } }))} active activation={1} entry="self" onOpenCategory={vi.fn()} />);
+    await screen.findByRole("tablist");
+    expect(screen.getByRole("tab", { name: "이번 주 목표" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector(".growth-card-title")?.textContent).toBe("목표 2시간 중 0시간");
+    const items = Array.from(document.querySelectorAll(".growth-item"));
+    expect(items.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["어학", "포트폴리오", "기타"]);
+    expect(items.map((li) => li.querySelector(".growth-row-value")?.textContent)).toEqual(["30분", "0분 · 2시간 더", "2시간 30분"]);
+    expect(items.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 없음", "목표 2시간", "목표 없음"]);
   });
 
-  it("이번 주 기록이 없으면 안내만 (막대·부족은 0과 안내)", async () => {
+  it("이번 주 기록이 없으면 안내 글(「오늘 기록」으로)과 목표 비율 띠 + 빈 띠 「0시간」", async () => {
     await mount(fakeApi(growth({ thisWeek: [], loggedDaysThisWeek: 0 })));
-    expect(screen.getByText("아직 이번 주 저녁 기록이 없어요. 저녁 기록을 남기면 여기에 쌓여요.")).toBeTruthy();
-    expect(screen.getByText("이번 주 저녁 기록이 쌓이면 채울 시간이 보여요.")).toBeTruthy();
-    expect(screen.getAllByText("0분").length).toBe(3); // 분야 둘과 기타 모두 0분이 보인다
+    expect(screen.getByText("아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.")).toBeTruthy();
+    expect(document.querySelector(".growth-band.is-empty")?.textContent).toBe("0시간");
+    expect(Array.from(document.querySelectorAll(".growth-band-cell")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
+    expect(document.body.textContent).not.toContain("채울");
   });
 
-  it("채울 시간이 없으면 그렇게 보인다", async () => {
-    await mount(fakeApi(growth({ thisWeek: [{ categoryId: C1, minutes: 60 }, { categoryId: C2, minutes: 40 }] })));
-    expect(screen.getByText("채울 시간이 없어요")).toBeTruthy();
+  it("목표에 닿았거나 넘은 분야는 쓴 시간만(「n시간 더」 없음, 「넘음」 같은 평가 말 없음)", async () => {
+    render(
+      <GrowthScreen
+        api={fakeApi(growth({ thisWeek: [{ categoryId: C1, minutes: 60 }, { categoryId: C2, minutes: 90 }], goal: { weekStart: "2026-11-02", items: [{ categoryId: C2, minutes: 60 }] } }))}
+        active
+        activation={1}
+        entry="self"
+        onOpenCategory={vi.fn()}
+      />,
+    );
+    await screen.findByRole("tablist");
+    const values = Array.from(document.querySelectorAll(".growth-row-value")).map((el) => el.textContent);
+    expect(values).toEqual(["1시간", "1시간 30분"]);
+    expect(document.body.textContent).not.toMatch(/더|넘음/);
   });
 
-  it("비교: 분야마다 이번 주·지난주·지난달·쌓인 것을 나란히, 지난주 대비 바뀐 시간", async () => {
+  it("비교: 분야마다 이번 주·지난주·지난달·총 시간을 나란히(옛 「쌓인 것」), 지난주 대비 바뀐 시간", async () => {
     await mount(fakeApi());
     fireEvent.click(screen.getByRole("button", { name: "비교" }));
     const group = screen.getByRole("heading", { name: "분야마다 나란히" });
@@ -146,7 +160,8 @@ describe("상태보기 (7-4, ③)", () => {
     const language = screen.getByRole("button", { name: /^어학/ });
     expect(within(language).getByText("이번 주").nextSibling?.textContent).toBe("30분");
     expect(within(language).getByText("지난주").nextSibling?.textContent).toBe("1시간");
-    expect(within(language).getByText("쌓인 것").nextSibling?.textContent).toBe("15시간");
+    expect(within(language).getByText("총 시간").nextSibling?.textContent).toBe("15시간");
+    expect(document.body.textContent).not.toContain("쌓인 것");
     expect(within(language).getByText("지난주보다 −30분")).toBeTruthy();
     const portfolio = screen.getByRole("button", { name: /^포트폴리오/ });
     expect(within(portfolio).getByText("지난달").nextSibling?.textContent).toBe("10시간");
