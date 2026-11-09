@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "@testing-library/react";
+import { skipZeroHandles } from "../../lib/ratio-dial-calc";
 import { DIAL_GAP, DIAL_GLOW, DIAL_MOTION_MS, DIAL_OUTLINE, DIAL_POP, HIT_R, KNOB_STROKE, popOffset, RatioDial, sectorPath, shortName, splitUnit, type DialSlice } from "../../components/ratio-dial";
 
 afterEach(cleanup);
@@ -698,5 +699,180 @@ describe("원형 다이얼: 조각 모양과 고른 조각(PM 9)", () => {
     render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="k1" />);
     const labels = [...document.querySelectorAll(".dial-slice")].map((p) => p.getAttribute("aria-label"));
     expect(labels).toEqual(["어학 40%", "코딩 30%, 고름", "운동 20%", "기타 10%"]);
+  });
+});
+
+/**
+ * 고침6 PM d-129 ②: 오늘 기록 나누기는 skipZero — 손잡이는 0이 아닌 조각 사이에만, 폭 0 조각은 건너뛴다(12시에 손잡이가 붙지 않는다).
+ * 분 단위(합 120, 5분 걸음)로 오늘 기록과 같게 그린다. 처음 정한 비율(skipZero 없음)은 지금 규칙 그대로인 것도 같이 본다.
+ */
+function SkipHarness({ initial, names, seen, selected0, skipZero = true }: { initial: number[]; names: string[]; seen: number[][]; selected0: string | null; skipZero?: boolean }) {
+  const [values, setValues] = useState(initial);
+  const [sel, setSel] = useState<string | null>(selected0);
+  const total = initial.reduce((a, b) => a + b, 0);
+  return (
+    <>
+      <RatioDial
+        id="d"
+        slices={slicesOf(values, names)}
+        total={total}
+        step={5}
+        bigStep={30}
+        format={(v) => `${v}분`}
+        selectedKey={sel}
+        onSelect={setSel}
+        onChange={(v) => {
+          seen.push(v);
+          setValues(v);
+        }}
+        skipZero={skipZero}
+      />
+      <ul>
+        {slicesOf(values, names).map((s, i) => (
+          <li key={s.key}>
+            <button type="button" aria-pressed={sel === s.key} onClick={() => setSel(s.key)}>
+              {`이름 ${s.name}`}
+            </button>
+            {/* 끌지 않는 길(오늘 기록 줄의 −): 줄인 몫은 맨 끝(기타)으로 */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = values.slice();
+                const take = Math.min(5, next[i]);
+                next[i] -= take;
+                next[next.length - 1] += take;
+                seen.push(next);
+                setValues(next);
+              }}
+            >
+              {`${s.name} 줄이기`}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+/** 손잡이의 자리(바퀴 0~1, 0 = 12시): transform translate(x y)에서 읽는다 */
+function turnOf(el: Element): number {
+  const m = /translate\((-?[\d.]+) (-?[\d.]+)\)/.exec(el.getAttribute("transform") ?? "");
+  if (!m) throw new Error("손잡이 자리 없음");
+  const t = Math.atan2(Number(m[2]), Number(m[1])) / (2 * Math.PI) + 0.25;
+  return ((t % 1) + 1) % 1;
+}
+const noonGap = (t: number) => Math.min(t, 1 - t); // 12시에서 떨어진 정도(바퀴)
+const NAMES3 = ["어학", "포트폴리오", "기타"];
+const NAMES4 = ["어학", "코딩", "운동", "기타"];
+
+describe("고침6 PM d-129 ②: 폭 0 조각을 건너뛰는 손잡이(skipZero, 오늘 기록 나누기)", () => {
+  it("기타 0분 + 마지막 분야 고름: 12시에 손잡이가 없다 — 앞 손잡이 하나(6시 자리)뿐. 같은 값에서 skipZero가 없으면(처음 정한 비율) 12시 손잡이가 있다", () => {
+    render(<SkipHarness initial={[60, 60, 0]} names={NAMES3} seen={[]} selected0="k1" />);
+    const hs = handles();
+    expect(hs).toHaveLength(1);
+    expect(hs[0].id).toBe("d-handle-start");
+    expect(hs[0].getAttribute("transform")).toBe("translate(0.00 81.00)"); // 6시(60/120)
+    expect(noonGap(turnOf(hs[0]))).toBeCloseTo(0.5, 5);
+    expect(slider("end")).toBeNull();
+    expect(hs[0].getAttribute("aria-label")).toContain("포트폴리오·어학 사이");
+    cleanup();
+    // 같은 값·같은 고름, skipZero 없음(지금 처음 정한 비율 규칙): 끝 손잡이가 12시에 선다 — 위 단언이 그 차이를 잡는다
+    render(<SkipHarness initial={[60, 60, 0]} names={NAMES3} seen={[]} selected0="k1" skipZero={false} />);
+    expect(handles()).toHaveLength(2);
+    expect(noonGap(turnOf(slider("end")!))).toBeCloseTo(0, 5);
+  });
+
+  it("0분 분야 조각의 양옆 손잡이는 하나로 합쳐진다(이웃을 골라도·0분 조각을 골라도), 12시 자리의 0분 조각은 손잡이 없음", () => {
+    render(<SkipHarness initial={[60, 0, 60, 0]} names={NAMES4} seen={[]} selected0="k0" />);
+    expect(handles().map((h) => h.id)).toEqual(["d-handle-end"]);
+    expect(slider("end")!.getAttribute("aria-label")).toContain("어학·운동 사이"); // 0분 코딩을 건너뛰었다
+    expect(noonGap(turnOf(slider("end")!))).toBeCloseTo(0.5, 5);
+    fireEvent.click(screen.getByRole("button", { name: "이름 코딩" })); // 0분 조각
+    expect(handles().map((h) => h.id)).toEqual(["d-handle-both"]);
+    expect(slider("both")!.getAttribute("aria-label")).toBe("어학·코딩·운동 사이 손잡이. 화살표 키로 코딩을 5분씩 키울 수 있어요");
+    expect(noonGap(turnOf(slider("both")!))).toBeCloseTo(0.5, 5);
+    fireEvent.click(screen.getByRole("button", { name: "이름 운동" }));
+    expect(handles().map((h) => h.id)).toEqual(["d-handle-start"]); // 기타 0분: 끝 손잡이(12시) 없음
+    expect(slider("start")!.getAttribute("aria-label")).toContain("운동·어학 사이");
+    fireEvent.click(screen.getByRole("button", { name: "이름 기타" })); // 기타 0분: 자리가 12시라 없음
+    expect(handles()).toHaveLength(0);
+  });
+
+  it("기타 > 0이고 0분 조각이 없으면 지금과 같다: 고름마다 손잡이 id·자리·이름이 skipZero 없을 때와 같다", () => {
+    const snap = () => handles().map((h) => [h.id, h.getAttribute("transform"), h.getAttribute("aria-label")]);
+    const withSkip: unknown[][] = [];
+    const without: unknown[][] = [];
+    for (const [skip, out] of [[true, withSkip], [false, without]] as const) {
+      render(<SkipHarness initial={[40, 30, 20, 30]} names={NAMES4} seen={[]} selected0={null} skipZero={skip} />);
+      for (const name of NAMES4) {
+        fireEvent.click(screen.getByRole("button", { name: `이름 ${name}` }));
+        out.push(snap());
+      }
+      cleanup();
+    }
+    expect(withSkip).toHaveLength(4);
+    expect(withSkip.flat()).toHaveLength(6); // 첫·끝 1개씩 + 가운데 2개씩
+    expect(withSkip).toEqual(without);
+  });
+
+  it("키보드: 다이얼 화살표로 고르는 조각마다 그려진 손잡이가 폭 0을 건너뛴 목록(skipZeroHandles)과 같다. 손잡이 화살표·Home/End로 바꾸면 목록이 따라 바뀌고 포커스를 잃지 않는다", () => {
+    const seen: number[][] = [];
+    render(<SkipHarness initial={[60, 0, 60, 0]} names={NAMES4} seen={seen} selected0={null} />);
+    const svg = document.querySelector("svg.dial") as unknown as HTMLElement;
+    act(() => svg.focus());
+    const values = [60, 0, 60, 0];
+    let total = 0;
+    for (let i = 0; i < 4; i++) {
+      press(svg, "ArrowRight");
+      const want = skipZeroHandles(values, i).map((h) => `d-handle-${h.side}`);
+      expect(handles().map((h) => h.id)).toEqual(want);
+      total += want.length;
+    }
+    expect(total).toBe(3); // 어학 end · 코딩 both · 운동 start · 기타 없음
+    // 운동(마지막 분야, 기타 0분) 고름: 앞 손잡이(어학·운동, 0분 코딩 건너뜀)
+    press(svg, "ArrowLeft");
+    const start = slider("start")!;
+    act(() => (start as unknown as HTMLElement).focus());
+    press(start, "ArrowRight"); // 운동 +5(어학에서, 코딩 0 그대로)
+    expect(seen.at(-1)).toEqual([55, 0, 65, 0]);
+    press(slider("start")!, "PageDown"); // 운동 −30 → 어학으로
+    expect(seen.at(-1)).toEqual([85, 0, 35, 0]);
+    press(slider("start")!, "Home"); // 운동 0까지(어학이 다 가져감) → 0분 아닌 조각이 어학 하나 → 손잡이 없음, 포커스는 다이얼로
+    expect(seen.at(-1)).toEqual([120, 0, 0, 0]);
+    expect(handles()).toHaveLength(0);
+    expect(document.activeElement).toBe(svg);
+    // 끌지 않는 길: 어학을 줄이면 기타로 돌아가고, 그러면 기타와의 경계에 손잡이가 다시 선다
+    fireEvent.click(screen.getByRole("button", { name: "이름 어학" }));
+    fireEvent.click(screen.getByRole("button", { name: "어학 줄이기" }));
+    expect(seen.at(-1)).toEqual([115, 0, 0, 5]);
+    expect(handles().map((h) => h.id)).toEqual(["d-handle-end"]);
+    expect(slider("end")!.getAttribute("aria-label")).toContain("어학·기타 사이");
+    press(slider("end")!, "End"); // 어학이 기타 5분을 다 가져간다
+    expect(seen.at(-1)).toEqual([120, 0, 0, 0]);
+    for (const v of seen) expect(v.reduce((a, b) => a + b, 0)).toBe(120);
+  });
+
+  it("끌기: 0분을 건너뛴 손잡이는 양쪽 조각끼리 주고받고 0분 조각은 0 그대로. 겹친 손잡이는 방향으로 이웃을 정한다. 기타 0분에서 12시를 넘겨 끌어도 돌지 않는다", () => {
+    const seen: number[][] = [];
+    render(<SkipHarness initial={[60, 0, 60, 0]} names={NAMES4} seen={seen} selected0="k0" />);
+    box();
+    dragAlong(slider("end")!, 0.5, 0.6, 6); // 시계 방향 12분 → 5분 단위
+    fireEvent.pointerUp(document.querySelector("svg.dial")!, { pointerId: 1 });
+    expect(seen.at(-1)).toEqual([70, 0, 50, 0]);
+    fireEvent.click(screen.getByRole("button", { name: "이름 코딩" }));
+    const at0 = turnOf(slider("both")!);
+    dragAlong(slider("both")!, at0, at0 - 0.1, 6); // 반시계 = 앞 이웃(어학)에서
+    fireEvent.pointerUp(document.querySelector("svg.dial")!, { pointerId: 1 });
+    expect(seen.at(-1)).toEqual([60, 10, 50, 0]);
+    // 운동(마지막 분야) 고름 — 기타 0분: 앞 손잡이를 시계로 12시를 넘겨 끌면 운동이 0에서 멈추고 첫 조각에 붙지 않는다
+    fireEvent.click(screen.getByRole("button", { name: "이름 운동" }));
+    const from = turnOf(slider("start")!);
+    dragAlong(slider("start")!, from, 1.2, 20);
+    fireEvent.pointerUp(document.querySelector("svg.dial")!, { pointerId: 1 });
+    expect(seen.at(-1)).toEqual([60, 60, 0, 0]);
+    for (const v of seen) {
+      expect(v.reduce((a, b) => a + b, 0)).toBe(120);
+      expect(v.every((x) => Number.isInteger(x) && x >= 0)).toBe(true);
+      expect(v[0]).toBeGreaterThanOrEqual(60); // 어학은 한 번도 60 밑으로 줄지 않았다(12시를 넘어 돌지 않음)
+    }
   });
 });

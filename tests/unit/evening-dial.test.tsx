@@ -155,8 +155,18 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(stepper("포트폴리오")).toBe(0);
     expect(otherText()).toBe("1시간 30분");
     key(dial()!, "Home"); // 어학 고름
-    key(handle("end"), "End"); // 어학이 바로 뒤(포트폴리오 0)에서 더 가져올 것이 없다 → 그대로
-    expect(stepper("어학")).toBe(30);
+    // 고침6 PM d-129 ②: 손잡이는 0분 조각(포트폴리오)을 건너뛰어 어학·기타 사이에 선다(옛 규칙은 어학·포트폴리오 0 사이라 그대로였다)
+    expect(handle("end").getAttribute("aria-label")).toContain("어학·기타 사이");
+    key(handle("end"), "PageUp"); // 어학 +30분 ← 기타(포트폴리오 0은 0 그대로)
+    expect(stepper("어학")).toBe(60);
+    expect(stepper("포트폴리오")).toBe(0);
+    expect(otherText()).toBe("1시간");
+    key(handle("end"), "End"); // 기타를 다 가져가도 기타 0에서 멈춘다
+    expect(stepper("어학")).toBe(120);
+    expect(otherText()).toBe("0분");
+    expect(screen.queryAllByRole("slider")).toHaveLength(0); // 0분 아닌 조각이 어학 하나 — 손잡이가 없다(12시에도)
+    setNumber("어학", 30); // Stepper로 줄이면 기타로 돌아간다
+    expect(otherText()).toBe("1시간 30분");
     setNumber("어학", 500); // Stepper 숫자 칸: 기타에 남은 만큼(90)까지만
     expect(stepper("어학")).toBe(120);
     expect(otherText()).toBe("0분");
@@ -267,12 +277,17 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     act(() => svg.focus());
     expect(document.activeElement).toBe(svg);
     key(svg, "ArrowRight");
+    act(() => handle("start").focus());
     key(handle("start"), "PageUp"); // 포트폴리오 +30분(어학에서)
     expect(stepper("어학")).toBe(0);
     expect(stepper("포트폴리오")).toBe(60);
+    // 고침6 PM d-129 ②: 어학이 0분이라 앞 경계가 12시에 닿아 앞 손잡이가 사라진다 → 포커스는 같은 조각의 남은 손잡이(포트폴리오·기타)로
+    expect(document.getElementById("evening-dial-handle-start")).toBeNull();
+    expect(document.activeElement).toBe(handle("end"));
+    expect(handle("end").getAttribute("aria-label")).toContain("포트폴리오·기타 사이");
     expect(onClose).not.toHaveBeenCalled();
     // 손잡이에서 Esc: 바꾼 값이 있으니 확인이 뜬다(창은 아직 닫히지 않는다). 확인에서 Esc = 계속 적기
-    fireEvent.keyDown(handle("start"), { key: "Escape" });
+    fireEvent.keyDown(handle("end"), { key: "Escape" });
     const confirm = screen.getByRole("alertdialog", { name: "저장하지 않고 닫을까요?" });
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(confirm, { key: "Escape" });
@@ -297,15 +312,22 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
 });
 
 describe("저녁 나누기 다이얼: 다이얼 고침1", () => {
-  it("끝에서 값이 안 바뀐 키를 누른 뒤 Stepper에 쳐도 포커스가 손잡이로 안 간다", async () => {
+  it("끝까지 밀어 손잡이가 사라진 뒤(포커스는 다이얼로) Stepper에 쳐도 포커스가 다이얼·손잡이로 안 간다", async () => {
     await openSplit120();
     const end = handle("end"); // 어학·포트폴리오 경계
     act(() => end.focus());
     key(end, "End"); // 어학이 포트폴리오를 다 가져간다
     expect(stepper("어학")).toBe(60);
     expect(stepper("포트폴리오")).toBe(0);
-    key(handle("end"), "End"); // 끝에서 한 번 더: 값이 안 바뀐다
-    key(handle("end"), "PageUp");
+    // 고침6 PM d-129 ②: 끝 손잡이는 0분 포트폴리오를 건너뛰어 어학·기타 사이로 옮겨 서고, 포커스가 그 손잡이에 있다
+    expect(document.activeElement).toBe(handle("end"));
+    expect(handle("end").getAttribute("aria-label")).toContain("어학·기타 사이");
+    key(handle("end"), "End"); // 어학이 기타까지 다 가져간다 → 0분 아닌 조각이 하나라 손잡이가 없다
+    expect(stepper("어학")).toBe(120);
+    expect(screen.queryAllByRole("slider")).toHaveLength(0);
+    expect(document.activeElement).toBe(dial()); // 포커스를 잃지 않고 다이얼(원 전체)로
+    key(dial()!, "End"); // 다이얼 키: 기타 고름(값은 그대로)
+    expect(stepper("어학")).toBe(120);
     const input = screen.getByLabelText("포트폴리오") as HTMLInputElement;
     act(() => input.focus());
     // 어학을 줄여 기타에 자리를 만든 뒤 포트폴리오에 친다 — 칠 때마다 다이얼이 다시 그려진다
@@ -798,5 +820,157 @@ describe("오늘 기록 나누기 「+ 분야」 (고침 5바퀴, 지금 앱의 
     const src = readFileSync(path.resolve(__dirname, "../../lib/evening-api.ts"), "utf-8");
     expect(src).toMatch(/import \{ addCategory \} from "\.\.\/app\/todos\/actions";/);
     expect(src).toMatch(/return await addCategory\(id, name\);/);
+  });
+});
+
+/**
+ * 고침6 PM d-129 ②: 오늘 기록 나누기 손잡이는 0분이 아닌 조각 사이에만 — 0분 조각은 건너뛴다. 기타 0분이어도 12시에 손잡이가 없다.
+ * 기타 0분에서 마지막 분야를 기타로 돌려주는 끌기 길은 없고, 줄의 −(Stepper)가 맡는다.
+ */
+/** 손잡이의 자리(바퀴 0~1, 0 = 12시) */
+function turnOfHandle(el: Element): number {
+  const m = /translate\((-?[\d.]+) (-?[\d.]+)\)/.exec(el.getAttribute("transform") ?? "");
+  if (!m) throw new Error("손잡이 자리 없음");
+  const t = Math.atan2(Number(m[2]), Number(m[1])) / (2 * Math.PI) + 0.25;
+  return ((t % 1) + 1) % 1;
+}
+const fromNoon = (el: Element) => {
+  const t = turnOfHandle(el);
+  return Math.min(t, 1 - t);
+};
+
+describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고침6 PM d-129 ②)", () => {
+  it("기타 0분 + 마지막 분야 고름: 손잡이는 앞(어학·포트폴리오) 하나뿐이고 자리는 12시가 아니다", async () => {
+    await openWith(state(), 1);
+    await press("어학, 다이얼에 넣기");
+    await press("포트폴리오, 다이얼에 넣기"); // 어학 30 · 포트폴리오 30 · 기타 0, 포트폴리오(마지막 분야) 고름
+    expect(otherText()).toBe("0분");
+    expect(pickedRow()).toBe(C2);
+    const hs = screen.getAllByRole("slider");
+    expect(hs).toHaveLength(1);
+    expect(hs[0].id).toBe("evening-dial-handle-start");
+    expect(hs[0].getAttribute("aria-label")).toContain("포트폴리오·어학 사이");
+    expect(hs[0].getAttribute("transform")).toBe("translate(0.00 81.00)"); // 30/60 = 6시
+    expect(fromNoon(hs[0])).toBeGreaterThan(0.4);
+    expect(document.getElementById("evening-dial-handle-end")).toBeNull();
+    // 첫 분야를 골라도 12시 손잡이 없음(끝 손잡이 하나, 6시)
+    fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C1}"]`)!);
+    expect(screen.getAllByRole("slider").map((h) => h.id)).toEqual(["evening-dial-handle-end"]);
+    expect(fromNoon(handle("end"))).toBeGreaterThan(0.4);
+    // 기타(0분) 줄을 골라도 손잡이 없음(자리가 12시)
+    fireEvent.click(document.querySelector('.ratio-list [data-row-key="other"]')!);
+    expect(pickedRow()).toBe("other");
+    expect(screen.queryAllByRole("slider")).toHaveLength(0);
+  });
+
+  it("기타 0분에서 마지막 분야를 기타로 돌려주기: 끌기 손잡이는 없고, 줄의 −(Stepper)가 돌려준다. 그 뒤에는 포트폴리오·기타 경계 손잡이가 선다. 저장은 서버 검증을 지난다", async () => {
+    const { sent, results } = await openWith(state(), 1);
+    await press("어학, 다이얼에 넣기");
+    await press("포트폴리오, 다이얼에 넣기");
+    expect(document.getElementById("evening-dial-handle-end")).toBeNull(); // 기타로 돌려줄 끌기 길이 없다
+    fireEvent.click(screen.getByRole("button", { name: "포트폴리오 5분 줄이기" }));
+    expect(stepper("포트폴리오")).toBe(25);
+    expect(otherText()).toBe("5분");
+    expect(stepper("어학")).toBe(30);
+    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    // 기타 > 0이 되면 지금과 같다: 포트폴리오의 끝 손잡이(포트폴리오·기타)가 12시가 아닌 자리에 선다
+    fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C2}"]`)!);
+    expect(screen.getAllByRole("slider").map((h) => h.id)).toEqual(["evening-dial-handle-start", "evening-dial-handle-end"]);
+    expect(handle("end").getAttribute("aria-label")).toContain("포트폴리오·기타 사이");
+    expect(fromNoon(handle("end"))).toBeGreaterThan(0);
+    key(handle("end"), "ArrowLeft"); // 포트폴리오 −5 → 기타(끌기 길도 다시 있다)
+    expect(stepper("포트폴리오")).toBe(20);
+    expect(otherText()).toBe("10분");
+    await press("저장");
+    expect(sent[0]).toMatchObject({
+      totalMinutes: 60,
+      items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 20 }, { categoryId: null, minutes: 10 }],
+      saveMode: "edited",
+    });
+    expect(results).toEqual([true]);
+  });
+
+  it("0분 분야(가운데)를 건너뛴 손잡이: 어학·운동 경계 하나, 키보드로 바꿔도 0분 포트폴리오는 0 그대로", async () => {
+    const cats = [{ id: C1, name: "어학" }, { id: C2, name: "포트폴리오" }, { id: C3, name: "운동" }];
+    await openWith(state({ categories: cats }), 1);
+    await press("어학, 다이얼에 넣기");
+    await press("운동, 다이얼에 넣기"); // 어학 30 · 운동 30 · 기타 0
+    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분 → 0분 줄(가운데)
+    expect(rowKeys()).toEqual([C1, C2, C3, "other"]);
+    expect(stepper("포트폴리오")).toBe(0);
+    fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C1}"]`)!);
+    expect(screen.getAllByRole("slider").map((h) => h.id)).toEqual(["evening-dial-handle-end"]);
+    expect(handle("end").getAttribute("aria-label")).toContain("어학·운동 사이");
+    key(handle("end"), "PageUp"); // 어학 +30(운동에서)
+    expect(stepper("어학")).toBe(60);
+    expect(stepper("포트폴리오")).toBe(0);
+    expect(stepper("운동")).toBe(0);
+    // 0분 포트폴리오 줄을 고르면: 앞뒤 0분 아닌 조각이 어학 하나뿐(자리 12시) — 손잡이 없음, 줄의 +로는 키울 수 없다(기타 0분)
+    fireEvent.click(document.querySelector(`.ratio-list [data-row-key="${C2}"]`)!);
+    expect(screen.queryAllByRole("slider")).toHaveLength(0);
+    expect((screen.getByRole("button", { name: "포트폴리오 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("악용: 기타 0분에서 시작해 끌기·손잡이 키보드·다이얼 키·Stepper −/+ 를 섞어도 화면 합 = 쓴 시간, 12시에 손잡이가 서지 않고, 저장 items 합 = 쓴 시간(서버 검증 통과)", async () => {
+    const { sent, results } = await openWith(state(), 1);
+    await press("어학, 다이얼에 넣기");
+    await press("포트폴리오, 다이얼에 넣기"); // 기타 0분에서 시작
+    expect(otherText()).toBe("0분");
+    const svg = dial()!;
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 200, right: 200, bottom: 200, x: 0, y: 0, toJSON: () => ({}) });
+    const pt = (t: number) => {
+      const a = t * 2 * Math.PI - Math.PI / 2;
+      return { clientX: 100 + 90 * Math.cos(a), clientY: 100 + 90 * Math.sin(a), pointerId: 1 };
+    };
+    let seed = 1109;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    let drags = 0;
+    let checks = 0;
+    for (let step = 0; step < 80; step++) {
+      const r = rand();
+      const name = rand() < 0.5 ? "어학" : "포트폴리오";
+      const hs = screen.queryAllByRole("slider");
+      if (r < 0.3 && hs.length > 0) {
+        const h = hs[Math.floor(rand() * hs.length)];
+        const from = turnOfHandle(h);
+        const to = from + (rand() - 0.5) * 1.2; // 12시를 넘을 만큼도
+        fireEvent.pointerDown(h, pt(from));
+        for (let i = 1; i <= 8; i++) fireEvent.pointerMove(svg, pt(from + ((to - from) * i) / 8));
+        fireEvent.pointerUp(svg, { pointerId: 1 });
+        drags++;
+      } else if (r < 0.5 && hs.length > 0) {
+        key(hs[Math.floor(rand() * hs.length)], ["PageUp", "PageDown", "End", "Home", "ArrowRight", "ArrowLeft"][Math.floor(rand() * 6)]);
+      } else if (r < 0.7) {
+        key(svg, ["ArrowRight", "ArrowLeft", "Home", "End"][Math.floor(rand() * 4)]);
+      } else if (screen.queryByLabelText(name)) {
+        const btn = screen.getByRole("button", { name: `${name} 5분 ${rand() < 0.6 ? "줄이기" : "늘리기"}` }) as HTMLButtonElement;
+        if (!btn.disabled) fireEvent.click(btn);
+      }
+      for (const h of screen.queryAllByRole("slider")) expect(fromNoon(h)).toBeGreaterThan(0.01); // 12시에 손잡이 없음
+      const shown = screenItems(NAMES);
+      expect(shown.reduce((s, i) => s + i.minutes, 0)).toBe(60);
+      expect(screen.getByText("합계 1시간")).toBeTruthy();
+      checks++;
+    }
+    expect(checks).toBe(80);
+    expect(drags).toBeGreaterThan(5); // 끌기가 실제로 섞였다
+    await press("저장");
+    expect(sent[0].totalMinutes).toBe(60);
+    expect(sent[0].items.reduce((s, i) => s + i.minutes, 0)).toBe(60);
+    expect(sent[0].items.every((i) => Number.isInteger(i.minutes) && i.minutes >= 0)).toBe(true);
+    expect(results).toEqual([true]);
+  });
+
+  it("악성 거절·정상 통과 대조: 서버 저장 검증은 합 > 쓴 시간인 저장을 거절하고, 합 = 쓴 시간이면 받는다(합 고정이 앱과 서버 두 층)", async () => {
+    const { api, results } = realApi(state());
+    const base = { targetDay: "2026-11-07", totalMinutes: 60, saveMode: "edited" as const, clientSavedAt: NOW.toISOString() };
+    const bad = await api.save({ ...base, id: "abababab-abab-4bab-8bab-abababababab", items: [{ categoryId: C1, minutes: 60 }, { categoryId: null, minutes: 5 }] });
+    expect(bad).toEqual({ ok: false, error: "invalid_input" });
+    const good = await api.save({ ...base, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd", items: [{ categoryId: C1, minutes: 55 }, { categoryId: null, minutes: 5 }] });
+    expect(good.ok).toBe(true);
+    expect(results).toEqual([false, true]);
   });
 });

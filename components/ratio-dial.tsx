@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from "react";
-import { dragBoundary, toTotal } from "../lib/ratio-dial-calc";
+import { dragBetween, skipZeroHandles, toTotal, type DialHandle } from "../lib/ratio-dial-calc";
 
 /**
  * 원형 다이얼(옛 시안 RatioDial에서 이식). 처음 정한 비율(처음 설정·내 정보 「비율 고치기」)과 오늘 기록 「분야마다 나누기」가 같이 쓴다.
@@ -14,6 +14,9 @@ import { dragBoundary, toTotal } from "../lib/ratio-dial-calc";
  * - 12시(맨 위)는 고정이다: 첫 조각은 끝 손잡이만, 마지막 조각은 앞 손잡이만 있고, 12시에는 눈금이 있다.
  * - 폭 0인 조각을 고르면 두 경계가 한 자리라 손잡이를 하나만 그린다. 끌기 시작한 방향으로 어느 경계인지 정한다
  *   (시계 방향이면 뒤 경계, 반시계 방향이면 앞 경계 — 어느 쪽이든 고른 조각이 커진다).
+ * - skipZero(오늘 기록 나누기, 고침6 PM d-129 ②): 손잡이는 0이 아닌 조각 사이 경계에만 서고 폭 0 조각은 건너뛴다(lib/ratio-dial-calc skipZeroHandles).
+ *   그래서 기타가 0이어도 12시에 손잡이가 붙지 않는다. 폭 0 조각을 건너뛴 손잡이는 양쪽 0 아닌 조각끼리 주고받고, 사이의 0 조각은 0 그대로다.
+ *   이때 기타 0에서 마지막 분야를 기타로 돌려주는 끌기 길은 없다 — 끌지 않는 길(줄의 −)이 맡는다. 처음 정한 비율(RatioEditor)은 이 옵션을 켜지 않는다(지금 규칙 그대로).
  * - 끌지 않는 길이 함께 있다(WCAG 2.5.7): 손잡이에서 화살표 step·PageUp/PageDown bigStep·Home/End 끝까지.
  * - 조각을 고르는 키보드 길이 부품 안에 있다: 다이얼(원 전체)이 탭 한 자리이고, 화살표로 앞뒤 조각·Home/End로 첫·마지막 조각을 고른다.
  *   폭 0인 조각도 고를 수 있다. 바깥 목록(처음 정한 비율의 이름 단추)은 같은 고른 조각을 쓰는 또 하나의 길이다.
@@ -67,6 +70,8 @@ interface Props {
   sub?: (slice: DialSlice, value: number) => string;
   /** 아무것도 안 골랐을 때 가운데 글 */
   center?: string;
+  /** 폭 0 조각을 건너뛰는 손잡이 규칙(고침6 PM d-129 ②, 오늘 기록 나누기). 기본 false(이웃 조각 사이마다 — 처음 정한 비율) */
+  skipZero?: boolean;
 }
 
 const R = 100;
@@ -178,6 +183,7 @@ export function RatioDial({
   format = (v) => `${v}%`,
   sub,
   center,
+  skipZero = false,
 }: Props) {
   const n = slices.length;
   const raw = slices.map((s) => s.value);
@@ -186,8 +192,8 @@ export function RatioDial({
   const empty = norm.every((v) => v === 0);
   const svg = useRef<SVGSVGElement>(null);
   const reducedMotion = useReducedMotion();
-  /* 끌기: 시작 값(base), 마지막 각도, 더해 온 각도(acc), 어느 경계(k, 겹친 손잡이는 첫 움직임 전까지 null) */
-  const drag = useRef<null | { base: number[]; last: number; acc: number; k: number | null; side: Side; si: number }>(null);
+  /* 끌기: 시작 값(base), 마지막 각도, 더해 온 각도(acc), 어느 경계(pair = 경계 양쪽 조각, 겹친 손잡이는 첫 움직임 전까지 null) */
+  const drag = useRef<null | { base: number[]; last: number; acc: number; pair: [number, number] | null; h: DialHandle; si: number }>(null);
   const [dragging, setDragging] = useState<Side | null>(null);
   /* 키보드로 바꾼 뒤 포커스를 둘 손잡이(손잡이가 갈리거나 합쳐져도 포커스를 잃지 않게) */
   const focusSide = useRef<Side | null>(null);
@@ -201,10 +207,16 @@ export function RatioDial({
     const want = focusSide.current;
     if (!want) return;
     focusSide.current = null;
-    const el = document.getElementById(`${id}-handle-${want}`) ?? document.getElementById(`${id}-handle-both`);
+    // skipZero에서는 이웃이 0이 되어 경계가 12시에 닿으면 그 손잡이가 사라진다: 같은 조각의 남은 손잡이로, 손잡이가 하나도 없으면 다이얼(원 전체)로 포커스를 옮긴다 — 포커스를 잃지 않게
+    const other = want === "start" ? "end" : want === "end" ? "start" : null;
+    const el =
+      document.getElementById(`${id}-handle-${want}`) ??
+      document.getElementById(`${id}-handle-both`) ??
+      (other ? document.getElementById(`${id}-handle-${other}`) : null) ??
+      svg.current;
     // 포커스가 이 다이얼 안에 있거나(손잡이가 갈리거나 합쳐진 직후) 아무 데도 없을 때만 옮긴다 — 바깥(−/+·숫자 칸·Stepper)의 포커스는 뺏지 않는다
     const active = document.activeElement;
-    const inDial = !active || active === document.body || (svg.current?.contains(active) ?? false);
+    const inDial = !active || active === document.body || active === svg.current || (svg.current?.contains(active) ?? false);
     if (el && inDial && active !== el) (el as unknown as HTMLElement).focus();
   });
 
@@ -241,19 +253,23 @@ export function RatioDial({
   const moved = (i: number) => (pop && i === si ? `translate(${pop[0].toFixed(2)}px, ${pop[1].toFixed(2)}px)` : "translate(0px, 0px)");
   const glowId = `${id}-glow`;
   /* 고른 조각의 앞 경계(start)와 끝 경계(end). 12시 쪽(첫 조각의 앞, 마지막 조각의 끝)에는 없다. 모두 0이면 끌 것이 없어 손잡이도 없다.
-     폭 0인 조각이 앞뒤 경계를 다 가지면 두 손잡이가 한 자리에 겹치므로 하나(both)만 그린다 */
-  const handles: { side: Side; at: number }[] = [];
-  const hasStart = !!sel && !empty && si > 0;
-  const hasEnd = !!sel && !empty && si < n - 1;
-  if (hasStart && hasEnd && selValue === 0) handles.push({ side: "both", at: starts[si] });
+     폭 0인 조각이 앞뒤 경계를 다 가지면 두 손잡이가 한 자리에 겹치므로 하나(both)만 그린다.
+     skipZero면 폭 0 조각을 건너뛴 경계에만 선다(skipZeroHandles — 12시에는 손잡이가 없다). a·b = 경계 양쪽 조각(both는 앞 이웃·뒤 이웃) */
+  const handles: DialHandle[] = [];
+  if (skipZero) handles.push(...skipZeroHandles(norm, si));
   else {
-    if (hasStart) handles.push({ side: "start", at: starts[si] });
-    if (hasEnd) handles.push({ side: "end", at: starts[si] + selValue });
+    const hasStart = !!sel && !empty && si > 0;
+    const hasEnd = !!sel && !empty && si < n - 1;
+    if (hasStart && hasEnd && selValue === 0) handles.push({ side: "both", at: starts[si], a: si - 1, b: si + 1 });
+    else {
+      if (hasStart) handles.push({ side: "start", at: starts[si], a: si - 1, b: si });
+      if (hasEnd) handles.push({ side: "end", at: starts[si] + selValue, a: si, b: si + 1 });
+    }
   }
   const note = changes.sig === keySig ? changes.text : "";
 
   /** 손잡이 키보드: 고른 조각이 커지는 쪽이 +. end는 시계 방향, start는 반시계 방향. both는 뒤 이웃이 있으면 뒤에서, 없으면 앞에서 가져온다 */
-  function onHandleKey(e: KeyboardEvent<SVGGElement>, side: Side) {
+  function onHandleKey(e: KeyboardEvent<SVGGElement>, h: DialHandle) {
     let grow = 0;
     if (e.key === "ArrowRight" || e.key === "ArrowUp") grow = step;
     else if (e.key === "ArrowLeft" || e.key === "ArrowDown") grow = -step;
@@ -264,12 +280,15 @@ export function RatioDial({
     if (!grow) return;
     e.preventDefault();
     e.stopPropagation(); // 다이얼의 조각 고르기 키로 올라가지 않게
-    let use: "start" | "end" = side === "start" ? "start" : "end";
-    if (side === "both") {
+    let use: "start" | "end" = h.side === "start" ? "start" : "end";
+    let pair: [number, number] = [h.a, h.b];
+    if (h.side === "both") {
       if (grow < 0) return; // 폭 0: 더 줄일 것이 없다
-      use = norm[si + 1] > 0 ? "end" : "start";
+      use = norm[h.b] > 0 ? "end" : "start";
+      pair = use === "end" ? [si, h.b] : [h.a, si];
     }
-    const next = use === "end" ? dragBoundary(norm, si, grow, step) : dragBoundary(norm, si - 1, -grow, step);
+    // end는 경계를 시계 방향(+), start는 반시계 방향(−)으로 민다 — 어느 쪽이든 grow > 0이면 고른 조각이 커진다
+    const next = dragBetween(norm, pair[0], pair[1], use === "end" ? grow : -grow, step);
     // 값이 실제로 바뀐 때만 포커스 표시를 세운다(끝에서 한 번 더 눌러 안 바뀌면 렌더가 없어 표시가 남았다가 뒤에 포커스를 뺏었다)
     if (apply(next)) focusSide.current = use;
   }
@@ -289,16 +308,15 @@ export function RatioDial({
     setChanges({ sig: keySig, text: DIAL_TEXT.picked(slices[next].name, format(norm[next])) });
   }
 
-  function startDrag(e: PointerEvent<SVGGElement>, side: Side) {
+  function startDrag(e: PointerEvent<SVGGElement>, h: DialHandle) {
     e.preventDefault();
     try {
       svg.current?.setPointerCapture(e.pointerId);
     } catch {
       /* 포인터 잡기를 못 해도 끌기는 이어 간다 */
     }
-    const k = side === "start" ? si - 1 : side === "end" ? si : null;
-    drag.current = { base: norm, last: angleOf(e), acc: 0, k, side, si };
-    setDragging(side);
+    drag.current = { base: norm, last: angleOf(e), acc: 0, pair: h.side === "both" ? null : [h.a, h.b], h, si };
+    setDragging(h.side);
   }
   function moveDrag(e: PointerEvent<SVGSVGElement>) {
     const dr = drag.current;
@@ -309,13 +327,13 @@ export function RatioDial({
     if (d < -0.5) d += 1;
     dr.last = a;
     dr.acc += d;
-    if (dr.k === null) {
+    if (dr.pair === null) {
       if (dr.acc === 0) return;
       // 겹친 손잡이: 처음 움직인 방향으로 경계를 정한다(시계 = 뒤 경계, 반시계 = 앞 경계)
-      dr.k = dr.acc > 0 ? dr.si : dr.si - 1;
+      dr.pair = dr.acc > 0 ? [dr.si, dr.h.b] : [dr.h.a, dr.si];
       setDragging(dr.acc > 0 ? "end" : "start");
     }
-    apply(dragBoundary(dr.base, dr.k, dr.acc * total, step));
+    apply(dragBetween(dr.base, dr.pair[0], dr.pair[1], dr.acc * total, step));
   }
   function endDrag() {
     drag.current = null;
@@ -392,8 +410,8 @@ export function RatioDial({
           const knob = polar(h.at / total, KNOB_AT);
           const label =
             h.side === "both"
-              ? DIAL_TEXT.handleBoth(sel!.name, slices[si - 1].name, slices[si + 1].name, stepText)
-              : DIAL_TEXT.handle(sel!.name, (h.side === "start" ? slices[si - 1] : slices[si + 1]).name, stepText);
+              ? DIAL_TEXT.handleBoth(sel!.name, slices[h.a].name, slices[h.b].name, stepText)
+              : DIAL_TEXT.handle(sel!.name, (h.side === "start" ? slices[h.a] : slices[h.b]).name, stepText);
           const isDragging = dragging === h.side || (h.side === "both" && dragging !== null);
           return (
             <g
@@ -409,8 +427,8 @@ export function RatioDial({
               aria-label={label}
               style={{ touchAction: "none" }}
               transform={`translate(${knob[0].toFixed(2)} ${knob[1].toFixed(2)})`}
-              onPointerDown={(e) => startDrag(e, h.side)}
-              onKeyDown={(e) => onHandleKey(e, h.side)}
+              onPointerDown={(e) => startDrag(e, h)}
+              onKeyDown={(e) => onHandleKey(e, h)}
             >
               <circle r={HIT_R} className="dial-hit" />
               <circle r={KNOB_R} className="dial-ring" />
