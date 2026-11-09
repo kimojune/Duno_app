@@ -19,6 +19,7 @@ import type { EveningState } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
+import { setNumberField } from "./time-wheel-helpers";
 
 /**
  * 저녁 기록 「분야마다 나누기」의 원형 다이얼(고침4 2단계). 원 전체 = 쓴 시간, 조각 = 분야마다 분, 맨 끝 = 기타.
@@ -73,7 +74,8 @@ async function mount(api: EveningApi) {
   await screen.findByRole("button", { name: "분야마다 나누기" });
   return { onClose };
 }
-const setNumber = (label: string, value: number) => fireEvent.change(screen.getByLabelText(label), { target: { value: String(value) } });
+/** 「시간」「분」은 두 줄 휠의 숫자 바로 쓰기(고침9), 그 밖(분야 줄)은 숫자 칸 */
+const setNumber = setNumberField;
 const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
 const key = (el: Element, k: string) => fireEvent.keyDown(el, { key: k });
 const dial = () => document.querySelector("svg.dial") as unknown as HTMLElement | null;
@@ -223,26 +225,29 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(results).toEqual([true]);
   });
 
-  it("쓴 시간이 5의 배수가 아닐 때(62분): 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
-    const { sent, results } = await openSplit120();
-    key(dial()!, "ArrowRight");
-    key(handle("end"), "PageUp"); // 30 · 60 · 기타 30
-    await press("이전");
-    setNumber("시간", 1);
-    setNumber("분", 2); // 62분
+  it("쓴 시간이 5의 배수가 아닐 때(타이머가 62분을 채움 — 고침9 휠은 손으로 5분 단위만 쓴다): 휠은 1시간 02분을 그대로 보이고, 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
+    const { sent, results } = await (async () => {
+      const r = realApi(state({ timerByCategory: [{ categoryId: null, minutes: 62 }] }));
+      await mount(r.api);
+      return r;
+    })();
+    expect(screen.getByRole("spinbutton", { name: "시간" }).getAttribute("aria-valuenow")).toBe("1");
+    expect(screen.getByRole("spinbutton", { name: "분" }).getAttribute("aria-valuenow")).toBe("2");
+    expect(screen.getByRole("spinbutton", { name: "분" }).querySelector(".time-wheel-center")!.textContent).toBe("02");
     await press("분야마다 나누기");
-    expect(stepper("어학")).toBe(15);
+    expect(otherText()).toBe("1시간 2분"); // 기타 100%
+    await press("어학, 다이얼에 넣기"); // 기타에서 30분
+    await press("포트폴리오, 다이얼에 넣기"); // 기타에서 30분 → 기타 2분
+    expect(stepper("어학")).toBe(30);
     expect(stepper("포트폴리오")).toBe(30);
-    expect(otherText()).toBe("17분");
-    expect(handle("end").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오)은 단계를 오가도 그대로
-    key(handle("end"), "ArrowRight"); // 30 → 35 (5분 단위)
-    expect(stepper("포트폴리오")).toBe(35);
-    key(handle("end"), "End"); // 기타 12분을 다 가져간다
-    expect(stepper("포트폴리오")).toBe(47);
+    expect(otherText()).toBe("2분");
+    expect(handle("start").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오, 마지막으로 고른 칩)
+    key(handle("end"), "End"); // 기타 2분을 다 가져간다(5분 걸음이어도 끝은 끝값)
+    expect(stepper("포트폴리오")).toBe(32);
     expect(otherText()).toBe("0분");
     await press("저장");
     expect(sent[0].totalMinutes).toBe(62);
-    expect(sent[0].items.reduce((s, i) => s + i.minutes, 0)).toBe(62);
+    expect(sent[0].items).toEqual([{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 32 }]);
     expect(results).toEqual([true]);
   });
 
@@ -492,7 +497,13 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     const list = document.querySelector("ul.ratio-list")!;
     expect(list.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hint.previousElementSibling).toBe(list);
-    expect(hint.nextElementSibling!.textContent).toBe("합계 2시간");
+    // 고침9(Figma 87:2): 안내 글이 흰 카드의 끝이고, 맨 아래 「합계」 줄은 없다 — 합계는 제목 같은 줄 오른쪽(12 보조)
+    expect(hint.nextElementSibling).toBeNull();
+    expect(hint.parentElement!.className).toBe("card-box evening-split-card");
+    const total = screen.getByText("합계 2시간");
+    expect(total.className).toBe("evening-split-total");
+    expect(total.previousElementSibling!.textContent).toBe("분야마다 나눠 주세요");
+    expect(screen.getAllByText(/^합계/)).toHaveLength(1);
     // 12 보조 글: CSS 규칙(글자 크기 0.75rem = 12, 보조 색 토큰)
     const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
     expect(css).toMatch(/\.evening-split-hint \{[^}]*font: 400 0\.75rem\/1rem var\(--font-family\);[^}]*color: var\(--color-text-sub\);/);
@@ -988,5 +999,110 @@ describe("오늘 기록 나누기: 기타 0분에서 12시 손잡이 없음 (고
     const good = await api.save({ ...base, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd", items: [{ categoryId: C1, minutes: 55 }, { categoryId: null, minutes: 5 }] });
     expect(good.ok).toBe(true);
     expect(results).toEqual([false, true]);
+  });
+});
+
+describe("오늘 기록 나누기 화면 꼴(고침9 Figma 87:2 · 87:96 · 49:26 · 49:83)", () => {
+  it("머리 「‹ 오늘 기록 닫기」(A1) · 제목 옆 「합계」 · 「오늘/어제」 알약 없음 · 흰 카드 하나에 이름표·칩 줄·다이얼·줄·안내 · 「이전」 글 단추 없음 · 「저장」은 아래 고정(A2)", async () => {
+    await openSplit120();
+    const dialog = screen.getByRole("dialog", { name: "오늘 기록" });
+    const back = within(dialog).getByRole("button", { name: "이전" });
+    expect(back.className).toBe("overlay-back");
+    expect(back.closest(".screen-head")).not.toBeNull();
+    expect(within(dialog).queryByRole("group", { name: "기록할 날" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "오늘" })).toBeNull();
+    expect(within(dialog).queryAllByRole("button", { name: "이전" })).toHaveLength(1); // 글 단추 「이전」 없음 — 「‹」 하나
+    const card = dialog.querySelector(".card-box.evening-split-card")!;
+    expect(Array.from(card.children).map((c) => c.className)).toEqual([
+      "evening-category-label",
+      "chip-scroller",
+      "input-help",
+      "evening-dial",
+      "ratio-list evening-rows",
+      "evening-split-hint",
+    ]);
+    expect(card.querySelector(".evening-category-label")!.textContent).toBe("분야 · 여러 개");
+    const actions = dialog.querySelector(".bottom-actions")!;
+    expect(Array.from(actions.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["저장"]);
+    expect(card.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // 「‹」는 시간 단계로(쓴 시간 그대로)
+    await act(async () => fireEvent.click(back));
+    expect(screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" })).toBeTruthy();
+    expect(screen.getByRole("spinbutton", { name: "시간" }).getAttribute("aria-valuenow")).toBe("2");
+  });
+
+  it("다이얼 가운데: 시간 24 Bold 위 · 분야 12 보조 아래(값이 위). 12시 작은 세로 눈금은 없다(처음 정한 비율 다이얼은 그대로 있다)", async () => {
+    await openSplit120();
+    const value = document.querySelector(".evening-dial .dial-center-value")!;
+    const name = document.querySelector(".evening-dial .dial-center-name")!;
+    expect(value.textContent).toBe("30분"); // 고른 조각 = 어학(타이머 30분)
+    expect(name.textContent).toBe("어학");
+    expect(value.getAttribute("class")).toBe("dial-center-value dial-center-big");
+    expect(name.getAttribute("class")).toBe("dial-center-name dial-center-small");
+    expect(Number(value.getAttribute("y"))).toBeLessThan(Number(name.getAttribute("y")));
+    expect(value.querySelector("tspan")).toBeNull(); // 숫자와 단위가 같은 크기
+    expect(document.getElementById("evening-dial-noon")).toBeNull();
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.dial-center-big \{ font: var\(--font-title\);/);
+    expect(css).toMatch(/\.dial-center-small \{ font: 400 0\.75rem\/1rem var\(--font-family\); \}/);
+  });
+
+  it("기타 줄은 −/+·숫자 칸 없이 오른쪽 끝 값만(14 Medium · 고정폭 숫자, PM d-148 가). 분야 줄은 A3 −/+(원 32)·칸 안 단위", async () => {
+    await openSplit120();
+    const other = document.querySelector('.ratio-list [data-row-key="other"]')!;
+    expect(other.querySelectorAll("button, input")).toHaveLength(0);
+    const value = other.querySelector(".evening-other-value")!;
+    expect(value.textContent).toBe("1시간");
+    expect(other.lastElementChild).toBe(value);
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.evening-row \.evening-other-value \{[^}]*margin-inline-start: auto;[^}]*text-align: end; font: 500 0\.875rem\/1\.25rem var\(--font-family\); font-variant-numeric: tabular-nums;/);
+    const row = document.querySelector(`.ratio-list [data-row-key="${C1}"]`)!;
+    expect(row.querySelectorAll(".step-btn .step-btn-face")).toHaveLength(2);
+    expect(row.querySelector(".num-field .stepper-unit")!.textContent).toBe("분");
+  });
+
+  it("나눈 합이 합계보다 많으면(이미 남긴 기록의 숨은 분야 등) 카드 아래 안내 상자, 제목 옆 합계는 맞춘 합(Figma 49:83)", async () => {
+    const existing = {
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      targetDay: "2026-11-07",
+      totalMinutes: 240,
+      items: [{ categoryId: C1, minutes: 180 }, { categoryId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", minutes: 60 }],
+      saveMode: "edited" as const,
+      savedAt: "x",
+    };
+    const r = realApi(state({ existing }));
+    await mount(r.api);
+    setNumber("시간", 3); // 쓴 시간을 줄였다(나눈 값은 비율대로 다시 나뉨)
+    await press("분야마다 나누기");
+    expect(screen.getByText(/^합계/).className).toBe("evening-split-total");
+  });
+});
+
+describe("악용: 두 줄 휠 바로 쓰기로 범위 밖 시간 저장(앱 검사 + 서버 저장 검증 그대로)", () => {
+  it("25시간·음수·1e9·분 7을 넣어도 저장 인자는 0~1440분이고 진짜 저장 함수(서버 검증)를 지난다. 정상 값도 지난다", async () => {
+    const r = realApi();
+    await mount(r.api);
+    setNumber("시간", 25);
+    await press("나누지 않고 저장");
+    expect(r.sent[0]).toMatchObject({ totalMinutes: 1440, items: [{ categoryId: null, minutes: 1440 }] });
+    expect(r.results).toEqual([true]);
+    cleanup();
+    for (const [h, m, expected] of [
+      [-3, 0, 0],
+      ["1e9", 0, 1440],
+      [1, 7, 65],
+      [2, 30, 150],
+    ] as const) {
+      const rr = realApi();
+      await mount(rr.api);
+      setNumberField("시간", h as number);
+      setNumberField("분", m);
+      expect(Number(screen.getByRole("spinbutton", { name: "시간" }).getAttribute("aria-valuenow")) * 60 + Number(screen.getByRole("spinbutton", { name: "분" }).getAttribute("aria-valuenow"))).toBe(expected);
+      await press("나누지 않고 저장");
+      expect(rr.sent[0].totalMinutes).toBe(expected);
+      expect(rr.sent[0].totalMinutes % 5).toBe(0);
+      expect(rr.results).toEqual([true]);
+      cleanup();
+    }
   });
 });

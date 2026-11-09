@@ -26,7 +26,7 @@ const growthApi = { fetchCategoryPage: never, recordView: vi.fn(async () => ({ o
 const eveningApi = { fetchState: never, save: vi.fn() };
 const GROWTH = {
   today: "2026-11-07", weekStart: "2026-11-02", lastWeekStart: "2026-10-26", lastMonthRange: { from: "2026-10-01", to: "2026-10-31" },
-  categories: [], ratios: [], thisWeek: [], lastWeek: [], lastMonth: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0, goal: null, goalText: null,
+  categories: [], ratios: [], thisWeek: [], lastWeek: [], lastMonth: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0, streakWeeks: 0, goal: null, goalText: null,
 };
 const manageApi = { fetchNotes: never, addNote: vi.fn(), deleteNote: vi.fn(), editTodo: vi.fn(), deleteTodo: vi.fn() };
 

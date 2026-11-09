@@ -37,12 +37,12 @@ test("evening-todo 360x800: 줄 누름 48 이상·가로 넘침 없음, 시트 �
   const sheetBox = (await sheet.boundingBox())!;
   expect(sheetBox.width).toBeLessThanOrEqual(360);
 
-  await sheet.getByRole("button", { name: "적기" }).click();
+  await sheet.getByRole("button", { name: "더하기" }).click(); // 고침9: 「적기」 → 폭 가득 「더하기」(Figma 88:12)
   await expect(sheet.getByText("발음 연습 20분")).toBeVisible();
   await sheet.getByRole("checkbox", { name: "운영체제 3장 읽기" }).check();
   await page.goBack(); // 안드로이드 뒤로 가기: 시트만 닫힌다
   await expect(sheet).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "오늘 기록" })).toBeVisible(); // 고침9: 창 이름 = 머리 「오늘 기록」(A1)
   await expect(page.getByRole("button", { name: /^오늘 할 일 3\/5/ })).toBeFocused();
   await page.screenshot({ path: `${OUT}/time-step-line-after-360x800.png` });
 });

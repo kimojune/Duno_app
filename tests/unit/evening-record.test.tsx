@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EveningEntry, EveningRecord } from "../../components/evening-record";
 import type { EveningState, SavedEvening } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
+import { setNumberField, wheelTotal, wheelValue } from "./time-wheel-helpers";
 
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 const C2 = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2";
@@ -42,8 +43,12 @@ async function mount(api: EveningApi, extra: Partial<React.ComponentProps<typeof
   await screen.findByRole("button", { name: "분야마다 나누기" });
   return { onClose, ...view };
 }
-const setNumber = (label: string, value: number) => fireEvent.change(screen.getByLabelText(label), { target: { value: String(value) } });
+/** 「시간」「분」은 두 줄 휠의 숫자 바로 쓰기(고침9), 그 밖(분야 줄)은 숫자 칸 */
+const setNumber = setNumberField;
 const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
+/** 저장 뒤 「이번 주」 카드의 줄: [분야 이름, 바뀐 몫] */
+const afterSaveRows = () =>
+  Array.from(document.querySelectorAll(".after-save-card .after-save-row")).map((li) => [li.querySelector(".after-save-name")!.textContent, li.querySelector(".after-save-delta")!.textContent]);
 
 beforeEach(() => {
   vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(true);
@@ -54,29 +59,55 @@ afterEach(() => {
 });
 
 describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
-  it("질문 「오늘 몇 시간 썼어요?」로 열리고 제목에 포커스가 간다", async () => {
+  it("창 이름은 머리 「오늘 기록」(A1), 머리 아래 큰 제목 「오늘 몇 시간 썼어요?」에 포커스가 간다. 시간 단계에 「합계」 줄은 없다(고침9)", async () => {
     await mount(fakeApi());
-    const dialog = screen.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
+    const dialog = screen.getByRole("dialog", { name: "오늘 기록" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" }));
-    expect(screen.getByText("합계 0분")).toBeTruthy();
+    const ask = screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" });
+    expect(document.activeElement).toBe(ask);
+    expect(ask.className).toBe("evening-ask");
+    // 머리 줄: 가운데 「오늘 기록」 · 오른쪽 「닫기」. 시간 단계에는 「‹」(이전)가 없다
+    const head = dialog.querySelector<HTMLElement>(".screen-head")!;
+    expect(head.querySelector(".screen-head-title")!.textContent).toBe("오늘 기록");
+    expect(within(head).getByRole("button", { name: "닫기" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "이전" })).toBeNull();
+    expect(head.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // 큰 제목은 머리 아래
+    expect(screen.queryByText(/^합계/)).toBeNull();
+    expect(wheelTotal()).toBe(0);
   });
 
-  it("시간과 분을 −/+ 단추나 숫자 칸으로 넣고, 합계가 숫자로 보인다", async () => {
+  it("「어제」 왼쪽 · 「오늘」 오른쪽 알약(aria-pressed), 단추는 「분야마다 나누기」(주) 위 · 「나누지 않고 저장」(보조) 아래, 아래 고정 자리(A2) 안", async () => {
     await mount(fakeApi());
+    const days = within(screen.getByRole("group", { name: "기록할 날" })).getAllByRole("button");
+    expect(days.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+      ["어제", "false"],
+      ["오늘", "true"],
+    ]);
+    const actions = document.querySelector(".bottom-actions")!;
+    expect(Array.from(actions.querySelectorAll("button")).map((b) => [b.textContent, b.className])).toEqual([
+      ["분야마다 나누기", "btn btn-primary"],
+      ["나누지 않고 저장", "btn btn-secondary evening-skip"],
+    ]);
+  });
+
+  it("쓴 시간은 두 줄 휠: 숫자 바로 쓰기와 「+ 5분」「− 5분」으로 넣고, 저장 총시간이 휠 값이다", async () => {
+    const api = fakeApi();
+    await mount(api);
     setNumber("시간", 2);
-    fireEvent.click(screen.getByRole("button", { name: "분 5분 늘리기" }));
-    fireEvent.click(screen.getByRole("button", { name: "분 5분 늘리기" }));
-    expect(screen.getByText("합계 2시간 10분")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "시간 1시간 줄이기" }));
-    expect(screen.getByText("합계 1시간 10분")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "+ 5분" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ 5분" }));
+    expect([wheelValue("시간"), wheelValue("분")]).toEqual([2, 10]);
+    fireEvent.click(screen.getByRole("button", { name: "− 5분" }));
+    expect(wheelTotal()).toBe(125);
+    await press("나누지 않고 저장");
+    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 125, items: [{ categoryId: null, minutes: 125 }] }));
   });
 
   it("타이머 시간으로 총시간을 미리 채운다. 알림 글 없이 「타이머 45분」 띠만(고침6 PM d-129 ④)", async () => {
     await mount(fakeApi(state({ timerByCategory: [{ categoryId: C1, minutes: 45 }] })));
     expect(screen.queryByText(/미리 채웠어요/)).toBeNull();
     expect(screen.getByText("타이머 45분").className).toBe("evening-timer-chip");
-    expect(screen.getByText("합계 45분")).toBeTruthy();
+    expect([wheelValue("시간"), wheelValue("분")]).toEqual([0, 45]);
   });
 
   it("「나누지 않고 저장」: 전부 기타, 저장 방식 not_split, 대상 날·기기 시각을 함께 보낸다", async () => {
@@ -93,9 +124,15 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
       saveMode: "not_split",
       clientSavedAt: NOW.toISOString(),
     });
-    expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
-    expect(screen.getByText("오늘 바뀐 분야별 시간")).toBeTruthy();
-    expect(screen.getByText("기타 +3시간")).toBeTruthy(); // 모두 기타로 저장한 날에도 값이 있다
+    // 저장 뒤 판(S5-3): 같은 창에서 「✓ 저장했어요」 + 「이번 주」 카드. 아래 「닫기」 알약은 없다(닫기는 머리)
+    // O-8: 저장 상태는 포커스를 옮겨 읽히지 않는다 — 포커스는 창 자체(누른 단추가 사라져도 창 밖으로 빠지지 않음), 알림은 상태 알림 한 곳
+    const savedHead = screen.getByRole("heading", { name: "저장했어요" });
+    expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "오늘 기록" }));
+    expect(savedHead.getAttribute("tabindex")).toBeNull();
+    expect(Array.from(document.querySelectorAll('[role="status"]')).map((e) => e.textContent).filter(Boolean)).toEqual(["저장했어요. 기타 +3시간."]);
+    expect(afterSaveRows()).toEqual([["기타", "+3시간"]]); // 모두 기타로 저장한 날에도 값이 있다(상태보기 데이터 없이 바뀐 몫만)
+    expect(document.querySelector(".bottom-actions")).toBeNull();
+    expect(within(screen.getByRole("dialog")).getAllByRole("button").map((b) => b.textContent)).toEqual(["닫기"]);
   });
 
   it("분야마다 나누기: 타이머 분야는 그 시간, 끝낸 할 일의 분야는 칩이 골라진 채 기타에서 30분(남은 시간을 나눠 채우지 않는다 — d-115 나·d-116 가). 그대로 저장하면 prefilled", async () => {
@@ -115,7 +152,37 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
         saveMode: "prefilled",
       }),
     );
-    expect(screen.getByText("어학 +30분 · 포트폴리오 +30분 · 기타 +1시간")).toBeTruthy();
+    expect(afterSaveRows()).toEqual([
+      ["어학", "+30분"],
+      ["포트폴리오", "+30분"],
+      ["기타", "+1시간"],
+    ]);
+  });
+
+  it("저장 중(O-7, Figma 133:48): 응답 전까지 주 단추가 「저장 중」 + 막힘 + aria-busy, 다른 단추도 막힌다. 응답 뒤 저장 뒤 판", async () => {
+    let resolve!: (v: Awaited<ReturnType<EveningApi["save"]>>) => void;
+    const save = vi.fn(() => new Promise<Awaited<ReturnType<EveningApi["save"]>>>((r) => (resolve = r)));
+    await mount(fakeApi(state(), { save }));
+    setNumber("시간", 1);
+    await press("분야마다 나누기");
+    await press("저장");
+    const busy = screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement;
+    expect([busy.disabled, busy.getAttribute("aria-busy"), busy.closest(".bottom-actions") !== null]).toEqual([true, "true", true]);
+    expect((screen.getByRole("button", { name: "이전" }) as HTMLButtonElement).disabled).toBe(true);
+    await press("저장 중"); // 막혀 있어 두 번 가지 않는다
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      resolve({ ok: true, data: { log: { id: "x", targetDay: "2026-11-07", totalMinutes: 60, items: [{ categoryId: null, minutes: 60 }], saveMode: "prefilled", savedAt: "x" }, delta: [{ categoryId: null, minutes: 60 }] } }),
+    );
+    expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
+    cleanup();
+    // 「나누지 않고 저장」도 같다
+    const save2 = vi.fn(() => new Promise<never>(() => {}));
+    await mount(fakeApi(state(), { save: save2 }));
+    await press("나누지 않고 저장");
+    const skip = screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement;
+    expect([skip.className, skip.disabled, skip.getAttribute("aria-busy")]).toEqual(["btn btn-secondary evening-skip", true, "true"]);
+    expect((screen.getByRole("button", { name: "분야마다 나누기" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("처음 값을 고치면 edited, 남은 시간은 기타", async () => {
@@ -150,13 +217,21 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 60, items: [{ categoryId: C1, minutes: 60 }] }));
   });
 
-  it("저장 직후 한 줄을 누르면 상태보기로 간다(onOpenGrowth)", async () => {
+  it("저장 뒤 카드 아래 가운데 「상태보기에서 보기 ›」 글 단추를 누르면 상태보기로 간다(onOpenGrowth). 없으면 단추도 없다", async () => {
     const onOpenGrowth = vi.fn();
     await mount(fakeApi(), { onOpenGrowth });
     setNumber("시간", 1);
     await press("나누지 않고 저장");
-    fireEvent.click(screen.getByRole("button", { name: /오늘 바뀐 분야별 시간/ }));
+    const go = screen.getByRole("button", { name: "상태보기에서 보기" });
+    expect(go.className).toContain("btn-text");
+    expect(document.querySelector(".after-save-card")!.compareDocumentPosition(go) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // 카드 아래
+    fireEvent.click(go);
     expect(onOpenGrowth).toHaveBeenCalledTimes(1);
+    cleanup();
+    await mount(fakeApi());
+    setNumber("시간", 1);
+    await press("나누지 않고 저장");
+    expect(screen.queryByRole("button", { name: /상태보기에서 보기/ })).toBeNull();
   });
 
   it("바뀐 시간이 없으면 그렇게 알린다", async () => {
@@ -171,11 +246,13 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(screen.getByText("바뀐 시간이 없어요")).toBeTruthy();
   });
 
-  it("저장 뒤 renderAfterSave가 한 줄 아래에 얹힌다", async () => {
-    await mount(fakeApi(), { renderAfterSave: (saved) => <p>채울 한 줄 {saved.log.totalMinutes}</p> });
+  it("저장 뒤 renderAfterSave가 「저장했어요」 아래 카드 자리를 맡는다(저장 결과·읽은 상태를 받는다)", async () => {
+    await mount(fakeApi(), { renderAfterSave: (saved, s) => <p>카드 {saved.log.totalMinutes} {s.categories.length}</p> });
     setNumber("시간", 1);
     await press("나누지 않고 저장");
-    expect(screen.getByText("채울 한 줄 60")).toBeTruthy();
+    const card = screen.getByText("카드 60 2");
+    expect(screen.getByRole("heading", { name: "저장했어요" }).compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector(".after-save-card")).toBeNull(); // 기본 카드는 그리지 않는다
   });
 
   it("어제로 바꾸면 어제 날짜로 다시 읽고, 질문과 저장 대상 날이 바뀐다", async () => {
@@ -187,7 +264,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     setNumber("시간", 1);
     await press("나누지 않고 저장");
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ targetDay: "2026-11-06" }));
-    expect(screen.getByText("어제 바뀐 분야별 시간")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
   });
 
   it("이미 남긴 기록이 있으면 그 값으로 열리고 고쳐 저장할 수 있다", async () => {
@@ -202,7 +279,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     const api = fakeApi(state({ existing }));
     await mount(api);
     expect(screen.getByText("이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.")).toBeTruthy();
-    expect(screen.getByText("합계 2시간 30분")).toBeTruthy();
+    expect([wheelValue("시간"), wheelValue("분")]).toEqual([2, 30]);
     await press("분야마다 나누기");
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("100");
     await press("저장");
@@ -222,7 +299,8 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     setNumber("시간", 2);
     await press("나누지 않고 저장");
     expect(screen.getByRole("alert").textContent).toContain("저장하지 못했어요");
-    expect(screen.getByText("합계 2시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(120);
+    expect(screen.queryByRole("heading", { name: "저장했어요" })).toBeNull(); // 실패면 저장 뒤 판으로 넘어가지 않는다
     await press("나누지 않고 저장");
     expect(save.mock.calls[0][0].id).toBe(save.mock.calls[1][0].id);
     expect(screen.getByRole("heading", { name: "저장했어요" })).toBeTruthy();
@@ -252,7 +330,7 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     await press("나누지 않고 저장");
     expect(api.save).not.toHaveBeenCalled();
     expect(screen.getAllByText("인터넷에 연결되면 저장할 수 있어요. 넣은 값은 그대로 있어요.").length).toBeGreaterThan(0);
-    expect(screen.getByText("합계 2시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(120);
   });
 
   it("읽기가 실패하면 안내와 「다시 불러오기」", async () => {

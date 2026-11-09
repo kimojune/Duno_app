@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
 import type { AddCategoryResult } from "../lib/categories/types";
 import { buildItems, classifySaveMode, initialSelection, notSplitItems, otherOf, pickChip, unpickChip, type EveningItem } from "../lib/evening/logic";
 import type { EveningState, SavedEvening } from "../lib/evening/types";
 import type { EveningApi } from "../lib/evening-api";
-import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
+import { formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { addDays } from "../lib/week";
 import { useOverlayWindow } from "../lib/use-overlay-window";
@@ -17,17 +17,22 @@ import { RatioDial, type DialSlice } from "./ratio-dial";
 import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { ChipScroller } from "./chip-scroller";
 import { Stepper } from "./stepper";
-import { BackHeader } from "./back-header";
 import { CloseConfirm } from "./close-confirm";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
+import { TimeWheel } from "./time-wheel";
+import { AfterSaveCard, AFTER_SAVE_TEXT } from "./after-save";
 import { categoryDuplicateText, categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
  * 오늘 기록(옛 이름 저녁 기록, PM 4 — 코드 이름은 evening 그대로. PRD 7-3, ②). 두 단계: 「오늘 몇 시간 썼어요?」 → 분야마다 나누기. 한 화면에서 아래로 내려 보지 않는다.
  * - 첫 단계에 「나누지 않고 저장」이 있다(그날 시간은 전부 기타, 임시).
- * - 저장하면 바로 「오늘 바뀐 분야별 시간」 한 줄을 보인다(값은 목표 대비가 아니라 바뀐 것). 그 줄을 누르면 상태보기로 간다.
+ * - 저장하면 같은 창이 저장 뒤 판으로 바뀐다(S5-3, 명세 ⑦-7): 머리 「오늘 기록 · 닫기」 · 「✓ 저장했어요」 · 「이번 주」 카드(renderAfterSave — app-shell은 components/after-save.tsx AfterSave,
+ *   없으면 바뀐 분야·바뀐 시간만 보이는 AfterSaveCard) · 가운데 「상태보기에서 보기 ›」 글 단추(onOpenGrowth). 아래 「닫기」 알약은 없다. 저장이 실패하면 넘어가지 않는다.
  * - 저장할 때마다 저장 방식(미리 채운 그대로·고침·나누지 않음)·대상 날·저장 시각이 남는다(G9, 서버가 시각을 정한다).
- * - 오늘과 어제 중 대상 날을 고를 수 있다. 입력 모양은 PM이 써 보며 확정한다(임시: −/+ 단추와 숫자 칸).
+ * - 오늘과 어제 중 대상 날을 고를 수 있다(「어제」 왼쪽 · 「오늘」 오른쪽 테두리 알약). 쓴 시간 입력 = 두 줄 휠(components/time-wheel.tsx, 명세 ⑦-4 · D-170) + 「− 5분 / + 5분」.
+ * - 화면 꼴(고침9 Figma 정합 49:5 · 87:2): 머리 = 공통 부품 BackHeader(A1, 나누기 단계만 「‹」), 큰 제목은 머리 아래, 주 단추는 BottomActions(A2, 폭 가득 아래 고정).
+ *   시간 단계 단추 = 「분야마다 나누기」(주) 위 · 「나누지 않고 저장」(보조) 아래. 나누기는 흰 카드 하나(A4)에 이름표·칩 줄·다이얼·줄·안내 한 줄, 제목 옆 「합계 n」.
  * - 나누기 단계(고침 5바퀴, PM 10 — d-114 가 · d-115 나 · d-116 가):
  *   - 위에 분야 칩 줄(이름표 「분야」). 칩 = 다이얼에 넣을 분야 고르기(여럿). 맨 끝 「+ 분야」는 그 자리에서 새 분야를 더하고 골라진 칩이 된다.
  *   - 다이얼과 아래 −/+ 줄 = 고른 분야 조각 + 맨 끝 기타 조각만. 고르지 않은 분야는 조각도 줄도 없다. 12시 고정(첫 조각 시작·기타 끝이 12시).
@@ -57,8 +62,8 @@ export const EVENING_TEXT = {
   yesterday: "어제",
   askToday: "오늘 몇 시간 썼어요?",
   askYesterday: "어제 몇 시간 썼어요?",
-  hours: "시간",
   minutes: "분",
+  /** 나누기 제목 옆 작은 글(12 보조). 시간 단계의 합계 줄은 없앴다(고침9) */
   total: (m: number) => `합계 ${formatMinutes(m)}`,
   /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시. 고침6 PM d-129 ④: 옛 알림 글 「타이머로 n 미리 채웠어요.」는 빼고 이 띠만 남긴다 */
   timerChip: (m: number) => `타이머 ${formatMinutes(m)}`,
@@ -77,22 +82,16 @@ export const EVENING_TEXT = {
   // 임시 글, 디자인 확정 뒤: 나누기 다이얼의 가운데 표시(아무 조각도 안 골랐을 때 = 쓴 시간)
   dialCenter: (m: number) => formatMinutes(m),
   save: "저장",
-  saving: "저장하는 중",
+  /** 저장 중(O-7, Figma 133:48): 주 단추 busy(막힘 + aria-busy + 흐림)와 이 글 */
+  saving: BACK_HEADER_TEXT.saving,
   saveFailed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요. 넣은 값은 그대로 있어요.",
   loading: "기록을 불러오는 중",
   loadFailed: "기록을 불러오지 못했어요.",
   reload: "다시 불러오기",
-  saved: "저장했어요",
-  changedToday: "오늘 바뀐 분야별 시간",
-  changedYesterday: "어제 바뀐 분야별 시간",
-  noChange: "바뀐 시간이 없어요",
-  openGrowth: "상태보기에서 보기",
+  saved: AFTER_SAVE_TEXT.saved,
+  openGrowth: AFTER_SAVE_TEXT.openGrowth,
 } as const;
-
-function splitMinutes(total: number): { hours: number; minutes: number } {
-  return { hours: Math.floor(total / 60), minutes: total % 60 };
-}
 
 function composing(event: KeyboardEvent): boolean {
   return event.nativeEvent.isComposing || event.keyCode === 229;
@@ -242,9 +241,17 @@ export function EveningRecord({
     };
   }, [api, apply]);
 
+  // 단계가 바뀌거나 기록을 다 읽으면 그 단계의 큰 제목에 포커스. 머리 「오늘 기록」은 창 이름이다.
+  // 저장 뒤 판(O-8): 저장 상태는 포커스를 옮겨 읽히지 않고 상태 알림 한 곳(「이번 주」 카드의 role=status)이 한 문장으로 알린다.
+  // 누른 단추가 사라지므로 포커스는 창 자체에 둔다(창 밖으로 빠지지 않게). 읽는 동안도 창 자체
+  const ready = load.status === "ready";
+  // 제목은 그린 직후(layout) — 읽기를 마친 그 그림에서 바로. 창 자체 포커스는 겹친 창 효과(연 단추 기억)가 돈 뒤(effect)
+  useLayoutEffect(() => {
+    if (ready && phase !== "saved") titleRef.current?.focus();
+  }, [phase, ready]);
   useEffect(() => {
-    titleRef.current?.focus();
-  }, [phase]);
+    if (!ready || phase === "saved") rootRef.current?.focus();
+  }, [phase, ready, rootRef]);
 
   function chooseDay(next: 0 | 1) {
     if (next === offsetDays || saving) return;
@@ -267,7 +274,6 @@ export function EveningRecord({
   const catalogIds = catalog.map((c) => c.id);
   const colorOf = (id: string) => categoryColorValue(catalogIds.indexOf(id));
   const names = new Map(catalog.map((c) => [c.id, c.name]));
-  const nameOf = (id: string | null) => (id === null ? EVENING_TEXT.other : (names.get(id) ?? EVENING_TEXT.other));
   const timerSum = state ? state.timerByCategory.reduce((s, t) => s + t.minutes, 0) : 0;
   // 저장 항목은 분야 순서(만든 순서) → 숨은 분야 → 기타. 칩을 고른 순서와 상관없이 화면 줄 순서와 같다
   const built = buildItems(total, {
@@ -488,273 +494,257 @@ export function EveningRecord({
     setTotal(next);
   }
 
-  const { hours, minutes } = splitMinutes(total);
   const ask = offsetDays === 0 ? EVENING_TEXT.askToday : EVENING_TEXT.askYesterday;
-  const deltaTitle = offsetDays === 0 ? EVENING_TEXT.changedToday : EVENING_TEXT.changedYesterday;
-  const deltaText = saved
-    ? saved.delta.length === 0
-      ? EVENING_TEXT.noChange
-      : saved.delta.map((d) => `${nameOf(d.categoryId)} ${formatDeltaMinutes(d.minutes)}`).join(" · ")
-    : "";
+  const fallbackNames = catalog;
 
   return (
-    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" onKeyDown={onKeyDown}>
-      <div className="detail-inner">
-        {phase === "split" ? (
-          <>
-            {/* 나누기 단계 머리(고침9, PM 1-A · Figma 87:2): 왼쪽 위 「‹」(이름 「이전」, 시간 단계로) · 가운데 「오늘 기록」 · 오른쪽 「닫기」 — components/back-header.tsx.
-                큰 제목은 머리 아래. 아래 단추 줄의 「이전」 글 단추는 없앴다 */}
-            <BackHeader onBack={() => setPhase("time")} backDisabled={saving} title={EVENING_TEXT.title} onClose={requestClose} />
-            <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
-              {EVENING_TEXT.splitHeading}
-            </h2>
-          </>
-        ) : (
-          <>
-            <div className="detail-head">
-              <h2 id="evening-title" className="detail-title" tabIndex={-1} ref={titleRef}>
-                {phase === "saved" ? EVENING_TEXT.saved : ask}
-              </h2>
-              <TextButton className="btn-flush-end" onClick={requestClose}>
-                {EVENING_TEXT.close}
-              </TextButton>
-            </div>
-            <p className="todo-sub">{EVENING_TEXT.title}</p>
-          </>
-        )}
-
-        {load.status === "loading" && (
-          <p className="todo-sub" role="status">
-            {EVENING_TEXT.loading}
-          </p>
-        )}
-        {load.status === "error" && (
-          <Notice role="alert" actions={<SecondaryButton onClick={reload}>{EVENING_TEXT.reload}</SecondaryButton>}>
-            {EVENING_TEXT.loadFailed}
-          </Notice>
-        )}
-
-        {state && phase !== "saved" && (
-          <div className="detail-section" role="group" aria-label={EVENING_TEXT.dayGroup}>
-            <div className="detail-chips">
-              {([0, 1] as const).map((n) => (
-                <button key={n} type="button" className="chip" aria-pressed={offsetDays === n} disabled={saving} onClick={() => chooseDay(n)}>
-                  <span className="chip-face">
-                    <span className="chip-label">{n === 0 ? EVENING_TEXT.today : EVENING_TEXT.yesterday}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {state && !online && phase !== "saved" && <Notice role="status">{EVENING_TEXT.offline}</Notice>}
-
-        {state && phase === "time" && (
-          <div className="detail-section">
-            {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
-            <div className="evening-time">
-              <Stepper id="evening-hours" label={EVENING_TEXT.hours} unit={EVENING_TEXT.hours} value={hours} max={24} step={1} onChange={(h) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, h * 60 + minutes))} />
-              <Stepper id="evening-minutes" label={EVENING_TEXT.minutes} unit={EVENING_TEXT.minutes} value={minutes} max={59} step={APP_CONFIG.minuteStep} onChange={(m) => changeTotal(Math.min(APP_CONFIG.maxDayMinutes, hours * 60 + m))} />
-            </div>
-            <p className="ratio-total" role="status">
-              {EVENING_TEXT.total(total)}
+    <div ref={rootRef} className="detail" role="dialog" aria-modal="true" aria-labelledby="evening-title" tabIndex={-1} onKeyDown={onKeyDown}>
+      <div className="detail-inner screen-fill evening-inner">
+        {/* A1 머리(공통 부품): 「오늘 기록」 + 「닫기」. 나누기 단계만 왼쪽 위 「‹」(이전 = 시간 단계로) */}
+        <BackHeader
+          onBack={state && phase === "split" ? () => setPhase("time") : undefined}
+          backDisabled={saving}
+          title={EVENING_TEXT.title}
+          titleId="evening-title"
+          onClose={requestClose}
+        />
+        <div className="screen-fill-body">
+          {load.status === "loading" && (
+            <p className="todo-sub" role="status">
+              {EVENING_TEXT.loading}
             </p>
-            {!state.existing && timerSum > 0 && <p className="evening-timer-chip">{EVENING_TEXT.timerChip(timerSum)}</p>}
-            {/* 오늘을 고른 때만(어제 할 일은 시트에서 다루지 않는다). 시트에서 체크·되돌림·더하기 → 끝낸 할 일 분야 목록이 바로 바뀐다 */}
-            {todos && offsetDays === 0 && (
-              <EveningTodoLine
-                todos={todos}
-                onDoneCategoriesChange={(ids) => setLoad((l) => (l.status === "ready" ? { status: "ready", state: { ...l.state, doneCategoryIds: ids } } : l))}
-              />
-            )}
-            {message && (
-              <Notice role="alert" className="onboarding-notice">
-                {message}
-              </Notice>
-            )}
-            <div className="detail-actions">
-              <SecondaryButton busy={saving} disabled={saving} onClick={() => void save(true)}>
-                {EVENING_TEXT.skipSplit}
-              </SecondaryButton>
-              <PrimaryButton disabled={saving} onClick={toSplit}>
-                {EVENING_TEXT.split}
-              </PrimaryButton>
-            </div>
-          </div>
-        )}
+          )}
+          {load.status === "error" && (
+            <Notice role="alert" actions={<SecondaryButton onClick={reload}>{EVENING_TEXT.reload}</SecondaryButton>}>
+              {EVENING_TEXT.loadFailed}
+            </Notice>
+          )}
 
-        {state && phase === "split" && (
-          <div className="detail-section">
-            <p id="evening-category-label" className="input-label sheet-category-label">
-              {EVENING_TEXT.categoryLabel}
-            </p>
-            {newCatOpen ? (
-              <div className="newcat">
-                <label htmlFor="evening-newcat-input" className="sheet-label input-label">
-                  {TODO_TEXT.newCategoryLabel}
-                </label>
-                <div className="newcat-row">
-                  <div className="newcat-field">
-                    {/* maxLength를 걸지 않는다: 몰래 자르지 않는다(넘으면 안내) */}
-                    <input
-                      id="evening-newcat-input"
-                      ref={newCatInputRef}
-                      className="input"
-                      type="text"
-                      value={newCatDraft}
-                      onChange={(e) => {
-                        setNewCatDraft(e.target.value);
-                        setNewCatHelp("");
-                      }}
-                      onKeyDown={onNewCatKeyDown}
-                      aria-describedby="evening-category-help"
-                      autoComplete="off"
-                      enterKeyHint="done"
-                    />
-                  </div>
-                  <div className="newcat-actions">
-                    <SecondaryButton busy={newCatBusy} onClick={() => void addCategoryNow()}>
-                      {newCatBusy ? TODO_TEXT.addingCategory : TODO_TEXT.addCategory}
-                    </SecondaryButton>
-                    <TextButton onClick={closeNewCategory}>{TODO_TEXT.cancel}</TextButton>
-                  </div>
-                </div>
+          {state && phase === "time" && (
+            <>
+              {/* 「어제」 왼쪽 · 「오늘」 오른쪽, 둘 다 테두리 알약. 켜진 쪽 2px 테두리 + Bold(채움 없음) */}
+              <div className="evening-days" role="group" aria-label={EVENING_TEXT.dayGroup}>
+                {([1, 0] as const).map((n) => (
+                  <button key={n} type="button" className="evening-day" aria-pressed={offsetDays === n} disabled={saving} onClick={() => chooseDay(n)}>
+                    {n === 0 ? EVENING_TEXT.today : EVENING_TEXT.yesterday}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <ChipScroller className="evening-chips" aria-labelledby="evening-category-label">
-                {catalog.map((c) => {
-                  const pressed = has(perCategory, c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="chip"
-                      aria-pressed={pressed}
-                      aria-label={EVENING_TEXT.chip(c.name)}
-                      data-chip-id={c.id}
-                      onClick={() => toggleChip(c.id)}
-                    >
+              <h2 className="evening-ask" tabIndex={-1} ref={titleRef}>
+                {ask}
+              </h2>
+              {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
+              {!online && <Notice role="status">{EVENING_TEXT.offline}</Notice>}
+              <TimeWheel id="evening-wheel" total={total} onChange={changeTotal} disabled={saving} />
+              {!state.existing && timerSum > 0 && (
+                <p className="evening-timer-row">
+                  <span className="evening-timer-chip">{EVENING_TEXT.timerChip(timerSum)}</span>
+                </p>
+              )}
+              {/* 오늘을 고른 때만(어제 할 일은 시트에서 다루지 않는다). 시트에서 체크·되돌림·더하기 → 끝낸 할 일 분야 목록이 바로 바뀐다 */}
+              {todos && offsetDays === 0 && (
+                <EveningTodoLine
+                  todos={todos}
+                  onDoneCategoriesChange={(ids) => setLoad((l) => (l.status === "ready" ? { status: "ready", state: { ...l.state, doneCategoryIds: ids } } : l))}
+                />
+              )}
+              {message && (
+                <Notice role="alert" className="onboarding-notice">
+                  {message}
+                </Notice>
+              )}
+            </>
+          )}
+
+          {state && phase === "split" && (
+            <>
+              <div className="evening-split-head">
+                <h2 className="evening-ask" tabIndex={-1} ref={titleRef}>
+                  {EVENING_TEXT.splitHeading}
+                </h2>
+                <p className="evening-split-total">{EVENING_TEXT.total(built.total)}</p>
+              </div>
+              {!online && <Notice role="status">{EVENING_TEXT.offline}</Notice>}
+              {/* A4 흰 카드 하나: 이름표 · 칩 줄 · 다이얼 · 줄들 · 안내 한 줄 */}
+              <div className="card-box evening-split-card">
+                <p id="evening-category-label" className="evening-category-label">
+                  {EVENING_TEXT.categoryLabel}
+                </p>
+                {newCatOpen ? (
+                  <div className="newcat">
+                    <label htmlFor="evening-newcat-input" className="sheet-label input-label">
+                      {TODO_TEXT.newCategoryLabel}
+                    </label>
+                    <div className="newcat-row">
+                      <div className="newcat-field">
+                        {/* maxLength를 걸지 않는다: 몰래 자르지 않는다(넘으면 안내) */}
+                        <input
+                          id="evening-newcat-input"
+                          ref={newCatInputRef}
+                          className="input"
+                          type="text"
+                          value={newCatDraft}
+                          onChange={(e) => {
+                            setNewCatDraft(e.target.value);
+                            setNewCatHelp("");
+                          }}
+                          onKeyDown={onNewCatKeyDown}
+                          aria-describedby="evening-category-help"
+                          autoComplete="off"
+                          enterKeyHint="done"
+                        />
+                      </div>
+                      <div className="newcat-actions">
+                        <SecondaryButton busy={newCatBusy} onClick={() => void addCategoryNow()}>
+                          {newCatBusy ? TODO_TEXT.addingCategory : TODO_TEXT.addCategory}
+                        </SecondaryButton>
+                        <TextButton onClick={closeNewCategory}>{TODO_TEXT.cancel}</TextButton>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <ChipScroller className="evening-chips" aria-labelledby="evening-category-label">
+                    {catalog.map((c) => {
+                      const pressed = has(perCategory, c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="chip"
+                          aria-pressed={pressed}
+                          aria-label={EVENING_TEXT.chip(c.name)}
+                          data-chip-id={c.id}
+                          onClick={() => toggleChip(c.id)}
+                        >
+                          <span className="chip-face">
+                            {pressed && <CheckIcon />}
+                            <span className="chip-dot" style={{ background: colorOf(c.id) }} aria-hidden="true" />
+                            <span className="chip-label">{c.name}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <button type="button" id="evening-add-category-chip" className="chip chip-add" onClick={openNewCategory}>
                       <span className="chip-face">
-                        {pressed && <CheckIcon />}
-                        <span className="chip-dot" style={{ background: colorOf(c.id) }} aria-hidden="true" />
-                        <span className="chip-label">{c.name}</span>
+                        <span className="chip-label">{TODO_TEXT.addCategoryChip}</span>
                       </span>
                     </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  id="evening-add-category-chip"
-                  className="chip chip-add"
-                  onClick={openNewCategory}
-                >
-                  <span className="chip-face">
-                    <span className="chip-label">{TODO_TEXT.addCategoryChip}</span>
-                  </span>
-                </button>
-              </ChipScroller>
-            )}
-            <p id="evening-category-help" className="input-help" role="status">
-              {newCatHelp}
-            </p>
-            {total > 0 && (
-              <div className="evening-dial">
-                <RatioDial
-                  id="evening-dial"
-                  slices={dialSlices}
-                  total={dialTotal}
-                  step={APP_CONFIG.minuteStep}
-                  bigStep={DIAL_BIG_STEP}
-                  selectedKey={dialPick}
-                  onSelect={setDialPick}
-                  onChange={(values) => {
-                    editedRef.current = true;
-                    dirtyRef.current = true;
-                    setPerCategory((prev) => ({ ...prev, ...Object.fromEntries(chosen.map((c, i) => [c.id, values[i]])) }));
-                  }}
-                  format={formatMinutes}
-                  center={EVENING_TEXT.dialCenter(total)}
-                  // 고침6 PM d-129 ②: 손잡이는 0분이 아닌 조각 사이에만 — 기타 0분이어도 12시에 손잡이가 없다. 기타로 돌려주기는 줄의 −가 맡는다
-                  skipZero
-                />
+                  </ChipScroller>
+                )}
+                <p id="evening-category-help" className="input-help" role="status">
+                  {newCatHelp}
+                </p>
+                {total > 0 && (
+                  <div className="evening-dial">
+                    <RatioDial
+                      id="evening-dial"
+                      slices={dialSlices}
+                      total={dialTotal}
+                      step={APP_CONFIG.minuteStep}
+                      bigStep={DIAL_BIG_STEP}
+                      selectedKey={dialPick}
+                      onSelect={setDialPick}
+                      onChange={(values) => {
+                        editedRef.current = true;
+                        dirtyRef.current = true;
+                        setPerCategory((prev) => ({ ...prev, ...Object.fromEntries(chosen.map((c, i) => [c.id, values[i]])) }));
+                      }}
+                      format={formatMinutes}
+                      center={EVENING_TEXT.dialCenter(total)}
+                      // 고침6 PM d-129 ②: 손잡이는 0분이 아닌 조각 사이에만 — 기타 0분이어도 12시에 손잡이가 없다. 기타로 돌려주기는 줄의 −가 맡는다
+                      skipZero
+                      // 고침9(Figma 87:96): 가운데 = 시간 24 Bold 위 · 분야 12 보조 아래. 12시 작은 눈금 없음
+                      valueFirst
+                      noonMark={false}
+                    />
+                  </div>
+                )}
+                <ul className="ratio-list evening-rows">
+                  {/* 줄을 누르거나(−/+·숫자 칸 포함) 줄 안에 포커스가 가면 그 조각이 골라진다(PM 10) */}
+                  {chosen.map((c) => (
+                    <li
+                      key={c.id}
+                      className={"ratio-row evening-row" + (dialPick === c.id ? " is-picked" : "")}
+                      data-row-key={c.id}
+                      onClick={() => setDialPick(c.id)}
+                      onFocus={() => setDialPick(c.id)}
+                    >
+                      <span className="chip-dot" style={{ background: colorOf(c.id) }} aria-hidden="true" />
+                      <Stepper
+                        id={`evening-cat-${c.id}`}
+                        label={c.name}
+                        unit={EVENING_TEXT.minutes}
+                        value={perCategory[c.id] ?? 0}
+                        // 나눈 합은 쓴 시간을 넘지 못한다: 이 분야는 기타에 남은 만큼까지만 늘어난다
+                        max={Math.max(0, total - (splitSum - (perCategory[c.id] ?? 0)))}
+                        step={APP_CONFIG.minuteStep}
+                        onChange={(m) => {
+                          editedRef.current = true;
+                          dirtyRef.current = true;
+                          setPerCategory((prev) => ({ ...prev, [c.id]: m }));
+                        }}
+                      />
+                    </li>
+                  ))}
+                  {/* 기타 줄 = 나누지 않은 나머지라 −/+·숫자 칸 없이 오른쪽 끝 값만(23 D 판단 · PM d-148 가) */}
+                  <li
+                    className={"ratio-row evening-row evening-other-row" + (dialPick === OTHER_KEY ? " is-picked" : "")}
+                    data-row-key={OTHER_KEY}
+                    onClick={() => setDialPick(OTHER_KEY)}
+                  >
+                    <span className="chip-dot" style={{ background: categoryColorValue(null) }} aria-hidden="true" />
+                    <span className="ratio-name evening-other-name">{EVENING_TEXT.other}</span>
+                    <span className="ratio-value evening-other-value">{EVENING_TEXT.otherRemain(otherMinutes)}</span>
+                  </li>
+                </ul>
+                <p className="evening-split-hint">{EVENING_TEXT.splitHint}</p>
               </div>
-            )}
-            <ul className="ratio-list">
-              {/* 줄을 누르거나(−/+·숫자 칸 포함) 줄 안에 포커스가 가면 그 조각이 골라진다(PM 10) */}
-              {chosen.map((c) => (
-                <li
-                  key={c.id}
-                  className={"ratio-row evening-row" + (dialPick === c.id ? " is-picked" : "")}
-                  data-row-key={c.id}
-                  onClick={() => setDialPick(c.id)}
-                  onFocus={() => setDialPick(c.id)}
-                >
-                  <span className="chip-dot" style={{ background: colorOf(c.id) }} aria-hidden="true" />
-                  <Stepper
-                    id={`evening-cat-${c.id}`}
-                    label={c.name}
-                    unit={EVENING_TEXT.minutes}
-                    value={perCategory[c.id] ?? 0}
-                    // 나눈 합은 쓴 시간을 넘지 못한다: 이 분야는 기타에 남은 만큼까지만 늘어난다
-                    max={Math.max(0, total - (splitSum - (perCategory[c.id] ?? 0)))}
-                    step={APP_CONFIG.minuteStep}
-                    onChange={(m) => {
-                      editedRef.current = true;
-                      dirtyRef.current = true;
-                      setPerCategory((prev) => ({ ...prev, [c.id]: m }));
-                    }}
-                  />
-                </li>
-              ))}
-              <li
-                className={"ratio-row evening-row" + (dialPick === OTHER_KEY ? " is-picked" : "")}
-                data-row-key={OTHER_KEY}
-                onClick={() => setDialPick(OTHER_KEY)}
-              >
-                <span className="chip-dot" style={{ background: categoryColorValue(null) }} aria-hidden="true" />
-                {/* 고침6 PM d-129 ③(PM d-130 가로 확정): 이름 아래 작은 글 「나누지 않은 시간」은 뺐다 — 안내 글과 같은 말이 두 번이라서. 이름은 줄 가운데 한 줄 */}
-                <span className="ratio-name evening-other-name">{EVENING_TEXT.other}</span>
-                <span className="ratio-value">{EVENING_TEXT.otherRemain(otherMinutes)}</span>
-              </li>
-            </ul>
-            <p className="evening-split-hint">{EVENING_TEXT.splitHint}</p>
-            <p className="ratio-total" role="status">
-              {EVENING_TEXT.total(built.total)}
-            </p>
-            {built.total > total && <p className="todo-sub">{EVENING_TEXT.raised(built.total)}</p>}
-            {message && (
-              <Notice role="alert" className="onboarding-notice">
-                {message}
-              </Notice>
-            )}
-            <div className="detail-actions">
-              <PrimaryButton busy={saving} disabled={saving} onClick={() => void save(false)}>
-                {saving ? EVENING_TEXT.saving : EVENING_TEXT.save}
-              </PrimaryButton>
-            </div>
-          </div>
-        )}
+              {built.total > total && <Notice role="status" className="evening-raised">{EVENING_TEXT.raised(built.total)}</Notice>}
+              {message && (
+                <Notice role="alert" className="onboarding-notice">
+                  {message}
+                </Notice>
+              )}
+            </>
+          )}
 
-        {state && phase === "saved" && saved && (
-          <div className="detail-section">
-            {onOpenGrowth ? (
-              <button type="button" className="after-save-line" onClick={onOpenGrowth}>
-                <span className="after-save-title">{deltaTitle}</span>
-                <span className="after-save-text">{deltaText}</span>
-                <span className="after-save-go">{EVENING_TEXT.openGrowth}</span>
-              </button>
-            ) : (
-              <div className="after-save-line">
-                <span className="after-save-title">{deltaTitle}</span>
-                <span className="after-save-text">{deltaText}</span>
-              </div>
-            )}
-            {renderAfterSave?.(saved, state)}
-            <div className="detail-actions">
-              <PrimaryButton onClick={onClose}>{EVENING_TEXT.close}</PrimaryButton>
-            </div>
-          </div>
+          {state && phase === "saved" && saved && (
+            <>
+              <h2 className="evening-saved">
+                <svg className="evening-saved-icon" width={22} height={22} viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+                  <circle cx={11} cy={11} r={10} fill="none" stroke="currentColor" strokeWidth={1.5} />
+                  <path d="M6.5 11.5l3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {EVENING_TEXT.saved}
+              </h2>
+              {renderAfterSave ? renderAfterSave(saved, state) : <AfterSaveCard delta={saved.delta} data={null} fallback={fallbackNames} />}
+              {onOpenGrowth && (
+                <TextButton className="evening-open-growth text-tap" onClick={onOpenGrowth}>
+                  {EVENING_TEXT.openGrowth}
+                  <span className="evening-open-growth-go" aria-hidden="true">›</span>
+                </TextButton>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* A2 아래 주 단추 자리(공통 부품): 폭 가득 · 아래 고정. 저장 뒤 판에는 단추가 없다(「닫기」는 머리) */}
+        {state && phase === "time" && (
+          <BottomActions>
+            <PrimaryButton disabled={saving} onClick={toSplit}>
+              {EVENING_TEXT.split}
+            </PrimaryButton>
+            <SecondaryButton className="evening-skip" busy={saving} onClick={() => void save(true)}>
+              {saving ? EVENING_TEXT.saving : EVENING_TEXT.skipSplit}
+            </SecondaryButton>
+          </BottomActions>
+        )}
+        {state && phase === "split" && (
+          <BottomActions>
+            <PrimaryButton busy={saving} onClick={() => void save(false)}>
+              {saving ? EVENING_TEXT.saving : EVENING_TEXT.save}
+            </PrimaryButton>
+          </BottomActions>
         )}
       </div>
       {confirmClose && <CloseConfirm onKeep={() => setConfirmClose(false)} onClose={onClose} />}

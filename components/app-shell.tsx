@@ -29,7 +29,8 @@ import { CategoryPage } from "./category-page";
 import type { GrowthData } from "../lib/growth/types";
 import { EveningEntry, EveningRecord } from "./evening-record";
 import { GoalEditor, GoalLine } from "./goal";
-import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
+import { GrowthScreen } from "./growth-screen";
+import { AfterSave } from "./after-save";
 import { MeScreen } from "./me-screen";
 import { OfferCard } from "./offer-card";
 import { Onboarding, pushOutcomeText, type OnboardingResult } from "./onboarding";
@@ -455,6 +456,7 @@ function MainShell({
           active={tab === "growth"}
           activation={growthActivation}
           entry={growthEntry}
+          openByGoal={growthEntry === "after_save"}
           onOpenCategory={(id, name, growth) => setCategory({ id, name, growth })}
           onOpenEvening={() => setEveningOpen(true)}
           onOpenGoal={(d) => setGoalEditor({ weekStart: d.weekStart, goal: d.goal?.items ?? null, thisWeek: d.thisWeek, categories: d.categories })}
@@ -545,7 +547,7 @@ function MainShell({
             setEveningOpen(false);
             openTab("growth", "after_save");
           }}
-          renderAfterSave={() => <AfterSaveShortfall api={local ? local.apis.growth : defaultGrowthApi} />}
+          renderAfterSave={(saved, state) => <AfterSave api={local ? local.apis.growth : defaultGrowthApi} delta={saved.delta} fallback={state.categories} />}
         />
       )}
       {goalEditor && (

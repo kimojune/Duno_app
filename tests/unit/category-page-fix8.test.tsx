@@ -53,6 +53,7 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     ],
     loggedDaysThisWeek: 1,
     loggedDaysTotal: 10,
+    streakWeeks: 0,
     goal: null,
     goalText: null,
     ...over,

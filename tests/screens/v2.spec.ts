@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { TEXT200_CSS } from "./text200-css";
 import { assertChipExpandCollapse, assertChipTwoLines } from "./chip-row";
+import { fillWheel } from "../e2e/wheel";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
@@ -482,10 +483,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
 }
 
 // ---- 새 전체 화면 창 넷 (B6·B7) ----
-// title = 창 맨 위 제목(h2, 창의 이름). 오늘 기록 창의 h2는 질문이고 「오늘 기록」은 그 밑 작은 글이다(eyebrow).
-const WINDOWS: { id: string; title: string; eyebrow?: string }[] = [
+// title = 창의 이름. heading = 창 안 h2. 오늘 기록 창(고침9 A1)은 머리 「오늘 기록」이 창 이름이고 h2는 머리 아래 큰 질문이다.
+const WINDOWS: { id: string; title: string; heading?: string; eyebrow?: string }[] = [
   { id: "goal", title: "이번 주 목표" },
-  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "오늘 기록" },
+  { id: "evening", title: "오늘 기록", heading: "오늘 몇 시간 썼어요?", eyebrow: "오늘 기록" },
   { id: "category", title: "어학" },
   { id: "detail", title: "할 일 자세히" },
 ];
@@ -499,7 +500,7 @@ for (const w of WINDOWS) {
       await opener.click();
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      await expect(page.getByRole("heading", { name: w.title, level: 2 }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: w.heading ?? w.title, level: 2 }).first()).toBeVisible();
       await expect(page.getByRole("dialog", { name: w.title })).toBeVisible();
       if (w.eyebrow) await expect(dialog.getByText(w.eyebrow, { exact: true })).toBeVisible();
       await shot(page, `${w.id}-window-${size}`);
@@ -604,7 +605,7 @@ for (const many of [false, true]) {
       await page.locator("#dev-open-window").click();
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      await page.getByLabel("시간", { exact: true }).fill("2");
+      await fillWheel(page, "시간", 2); // 고침9: 두 줄 휠
       await page.getByRole("button", { name: "분야마다 나누기" }).click();
       await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
       await measureDial(page, "evening-dial");
@@ -647,7 +648,7 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
     prepare: async (page) => {
       await page.locator("#dev-open-window").click();
       await expect(page.getByRole("dialog")).toBeVisible();
-      await page.getByLabel("시간", { exact: true }).fill("2");
+      await fillWheel(page, "시간", 2); // 고침9: 두 줄 휠
       await page.getByRole("button", { name: "분야마다 나누기" }).click();
       await expect(page.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
     },
@@ -655,7 +656,7 @@ const CHIP_ROW_CASES: { id: string; state: string; group: string; prepare?: (pag
   {
     id: "evening-todo-sheet",
     state: "evening-todo-many",
-    group: "분야",
+    group: "분야", // 고침9: 시트 이름표 「분야」 + 맨 앞 「기타」 칩(Figma 88:12)
     prepare: async (page) => {
       await page.getByRole("button", { name: /^오늘 할 일 2\/4/ }).click();
       const sheet = page.getByRole("dialog", { name: "오늘 할 일" });

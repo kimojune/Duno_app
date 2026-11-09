@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { fillWheel } from "../e2e/wheel";
 
 /**
  * 고침6(23 「발표 판 고침6」 ①·②·③·④-①): 360×800 사진을 docs/oneshot-v2/고침6/에 두고, 사진만 남는 시험이 되지 않게 치수·글·순서를 같이 단언한다.
@@ -99,15 +100,15 @@ test("① 목표 없는 주 처음 = 「목표 비율」 탭 · ② 「이번 �
   await photo(page, "상태보기-목표없는주-이번주목표탭");
 });
 
-test("④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n시간 더」(12 보조), 「채울」 없음", async ({ page }) => {
+test("④-① 오늘 기록 저장 직후: 막대 아래 「n시간 더」/「목표 n」(12 보조), 「채울」 없음 — 고침9 S5-3 카드로 바뀜(Figma 49:142)", async ({ page }) => {
   await open(page, "after-save");
   await page.locator("#dev-open-window").click();
-  const dialog = page.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
-  await dialog.getByLabel("시간", { exact: true }).fill("1");
+  const dialog = page.getByRole("dialog", { name: "오늘 기록" });
+  await fillWheel(dialog, "시간", 1);
   await dialog.getByRole("button", { name: "나누지 않고 저장" }).click();
-  const short = page.locator(".after-save-short");
-  await expect(short).toBeVisible();
-  const rows = await short.locator(".after-save-row").evaluateAll((els) =>
+  const card = page.locator(".after-save-card");
+  await expect(card.locator(".after-save-bar").first()).toBeVisible();
+  const rows = await card.locator(".after-save-row").evaluateAll((els) =>
     els.map((li) => {
       const name = li.querySelector(".after-save-name")!;
       const more = li.querySelector(".after-save-more")!;
@@ -117,8 +118,8 @@ test("④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n�
   );
   expect(rows.length).toBeGreaterThan(0);
   expect(rows.map((r) => [r.name, r.more])).toEqual([
+    ["포트폴리오", "목표 6시간"],
     ["어학", "3시간 더"],
-    ["CS 공부", "1시간 40분 더"],
   ]);
   for (const r of rows) {
     expect(r.below, `${r.name}: 「n시간 더」는 이름 줄 아래`).toBe(true);
@@ -127,9 +128,9 @@ test("④-① 오늘 기록 저장 직후: 남은 분야만 이름 아래 「n�
   }
   expect(await page.evaluate(() => document.body.innerText.includes("채울"))).toBe(false);
   await noOverflow(page);
-  await short.scrollIntoViewIfNeeded();
   await photo(page, "저장직후-n시간더");
 });
+
 
 test("③ 내 정보 첫 카드(목표 있음·없음) · S8-b · 나가기 확인", async ({ page }) => {
   await open(page, "me-goal");

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { minutesOf } from "../lib/growth/logic";
-import { buildGoalChart, buildStatusChart, fillTimeFor, type ChartCategoryId, type GoalChart, type StatusChart } from "../lib/growth/status-chart";
+import { buildGoalChart, buildStatusChart, type ChartCategoryId, type GoalChart, type StatusChart } from "../lib/growth/status-chart";
 import {
   DEFAULT_STATUS_PREF,
   initialStatusPeriod,
@@ -103,9 +103,6 @@ export const GROWTH_TEXT = {
   reload: "다시 불러오기",
 } as const;
 
-/** 저장 직후 한 줄(오늘 기록 화면, AfterSaveShortfall)의 글. 상태보기 화면 글이 아니다. 분야 줄 아래 「2시간 30분 더」(고침6 ④-①, 「채울 시간」 제목은 없앰) */
-export const AFTER_SAVE_TEXT = { more: (minutes: number) => `${formatMinutes(minutes)} 더` } as const;
-
 const VIEW_IDS = STATUS_VIEWS.map((v) => v.id);
 const PERIOD_LABEL: Record<StatusPeriod, "modeWeek" | "modeTotal" | "modeCompare"> = { week: "modeWeek", total: "modeTotal", compare: "modeCompare" };
 const TAB_LABEL: Record<StatusTab, "tabGoal" | "tabRatio"> = { goal: "tabGoal", ratio: "tabRatio" };
@@ -130,6 +127,7 @@ export function GrowthScreen({
   onOpenEvening,
   onOpenGoal,
   refreshKey = 0,
+  openByGoal = false,
 }: {
   api: GrowthApi;
   /** 이 탭이 지금 보이는가 */
@@ -145,6 +143,11 @@ export function GrowthScreen({
   onOpenGoal?: (data: GrowthData) => void;
   /** 바뀌면 다시 읽는다(본 것은 다시 남기지 않는다). 목표를 저장한 뒤 등 */
   refreshKey?: number;
+  /**
+   * 오늘 기록 저장 직후 「상태보기에서 보기 ›」로 열었나(고침9, 23 흐름도 135:2). true면 이번 열림(activation)에서는 기억한 탭보다
+   * 목표 유무로 정한 탭이 먼저다: 목표 세운 주 → 「이번 주 목표」, 없는 주 → 「목표 비율」. 그 열림에서 사용자가 탭을 고르면 고른 것.
+   */
+  openByGoal?: boolean;
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [pref, setPref] = useState<StatusPref>(DEFAULT_STATUS_PREF);
@@ -221,10 +224,14 @@ export function GrowthScreen({
   }
 
   const data = load.status === "ready" ? load.data : null;
-  const tab: StatusTab | null = data ? initialStatusTab(pref, data.weekStart, hasWeekGoal(data)) : null;
+  // openByGoal: 이 열림에서 사용자가 탭을 고르기 전까지만(고른 열림 번호를 둔다)
+  const [pickedAt, setPickedAt] = useState<number | null>(null);
+  const byGoal = openByGoal && pickedAt !== activation;
+  const tab: StatusTab | null = data ? (byGoal ? (hasWeekGoal(data) ? "goal" : "ratio") : initialStatusTab(pref, data.weekStart, hasWeekGoal(data))) : null;
 
   function selectTab(next: StatusTab, focus: boolean) {
     if (!data) return;
+    setPickedAt(activation);
     choose({ ...pref, tab: next, tabWeek: data.weekStart });
     if (focus) tabRefs.current[next]?.focus();
   }
@@ -541,44 +548,5 @@ function CompareView({ data, onOpenCategory }: { data: GrowthData; onOpenCategor
         );
       })}
     </ul>
-  );
-}
-
-/**
- * 오늘 기록 저장 직후 한 줄 아래에 얹는 남은 시간(F4 ㄴ, 고침6 ④-① — Figma 49:142·59:2). 오늘 기록 화면에 놓인다(상태보기 화면이 아니다).
- * 남은 시간이 있는 분야만 한 줄씩: 분야 이름 줄 아래 「n시간 더」(12 보조). 기준은 목표를 세운 주 = 이번 주 목표까지, 세우지 않은 주 = 목표 비율(fillTimeFor 그대로).
- * 제목(옛 「채울 시간」)은 두지 않는다. 남은 분야가 없으면 아무것도 그리지 않는다.
- */
-export function AfterSaveShortfall({ api }: { api: GrowthApi }) {
-  const [data, setData] = useState<GrowthData | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void api.fetchGrowth().then((res) => {
-      if (alive && res.ok) setData(res.data);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [api]);
-  if (!data) return null;
-  const { items } = fillTimeFor({
-    categoryIds: data.categories.map((c) => c.id),
-    ratios: data.ratios,
-    goalItems: data.goal?.items ?? null,
-    thisWeek: data.thisWeek,
-  });
-  const rows = items.filter((s) => s.minutes > 0);
-  if (rows.length === 0) return null;
-  return (
-    <div className="after-save-line after-save-short">
-      <ul className="after-save-rows">
-        {rows.map((s) => (
-          <li key={s.categoryId ?? "other"} className="after-save-row">
-            <span className="after-save-name">{nameFor(data, s.categoryId)}</span>
-            <span className="after-save-more">{AFTER_SAVE_TEXT.more(s.minutes)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
