@@ -4,11 +4,11 @@
 // 사용자 데이터가 로그아웃 뒤 캐시에 남지 않게 하려는 것이다.
 // skipWaiting·clients.claim을 쓰지 않는다: 앱을 모두 닫았다 다시 열 때 새 버전이 적용된다.
 
-const VERSION = "v3"; // 오프라인 화면(offline.html)의 색·단추 모양이 바뀌어 올렸다(고침 5바퀴)
+const VERSION = "v4"; // 아이콘 이름이 icon-v2-*로 바뀌고 오프라인 화면 머리가 워드마크로 바뀌어 올렸다(고침 10바퀴). activate가 옛 판(duno-v3 등)을 지운다
 const CACHE_PREFIX = "duno-";
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"];
+const PRECACHE = [OFFLINE_URL, "/manifest.webmanifest", "/icon-v2-192.png", "/icon-v2-512.png", "/icon-v2-maskable-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)));
@@ -128,7 +128,7 @@ self.addEventListener("push", (event) => {
     loadNotifications().then((items) =>
       Promise.all(
         items.map((item) =>
-          self.registration.showNotification(item.title, { body: item.body, tag: item.tag, icon: "/icon-192.png", data: { url: item.url } }),
+          self.registration.showNotification(item.title, { body: item.body, tag: item.tag, icon: "/icon-v2-192.png", data: { url: item.url } }),
         ),
       ),
     ),

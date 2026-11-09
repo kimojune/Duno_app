@@ -9,7 +9,7 @@
    값을 바꿀 때는 그 표와 app/globals.css :root도 같이 바꾼다. :root 밖에서는 색 hex를 쓰지 않는다. */
 :root{
   --color-bg:#FAF7F2;--color-text:#1C2340;--color-text-sub:#5E6478;
-  --color-primary:#1C2340;--color-primary-pressed:#2E3350;--color-on-primary:#FFFFFF;--color-notice-bg:#F3EEE6;
+  --color-accent:#FF8A57;--color-primary:#1C2340;--color-primary-pressed:#2E3350;--color-on-primary:#FFFFFF;--color-notice-bg:#F3EEE6;
   --font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;
   --font-title:700 24px/32px var(--font-family);
   --font-body:400 16px/24px var(--font-family);
@@ -18,7 +18,9 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--color-bg);color:var(--color-text);font:var(--font-body)}
 main{max-width:var(--page-max);margin:0 auto;padding:24px var(--page-x)}
-h1{margin:0;font:var(--font-title)}
+h1{margin:0;display:flex;align-items:center;gap:6px;font:700 16px/24px var(--font-family)}
+.ring{display:block;flex:none;width:18px;height:18px;overflow:visible;fill:var(--color-text)}
+.piece{fill:var(--color-accent)}
 .notice{margin-top:16px;padding:12px 16px;border-radius:8px;background:var(--color-notice-bg);overflow-wrap:anywhere}
 .notice p{margin:0}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:var(--tap-min);margin-top:8px;padding:0 16px;border:1px solid var(--color-primary);border-radius:var(--radius-pill);background:var(--color-primary);color:var(--color-on-primary);font:var(--font-body);cursor:pointer}
@@ -28,8 +30,8 @@ h1{margin:0;font:var(--font-title)}
 </head>
 <body>
 <main>
-<!-- 로그인 여부를 알 수 없으니 로그인·할 일 화면을 흉내 내지 않는다 -->
-<h1>duno</h1>
+<!-- 로그인 여부를 알 수 없으니 로그인·할 일 화면을 흉내 내지 않는다. 맨 위 = 워드마크(고리 + duno, components/wordmark.tsx와 같은 모양, Figma 149:105). 바깥 파일·글꼴 없이 인라인 SVG -->
+<h1 aria-label="두노"><svg class="ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M17.6933 6.67063C18.2061 8.58433 18.0731 10.6138 17.3149 12.4442C16.5568 14.2746 15.2158 15.8036 13.5 16.7942C11.7842 17.7848 9.78954 18.1816 7.82528 17.923C5.86102 17.6644 4.03698 16.7649 2.63605 15.364C1.23513 13.963 0.335609 12.139 0.077009 10.1747C-0.181591 8.21048 0.21518 6.21578 1.20578 4.5C2.19639 2.78423 3.72546 1.44326 5.55586 0.685088C7.38626 -0.073088 9.41568 -0.206104 11.3294 0.306671L10.2941 4.17037C9.23094 3.8855 8.10348 3.9594 7.0866 4.38061C6.06971 4.80181 5.22022 5.54679 4.66989 6.5C4.11955 7.45321 3.89912 8.56138 4.04279 9.65263C4.18646 10.7439 4.68619 11.7572 5.46448 12.5355C6.24277 13.3138 7.25613 13.8136 8.34738 13.9572C9.43864 14.1009 10.5468 13.8805 11.5 13.3301C12.4532 12.7798 13.1982 11.9303 13.6194 10.9134C14.0406 9.89653 14.1145 8.76907 13.8296 7.70591L17.6933 6.67063Z"/><path class="piece" d="M1.03528 0C2.56128 0.40889 3.95276 1.21226 5.06987 2.32937C6.18697 3.44648 6.99035 4.83796 7.39924 6.36396L3.53553 7.39924C3.30837 6.55146 2.86205 5.77841 2.24144 5.1578C1.62082 4.53718 0.847777 4.09086 0 3.8637L1.03528 0Z" transform="translate(11.708 -1.108)"/></svg><span aria-hidden="true">duno</span></h1>
 <div class="notice" role="status">
 <div id="msg">
 <p>인터넷에 연결되지 않았어요.</p>
