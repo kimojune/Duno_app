@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "@testing-library/react";
-import { HIT_R, RatioDial, shortName, splitUnit, type DialSlice } from "../../components/ratio-dial";
+import { DIAL_GAP, DIAL_GLOW, DIAL_MOTION_MS, DIAL_OUTLINE, DIAL_POP, HIT_R, KNOB_STROKE, popOffset, RatioDial, sectorPath, shortName, splitUnit, type DialSlice } from "../../components/ratio-dial";
 
 afterEach(cleanup);
 
@@ -51,7 +51,10 @@ describe("원형 다이얼: 그리기와 고르기", () => {
   it("조각 수만큼 그려지고(폭 0인 조각은 그리지 않는다), 처음에는 첫 조각이 골라져 있다", () => {
     render(<Harness initial={[40, 30, 20, 10]} seen={[]} />);
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(4);
-    expect(document.querySelector(".dial-rim")?.getAttribute("d")).toBeTruthy(); // 고른 조각의 띠
+    // 고른 조각 표시(고침 5바퀴, PM 9 — 옛 3px 띠 대신): 그 조각에만 is-picked·빛 번짐
+    expect(document.querySelectorAll(".dial-slice.is-picked")).toHaveLength(1);
+    expect(document.querySelector(".dial-slice.is-picked")).toBe(document.querySelectorAll(".dial-slice")[0]);
+    expect(document.querySelectorAll(".dial-glow")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "이름 어학" }).getAttribute("aria-pressed")).toBe("true");
     cleanup();
     render(<Harness initial={[60, 40, 0, 0]} seen={[]} />);
@@ -122,23 +125,36 @@ describe("원형 다이얼: 그리기와 고르기", () => {
   it("선택이 목록에 없는 key면 다이얼도 목록도 아무것도 안 고른 것으로 보인다(손잡이·띠 없음)", () => {
     render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="없는 분야" />);
     expect(handles()).toHaveLength(0);
-    expect(document.querySelector(".dial-rim")?.getAttribute("d")).toBe("");
+    expect(document.querySelectorAll(".dial-slice")).toHaveLength(4);
+    expect(document.querySelector(".dial-slice.is-picked")).toBeNull(); // 고른 조각 표시(나옴·빛) 없음
+    expect(document.querySelector(".dial-glow")).toBeNull();
     expect(document.querySelector(".dial-center-name")).toBeNull();
     expect(screen.queryAllByRole("button", { pressed: true })).toHaveLength(0);
     expect(screen.getAllByRole("button", { pressed: false })).toHaveLength(4);
   });
 
-  it("첫 조각은 늘 12시에서 시작한다: 손잡이로 이리저리 바꿔도 처음 그린 조각의 시작점이 맨 위(0, −100)", () => {
+  it("첫 조각은 늘 12시에서 시작한다: 손잡이로 이리저리 바꿔도 처음 그린 조각의 시작점이 맨 위(0, −100) — 흰 틈 절반 + 윤곽 절반만큼 오른쪽", () => {
     render(<Harness initial={[20, 30, 50]} names={["어학", "코딩", "기타"]} seen={[]} />);
+    // 고침 5바퀴: 조각 사이 흰 틈 2px(PM 9)이라 첫 조각의 바깥 시작점은 12시 반지름 선에서 오른쪽으로 최대 1.5 옮긴 바깥 원 위의 점
+    // (보통 (1.5, −99.989), 아주 가는 조각은 틈을 줄여 더 12시 가까이). 12시에서 벗어나면 x가 1.5를 넘는다
     const firstStart = () => document.querySelectorAll(".dial-slice")[0].getAttribute("d")!.split("A")[0].trim();
-    expect(firstStart()).toBe("M0 0 L0.000 -100.000");
+    const atNoon = (label: string) => {
+      const m = /^M(-?[\d.]+) (-?[\d.]+)$/.exec(firstStart());
+      expect(m, `${label}: ${firstStart()}`).toBeTruthy();
+      const [x, y] = [Number(m![1]), Number(m![2])];
+      expect(x, label).toBeGreaterThan(0);
+      expect(x, label).toBeLessThanOrEqual(1.5);
+      expect(y, label).toBeLessThan(-99.98);
+      expect(Math.hypot(x, y), label).toBeCloseTo(100, 2);
+    };
+    expect(firstStart()).toBe("M1.500 -99.989");
     for (const key of ["PageUp", "PageUp", "End", "Home", "ArrowRight"]) {
       press(slider("end")!, key);
-      expect(firstStart(), key).toBe("M0 0 L0.000 -100.000");
+      atNoon(key);
     }
     fireEvent.click(screen.getByRole("button", { name: "이름 기타" }));
     press(slider("start")!, "End"); // 기타가 코딩을 다 가져간다
-    expect(firstStart()).toBe("M0 0 L0.000 -100.000");
+    atNoon("기타 End");
   });
 });
 
@@ -352,16 +368,24 @@ describe("원형 다이얼: 글과 스크롤", () => {
     expect(seen.at(-1)).toEqual([0, 0, 90, 10]);
   });
 
-  it("손잡이 누르는 자리(보이지 않는 원)는 지름 48 이상이다(다이얼 최대 폭 240px = viewBox 240, 1:1). 보이는 고리는 그대로 16", () => {
+  it("손잡이 누르는 자리(보이지 않는 원)는 지름 48 이상이다(다이얼 최대 폭 240px = viewBox 240, 1:1). 보이는 손잡이는 흰 원 + 2px, 지름 20~22(PM 9)", () => {
     render(<Harness initial={[40, 30, 20, 10]} seen={[]} />);
     const svg = document.querySelector("svg.dial")!;
     expect(svg.getAttribute("viewBox")).toBe("-120 -120 240 240");
     const hit = slider("end")!.querySelector(".dial-hit")!;
     expect(Number(hit.getAttribute("r")) * 2).toBeGreaterThanOrEqual(48);
     expect(HIT_R * 2).toBeGreaterThanOrEqual(48);
-    expect(slider("end")!.querySelector(".dial-ring")!.getAttribute("r")).toBe("16");
+    // 고침 5바퀴: 보이는 손잡이 = 흰 원(r 10) + 2px 테두리 → 보이는 지름 22(옛 고리 16·안쪽 원·색 점은 없앴다 — 명세 ③ E)
+    const ring = slider("end")!.querySelector(".dial-ring")!;
+    expect(ring.getAttribute("r")).toBe("10");
+    const visible = 2 * Number(ring.getAttribute("r")) + KNOB_STROKE;
+    expect(visible).toBeGreaterThanOrEqual(20);
+    expect(visible).toBeLessThanOrEqual(22);
+    expect(slider("end")!.querySelectorAll("circle")).toHaveLength(2); // 누르는 자리 + 흰 원뿐
     const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
     expect(css).toMatch(/\.dial \{[^}]*max-width: 240px/);
+    expect(css).toMatch(/\.dial-ring \{[^}]*fill: var\(--color-surface\);[^}]*stroke: var\(--color-text\);[^}]*stroke-width: 2;/);
+    expect(KNOB_STROKE).toBe(2);
   });
 
   it("손잡이를 끌 때 포인터 잡기를 못 해도(jsdom) 깨지지 않는다", () => {
@@ -492,7 +516,7 @@ describe("원형 다이얼: 키보드만으로 조각 고르기(부품 안의 �
     expect(document.activeElement).toBe(svg);
     press(svg, "ArrowRight"); // 아무것도 안 골랐으면 첫 조각
     expect(picks.at(-1)).toBe("k0");
-    expect(document.getElementById("d-changes")!.textContent).toBe("어학 고름, 60%");
+    expect(document.getElementById("d-changes")!.textContent).toBe("어학 60%, 고름"); // 화면 읽기 「{분야} {값}, 고름」(PM 10 ⑩)
     press(svg, "ArrowRight");
     press(svg, "ArrowRight"); // 폭 0인 운동
     expect(picks.at(-1)).toBe("k2");
@@ -540,9 +564,139 @@ describe("원형 다이얼: 합(total)이 0 이하(다이얼 고침1)", () => {
     render(
       <RatioDial id="d" total={0} slices={slicesOf([0, 0, 0])} selectedKey="k0" onSelect={() => {}} onChange={() => {}} format={(v) => `${v}분`} />,
     );
-    expect(document.querySelector(".dial-rim")!.getAttribute("d")).toBe("");
+    expect(document.querySelector(".dial-glow")).toBeNull();
     expect(document.querySelectorAll(".dial-slice")).toHaveLength(0);
     expect(handles()).toHaveLength(0);
     expect(document.querySelector("svg.dial")!.outerHTML).not.toMatch(/NaN|Infinity/);
+  });
+});
+
+/** 고침 5바퀴(PM 9 · 명세 ② 「다이얼의 고른 조각」): 조각 윤곽·틈, 고른 조각 3px 나옴·빛 번짐, 움직임 */
+describe("원형 다이얼: 조각 모양과 고른 조각(PM 9)", () => {
+  const translateOf = (el: Element) => {
+    const m = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec((el as SVGElement).style.transform);
+    expect(m, (el as SVGElement).style.transform).toBeTruthy();
+    return [Number(m![1]), Number(m![2])] as [number, number];
+  };
+
+  it("고른 조각만 조각 가운데 각도 쪽 바깥으로 3px 옮긴다(모양은 그대로). 고르지 않은 조각은 제자리", () => {
+    render(<Harness initial={[25, 25, 25, 25]} seen={[]} selected0="k1" />); // 코딩 = 1/4~2/4 바퀴, 가운데 각도 = 오른쪽 아래 45°
+    const slices = [...document.querySelectorAll(".dial-slice")];
+    expect(slices).toHaveLength(4);
+    const [x, y] = translateOf(slices[1]);
+    expect(DIAL_POP).toBe(3);
+    expect(Math.hypot(x, y)).toBeCloseTo(DIAL_POP, 1);
+    expect(x).toBeCloseTo(3 * Math.cos(Math.PI / 4), 1);
+    expect(y).toBeCloseTo(3 * Math.sin(Math.PI / 4), 1);
+    for (const i of [0, 2, 3]) expect(translateOf(slices[i])).toEqual([0, 0]);
+    // 모양은 그대로: 고른 조각의 d는 그 자리의 조각 모양 그대로(옮김은 transform으로만)
+    expect(slices[1].getAttribute("d")).toBe(sectorPath(0.25, 0.5));
+    expect(popOffset(0.25, 0.5).map((v) => Number(v.toFixed(3)))).toEqual([2.121, 2.121]);
+    fireEvent.click(screen.getByRole("button", { name: "이름 운동" }));
+    expect(translateOf(document.querySelectorAll(".dial-slice")[1])).toEqual([0, 0]);
+    const [x2, y2] = translateOf(document.querySelectorAll(".dial-slice")[2]);
+    expect(Math.hypot(x2, y2)).toBeCloseTo(3, 1);
+    expect(x2).toBeLessThan(0); // 운동 = 2/4~3/4 바퀴 → 왼쪽 아래
+    expect(y2).toBeGreaterThan(0);
+  });
+
+  it("고른 조각에만 같은 분야 색 빛 번짐: 흐림 24(표준 편차 12) · 퍼짐 2 · 불투명 80%, 필터 영역이 그림 칸보다 넓어 잘리지 않는다", () => {
+    render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="k2" />);
+    const glows = document.querySelectorAll(".dial-glow");
+    expect(glows).toHaveLength(1);
+    const glow = glows[0] as SVGElement;
+    const picked = document.querySelectorAll(".dial-slice")[2] as SVGElement;
+    expect(glow.style.fill).toBe(picked.style.fill); // 고른 조각(운동)과 같은 분야 색
+    expect(glow.style.fill).not.toBe((document.querySelectorAll(".dial-slice")[0] as SVGElement).style.fill);
+    expect(glow.getAttribute("d")).toBe(picked.getAttribute("d"));
+    expect(glow.style.transform).toBe(picked.style.transform); // 조각과 같이 나온다
+    // 빛은 조각들 뒤(먼저 그림)
+    expect(glow.compareDocumentPosition(document.querySelectorAll(".dial-slice")[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const filterId = /url\(#(.+)\)/.exec(glow.getAttribute("filter")!)![1];
+    const filter = document.getElementById(filterId)!;
+    expect(filter.tagName.toLowerCase()).toBe("filter");
+    expect(DIAL_GLOW).toEqual({ blur: 24, spread: 2, opacity: 0.8 });
+    expect(filter.querySelector("feMorphology")!.getAttribute("operator")).toBe("dilate");
+    expect(filter.querySelector("feMorphology")!.getAttribute("radius")).toBe("2");
+    expect(filter.querySelector("feGaussianBlur")!.getAttribute("stdDeviation")).toBe("12");
+    expect(filter.querySelector("feFuncA")!.getAttribute("slope")).toBe("0.8");
+    // 필터 영역: 그림 칸(viewBox −120~120)보다 넓다 — 가장자리 조각의 빛이 영역 끝에서 잘리지 않는다
+    expect(filter.getAttribute("filterUnits")).toBe("userSpaceOnUse");
+    expect(Number(filter.getAttribute("x"))).toBeLessThanOrEqual(-150);
+    expect(Number(filter.getAttribute("width"))).toBeGreaterThanOrEqual(300);
+    // 그림 칸 밖으로 번진 빛이 svg 끝에서 잘리지 않게 overflow visible
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.dial \{[^}]*overflow: visible/);
+  });
+
+  it("원을 다 채운 조각(경계 없음)·폭 0인 조각은 나오지 않고 빛도 없다", () => {
+    render(<Harness initial={[0, 0, 0, 100]} seen={[]} selected0="k3" />);
+    expect(document.querySelectorAll(".dial-slice")).toHaveLength(1);
+    expect(translateOf(document.querySelector(".dial-slice")!)).toEqual([0, 0]);
+    expect(document.querySelector(".dial-glow")).toBeNull();
+    cleanup();
+    render(<Harness initial={[60, 40, 0, 0]} seen={[]} selected0="k2" />);
+    expect(document.querySelector(".dial-glow")).toBeNull();
+    const all = [...document.querySelectorAll(".dial-slice")];
+    expect(all).toHaveLength(2);
+    for (const p of all) expect(translateOf(p)).toEqual([0, 0]);
+    expect(popOffset(0.2, 0.2)).toEqual([0, 0]);
+    expect(popOffset(0, 1)).toEqual([0, 0]);
+  });
+
+  it("조각마다 1px 윤곽(--color-chart-outline, 없으면 같은 값 --color-text)이고, 이웃 조각 윤곽 사이에 흰 틈 2px이 남는다", () => {
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.dial-slice \{[^}]*stroke: var\(--color-chart-outline, var\(--color-text\)\);[^}]*stroke-width: 1;/);
+    expect(DIAL_OUTLINE).toBe(1);
+    expect(DIAL_GAP).toBe(2);
+    // 3시 경계: 앞 조각(12~3시)의 바깥 끝점과 뒤 조각(3~6시)의 바깥 시작점 사이 거리 3 = 윤곽 반 + 틈 2 + 윤곽 반
+    const outerStart = (d: string) => /^M(-?[\d.]+) (-?[\d.]+)/.exec(d)!.slice(1).map(Number);
+    const outerEnd = (d: string) => /A100 100 0 \d 1 (-?[\d.]+) (-?[\d.]+)/.exec(d)!.slice(1).map(Number);
+    const a = outerEnd(sectorPath(0, 0.25));
+    const b = outerStart(sectorPath(0.25, 0.5));
+    expect(a).toHaveLength(2);
+    expect(b).toHaveLength(2);
+    const between = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    expect(between - DIAL_OUTLINE).toBeCloseTo(DIAL_GAP, 2);
+    expect(between).toBeGreaterThan(0);
+    // 반 바퀴 근처에서 큰 호 여부가 맞다(엉뚱한 쪽 호를 그리지 않는다)
+    expect(sectorPath(0, 0.502)).toMatch(/^M[^A]+A100 100 0 0 1/);
+    expect(sectorPath(0, 0.6)).toMatch(/^M[^A]+A100 100 0 1 1/);
+    // 아주 가는 조각(5분/24시간)도 NaN 없이 그린다
+    expect(sectorPath(0.3, 0.3 + 5 / 1440)).not.toMatch(/NaN/);
+  });
+
+  it("고른 조각이 나오는 움직임은 120ms, 「동작 줄이기」면 transition 없이 바로 나온다(나옴·빛은 그대로 보인다)", () => {
+    expect(DIAL_MOTION_MS).toBe(120);
+    render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="k1" />);
+    const picked = document.querySelector(".dial-slice.is-picked") as SVGElement;
+    expect(picked.style.transition).toBe("transform 120ms ease-out");
+    cleanup();
+    const mm = vi.fn((q: string) => ({
+      matches: q === "(prefers-reduced-motion: reduce)",
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    vi.stubGlobal("matchMedia", mm);
+    try {
+      render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="k1" />);
+      expect(mm).toHaveBeenCalledWith("(prefers-reduced-motion: reduce)");
+      const slices = [...document.querySelectorAll(".dial-slice")] as SVGElement[];
+      expect(slices).toHaveLength(4);
+      for (const p of slices) expect(p.style.transition).toBe("none");
+      expect((document.querySelector(".dial-glow") as SVGElement).style.transition).toBe("none");
+      // 나옴·빛은 그대로
+      expect(Math.hypot(...translateOf(document.querySelector(".dial-slice.is-picked")!))).toBeCloseTo(3, 1);
+      expect(document.querySelector(".dial-glow")).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("조각의 화면 읽기 이름: 「{분야} {값}」, 고른 조각은 「{분야} {값}, 고름」(PM 10 ⑩)", () => {
+    render(<Harness initial={[40, 30, 20, 10]} seen={[]} selected0="k1" />);
+    const labels = [...document.querySelectorAll(".dial-slice")].map((p) => p.getAttribute("aria-label"));
+    expect(labels).toEqual(["어학 40%", "코딩 30%, 고름", "운동 20%", "기타 10%"]);
   });
 });
