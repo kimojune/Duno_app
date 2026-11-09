@@ -7,8 +7,8 @@ import { defineConfig } from "@playwright/test";
 // 서버는 루프백(localhost)에서만 듣는다(MO-17 ②).
 const PORT = process.env.E2E_PORT || "3100";
 // 같은 작업 폴더의 운영 서버(next start, 기본 .next)를 덮지 않게: 다른 빌드 폴더(DUNO_DIST_DIR)와 3200이 아닌 포트를 꼭 받는다(K2 사고 21:32 뒤 막음)
-const DIST = (process.env.DUNO_DIST_DIR ?? "").split("\\").join("/").replace(/\/+$/, "");
-if (DIST === "" || DIST === ".next" || DIST === "./.next") {
+const DIST = (process.env.DUNO_DIST_DIR ?? "").split("\\").join("/").replace(/^\.\//, "").replace(/\/+$/, "");
+if (DIST === "" || DIST === ".next" || DIST.startsWith(".next/")) {
   throw new Error("playwright.release.config.ts: DUNO_DIST_DIR(기본 .next가 아닌 다른 빌드 폴더)를 주고 돌린다");
 }
 if (PORT === "3200") throw new Error("playwright.release.config.ts: 포트 3200은 쓰지 않는다(E2E_PORT)");
