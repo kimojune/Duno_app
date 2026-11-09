@@ -1199,7 +1199,8 @@ describe("모양 규칙(CSS 출처 값, app/globals.css) — 실제 칠해짐은
     expect(rule(".growth-period-chip-face")).toContain("font: 500 11px/16px var(--font-family)");
     expect(rule(".growth-period-chip")).toMatch(/min-width: var\(--tap-min\); min-height: var\(--tap-min\)/);
     expect(rule(".growth-row")).toContain("flex-wrap: wrap");
-    const growth = css.slice(css.indexOf(".growth-body {"), css.indexOf(".growth-dl dd"));
+    const growthStart = css.indexOf(".growth-body {");
+    const growth = css.slice(growthStart, css.indexOf(".ratio-row", growthStart)); // 상태보기 규칙 범위. 뒤의 .ratio-row(내 정보 분야 줄, 말줄임 있음)는 상태보기가 아니다
     expect(growth.length).toBeGreaterThan(1000);
     expect(growth).not.toMatch(/ellipsis|--color-accent/);
   });

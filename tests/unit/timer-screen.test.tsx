@@ -43,7 +43,7 @@ const todayRead = (todos: { id: string; text: string; done?: boolean; categoryId
     data: {
       categories: [
         { id: C1, readable: true, name: "어학", createdAt: "x" },
-        { id: C2, readable: true, name: "포트폴리오", createdAt: "x" },
+        { id: C2, readable: true, name: "글쓰기", createdAt: "x" },
       ],
     },
   },
@@ -88,10 +88,10 @@ afterEach(() => {
 
 describe("타이머 탭 (7-6, ④)", () => {
   it("오늘 끝내지 않은 할 일이 고를 목록이고, 처음에는 첫 할 일이 골라져 있다", async () => {
-    await mount(fakeApi(), todayRead([{ id: T1, text: "단어 외우기", categoryId: C1 }, { id: T2, text: "이미 끝냄", done: true }, { id: T3, text: "포트폴리오 정리" }]));
+    await mount(fakeApi(), todayRead([{ id: T1, text: "단어 외우기", categoryId: C1 }, { id: T2, text: "이미 끝냄", done: true }, { id: T3, text: "글쓰기 정리" }]));
     expect((screen.getByRole("radio", { name: /단어 외우기/ }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("radio", { name: /이미 끝냄/ })).toBeNull();
-    expect(screen.getByRole("radio", { name: /포트폴리오 정리/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /글쓰기 정리/ })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "할 일 없이 시작" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "30분 시작" })).toBeTruthy();
   });
@@ -167,7 +167,7 @@ describe("타이머 탭 (7-6, ④)", () => {
     const api = fakeApi();
     await mount(api, todayRead([]));
     expect((screen.getByRole("radio", { name: "할 일 없이 시작" }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오" }));
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기" }));
     await press("30분 시작");
     expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ todoId: null, categoryId: C2, surface: "manual" }));
   });
@@ -179,11 +179,11 @@ describe("타이머 탭 (7-6, ④)", () => {
     expect(screen.queryByText(/고르지 않으면 기타/)).toBeNull();
     const group = screen.getByRole("group", { name: "분야" });
     const chips = () => [...group.querySelectorAll("button[aria-pressed]")];
-    expect(chips().map((b) => b.textContent)).toEqual(["기타", "어학", "포트폴리오"]);
+    expect(chips().map((b) => b.textContent)).toEqual(["기타", "어학", "글쓰기"]);
     expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오" }));
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기" }));
     expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false", "true"]);
-    fireEvent.click(screen.getByRole("button", { name: "포트폴리오" })); // 다시 눌러 풀면 기타
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기" })); // 다시 눌러 풀면 기타
     expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
     fireEvent.click(screen.getByRole("button", { name: "어학" }));
     fireEvent.click(screen.getByRole("button", { name: "기타" })); // 기타를 누르면 고른 분야가 풀림

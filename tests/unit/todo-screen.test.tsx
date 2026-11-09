@@ -357,7 +357,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     await renderLoaded([]);
     write("적던 글");
     const back = vi.spyOn(window.history, "back");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     const dialog = confirmDialog(LOGOUT.title);
     signOut.mockResolvedValueOnce(undefined); // 서버 Action이 redirect로 끝남(클라이언트에서는 풀림)
     await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.top })));
@@ -372,7 +372,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     await renderLoaded([]);
     write("적던 글");
     const back = vi.spyOn(window.history, "back");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     const dialog = confirmDialog(LOGOUT.title);
     signOut.mockRejectedValueOnce(new Error("network"));
     const top = within(dialog).getByRole("button", { name: LOGOUT.top }) as HTMLButtonElement;
@@ -387,7 +387,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
     expect(back, "확인이 쌓은 칸을 거둔다(「눌렀다」가 풀렸다)").toHaveBeenCalledTimes(1);
     // 다시 열면 안내는 없다. 다시 누르면 이번에는 로그아웃(실패 뒤 다시 누를 수 있다)
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     const again = confirmDialog(LOGOUT.title);
     expect(within(again).queryByRole("alert")).toBeNull();
     await act(async () => fireEvent.click(within(again).getByRole("button", { name: LOGOUT.top })));
