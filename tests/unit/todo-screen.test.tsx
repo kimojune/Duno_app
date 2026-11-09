@@ -31,6 +31,26 @@ const DAY: TodoDay = { date: "2026-11-05", year: 2026, month: 11, dayOfMonth: 5,
 const ID_A = "11111111-1111-4111-8111-111111111111";
 const ID_B = "22222222-2222-4222-8222-222222222222";
 
+/**
+ * 화면에 보이는 글만 센다(화면 읽기용 안내 영역 .sr-only는 뺀다 — todo-offline.test.tsx와 같은 방식, 고침8 검토).
+ * 실패·끊김 안내는 보이는 줄과 안내 영역이 같은 글을 담는데, 안내 영역은 announce(…, { again: true })가 비운 뒤 100ms 뒤에 채운다.
+ * 그래서 시험이 빠르면 한 곳, 느리면(전체 시험이 몰려 도는 때) 두 곳에서 잡혀 getByText가 「여러 개」로 가끔 실패했다.
+ * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다).
+ */
+function visibleTexts(text: string): HTMLElement[] {
+  return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
+}
+/** 보이는 줄이 정확히 하나일 때 그것 */
+function oneVisible(text: string): HTMLElement {
+  const found = visibleTexts(text);
+  expect(found).toHaveLength(1);
+  return found[0];
+}
+/** 보이는 줄이 정확히 하나가 될 때까지 기다린다(findByText 대신) */
+async function findOneVisible(text: string): Promise<HTMLElement> {
+  await waitFor(() => expect(visibleTexts(text)).toHaveLength(1));
+  return visibleTexts(text)[0];
+}
 function item(id: string, text: string, done = false): TodoItem {
   return { id, readable: true, text, done, createdAt: "2026-11-05T01:00:00.000Z", categoryId: null };
 }
@@ -149,7 +169,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     addTodo.mockResolvedValueOnce(ok({ day: DAY, todo: item("33333333-3333-4333-8333-333333333333", "둘째 글") }));
     write("첫째 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     write("둘째 글");
     press();
     await waitFor(() => expect(addTodo).toHaveBeenCalledTimes(2));
@@ -212,7 +232,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("못 저장한 글");
     press();
-    const status = await screen.findByText("저장하지 못했어요.");
+    const status = await findOneVisible("저장하지 못했어요.");
     expect(status.getAttribute("role")).toBe("status");
     expect(screen.getByText("못 저장한 글")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
@@ -252,7 +272,7 @@ describe("적기 (T6, T7, T11, D4)", () => {
     act(() => {
       window.dispatchEvent(new Event("offline"));
     });
-    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
+    expect(oneVisible("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
     write("지하철에서 적은 글");
     press();
     expect(addTodo).not.toHaveBeenCalled();
@@ -300,7 +320,7 @@ describe("체크 (T8, D5)", () => {
     const box = screen.getByRole("checkbox", { name: "실패할 체크" }) as HTMLInputElement;
     fireEvent.click(box);
     expect(box.checked).toBe(true); // 누른 즉시 바뀐다
-    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await findOneVisible("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     expect(box.checked).toBe(false);
   });
 
@@ -325,7 +345,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     const alert = await screen.findByText(/로그인이 풀렸어요\. 다시 로그인하면 이 화면을 떠나서/);
     expect(alert.closest("[role=alert]")).toBeTruthy();
     expect(screen.getByText("저장 못 한 글")).toBeTruthy(); // 줄이 T7 모양으로 남는다
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     expect(refresh).not.toHaveBeenCalled(); // 바로 넘기지 않는다
     write("입력 칸 글");
     fireEvent.click(screen.getByRole("button", { name: "저장 안 된 글 복사" }));
@@ -423,7 +443,7 @@ describe("화면 검토 LOW 고침", () => {
     await screen.findByText("서버에 있던 글");
     await waitFor(() => expect(screen.queryByText(/로그인이 풀렸어요/)).toBeNull());
     expect(screen.getByText("저장 못 한 글")).toBeTruthy();
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
   });
 
   it("켬 성공이 늦게 도착하고 끔이 실패하면, 화면은 서버 확인값(켬)으로 돌아온다", async () => {
@@ -517,7 +537,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("못 저장한 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
     fireVisible();
     await screen.findByText(/로그인이 풀렸어요/);
@@ -540,7 +560,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     addTodo.mockResolvedValueOnce(fail("unavailable"));
     write("저장 못 한 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     const box = screen.getByRole("checkbox", { name: "저장 못 한 글" }) as HTMLInputElement;
     expect(box.getAttribute("aria-disabled")).toBe("true");
     expect(document.getElementById(box.getAttribute("aria-describedby")!)?.textContent).toBe("저장하지 못했어요.");
@@ -564,7 +584,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     expect(input().value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     const notice = screen.getByText("아직 저장되지 않은 글이 있어요. 로그아웃하면 이 글은 사라져요.").closest("[role=alert]");
@@ -648,7 +668,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
 
     const id = addTodo.mock.calls[0][0] as string;
     addTodo.mockReturnValueOnce(new Promise(() => {}));
@@ -669,7 +689,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     fireEvent.click(box);
     fireEvent.click(box);
     resolvers[1](fail("unavailable"));
-    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await findOneVisible("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     resolvers[0](ok({ id: ID_A, done: true }));
     await waitFor(() => expect(screen.queryByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.")).toBeNull());
     expect(box.checked).toBe(true);
@@ -682,7 +702,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
     fireEvent.click(box); // 1: 끔 요청
     fireEvent.click(box); // 2: 켬 요청
     resolvers[1](fail("unavailable")); // 2 실패 → 확인값(켬)으로 돌아감
-    await screen.findByText("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
+    await findOneVisible("끝냄 표시를 바꾸지 못했어요. 다시 눌러 주세요.");
     expect(box.checked).toBe(true);
     fireEvent.click(box); // 3: 끔 요청(진행 중)
     expect(box.checked).toBe(false);
@@ -774,7 +794,7 @@ describe("다듬기 1회차 P1 「저장하는 중」은 1초 뒤에만 보인�
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
     });
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     expect(screen.queryByText("저장하는 중")).toBeNull();
   });
 });
@@ -809,7 +829,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(confirmBox()).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
@@ -824,7 +844,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
       "로그인이 풀렸어요. 다시 로그인하면 이 화면을 떠나서, 아직 저장되지 않은 글은 사라져요. 필요하면 먼저 복사해 두세요.",
     );
     expect(alert.closest("[role=alert]")).toBeTruthy();
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy(); // 줄 안의 문구는 그대로
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1); // 줄 안의 문구는 그대로
   });
 
   it("③ 확인이 뜬 뒤 실패 줄을 빼면 확인이 사라지고 포커스가 다음 줄 체크 칸(없으면 입력 칸)에 있다", async () => {
@@ -832,7 +852,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     expect(confirmBox()).toBeTruthy();
     // 실패 줄은 마지막 줄이라 아래 줄이 없다 → 위 줄 체크 칸
@@ -847,7 +867,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     addTodo.mockResolvedValue(fail("unavailable"));
     write("혼자 있는 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
     await waitFor(() => expect(confirmBox()).toBeNull());
@@ -859,7 +879,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     addTodo.mockResolvedValueOnce(fail("unavailable")).mockResolvedValueOnce(fail("unavailable"));
     write("첫째 실패");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     write("둘째 실패");
     press();
     await waitFor(() => expect(screen.getAllByText("저장하지 못했어요.")).toHaveLength(2));
@@ -914,7 +934,7 @@ describe("MO-17 LOW 고침", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
     });
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     expect(addTodo).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
@@ -1010,7 +1030,7 @@ describe("MO-17 LOW 고침", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
     });
-    expect(screen.getByText("저장하지 못했어요.")).toBeTruthy();
+    expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1);
     first.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "늦은 성공") }));
     await act(async () => {});
     expect(screen.queryByText("저장하지 못했어요.")).toBeNull();
@@ -1022,7 +1042,7 @@ describe("MO-17 LOW 고침", () => {
     addTodo.mockResolvedValueOnce(fail("unavailable")).mockReturnValueOnce(new Promise(() => {}));
     write("다시 보낼 글");
     press();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     const again = screen.getByRole("button", { name: "다시" });
     again.focus();
     fireEvent.click(again);

@@ -8,6 +8,7 @@ import { resolveWriteDay } from "../todos/day";
 import { todoIdSchema } from "../todos/validation";
 import { checkNoteText, NOTE_MAX_LENGTH_PUBLIC } from "./public";
 import { readLatestLogsForUser } from "../evening/core";
+import type { EveningLog } from "../evening/types";
 import { CATEGORY_PAGE_LOG_LIMIT, CATEGORY_PAGE_TODO_LIMIT, categoryPageFromDay, mergeCategoryMinutes } from "./category-minutes";
 import type { CategoryPageData, CategoryPageTodo, NoteItem } from "./types";
 
@@ -198,10 +199,17 @@ export async function readCategoryPage(deps: NotesDeps, categoryId: unknown): Pr
     // 날짜별 시간(고침8): 이미 저장된 오늘 기록을 읽기만 한다. 세션의 user id로만 읽고(앱 필터 + RLS), 분야 번호는 위 할 일 읽기와
     // 같은 검사(uuid · 내 할 일만)를 거친 값이다. 남의 분야 번호면 할 일이 비고, 내 기록의 items에 그 번호가 없어 분도 0이다.
     // 범위: 할 일을 상한까지 읽었으면 그 가장 오래된 날부터, 오늘 기록은 최근 것부터 CATEGORY_PAGE_LOG_LIMIT행까지(상태보기와 같은 상한).
+    // 오늘 기록 읽기가 실패해도(오류·예외) 분야 페이지는 연다: 고침8 전에는 오늘 기록 표와 무관하게 열리던 화면이라, 새 기능 때문에
+    // 있던 화면을 깨지 않는다(팀장 판단). 그때는 minutes만 0(날짜 머리 시간·막대 없음)이고 할 일 묶음은 그대로다. 화면에 따로 알리지 않는다
     const fromDay = categoryPageFromDay(todoRows.length, days);
-    const logs = await readLatestLogsForUser(deps.supabase, user.data, { fromDay, limit: CATEGORY_PAGE_LOG_LIMIT });
-    if (!logs.ok) return logs;
-    return { ok: true, data: { categoryId: category, days: mergeCategoryMinutes(days, logs.data, category, fromDay) } };
+    let logs: EveningLog[] = [];
+    try {
+      const read = await readLatestLogsForUser(deps.supabase, user.data, { fromDay, limit: CATEGORY_PAGE_LOG_LIMIT });
+      if (read.ok) logs = read.data;
+    } catch {
+      logs = [];
+    }
+    return { ok: true, data: { categoryId: category, days: mergeCategoryMinutes(days, logs, category, fromDay) } };
   } catch {
     return recordFail("unavailable");
   }

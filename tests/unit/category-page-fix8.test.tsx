@@ -310,6 +310,15 @@ describe("기기 먼저 저장(deriveCategoryDays): 기기 사본의 오늘 기�
     ]);
   });
 
+  it("기기 사본의 오늘 기록을 읽지 못하면(깨진 값) 서버와 같은 기준: 할 일 묶음 그대로, minutes 0", () => {
+    const serverDays: CategoryPageData["days"] = [
+      { day: "2026-11-12", minutes: 75, todos: [{ id: "a", text: "a", done: true, notes: [] }] },
+      { day: "2026-11-11", minutes: 30, todos: [] },
+    ];
+    const broken = { ...mirror([]), logs: null } as unknown as Mirror;
+    expect(deriveCategoryDays(broken, C1, serverDays)).toEqual([{ day: "2026-11-12", minutes: 0, todos: [{ id: "a", text: "a", done: true, notes: [] }] }]);
+  });
+
   it("기기 사본을 아직 모르면 null(서버 값을 그대로 쓴다)", () => {
     expect(deriveCategoryDays(mirror([], false), C1, [])).toBeNull();
   });

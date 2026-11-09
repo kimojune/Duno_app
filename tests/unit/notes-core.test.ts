@@ -254,3 +254,67 @@ describe("readCategoryPage 날짜별 시간(고침8): 오늘 기록을 세션 us
     expect(small.store.calls.filter((c) => c.table === "evening_logs").at(-1)!.filters.some(([op]) => op === "gte")).toBe(false);
   });
 });
+
+describe("readCategoryPage: 오늘 기록 읽기가 실패해도 분야 페이지는 열린다(고침8 검토 LOW)", () => {
+  /** evening_logs만 실패시키는 감싼 클라이언트. error = 오류 응답, throw = 쿼리 만들기에서 예외 */
+  function failingLogs(client: ReturnType<typeof fakeTablesClient>, mode: "error" | "throw") {
+    const failing = () => {
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "gte", "order", "limit"]) {
+        q[m] = () => {
+          if (mode === "throw") throw new Error("network down");
+          return q;
+        };
+      }
+      q.then = (ok: (v: unknown) => unknown, bad: (e: unknown) => unknown) => Promise.resolve({ data: null, error: { code: "57014", message: "canceling statement" } }).then(ok, bad);
+      return q;
+    };
+    return new Proxy(client, {
+      get(target, prop, receiver) {
+        if (prop === "from") return (table: string) => (table === "evening_logs" ? failing() : target.from(table));
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+  const seedLog = (store: FakeStore, targetDay: string, minutes: number) =>
+    store.seed("evening_logs", { user_id: ME, target_day: targetDay, total_minutes: minutes, items: [{ categoryId: CAT, minutes }], save_mode: "edited", saved_at: `${targetDay}T10:00:00.000Z`, client_saved_at: null });
+
+  for (const mode of ["error", "throw"] as const) {
+    it(`오늘 기록 읽기 ${mode === "error" ? "오류 응답" : "예외"} → 응답 ok, 할 일 묶음 그대로, minutes 0(시간만 있는 날은 없음)`, async () => {
+      const { store, seedTodo } = setup();
+      seedTodo(T1, "단어", "2026-11-06", CAT, ME, true);
+      seedTodo(T2, "듣기", "2026-11-04", CAT);
+      seedLog(store, "2026-11-06", 90);
+      seedLog(store, "2026-11-05", 45);
+      const page = await readCategoryPage({ supabase: failingLogs(fakeTablesClient(store, { sub: ME }), mode), key: KEY }, CAT);
+      expect(page.ok).toBe(true);
+      if (!page.ok) return;
+      expect(page.data.days.map((d) => [d.day, d.minutes, d.todos.map((t) => [t.id, t.text, t.done])])).toEqual([
+        ["2026-11-06", 0, [[T1, "단어", true]]],
+        ["2026-11-04", 0, [[T2, "듣기", false]]],
+      ]);
+    });
+  }
+
+  it("정상(같은 자료, 감싸지 않음) → 값 그대로", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "단어", "2026-11-06", CAT, ME, true);
+    seedTodo(T2, "듣기", "2026-11-04", CAT);
+    seedLog(store, "2026-11-06", 90);
+    seedLog(store, "2026-11-05", 45);
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, CAT);
+    expect(page.ok && page.data.days.map((d) => [d.day, d.minutes, d.todos.length])).toEqual([
+      ["2026-11-06", 90, 1],
+      ["2026-11-05", 45, 0],
+      ["2026-11-04", 0, 1],
+    ]);
+  });
+
+  it("할 일 읽기가 실패하면 지금처럼 실패다(오늘 기록 실패만 너그럽게 본다)", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "단어", "2026-11-06", CAT);
+    store.alwaysError = { code: "57014" };
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, CAT);
+    expect(page.ok).toBe(false);
+  });
+});

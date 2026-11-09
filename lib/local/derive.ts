@@ -132,7 +132,12 @@ export function deriveCategoryDays(m: Mirror, categoryId: string | null, days: C
   const todoDays = days.filter((d) => d.todos.length > 0);
   const todoCount = todoDays.reduce((s, d) => s + d.todos.length, 0);
   const fromDay = categoryPageFromDay(todoCount, todoDays);
-  return mergeCategoryMinutes(todoDays, latestLogPerDay(m.logs), categoryId, fromDay);
+  try {
+    return mergeCategoryMinutes(todoDays, latestLogPerDay(m.logs), categoryId, fromDay);
+  } catch {
+    // 기기 사본의 오늘 기록을 읽지 못하면(깨진 값 등) 서버와 같은 기준: minutes만 0, 할 일 묶음은 그대로
+    return mergeCategoryMinutes(todoDays, [], categoryId, fromDay);
+  }
 }
 
 /** 타이머 화면이 열릴 때: 진행 중인 세션과 오늘 시작한 세션들 */
