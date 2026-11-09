@@ -5,7 +5,7 @@ import type { SettingsApi } from "../lib/onboarding-api";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
-import { BackHeader, BottomActions } from "./back-header";
+import { BACK_HEADER_TEXT, BackHeader, BottomActions } from "./back-header";
 import { GOAL_FIELD_TEXT, GoalField, goalFieldCheck } from "./goal-field";
 import { Notice, PrimaryButton } from "./ui";
 
@@ -22,7 +22,7 @@ export const GOAL_SENTENCE_TEXT = {
   title: "목표",
   example: GOAL_FIELD_TEXT.example,
   save: "저장",
-  saving: "저장하는 중",
+  saving: BACK_HEADER_TEXT.saving, // 「저장 중」(O-7)
   failed: "저장하지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 저장할 수 있어요.",
 } as const;

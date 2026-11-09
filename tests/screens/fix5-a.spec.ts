@@ -47,7 +47,7 @@ test("처음 설정 목표 비율 단계 360px: 균등 배분 단추, 다이얼 
   await open(page, "/dev/v2?s=ratio-onboarding");
   await page.getByRole("button", { name: "다음" }).click();
   await page.getByRole("button", { name: "다음" }).click();
-  await expect(page.getByText("합계 100%")).toBeVisible();
+  await expect(page.getByText(/^합계 \d+%$/)).toHaveCount(0); // 고침9: 「합계」 줄 없앰(합은 늘 100)
   await expect(page.getByRole("button", { name: "균등 배분" })).toBeVisible();
   const caption = page.getByText("분야마다 쓰고 싶은 몫 · 합 100%");
   await expect(caption).toBeVisible();
@@ -70,13 +70,16 @@ test("처음 설정 목표 비율 단계 360px: 균등 배분 단추, 다이얼 
   await photo(page, "처음설정-목표비율");
 });
 
-test("내 정보 360px: 목표 비율 이름과 균등 배분 단추, 아래 탭 순서", async ({ page }) => {
+test("내 정보 360px: 목표 비율 카드(→ S8-a의 균등 배분 단추), 아래 탭 순서", async ({ page }) => {
   await open(page, "/dev/v2?s=me-ratio");
-  await expect(page.getByRole("heading", { name: "목표 비율" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "균등 배분" })).toBeVisible();
-  await expect(page.getByText("오늘 기록 알림", { exact: true })).toBeVisible();
+  // 고침9(PM 6): 내 정보에서는 고치지 않는다 — 「목표 비율」 카드 단추, 균등 배분은 S8-a 안
+  await expect(page.locator(".me-ratio-card .me-card-title")).toHaveText("목표 비율");
+  await expect(page.getByRole("button", { name: "균등 배분" })).toHaveCount(0);
+  await expect(page.locator(".notify-name", { hasText: "오늘 기록 알림" })).toBeVisible(); // 고침9: 「시각」 고르기의 접근 이름에도 같은 글(화면 읽기 전용)이 있어 줄 이름으로 찾는다
   const tabs = await page.$$eval(".tabbar-btn", (els) => els.map((e) => e.textContent));
   expect(tabs).toEqual(["상태보기", "할 일", "타이머", "내 정보"]);
-  await page.getByRole("heading", { name: "목표 비율" }).scrollIntoViewIfNeeded();
+  await page.locator(".me-ratio-card").scrollIntoViewIfNeeded();
   await photo(page, "내정보");
+  await page.getByRole("button", { name: /^목표 비율, / }).click();
+  await expect(page.getByRole("dialog", { name: "목표 비율" }).getByRole("button", { name: "균등 배분" })).toBeVisible();
 });

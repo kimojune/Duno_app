@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeScreen } from "../../components/me-screen";
 import { entriesToRatios, OTHER_RATIO_ID, type RatioEntry } from "../../components/ratio-editor";
@@ -114,11 +114,12 @@ describe("다시 열 때 저장 목록에 없는 분야는 0%로 보인다", () 
     vi.restoreAllMocks();
   });
 
-  it("내 정보: 분야 50개 + 몫이 있는 넷으로 열면 나머지 분야 숫자 칸이 0이다(합 100)", () => {
+  it("내 정보: 분야 50개 + 몫이 있는 넷으로 열면 나머지 분야 숫자 칸이 0이다(합 100) — 고침9: S8-a에서", () => {
     const settings: SettingsData = { goal: null, goalReadable: true, onboardingDone: true, notify: NOTIFY_OFF, ratios: entriesToRatios(LIKE_USER) };
     const api: SettingsApi = { addCategory: vi.fn(), saveRatios: vi.fn(), saveSettings: vi.fn(), requestPermission: vi.fn() };
     const push = { permission: vi.fn(() => "default" as const), supported: vi.fn(() => true), hasKey: vi.fn(() => true), subscribed: vi.fn(async () => false), enable: vi.fn(), disable: vi.fn() } as unknown as PushApi;
     render(<MeScreen settings={settings} categories={IDS.map((id, i) => ({ id, name: `분야${i + 1}` }))} api={api} push={push} />);
+    fireEvent.click(screen.getByRole("button", { name: /^목표 비율, / }));
     const value = (name: string) => Number((screen.getByLabelText(`${name} 비율(%)`) as HTMLInputElement).value);
     expect([value("분야1"), value("분야2"), value("분야3"), value("기타")]).toEqual([40, 30, 10, 20]);
     expect(value("분야4")).toBe(0);
