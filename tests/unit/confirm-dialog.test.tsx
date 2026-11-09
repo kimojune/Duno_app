@@ -349,8 +349,7 @@ describe("CSS 값(146:11 · 150:58)", () => {
     expect(CSS).toMatch(/\.close-confirm-desc \{[^}]*font: var\(--font-sub\); color: var\(--color-text-sub\);/);
     expect(CSS).toMatch(/\.close-confirm-actions \{ display: grid; gap: var\(--space-3\);/);
     expect(CSS).toMatch(/\.close-confirm-actions > \.btn \{ width: 100%; min-height: var\(--tap-min\); font: var\(--font-body\); font-weight: 700; \}/);
-    expect(CSS).toMatch(/\.close-confirm-actions > \.btn-secondary \{ border-color: var\(--color-text\); color: var\(--color-text\); background: transparent; \}/);
-    expect(CSS).toMatch(/\.btn-secondary \{ border-width: 1\.5px;/);
+    expect(CSS).toMatch(/\.close-confirm-actions > \.btn-secondary \{ box-shadow: inset 0 0 0 1\.5px var\(--color-text\); color: var\(--color-text\); background: transparent; \}/);
     expect(CSS).toMatch(/\.close-confirm-actions > \.btn-primary \{ background: var\(--color-text\); border-color: var\(--color-text\); color: var\(--color-on-primary\); \}/);
     expect(CSS).toMatch(/\.close-confirm-actions > \.btn-primary:active \{ background: var\(--color-primary-pressed\);/);
     expect(CSS).toMatch(/\.close-confirm-actions > \.btn-secondary:active \{ background: var\(--color-secondary-pressed\); \}/);
