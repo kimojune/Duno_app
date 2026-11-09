@@ -149,19 +149,60 @@ describe("내 정보 탭", () => {
     expect(screen.queryByRole("button", { name: /^목표 비율, / })).toBeNull();
   });
 
-  it("알림을 켜면 허락 → 구독을 한 뒤 설정을 저장한다", async () => {
+  it("알림을 켜는 순간 허락 → 구독을 한 뒤 바로 저장하고 「✓ 저장했어요」(polite). 시각도 바꾸는 즉시 저장, 「알림 설정 저장」 단추는 없다(O-5)", async () => {
     const api = fakeApi();
     const push = fakePush();
     const onChanged = vi.fn();
     render(<MeScreen settings={settings()} categories={categories} api={api} push={push} onChanged={onChanged} />);
+    expect(screen.queryByRole("button", { name: "알림 설정 저장" })).toBeNull();
     expect(screen.getByText("이 기기에서는 알림을 받지 않아요")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" }));
-    fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(21 * 60) } });
-    await press("알림 설정 저장");
+    await act(async () => fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" })));
     expect(push.enable).toHaveBeenCalledTimes(1);
-    expect(api.saveSettings).toHaveBeenCalledWith({ notify: { eveningEnabled: true, eveningMinute: 1260, morningEnabled: false, morningMinute: 600 } });
-    expect(onChanged).toHaveBeenCalled();
+    expect(api.saveSettings).toHaveBeenCalledWith({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } });
+    expect(onChanged).toHaveBeenLastCalledWith({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } });
+    const status = document.querySelector(".me-notify-status")!;
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.textContent).toBe("✓ 저장했어요");
+    expect(status.querySelector("[aria-hidden='true']")?.textContent).toBe("✓ "); // 화면 읽기는 「저장했어요」만
     expect(screen.getByText("이 기기에서 알림을 받아요")).toBeTruthy();
+    await act(async () => fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(21 * 60) } }));
+    expect(api.saveSettings).toHaveBeenLastCalledWith({ notify: { eveningEnabled: true, eveningMinute: 1260, morningEnabled: false, morningMinute: 600 } });
+    expect(push.enable).toHaveBeenCalledTimes(1); // 이미 구독했으니 다시 묻지 않는다
+    expect(api.saveSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it("「✓ 저장했어요」는 잠깐(4초) 보이고 사라진다", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<MeScreen settings={settings()} categories={categories} api={fakeApi()} push={fakePush()} />);
+      await act(async () => fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" })));
+      expect(document.querySelector(".me-notify-status")?.textContent).toBe("✓ 저장했어요");
+      await act(async () => vi.advanceTimersByTime(3900));
+      expect(document.querySelector(".me-notify-status")?.textContent).toBe("✓ 저장했어요");
+      await act(async () => vi.advanceTimersByTime(200));
+      expect(document.querySelector(".me-notify-status")?.textContent).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("저장이 실패하면 스위치를 앞 값으로 되돌리고 「저장하지 못했어요…」", async () => {
+    const api = fakeApi({ saveSettings: vi.fn(async () => ({ ok: false as const, error: "unavailable" as const })) });
+    const push = fakePush({ permission: vi.fn(() => "granted" as const) });
+    await act(async () => {
+      render(
+        <MeScreen
+          settings={settings({ notify: { eveningEnabled: true, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } })}
+          categories={categories}
+          api={api}
+          push={push}
+        />,
+      );
+    });
+    await act(async () => fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(20 * 60) } }));
+    expect(api.saveSettings).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement).value).toBe("1170");
+    expect(document.querySelector(".me-notify-status")?.textContent).toBe("저장하지 못했어요. 다시 눌러 주세요.");
   });
 
   it("허락이 안 되거나 브라우저가 못 받거나 보내는 설정이 없으면 설정을 저장하지 않고 이유를 알린다", async () => {
@@ -174,10 +215,10 @@ describe("내 정보 탭", () => {
       cleanup();
       const api = fakeApi();
       render(<MeScreen settings={settings()} categories={categories} api={api} push={fakePush({ enable: vi.fn(async () => result) })} />);
-      fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" }));
-      await press("알림 설정 저장");
+      await act(async () => fireEvent.click(screen.getByRole("checkbox", { name: "아침 알림" })));
       expect(screen.getByText(text)).toBeTruthy();
       expect(api.saveSettings).not.toHaveBeenCalled();
+      expect((screen.getByRole("checkbox", { name: "아침 알림" }) as HTMLInputElement).checked).toBe(false); // 되돌림
     }
   });
 
@@ -193,8 +234,7 @@ describe("내 정보 탭", () => {
       />,
     );
     expect(screen.getByText("이 기기에서 알림을 받아요")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" }));
-    await press("알림 설정 저장");
+    await act(async () => fireEvent.click(screen.getByRole("checkbox", { name: "오늘 기록 알림" })));
     expect(push.disable).toHaveBeenCalledTimes(1);
     expect(push.enable).not.toHaveBeenCalled();
     expect(api.saveSettings).toHaveBeenCalledWith({ notify: { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 } });
@@ -213,8 +253,8 @@ describe("내 정보 탭", () => {
       );
     });
     expect(screen.getByText("이 기기에서는 알림을 받지 않아요")).toBeTruthy();
-    // 저장하면 구독을 다시 시도한다
-    await press("알림 설정 저장");
+    // 켜 둔 알림의 시각을 바꾸면(바로 저장) 구독을 다시 시도한다
+    await act(async () => fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(20 * 60) } }));
     expect(push.enable).toHaveBeenCalledTimes(1);
   });
 
@@ -229,8 +269,7 @@ describe("내 정보 탭", () => {
         push={push}
       />,
     );
-    fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(20 * 60) } });
-    await press("알림 설정 저장");
+    await act(async () => fireEvent.change(screen.getByLabelText("오늘 기록 알림 시각"), { target: { value: String(20 * 60) } }));
     expect(push.enable).not.toHaveBeenCalled();
     expect(api.saveSettings).toHaveBeenCalledWith({ notify: expect.objectContaining({ eveningMinute: 1200 }) });
   });
@@ -242,7 +281,9 @@ describe("내 정보 탭", () => {
       window.dispatchEvent(new Event("offline"));
     });
     expect(screen.getAllByText("인터넷에 연결되면 저장할 수 있어요.").length).toBeGreaterThan(0);
-    expect((screen.getByRole("button", { name: "알림 설정 저장" }) as HTMLButtonElement).disabled).toBe(true);
+    // 알림은 바로 저장이라 스위치·시각이 막힌다(O-5)
+    for (const name of ["오늘 기록 알림", "아침 알림"]) expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("오늘 기록 알림 시각") as HTMLSelectElement).disabled).toBe(true);
     // 목표 비율은 S8-a의 「저장」이 막힌다(고침9)
     await openRatio();
     expect((within(ratioDialog()).getByRole("button", { name: "저장" }) as HTMLButtonElement).disabled).toBe(true);

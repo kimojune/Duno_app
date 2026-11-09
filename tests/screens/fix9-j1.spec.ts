@@ -141,7 +141,7 @@ test("S5-2 나누기 · 들어간 처음: 머리 한 줄 「‹」 · 가운데 
   expect(Math.abs(b!.y + b!.height / 2 - (t!.y + t!.height / 2)), "한 줄").toBeLessThanOrEqual(2);
   expect(Math.abs(t!.x + t!.width / 2 - 180), "제목 가운데").toBeLessThanOrEqual(2);
   expect(x!.x + x!.width, "닫기 오른쪽 끝").toBeGreaterThan(340);
-  expect(x!.height).toBeGreaterThanOrEqual(48);
+  expect(x!.height, "닫기 누름 높이 44(O-2)").toBeGreaterThanOrEqual(44);
   expect(hd!.y, "큰 제목은 머리 아래").toBeGreaterThan(b!.y + b!.height - 1);
   expect(await title.evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).fontWeight])).toEqual(["16px", "700"]);
   await expect(dlg.getByRole("button", { name: "이전" })).toHaveCount(1);
@@ -225,4 +225,20 @@ test("S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창(같은 꼴), 
   await photo(page, "S8-b 목표 고치기 · 바꾼 뒤 「‹」 → 확인 창");
   await confirm.getByRole("button", { name: "계속 적기" }).click();
   await expect(dlg).toBeVisible();
+});
+
+test("S8 내 정보 · 알림 바로 저장(O-5): 「알림 설정 저장」 없음, 스위치를 바꾸면 카드 아래 「✓ 저장했어요」", async ({ page }) => {
+  await open(page, "me-goal");
+  await expect(page.getByRole("button", { name: "알림 설정 저장" })).toHaveCount(0);
+  const morning = page.getByRole("checkbox", { name: "아침 알림" });
+  await expect(morning).not.toBeChecked();
+  await page.locator(".notify-toggle", { hasText: "아침 알림" }).click();
+  await expect(morning).toBeChecked();
+  const status = page.locator(".me-notify-status");
+  await expect(status).toHaveText("✓ 저장했어요");
+  await expect(status).toHaveAttribute("role", "status");
+  await expect(page.getByLabel("아침 알림 시각")).toBeEnabled();
+  await status.scrollIntoViewIfNeeded();
+  await noOverflow(page);
+  await photo(page, "S8 내 정보 · 알림 바로 저장");
 });

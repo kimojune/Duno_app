@@ -462,6 +462,7 @@ export function NotifyRow({
   minute,
   onToggle,
   onMinute,
+  disabled,
 }: {
   id: string;
   name: string;
@@ -470,6 +471,8 @@ export function NotifyRow({
   minute?: number;
   onToggle: (on: boolean) => void;
   onMinute?: (minute: number) => void;
+  /** 저장 중·오프라인이면 켜고 끄기·시각을 막는다(내 정보 바로 저장, O-5) */
+  disabled?: boolean;
 }) {
   const options = timeOptions();
   // 30분 단위가 아닌 값(옛 설정)도 고를 수 있게 목록에 끼워 둔다
@@ -482,6 +485,7 @@ export function NotifyRow({
           type="checkbox"
           className="notify-switch-input"
           checked={on}
+          disabled={disabled}
           onChange={(e) => onToggle(e.target.checked)}
           aria-describedby={preview ? `${id}-preview` : undefined}
         />
@@ -497,7 +501,7 @@ export function NotifyRow({
           <label htmlFor={`${id}-time`} className="notify-time-label">
             <span className="sr-only">{name} </span>시각
           </label>
-          <select id={`${id}-time`} className="input notify-time-select" value={minute} disabled={!on} onChange={(e) => onMinute(Number(e.target.value))}>
+          <select id={`${id}-time`} className="input notify-time-select" value={minute} disabled={!on || disabled} onChange={(e) => onMinute(Number(e.target.value))}>
             {list.map((m) => (
               <option key={m} value={m}>
                 {formatClock(m)}

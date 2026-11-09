@@ -47,10 +47,11 @@ for (const size of ALL_SIZES) {
     await shot(page, `tabbar-bottom-${size}`);
 
     const bar = (await page.locator(".tabbar").boundingBox())!;
-    const save = (await page.getByRole("button", { name: "알림 설정 저장" }).boundingBox())!;
+    // 고침9 O-5: 「알림 설정 저장」 단추는 없어졌다(바로 저장). 알림 카드의 마지막 조작(아침 알림 시각)과 로그아웃을 본다
+    const save = (await page.getByLabel("아침 알림 시각").boundingBox())!;
     const logout = (await page.getByRole("button", { name: "로그아웃" }).boundingBox())!;
-    // B1: 맨 아래에서 저장 단추와 로그아웃의 아래 끝이 탭 줄의 위 끝보다 위에 있다
-    expect(save.y + save.height, "알림 설정 저장 단추가 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
+    // B1: 맨 아래에서 알림 카드 마지막 조작과 로그아웃의 아래 끝이 탭 줄의 위 끝보다 위에 있다
+    expect(save.y + save.height, "아침 알림 시각 칸이 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
     expect(logout.y + logout.height, "로그아웃이 탭 줄에 가려지지 않는다").toBeLessThanOrEqual(bar.y + 0.5);
 
     // B9: 탭 글이 자기 칸을 넘치지 않고(두 줄로 내려갈 수 있다), 가로 스크롤이 없다
@@ -70,8 +71,9 @@ test("tabbar: 내 정보 안 포커스가 탭 줄 밑으로 들어가지 않는�
   const padding = await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom);
   const bar = (await page.locator(".tabbar").boundingBox())!;
   expect(parseFloat(padding), "스크롤 여백이 탭 줄 높이보다 크다").toBeGreaterThan(bar.height);
-  await page.getByRole("button", { name: "알림 설정 저장" }).focus();
-  const save = (await page.getByRole("button", { name: "알림 설정 저장" }).boundingBox())!;
+  // 고침9 O-5: 「알림 설정 저장」 대신 맨 아래 누름 요소 「로그아웃」에 포커스
+  await page.getByRole("button", { name: "로그아웃" }).focus();
+  const save = (await page.getByRole("button", { name: "로그아웃" }).boundingBox())!;
   expect(save.y + save.height).toBeLessThanOrEqual(bar.y + 0.5);
 });
 
