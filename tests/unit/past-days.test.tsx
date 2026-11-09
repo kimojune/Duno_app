@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { randomBytes, randomUUID } from "node:crypto";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { expectHeadButton } from "./confirm-helpers";
 import type { ManageApi } from "../../lib/manage-api";
@@ -60,8 +62,8 @@ describe("지난 날 보기 화면 (고침 3바퀴 PM 답 d-69 ⑦)", () => {
     expect(await screen.findByText("단어 외우기")).toBeTruthy();
     expect(fetchDay).toHaveBeenCalledWith("2026-11-06");
     expect(screen.getByText("11월 6일 금요일")).toBeTruthy();
-    expect(screen.getByText("끝냄")).toBeTruthy();
-    expect(screen.getByText("보기만 할 수 있어요.")).toBeTruthy();
+    expect(screen.getByText(/^끝냄:$/, { selector: ".sr-only" })).toBeTruthy(); // 끝냄 = 채운 원(그림) + 화면 읽기 글
+    expect(screen.queryByText("보기만 할 수 있어요.")).toBeNull(); // PM d-174 ①: 설명 글을 지웠다
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /적기|자세히|빼기/ })).toBeNull();
@@ -69,7 +71,7 @@ describe("지난 날 보기 화면 (고침 3바퀴 PM 답 d-69 ⑦)", () => {
   it("「이전 날」로 하루씩 거슬러 가고, 「다음 날」은 어제까지만(오늘·앞날은 못 본다)", async () => {
     const fetchDay = vi.fn(async (date: string): Promise<TodoResult<TodayTodos>> => ({ ok: true, data: { day: dayOf(date), todos: [] } }));
     render(<PastDays api={manageApi(fetchDay)} today={TODAY.date} onClose={vi.fn()} />);
-    await screen.findByText("그날 적은 할 일이 없어요.");
+    await screen.findByText("할 일 0개");
     const newer = screen.getByRole("button", { name: "다음 날" }) as HTMLButtonElement;
     expect(newer.disabled).toBe(true); // 어제가 가장 최근
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "이전 날" })));
@@ -102,6 +104,60 @@ describe("지난 날 보기 화면 (고침 3바퀴 PM 답 d-69 ⑦)", () => {
     const { container } = render(<PastDays api={manageApi(fetchDay)} today={TODAY.date} onClose={vi.fn()} />);
     expect(await screen.findByText(tagged)).toBeTruthy();
     expect(container.querySelector("b, img")).toBeNull();
+  });
+});
+
+describe("지난 날 (고침10 W2b — 148:56 · 148:95, PM d-173 · d-174 ①)", () => {
+  const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+  const withTodos = (todos: TodoItem[]) => vi.fn(async (date: string): Promise<TodoResult<TodayTodos>> => ({ ok: true, data: { day: dayOf(date), todos } }));
+
+  it("꼴: 머리 「‹」 → 이름표 「지난 날」(14 Medium 보조) → 날짜 24 Bold + 오른쪽 원 단추 둘(보이는 32 · 누름 48) → 할 일 카드 → 「이날 기록」 카드", async () => {
+    render(<PastDays api={manageApi(withTodos([todo(A, "단어 외우기", true)]))} today={TODAY.date} onClose={vi.fn()} />);
+    await screen.findByText("단어 외우기");
+    const dialog = screen.getByRole("dialog", { name: "지난 날" });
+    expectHeadButton(dialog, "back");
+    const order = ["#past-days-title", ".past-date", ".past-nav", ".past-todos", ".past-record"].map((q) => dialog.querySelector(q)!);
+    for (let i = 1; i < order.length; i += 1) expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${i}번째`).toBeTruthy();
+    expect(dialog.querySelector(".past-date")!.tagName).toBe("H3");
+    const [older, newer] = [...dialog.querySelectorAll(".past-nav .step-btn")] as HTMLButtonElement[];
+    expect([older.getAttribute("aria-label"), newer.getAttribute("aria-label")]).toEqual(["이전 날", "다음 날"]);
+    expect([older.textContent, newer.textContent]).toEqual(["‹", "›"]);
+    expect(newer.disabled).toBe(true); // 어제에서는 › 막힘
+    expect(css).toMatch(/\.past-title \{[^}]*font: 500 0\.875rem\/1\.25rem[^}]*color: var\(--color-text-sub\)/);
+    expect(css).toMatch(/\.past-date \{[^}]*font: var\(--font-title\)/); // 24 Bold
+    expect(css).toMatch(/\.step-btn-face \{[^}]*inline-size: 32px; block-size: 32px/);
+  });
+
+  it("할 일 카드: 끝냄 = 채운 원, 안 끝냄 = 빈 원. 카드 안에 누를 수 있는 것(버튼·링크·체크 칸·입력)이 0개, 「›」도 없다", async () => {
+    render(<PastDays api={manageApi(withTodos([todo(A, "끝낸 일", true), todo("b", "못 끝낸 일")]))} today={TODAY.date} onClose={vi.fn()} />);
+    await screen.findByText("끝낸 일");
+    const card = document.querySelector(".past-todos") as HTMLElement;
+    const dots = [...card.querySelectorAll(".past-dot")];
+    expect(dots.map((d) => d.classList.contains("is-done"))).toEqual([true, false]);
+    expect(card.querySelectorAll("button, a, input, textarea, select, [role=button], [role=checkbox], [tabindex]")).toHaveLength(0);
+    expect(card.textContent).not.toContain("›");
+    expect(within(card).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["끝냄: 끝낸 일", "안 끝냄: 못 끝낸 일"]);
+    // 누르거나 키보드로 눌러도 아무 일도 없다(끝냄 표시가 바뀌지 않는다)
+    fireEvent.click(within(card).getByText("못 끝낸 일"));
+    fireEvent.keyDown(within(card).getByText("못 끝낸 일"), { key: "Enter" });
+    fireEvent.keyDown(within(card).getByText("못 끝낸 일"), { key: " " });
+    expect([...card.querySelectorAll(".past-dot")].map((d) => d.classList.contains("is-done"))).toEqual([true, false]);
+    expect(css).toMatch(/\.past-dot\.is-done \{[^}]*background: var\(--color-primary\)/);
+  });
+
+  it("빈 날 = 카드 안 「할 일 0개」(14 보조색), 「이날 기록」 카드 = 그날 합계 숫자만(기록이 없으면 0분)", async () => {
+    const api = manageApi(withTodos([]));
+    api.fetchDayRecord = vi.fn(async (date: string) => ({ ok: true as const, data: { totalMinutes: date === "2026-11-06" ? 150 : null } }));
+    render(<PastDays api={api} today={TODAY.date} onClose={vi.fn()} />);
+    const empty = await screen.findByText("할 일 0개");
+    expect(empty.closest(".card-box")).toBeTruthy();
+    expect(empty.className).toContain("todo-sub");
+    const record = await screen.findByRole("region", { name: "이날 기록" });
+    expect(record.querySelector(".past-record-total")!.textContent).toBe("2시간 30분");
+    expect(api.fetchDayRecord).toHaveBeenCalledWith("2026-11-06");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "이전 날" })));
+    await waitFor(() => expect(screen.getByRole("region", { name: "이날 기록" }).querySelector(".past-record-total")!.textContent).toBe("0분"));
+    expect(api.fetchDayRecord).toHaveBeenLastCalledWith("2026-11-05");
   });
 });
 

@@ -1,4 +1,5 @@
 import { addNote, carryOverTodos, deleteNote, deleteTodo, editTodo, reorderTodos } from "../app/todos/manage-actions";
+import type { EveningState } from "./evening/types";
 import type { NoteItem } from "./notes/types";
 import type { RecordResult } from "./records/common";
 import type { TodayTodos, TodoDay, TodoItem, TodoResult } from "./todos/types";
@@ -22,6 +23,8 @@ export type ManageApi = {
   carryOver(items: { from: string; id: string }[]): Promise<TodoResult<{ todos: TodoItem[]; day: TodoDay }>>;
   /** 지난 날의 할 일 보기(보기만, 고침 3바퀴). 없으면 「지난 날 보기」를 그리지 않는다 */
   fetchDay?(date: string): Promise<TodoResult<TodayTodos>>;
+  /** 지난 날 「이날 기록」 카드의 합계(분, 고침10). 그날 남긴 오늘 기록이 없으면 null. 없으면 합계를 0으로 보인다 */
+  fetchDayRecord?(date: string): Promise<RecordResult<{ totalMinutes: number | null }>>;
 };
 
 const UNAVAILABLE = { ok: false, error: "unavailable" } as const;
@@ -60,4 +63,9 @@ export const defaultManageApi: ManageApi = {
   fetchYesterday: () => getJson("/todos/yesterday"),
   carryOver: (items) => safely(() => carryOverTodos(items)) as ReturnType<ManageApi["carryOver"]>,
   fetchDay: (date) => getJson(`/todos/day?date=${encodeURIComponent(date)}`),
+  // 새 서버 입구가 아니다: 오늘 기록 화면이 읽는 GET /evening?day=… 의 existing(그날 마지막 기록)에서 합계만 꺼낸다
+  fetchDayRecord: async (date) => {
+    const res = await getJson<RecordResult<EveningState>>(`/evening?day=${encodeURIComponent(date)}`);
+    return res.ok ? { ok: true, data: { totalMinutes: res.data.existing?.totalMinutes ?? null } } : res;
+  },
 };

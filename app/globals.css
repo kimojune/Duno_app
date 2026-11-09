@@ -1280,3 +1280,21 @@ select.input { appearance: auto; }
 .note-actions { justify-content: flex-end; margin-top: var(--space-1); }
 .note-add-btn { min-inline-size: 80px; min-block-size: 44px; padding: 0 var(--space-3); white-space: nowrap; }
 .detail-menu-scrim { position: fixed; inset: 0; z-index: 1; background: color-mix(in srgb, var(--color-text) 45%, transparent); } /* 「⋯」 메뉴 막: 화면 전체(58:92) */
+
+/* ---- 고침10 W2b 지난 날(148:56 · 148:95): 이름표 14 Medium 보조 → 날짜 24 Bold + 원 단추 ‹ › → 할 일 카드 → 이날 기록 카드. 보기만 ---- */
+.past-title { margin: var(--space-4) 0 0; font: 500 0.875rem/1.25rem var(--font-family); color: var(--color-text-sub); }
+.past-title:focus { outline: none; }
+.past-date-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: var(--space-1) 0 var(--space-4); }
+.past-date { margin: 0; min-width: 0; font: var(--font-title); overflow-wrap: anywhere; }
+.past-nav { display: flex; flex: none; margin-inline-end: -8px; }
+.past-card { margin: 0 0 var(--space-3); }
+.past-todos { list-style: none; padding: var(--space-1) var(--space-4); border-radius: var(--radius-card); background: var(--color-surface); }
+.past-todo { display: flex; align-items: flex-start; gap: var(--space-3); min-block-size: 48px; padding: var(--space-3) 0; font: var(--font-body); }
+.past-todo + .past-todo { border-top: 1px solid var(--color-divider); }
+.past-dot { flex: none; inline-size: 24px; block-size: 24px; margin-block: -2px; border: 2px solid var(--color-border-check); border-radius: 50%; background: transparent; } /* 안 끝냄 = 빈 원 */
+.past-dot.is-done { border-color: var(--color-primary); background: var(--color-primary); } /* 끝냄 = 채운 원 */
+.past-todo-text { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.past-empty { margin: 0; }
+.past-record { margin: 0; }
+.past-record-title { margin: 0; font: 500 0.875rem/1.25rem var(--font-family); color: var(--color-text-sub); }
+.past-record-total { margin: var(--space-1) 0 0; font: var(--font-title); }

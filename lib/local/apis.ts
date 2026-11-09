@@ -144,6 +144,11 @@ export function createLocalApis(runtime: Runtime): LocalApis {
       if (local) return local;
       return getJson(`/todos/day?date=${encodeURIComponent(date)}`);
     },
+    async fetchDayRecord(date) {
+      // 이날 기록 합계(고침10): 거울에서 오늘 기록 상태를 읽어 그날 마지막 기록의 합계만 쓴다
+      const state = deriveEveningState(mirror(), date, nowMs());
+      return state.ok ? { ok: true, data: { totalMinutes: state.data.existing?.totalMinutes ?? null } } : state;
+    },
   };
 
   const evening: EveningApi = {
