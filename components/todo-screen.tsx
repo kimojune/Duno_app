@@ -66,6 +66,8 @@ type LocalRow = {
   categoryId: string | null;
   /** 작업 기록이 하나라도 있나(고침9 PM 2-B 할 일 줄 아이콘) */
   hasNotes?: boolean;
+  /** 기기 먼저 저장: 서버가 아직 받지 않은 줄(보낼 줄에 「적기」가 남음). 끊긴 동안 「저장 대기」 원을 그린다(고침10, 128:87) */
+  pendingSave?: boolean;
 };
 
 /** 화면이 아는 분야 하나. name이 null이면 이름을 풀 수 없다(칩에 보이지 않고, 목록 표시는 「읽을 수 없는 분야」) */
@@ -332,7 +334,8 @@ export function TodoScreen({
     }
     loadedRef.current = true;
     setDay(read.todos.data.day);
-    setRows(read.todos.data.todos.map(fromItem));
+    const pending = local.pendingAddIds();
+    setRows(read.todos.data.todos.map((item) => ({ ...fromItem(item), pendingSave: pending.has(item.id) })));
     setList("ready");
   }, [local, applyCategories]);
 
@@ -402,7 +405,11 @@ export function TodoScreen({
   // 로그인이 풀려 보내지 못하는 상태를 화면에 알린다(보낼 줄은 기기에 남아 다시 로그인하면 이어서 보낸다)
   useEffect(() => {
     if (!local) return;
-    const sync = () => setSessionLost(local.isAuthLost());
+    // 보낼 줄이 바뀔 때(적은 글이 서버에 가서 줄이 빠질 때)도 줄의 「저장 대기」 원을 맞춘다
+    const sync = () => {
+      setSessionLost(local.isAuthLost());
+      applyLocalRead();
+    };
     let alive = true;
     void Promise.resolve().then(() => {
       if (alive) sync();
@@ -412,7 +419,7 @@ export function TodoScreen({
       alive = false;
       stop();
     };
-  }, [local]);
+  }, [local, applyLocalRead]);
 
   // 처음 불러오기: 서버 컴포넌트가 처음 목록을 넘기지 않았을 때만
   useEffect(() => {
@@ -1220,6 +1227,7 @@ export function TodoScreen({
     savingSlow: r.slow === true,
     failed: r.status === "failed",
     queued: r.status === "queued",
+    pending: r.pendingSave === true && !online, // 끊긴 동안만(연결된 채로는 곧 서버에 가므로 원이 깜박이지 않게)
     checkFailed: r.checkFailed,
     category: categoryText(r.categoryId),
     categoryColor: categoryColorOf(r.categoryId),

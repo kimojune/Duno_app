@@ -169,6 +169,8 @@ export type RowView = {
   failed: boolean;
   /** 오프라인으로 적어 기기에 둔 줄: 연결되면 저장한다(PRD 10절) */
   queued?: boolean;
+  /** 기기 먼저 저장: 서버가 아직 받지 않은 줄(끊긴 동안). 줄 오른쪽에 「저장 대기」 원만 그린다 — 「빼기」 단추는 없다(기기 보낼 줄은 빼지 않는다) */
+  pending?: boolean;
   checkFailed: boolean;
   /** 분야 표시 글(CategoryTag). null이면 기타라 붙이지 않는다. 풀 수 없는 분야는 TODO_TEXT.unreadableCategory */
   category?: string | null;
@@ -383,7 +385,7 @@ function Row({
   const tagId = `todo-tag-${row.id}`;
   const noteId = `todo-note-${row.id}`;
   // 저장 중·저장 못 한 줄은 서버에 아직 없다: 체크 칸은 보이되 눌러도 바뀌지 않고, 그 줄의 안내에 잇는다
-  const notSaved = row.saving || row.failed || row.queued === true;
+  const notSaved = row.saving || row.failed || row.queued === true || row.pending === true;
   const describedBy = [row.category ? tagId : null, row.hasNotes ? noteId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
   return (
     <li className="todo-row" id={`row-${row.id}`}>
@@ -438,7 +440,7 @@ function Row({
         )}
       </div>
       {/* 고침9: 저장 대기는 할 일 글 줄 세로 가운데, 줄 오른쪽에 16px 도는 원(글 「연결되면 저장해요」 대신) */}
-      {row.queued && <SavePending id={statusId} />}
+      {(row.queued || row.pending) && <SavePending id={statusId} />}
       {/* 저장된 줄에만, 줄 오른쪽 「›」(고침9 Figma 50:52 — 할 일 페이지로). 누름 48. 그림 글자라 접근 이름은 「자세히 보기: 할 일 글」 */}
       {onOpenDetail && !notSaved && (
         <div className="row-actions row-detail">

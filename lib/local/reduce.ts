@@ -82,7 +82,12 @@ export function applyOp(m: Mirror, queued: Pick<QueuedOp, "op" | "clientAt">): M
     }
     case "note.add": {
       const list = m.notes[op.todoId];
-      if (!list) return m; // 열어 보지 않은 할 일의 기록은 서버에서 받을 때 함께 온다
+      if (!list) {
+        // 기록 목록을 모르는 할 일(열어 보지 않았거나 끊겨서 못 읽음): 목록은 서버에서 받을 때 함께 온다. 다만 이 할 일에 기록이 생겼다는 표시만은 바로 남긴다
+        // (고침10: 안 남기면 거울을 다시 읽는 순간 할 일 줄의 종이 아이콘이 사라진다)
+        if (!m.todos.some((t) => t.id === op.todoId && t.hasNotes !== true)) return m;
+        return { ...m, todos: m.todos.map((t) => (t.id === op.todoId ? { ...t, hasNotes: true } : t)) };
+      }
       if (list.some((n) => n.id === op.id)) return m;
       const note: NoteItem = { id: op.id, todoId: op.todoId, day: dayOf(clientAt), createdAt: clientAt, readable: true, text: op.text };
       return { ...m, notes: { ...m.notes, [op.todoId]: [...list, note] } };

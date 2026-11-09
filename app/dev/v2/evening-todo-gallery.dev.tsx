@@ -62,6 +62,7 @@ function memoryTodos(categories: { id: string; name: string }[]): LocalTodos {
     addCategory: async () => ({ ok: false, error: "unavailable" }),
     refresh: () => {},
     isAuthLost: () => false,
+    pendingAddIds: () => new Set<string>(),
     flushBeforeSignOut: async () => 0,
     discard: async () => {},
   };
