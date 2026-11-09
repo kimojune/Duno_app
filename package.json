@@ -10,6 +10,7 @@
     "test:rls": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "notify:keys": "node scripts/notify-keys.mjs",
     "e2e": "playwright test",
     "screens": "playwright test --config playwright.screens.config.ts"
   },

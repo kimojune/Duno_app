@@ -4,7 +4,8 @@ const runNotifyTick = vi.fn();
 const createClient = vi.fn(() => ({ fakeAdmin: true }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => createClient(...(a as [])) }));
 vi.mock("../../lib/push/tick", () => ({ runNotifyTick: (...a: unknown[]) => runNotifyTick(...a) }));
-vi.mock("../../lib/push/send", () => ({ sendPushSignal: vi.fn() }));
+const sendPushSignal = vi.fn();
+vi.mock("../../lib/push/send", () => ({ sendPushSignal: (...a: unknown[]) => sendPushSignal(...a) }));
 
 import { GET, POST } from "../../app/api/notify/tick/route";
 
@@ -30,6 +31,7 @@ const call = (handler: typeof GET, secret?: string) =>
 beforeEach(() => {
   runNotifyTick.mockReset();
   createClient.mockClear();
+  sendPushSignal.mockReset();
   runNotifyTick.mockResolvedValue({ ok: true, data: { dueUsers: 1, sent: 1, gone: 0, failed: 0 } });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -103,5 +105,62 @@ describe("/api/notify/tick (알림 예약 실행 주소)", () => {
     const thrown = await call(POST, FULL_ENV.CRON_SECRET);
     expect(thrown.status).toBe(503);
     expect(JSON.stringify(await thrown.json())).not.toContain("secret");
+  });
+});
+
+// d-214: 예약 비밀 입구를 넓게 못 박는다(GET·POST 모두, 아무것도 안 불린다)
+describe("/api/notify/tick 예약 비밀 입구 (d-214)", () => {
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const nothingCalled = () => {
+    expect(createClient).not.toHaveBeenCalled();
+    expect(runNotifyTick).not.toHaveBeenCalled();
+    expect(sendPushSignal).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  };
+
+  it("서버 설정에 예약 비밀이 없거나·빈칸·공백뿐이면 어떤 값을 보내도 GET·POST 모두 401이고 아무것도 안 불린다", async () => {
+    for (const configured of ["", "   "]) {
+      setEnv({ ...FULL_ENV, CRON_SECRET: configured });
+      for (const handler of [GET, POST]) {
+        for (const sent of [undefined, "", " ", "   ", "anything", FULL_ENV.CRON_SECRET]) {
+          const res = await call(handler, sent);
+          expect(res.status).toBe(401);
+          expect(await res.json()).toEqual({ ok: false, error: "unauthorized" });
+        }
+      }
+    }
+    nothingCalled();
+  });
+  it("보낸 값이 없거나·빈칸·틀리거나·한 글자 더하거나 빼면 GET·POST 모두 401이고 아무것도 안 불린다", async () => {
+    setEnv(FULL_ENV);
+    const secret = FULL_ENV.CRON_SECRET;
+    const wrong = [undefined, "", " ", "wrong", secret + "x", secret.slice(1), secret.slice(0, -1), "x" + secret, secret.toUpperCase(), ` ${secret}`];
+    for (const handler of [GET, POST]) {
+      for (const sent of wrong) {
+        const res = await call(handler, sent);
+        expect(res.status).toBe(401);
+        expect(await res.json()).toEqual({ ok: false, error: "unauthorized" });
+      }
+      // Bearer 꼴이 아닌 머리글도 거절
+      for (const raw of [secret, `Basic ${secret}`, `bearer ${secret}`]) {
+        const res = await handler(new Request("http://localhost/api/notify/tick", { headers: { authorization: raw } }));
+        expect(res.status).toBe(401);
+      }
+    }
+    nothingCalled();
+  });
+  it("양성 대조: 맞는 비밀과 설정이면 실행하고 200이다(GET·POST 모두)", async () => {
+    setEnv(FULL_ENV);
+    for (const handler of [GET, POST]) {
+      const res = await call(handler, FULL_ENV.CRON_SECRET);
+      expect(res.status).toBe(200);
+    }
+    expect(runNotifyTick).toHaveBeenCalledTimes(2);
+    expect(createClient).toHaveBeenCalledTimes(2);
   });
 });
