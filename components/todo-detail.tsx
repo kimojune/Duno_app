@@ -23,7 +23,6 @@ import { Notice, SecondaryButton, TextButton } from "./ui";
 
 export const DETAIL_TEXT = {
   title: "할 일 자세히",
-  close: "닫기",
   editLabel: "할 일 글",
   // 고침9 PM 3(④-2, Figma 51:55 · 77:18): 칩 줄 대신 고른 분야 한 줄(색 원 + 이름 + 「›」). 누르면 분야 고르기 시트
   categoryLabel: "분야",

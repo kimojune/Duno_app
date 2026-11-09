@@ -318,7 +318,6 @@ button, input { font: inherit; color: inherit; }
   box-shadow: var(--edge-bar-top);
   padding: var(--space-2) var(--page-x) calc(var(--space-3) + env(safe-area-inset-bottom));
 }
-.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .sheet-label { display: block; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); } /* 고침10 C: 이름표 12 Regular 보조색 */
 /* 창 안 TextButton의 글자 가장자리를 위 글 줄에 맞춘다: 안 여백 12만큼 단추 상자를 바깥으로 민다(테두리 1은 남겨 포커스 고리가 창 가장자리에서 잘리지 않게. 누르는 면적은 줄지 않고 바깥으로 12 늘어남) */
 .todo-sheet .btn-flush-start { margin-inline-start: calc(-1 * var(--space-3)); }

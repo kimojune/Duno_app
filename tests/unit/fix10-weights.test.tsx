@@ -51,7 +51,7 @@ describe("고침10 C 단추 글 굵기 · 선", () => {
   it("이름표 .input-label · .sheet-label은 12 Regular 보조색(적는 창 머리 「할 일」은 창 제목이라 16 Bold 글색)", () => {
     expect(rule(".input-label")).toMatch(/font: 400 0\.75rem\/1rem var\(--font-family\); color: var\(--color-text-sub\);/);
     expect(rule(".sheet-label")).toMatch(/font: 400 0\.75rem\/1rem var\(--font-family\); color: var\(--color-text-sub\);/);
-    expect(CSS).toMatch(/\.todo-sheet \.(?:sheet-head|screen-head) \.sheet-label \{ font: var\(--font-body\); font-weight: 700; color: var\(--color-text\); \}/);
+    expect(CSS).toMatch(/\.todo-sheet \.screen-head \.sheet-label \{ font: var\(--font-body\); font-weight: 700; color: var\(--color-text\); \}/);
   });
 
   it("단추 글을 Regular(400)로 되돌리는 .btn 규칙이 없다(「저장」·「작업 기록 남기기」·「30분 시작」·확인 창)", () => {
