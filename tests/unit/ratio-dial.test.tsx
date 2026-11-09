@@ -901,3 +901,37 @@ describe("가운데 순서·12시 눈금 옵션(고침9 — 오늘 기록 나누
     expect(document.querySelector(".dial-center-big")!.textContent).toBe("3시간");
   });
 });
+
+describe("원형 다이얼: 손가락 끌기 스크롤 막기(보고 19절)", () => {
+  it("손잡이에서 시작한 touchstart만 preventDefault하고(passive 아님), 조각에서 시작한 터치는 그대로 둔다. 언마운트 때 리스너를 뗀다", () => {
+    const added: [string, EventListenerOrEventListenerObject, unknown][] = [];
+    const removed: [string, EventListenerOrEventListenerObject][] = [];
+    const add = vi.spyOn(SVGSVGElement.prototype, "addEventListener").mockImplementation(function (this: SVGSVGElement, type: string, fn: EventListenerOrEventListenerObject, opt?: unknown) {
+      added.push([type, fn, opt]);
+      return EventTarget.prototype.addEventListener.call(this, type, fn, opt as AddEventListenerOptions);
+    });
+    const remove = vi.spyOn(SVGSVGElement.prototype, "removeEventListener").mockImplementation(function (this: SVGSVGElement, type: string, fn: EventListenerOrEventListenerObject) {
+      removed.push([type, fn]);
+      return EventTarget.prototype.removeEventListener.call(this, type, fn);
+    });
+    try {
+      const { container, unmount } = render(<Harness initial={[40, 60]} seen={[]} />);
+      const touches = added.filter(([type]) => type === "touchstart");
+      expect(touches).toHaveLength(1);
+      expect(touches[0][2]).toEqual({ passive: false });
+      const fire = (el: Element) => {
+        const e = new Event("touchstart", { bubbles: true, cancelable: true });
+        el.dispatchEvent(e);
+        return e.defaultPrevented;
+      };
+      expect(fire(container.querySelector(".dial-handle .dial-ring")!), "손잡이 안에서 시작").toBe(true);
+      expect(fire(container.querySelector(".dial-slice")!), "조각에서 시작").toBe(false);
+      expect(fire(container.querySelector("svg.dial")!), "원 빈 곳에서 시작").toBe(false);
+      unmount();
+      expect(removed.filter(([type, fn]) => type === "touchstart" && fn === touches[0][1])).toHaveLength(1);
+    } finally {
+      add.mockRestore();
+      remove.mockRestore();
+    }
+  });
+});

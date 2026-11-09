@@ -24,7 +24,10 @@ import { dragBetween, skipZeroHandles, toTotal, type DialHandle } from "../lib/r
  * - 선택은 바깥이 가진다(selectedKey·onSelect). 목록에 없는 key는 「아무것도 안 고름」으로 읽는다(바깥 목록과 같게).
  * - 값은 합 total의 정수로 그린다. 합이 total이 아니면 합으로 나눠 그린다(처음 정한 비율은 RatioEditor가 열 때 합 100으로 맞춰 둔다).
  * - 끌기는 원 전체(svg)가 포인터를 잡는다: 끄는 동안 손잡이가 바뀌어도(폭 0 손잡이가 둘로 갈림) 끌기가 끊기지 않는다. 각도는 조금씩 더해 가므로 12시를 넘어도 뛰지 않는다.
- * - touch-action: none은 손잡이에만 있다(CSS .dial-handle와 아래 인라인 스타일). 원의 나머지와 화면은 손가락으로 스크롤된다.
+ * - 손가락 끌기(보고 19절): 손잡이 안에서 시작한 터치만 브라우저 스크롤을 막는다 — svg에 passive가 아닌 네이티브 touchstart 리스너를 달고,
+ *   대상이 손잡이(.dial-handle) 안이면 preventDefault한다(React onTouchStart는 passive라 preventDefault가 듣지 않는다). 원의 나머지와 화면은 손가락으로 스크롤된다.
+ *   손잡이의 touch-action: none(CSS .dial-handle·인라인 스타일)만으로는 모자랐다: SVG 안 <g>는 display가 inline이라 Chromium이 touch-action을 무시하고,
+ *   손가락이 조금 움직이면 화면을 스크롤하며 pointercancel을 보내 끌기가 끊겼다(안드로이드 Chrome). touch-action은 그대로 두어 다른 브라우저에 힌트로 남긴다.
  */
 
 export interface DialSlice {
@@ -225,6 +228,18 @@ export function RatioDial({
     const inDial = !active || active === document.body || active === svg.current || (svg.current?.contains(active) ?? false);
     if (el && inDial && active !== el) (el as unknown as HTMLElement).focus();
   });
+
+  /* 손잡이에서 시작한 터치만 스크롤을 막는다(머리 주석 「손가락 끌기」). 조각·가운데·다이얼 밖에서 시작한 터치는 그대로 스크롤된다. 언마운트 때 뗀다 */
+  const hasDial = n > 0;
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest(".dial-handle")) e.preventDefault();
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    return () => el.removeEventListener("touchstart", onTouchStart);
+  }, [hasDial]);
 
   function apply(next: number[]) {
     if (next.every((v, i) => v === raw[i])) return false;
