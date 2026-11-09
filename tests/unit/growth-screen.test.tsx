@@ -63,6 +63,7 @@ function growth(over: Partial<GrowthData> = {}): GrowthData {
     cumulative: [{ categoryId: C1, minutes: 900 }],
     loggedDaysThisWeek: 2,
     loggedDaysTotal: 10,
+    streakWeeks: 0,
     goal: null,
     goalText: null,
     ...over,
@@ -76,11 +77,18 @@ function fakeApi(data: GrowthData = growth(), over: Partial<GrowthApi> = {}): Gr
     ...over,
   };
 }
+/** 목표 비율 뷰가 그려질 때까지 기다린다(고침9: 카드 위 머리 줄 「이번 주 내 시간이 …」이 없어져 탭 패널로 기다린다) */
+const ratioPanel = () => screen.findByRole("tabpanel", { name: "목표 비율" });
 async function mount(api: GrowthApi, props: Partial<React.ComponentProps<typeof GrowthScreen>> = {}) {
   const onOpenCategory = vi.fn();
   const view = render(<GrowthScreen api={api} active activation={1} entry="self" onOpenCategory={onOpenCategory} {...props} />);
-  await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
+  await ratioPanel();
   return { onOpenCategory, ...view };
+}
+/** 기간 칩 하나(고침9)를 열고 기간을 고른다 */
+function pickPeriod(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: /^기간, / }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name }));
 }
 
 beforeEach(() => {
@@ -99,9 +107,13 @@ describe("상태보기 (7-4, ③)", () => {
     expect(screen.getByRole("tab", { name: "목표 비율" }).getAttribute("aria-selected")).toBe("true");
     const items = screen.getAllByRole("listitem").filter((li) => li.className === "growth-item");
     // 고침5: 분야 줄 = 이번 주 몫 / 목표 비율(전체 180분 → 어학 30분 17%, 기타 150분 83%). 기타는 목표 비율에 없어 %만
-    expect(items.map((li) => li.textContent)).toEqual(["어학17% / 목표 60%", "포트폴리오0% / 목표 40%", "기타83%"]);
+    // 고침9: 줄마다 끝에 「›」(화면 읽기에는 숨김) — 줄 단추 이름은 분야 이름과 값 그대로
+    expect(items.map((li) => li.textContent)).toEqual(["어학17% / 목표 60%›", "포트폴리오0% / 목표 40%›", "기타83%›"]);
+    expect(items.map((li) => li.querySelector("button")?.lastElementChild?.getAttribute("aria-hidden"))).toEqual(["true", "true", "true"]);
+    expect(screen.getByRole("button", { name: /^어학\s?17% \/ 목표 60%$/ })).toBeTruthy(); // 「›」는 이름에 들지 않는다
     expect(document.querySelector(".growth-card-total")?.textContent).toBe("3시간");
-    expect(screen.getByText("오늘 기록 2일")).toBeTruthy();
+    // 고침9: 카드 위 머리 줄 「오늘 기록 n일」은 없앴다(탭 바로 아래가 카드)
+    expect(screen.queryByText(/오늘 기록 \d+일/)).toBeNull();
   });
 
   it("「역량」·경고 말이 화면에 없다", async () => {
@@ -128,13 +140,18 @@ describe("상태보기 (7-4, ③)", () => {
     expect(items.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 없음", "목표 2시간", "목표 없음"]);
   });
 
-  it("기록이 하나도 없으면 안내 글(「오늘 기록」으로)과 목표 비율 띠 + 빈 띠 「0시간」, 머리는 「0시간」 · 칩 셋 · 「원그래프로 보기」(고침7 ②)", async () => {
+  it("기록이 하나도 없으면 목표 비율 띠 + 빈 띠 「0시간」 + 카드 안 「오늘 기록」, 머리는 「0시간」 · 기간 칩 「이번 주」 · 「원그래프로 보기」(고침7 ② · 고침9)", async () => {
     // 고침7: 쌓인 시간이 있으면 「총 시간」으로 시작하므로(경우 1, growth-views 시험) 여기는 쌓인 시간도 0인 사람(경우 2)
-    await mount(fakeApi(growth({ thisWeek: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0 })));
-    expect(screen.getByText("아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.")).toBeTruthy();
+    await mount(fakeApi(growth({ thisWeek: [], cumulative: [], loggedDaysThisWeek: 0, loggedDaysTotal: 0 })), { onOpenEvening: vi.fn() });
+    // 고침9(⑬ 20, PM d-143 가): 카드 밖 안내 글은 없앴다. 「오늘 기록」은 카드 안 끝
+    expect(document.body.textContent).not.toContain("아직 이번 주 오늘 기록이 없어요");
+    expect(document.querySelector(".growth-card .growth-evening-button")?.textContent).toBe("오늘 기록");
     expect(document.querySelector(".growth-band.is-empty")?.textContent).toBe("0시간");
     expect(document.querySelector(".growth-card-total")?.textContent).toBe("0시간");
-    expect(within(screen.getByRole("group", { name: "기간" })).getAllByRole("button").map((b) => b.textContent)).toEqual(["이번 주", "총 시간", "비교"]);
+    const chip = screen.getByRole("button", { name: "기간, 이번 주" });
+    expect(chip.getAttribute("aria-haspopup")).toBe("menu");
+    fireEvent.click(chip);
+    expect(screen.getAllByRole("menuitemradio").map((b) => b.textContent)).toEqual(["이번 주", "총 시간", "비교"]);
     expect(screen.getByRole("button", { name: "원그래프로 보기" })).toBeTruthy();
     expect(Array.from(document.querySelectorAll(".growth-band-cell")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
     expect(document.body.textContent).not.toContain("채울");
@@ -158,9 +175,11 @@ describe("상태보기 (7-4, ③)", () => {
 
   it("비교: 분야마다 이번 주·지난주·지난달·총 시간을 나란히(옛 「쌓인 것」), 지난주 대비 바뀐 시간", async () => {
     await mount(fakeApi());
-    fireEvent.click(screen.getByRole("button", { name: "비교" }));
-    const group = screen.getByRole("heading", { name: "분야마다 나란히" });
-    expect(group).toBeTruthy();
+    pickPeriod("비교");
+    // 고침9: 카드 위 머리 줄 「분야마다 나란히」는 없앴다. 칩이 지금 기간을 말한다
+    expect(screen.queryByRole("heading", { name: "분야마다 나란히" })).toBeNull();
+    expect(screen.getByRole("button", { name: "기간, 비교" })).toBeTruthy();
+    expect(document.querySelectorAll(".growth-list.is-compare .growth-item")).toHaveLength(3);
     const language = screen.getByRole("button", { name: /^어학/ });
     expect(within(language).getByText("이번 주").nextSibling?.textContent).toBe("30분");
     expect(within(language).getByText("지난주").nextSibling?.textContent).toBe("1시간");
@@ -213,7 +232,7 @@ describe("상태보기 (7-4, ③)", () => {
     expect(await screen.findByText("상태보기를 불러오지 못했어요.")).toBeTruthy();
     expect(api.recordView).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" })));
-    expect(await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" })).toBeTruthy();
+    expect(await ratioPanel()).toBeTruthy();
     expect(api.recordView).toHaveBeenCalledTimes(1);
   });
 
@@ -223,7 +242,8 @@ describe("상태보기 (7-4, ③)", () => {
     const { rerender, onOpenCategory } = await mount(api);
     rerender(<GrowthScreen api={api} active activation={2} entry="self" onOpenCategory={onOpenCategory} />);
     await act(async () => {});
-    expect(screen.getByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" })).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "목표 비율" })).toBeTruthy();
+    expect(document.querySelectorAll(".growth-item")).toHaveLength(3);
     expect(screen.queryByText("상태보기를 불러오지 못했어요.")).toBeNull();
   });
 
@@ -409,7 +429,7 @@ describe("AppShell의 탭", () => {
     const fetchMock = stubFetch();
     const { container } = render(<AppShell home={home} />);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
-    await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
+    await ratioPanel();
     expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith("/growth"))).toBe(true);
     await waitFor(() => expect(recordViewAction).toHaveBeenCalledTimes(1));
     expect(recordViewAction.mock.calls[0][0]).toMatchObject({ screen: "growth", entry: "self" });
@@ -424,7 +444,7 @@ describe("AppShell의 탭", () => {
     stubFetch();
     render(<AppShell home={home} />);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기" })));
-    await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
+    await ratioPanel();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: /^어학/ })));
     const dialog = await screen.findByRole("dialog", { name: "어학" });
     fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
@@ -450,7 +470,7 @@ describe("AppShell의 탭", () => {
     expect(document.querySelector(".after-save-row .after-save-name")?.textContent).toBe("어학");
     expect(document.body.textContent).not.toContain("채울");
     await act(async () => fireEvent.click(screen.getByRole("button", { name: /오늘 바뀐 분야별 시간/ })));
-    await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
+    await ratioPanel();
     expect(screen.queryByRole("dialog")).toBeNull(); // 저녁 기록 창은 닫혔다
     expect(screen.getByRole("button", { name: "상태보기" }).getAttribute("aria-current")).toBe("page");
     expect(recordViewAction.mock.calls.at(-1)?.[0]).toMatchObject({ screen: "growth", entry: "after_save" });

@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
  * 카드 머리 합계 옆의 작은 칩(보이는 면 높이 24, 11px, --radius-pill, 누름 영역 48). 누르면 기간 목록(이번 주 / 총 시간 / 비교)이 열린다.
  *
  * 메뉴 단추 꼴(WAI-ARIA APG Menu Button):
- * - 칩: aria-haspopup="menu" · aria-expanded · aria-controls(열렸을 때). 이름 = 「기간, {지금 기간}」(▾는 숨김)
+ * - 칩: aria-haspopup="menu" · aria-expanded · aria-controls(열렸을 때). 이름 = 「기간, {지금 기간}」(aria-label — 보이는 글 「이번 주」를 이름 안에 담는다, ▾는 숨김)
  * - 목록: role="menu", 항목 role="menuitemradio" + aria-checked(지금 기간). 열면 지금 기간 항목에 포커스
  * - 키보드: 칩에서 ↓·Enter·Space = 열기(지금 항목), ↑ = 열기(끝 항목). 목록에서 ↑↓ 옆 항목(끝에서 돌아감), Home·End 처음·끝,
  *   Enter·Space = 고르기(단추 눌림), Esc = 닫고 칩으로 포커스, Tab = 닫기(포커스는 다음 자리로)
@@ -106,11 +106,11 @@ export function PeriodMenu<P extends string>({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        aria-label={`${groupLabel}, ${labelOf(value)}`}
         onClick={() => (open ? close(false) : openAt(current))}
         onKeyDown={onChipKey}
       >
         <span className="growth-period-chip-face">
-          <span className="sr-only">{`${groupLabel}, `}</span>
           {labelOf(value)}
           <span className="growth-period-caret" aria-hidden="true">
             {" ▾"}

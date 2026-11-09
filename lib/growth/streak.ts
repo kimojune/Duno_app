@@ -11,7 +11,7 @@ import { addDays, weekStartFor } from "../week";
  * - 이번 주에 기록이 있으면 이번 주부터, 없으면 지난주부터 거꾸로 이어진 주를 센다. 이번 주는 아직 끝나지 않아서,
  *   월요일 아침에 기록이 아직 없다고 지난주까지의 연속이 바로 사라지지 않는다(끊김은 한 주를 통째로 비웠을 때).
  * - 오늘보다 뒤의 날·모양이 틀린 날은 세지 않는다.
- * - 계산은 기록 수에 대해 선형이다(주 시작을 한 번씩 모으고, 모은 주 수보다 많이 거슬러 가지 않는다).
+ * - 계산은 기록 수에 대해 선형이다(같은 날은 한 번만 풀고, 주 시작을 한 번씩 모으고, 모은 주 수보다 많이 거슬러 가지 않는다).
  */
 
 /** 연속 기록 줄을 보이는 가장 작은 주 수(명세 ⑦-9 「2주 이상일 때만」) */
@@ -23,9 +23,11 @@ export const STREAK_MIN_WEEKS = 2;
  * @returns 이어진 주 수(0 = 이어진 주 없음)
  */
 export function streakWeeks(today: string, loggedDays: Iterable<string>): number {
+  // 같은 날은 한 번만 날짜 계산을 한다(기록이 많아도 날짜 풀기는 서로 다른 날 수만큼)
+  const days = new Set<string>();
+  for (const day of loggedDays) if (typeof day === "string" && day <= today) days.add(day);
   const weeks = new Set<string>();
-  for (const day of loggedDays) {
-    if (typeof day !== "string" || day > today) continue;
+  for (const day of days) {
     try {
       weeks.add(weekStartFor(day));
     } catch {

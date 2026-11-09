@@ -52,14 +52,14 @@ afterEach(() => {
 
 describe("아래 탭 줄 높이 (B8·B9)", () => {
   it("탭 줄의 실제 높이를 재어 --tabbar-h에 넣고, 글자가 커져 두 줄이 되면 따라 바뀐다", async () => {
-    let height = 56;
+    let height = 64; // 고침9 A6: 한 줄 탭 줄 높이 64(Figma 50:185)
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       return { height: this.classList.contains("tabbar") ? height : 0 } as DOMRect;
     });
     const { container } = render(<AppShell home={home} />);
     await act(async () => {});
     const shell = container.querySelector<HTMLElement>(".app-shell")!;
-    expect(shell.style.getPropertyValue("--tabbar-h")).toBe("56px");
+    expect(shell.style.getPropertyValue("--tabbar-h")).toBe("64px");
     height = 104; // 200% 글자: 두 줄
     await act(async () => observed?.());
     expect(shell.style.getPropertyValue("--tabbar-h")).toBe("104px");
@@ -68,12 +68,12 @@ describe("아래 탭 줄 높이 (B8·B9)", () => {
   it("재기 전·아직 그려지지 않았을 때(0)는 한 줄 기준 값 + 안전 영역을 쓴다", async () => {
     const { container } = render(<AppShell home={home} />);
     await act(async () => {});
-    expect(container.querySelector<HTMLElement>(".app-shell")!.style.getPropertyValue("--tabbar-h")).toBe("calc(56px + env(safe-area-inset-bottom))");
+    expect(container.querySelector<HTMLElement>(".app-shell")!.style.getPropertyValue("--tabbar-h")).toBe("calc(64px + env(safe-area-inset-bottom))");
   });
 
   it("CSS: 탭 칸은 글에 밀려 넘치지 않고(min-width: 0) 글이 두 줄로 내려갈 수 있다. 스크롤 여백은 탭 줄 높이를 더한다", () => {
     expect(css).toMatch(/\.tabbar-item\s*\{[^}]*min-width:\s*0/);
-    expect(css).toMatch(/\.tabbar-btn\s*\{[^}]*min-height:\s*56px/); // 높이는 최소값이라 늘어날 수 있다
+    expect(css).toMatch(/\.tabbar-btn\s*\{[^}]*min-height:\s*64px/); // 높이는 최소값이라 늘어날 수 있다(고침9 A6: Figma 아래 탭 64)
     expect(css).toMatch(/\.tabbar-btn\s*\{[^}]*overflow-wrap:\s*anywhere/);
     expect(css).toMatch(/html\s*\{\s*scroll-padding-bottom:[^;]*var\(--tabbar-h/);
   });

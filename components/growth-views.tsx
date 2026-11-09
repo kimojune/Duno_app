@@ -164,7 +164,7 @@ export type EmptyViewProps = StatusViewProps & { zeroText: string };
 export function EmptyBands({ chart, text, periodName, zeroText }: EmptyViewProps) {
   if (chart.ratioEmpty) return null;
   return (
-    <div className="growth-graph" aria-hidden="true">
+    <div className="growth-graph is-empty" aria-hidden="true">
       <BandLine chart={chart} line={chart.ratio} empty={false} caption={text.ratioLine} kind="ratio" text={text} />
       <div className="growth-band-line">
         <span className="growth-line-caption">{periodName}</span>

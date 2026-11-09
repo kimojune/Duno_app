@@ -122,20 +122,23 @@ describe("상태보기 기록 없음의 「오늘 기록」 단추 (B17, 고침5
     cumulative: [],
     loggedDaysThisWeek: 0,
     loggedDaysTotal: 0,
+    streakWeeks: 0,
     goal: null,
     goalText: null,
   };
   const api = (data: GrowthData): GrowthApi =>
     ({ fetchGrowth: async () => ({ ok: true as const, data }), fetchCategoryPage: vi.fn(), recordView: vi.fn() }) as unknown as GrowthApi;
 
-  it("이번 주 기록이 없으면 빈 안내 아래에 단추가 보이고, 누르면 저녁 기록을 연다", async () => {
+  it("이번 주 기록이 없으면 카드 안 끝에 단추가 보이고(고침9: 카드 밖 빈 안내 글 없음), 누르면 저녁 기록을 연다", async () => {
     const onOpenEvening = vi.fn();
     await act(async () => {
       render(<GrowthScreen api={api(empty)} active activation={1} entry="self" onOpenCategory={() => {}} onOpenEvening={onOpenEvening} />);
     });
-    expect(screen.getByText(/아직 이번 주 오늘 기록이 없어요/)).toBeTruthy();
+    expect(screen.queryByText(/아직 이번 주 오늘 기록이 없어요/)).toBeNull();
     expect(screen.queryByRole("button", { name: "저녁 기록 남기기" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "오늘 기록" }));
+    const button = screen.getByRole("button", { name: "오늘 기록" });
+    expect(button.closest(".growth-card")).not.toBeNull();
+    fireEvent.click(button);
     expect(onOpenEvening).toHaveBeenCalledTimes(1);
   });
   it("기록이 있으면 단추가 없다", async () => {
