@@ -791,13 +791,18 @@ export const EVENING_ENTRY_LABEL = `${EVENING_TEXT.title} 남기기`;
 /** 할 일 화면 위에 얹는 오늘 기록 입구. 저녁(오후 6시~새벽 4시 전)에는 질문 글을 앞세운다 */
 export function EveningEntry({ onOpen }: { evening?: boolean; onOpen: () => void }) {
   return (
-    <section className="entry-card" aria-label={EVENING_TEXT.title}>
-      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만). 두 줄 글은 한 묶음, 단추는 오른쪽 한 줄 */}
-      <div className="entry-text">
-        <p className="entry-title">{EVENING_TEXT.title}</p>
-        <p className="todo-sub entry-ask">{EVENING_TEXT.askToday}</p>
-      </div>
-      <SecondaryButton onClick={onOpen}>{EVENING_ENTRY_LABEL}</SecondaryButton>
-    </section>
+    // 고침10 E(50:72): 카드 전체가 누름 — 오른쪽 「›」, 알약 「오늘 기록 남기기」는 없다. 화면 읽기 이름은 단추 이름(EVENING_ENTRY_LABEL) + 설명(질문 글)
+    <button type="button" id="evening-entry" className="entry-card entry-card-button" aria-label={EVENING_ENTRY_LABEL} aria-describedby="evening-entry-ask" onClick={onOpen}>
+      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만) */}
+      <span className="entry-text">
+        <span className="entry-title">{EVENING_TEXT.title}</span>
+        <span id="evening-entry-ask" className="todo-sub entry-ask">
+          {EVENING_TEXT.askToday}
+        </span>
+      </span>
+      <span className="entry-go" aria-hidden="true">
+        ›
+      </span>
+    </button>
   );
 }

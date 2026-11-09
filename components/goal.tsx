@@ -76,8 +76,12 @@ export function GoalLine({
   const goal = data.goal;
   const progress = goal ? goalProgress(goal, data.thisWeek) : null;
   return (
+    // 고침10 E(50:28): 흰 카드(테두리 없음) 한 줄 48 · 글 14 Bold · 오른쪽 「›」(꾸밈이라 화면 읽기에서 숨긴다)
     <button type="button" className="goal-line" onClick={() => onOpen(data)}>
-      {progress ? GOAL_TEXT.line(progress.targetMinutes, progress.doneMinutes) : GOAL_TEXT.set}
+      <span className="goal-line-text">{progress ? GOAL_TEXT.line(progress.targetMinutes, progress.doneMinutes) : GOAL_TEXT.set}</span>
+      <span className="goal-line-go" aria-hidden="true">
+        ›
+      </span>
     </button>
   );
 }

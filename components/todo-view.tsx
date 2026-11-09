@@ -30,7 +30,8 @@ import { Wordmark } from "./wordmark";
 
 export const TODO_TEXT = {
   title: "오늘",
-  logout: "로그아웃",
+  /** 고침10 E(50:52, d-173): 날짜 줄 오른쪽 원 단추 「‹」의 화면 읽기 이름(아이콘만 보인다). 「›」 하루 뒤는 없다 */
+  pastDays: "지난 날 보기",
   label: "할 일 적기",
   add: "적기",
   unreadable: "읽을 수 없는 할 일", // (임시)
@@ -38,9 +39,9 @@ export const TODO_TEXT = {
   // 고침9 ⑬ 9: 빈 목록 = 이름표 「예시」 + 흐린 예시 할 일 줄 둘(옛 「아래 단추를 눌러 적어 보세요.」 대신). 누를 수 없고 목록·개수에 안 섞인다
   exampleLabel: "예시",
   examples: [
-    // colorOrder: 분야 색 순서(0부터) — Figma 50:28의 점 색(어학 = 분야 색 2, 포트폴리오 = 분야 색 1)
+    // colorOrder: 분야 색 순서(0부터) — Figma 50:28의 점 색(어학 = 분야 색 2, 글쓰기 = 분야 색 1)
     { text: "토익 단어 50개", category: "어학", colorOrder: 1 },
-    { text: "포트폴리오 2장 고치기", category: "포트폴리오", colorOrder: 0 },
+    { text: "글 한 편 초고 쓰기", category: "글쓰기", colorOrder: 0 },
   ],
   /** 고침9 PM 2-B: 할 일 글 바로 뒤 종이 아이콘의 화면 읽기 이름(옛 글 「기록 있음」) */
   hasNotes: "작업 기록 있음",
@@ -193,6 +194,8 @@ export type TodoViewProps = {
   sessionLost: boolean;
   /** 로그인 풀림 안내에서 「저장 안 된 글 복사」를 보일지(복사할 글이 있는가, 12-5) */
   hasUnsaved: boolean;
+  /** 날짜 줄 오른쪽 원 단추 「‹」(지난 날 보기, d-173). 없으면 단추를 그리지 않는다(지난 날을 읽을 길이 없을 때) */
+  onOpenPast?: () => void;
   /** 로그아웃 확인 창(고침10 B)이 떠 있나 */
   logoutConfirm: boolean;
   /** 로그아웃을 걸었다(확인 창 「로그아웃 중」 막힘) */
@@ -232,7 +235,6 @@ export type TodoViewProps = {
   onRetry: (id: string) => void;
   onRemove: (id: string) => void;
   onReload: () => void;
-  onLogout: () => void;
   /** 확인 창 「로그아웃」. Promise면 끝날 때까지 확인 창이 막힌다 */
   onLogoutConfirm: () => void | Promise<unknown>;
   onLogoutCancel: () => void;
@@ -743,14 +745,20 @@ export function TodoView(props: TodoViewProps) {
 
   const header = (
     <header className="today-header">
-      <div>
-        <Wordmark className="today-wordmark" />
-        <h1 className="today-title">{TODO_TEXT.title}</h1>
+      <Wordmark className="today-wordmark" />
+      <h1 className="today-title">{TODO_TEXT.title}</h1>
+      {/* 고침10 E(50:52 · d-173): 머리의 「로그아웃」은 없다(로그아웃은 내 정보 한 곳). 날짜 줄 오른쪽에 원 단추 「‹」 하나 = 지난 날 보기
+          (보이는 원 32 · 누름 48 — 공통 .step-btn). 「›」 하루 뒤는 없다 */}
+      <div className="today-date-row">
         <p className="today-date">{dateLine}</p>
+        {props.onOpenPast && (
+          <button type="button" id="past-days-button" className="step-btn today-past-btn" aria-label={TODO_TEXT.pastDays} onClick={props.onOpenPast}>
+            <span className="step-btn-face" aria-hidden="true">
+              ‹
+            </span>
+          </button>
+        )}
       </div>
-      <TextButton id="logout-button" onClick={props.onLogout}>
-        {TODO_TEXT.logout}
-      </TextButton>
     </header>
   );
 

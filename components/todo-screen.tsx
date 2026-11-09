@@ -35,7 +35,7 @@ import {
 import { categoryColorValue } from "../lib/category-color";
 import { CarryOver } from "./carry-over";
 import { CloseConfirm } from "./close-confirm";
-import { PAST_DAYS_TEXT, PastDays } from "./past-days";
+import { PastDays } from "./past-days";
 import { Notice, TextButton } from "./ui";
 import { TodoDetail, type DetailCategoryAdd } from "./todo-detail";
 
@@ -176,7 +176,7 @@ export function TodoScreen({
   outbox?: Outbox;
   /** 원샷 v2(선택, A7): 로그아웃 직전에 부른다(이 기기의 푸시 구독을 거둔다). 3초 안에 끝나지 않아도 로그아웃은 진행한다 */
   onBeforeSignOut?: () => Promise<void>;
-  /** 원샷 v2(선택, B18): 1 이상으로 커질 때마다 머리 「로그아웃」을 누른 것과 같은 흐름을 시작한다(내 정보 맨 아래 단추가 건다) */
+  /** 원샷 v2(선택, B18): 1 이상으로 커질 때마다 로그아웃 흐름을 시작한다(내 정보 맨 아래 단추가 건다. 고침10: 머리 「로그아웃」은 없다) */
   logoutRequest?: number;
 }) {
   const initialTodos = initial?.todos;
@@ -1238,7 +1238,7 @@ export function TodoScreen({
 
   // 포커스가 있던 요소가 사라져도 body로 떨어뜨리지 않는다.
   // 요청된 곳(「빼기」의 이웃 줄, 「다시」의 그 줄, 할 일 칸, 「+ 분야」 등)이 앞서고, 없으면 할 일 칸 → 단추.
-  // 확인이 닫힐 때 포커스가 확인 안이나 body면 머리 「로그아웃」으로 보낸다. 요소가 사라진 그 커밋 안에서(layout) 옮긴다.
+  // 확인이 닫힐 때 포커스가 확인 안이나 body면 할 일 칸(창이 닫혔으면 「할 일 적기」 단추)으로 보낸다(고침10 E: 머리의 「로그아웃」은 없다). 요소가 사라진 그 커밋 안에서(layout) 옮긴다.
   useLayoutEffect(() => {
     const request = focusRequestRef.current;
     focusRequestRef.current = null;
@@ -1253,7 +1253,7 @@ export function TodoScreen({
       (target ?? fallback())?.focus();
     } else if (confirmWasOpenRef.current && !confirmOpen) {
       const active = document.activeElement;
-      if (!active || active === document.body) document.getElementById("logout-button")?.focus();
+      if (!active || active === document.body) (inputRef.current ?? document.getElementById("add-todo-button"))?.focus();
     }
     confirmWasOpenRef.current = confirmOpen;
   });
@@ -1297,7 +1297,7 @@ export function TodoScreen({
       onRetry={retry}
       onRemove={remove}
       onReload={reload}
-      onLogout={onLogout}
+      onOpenPast={manage?.fetchDay && list === "ready" ? () => setPastOpen(true) : undefined}
       onLogoutConfirm={doSignOut}
       onLogoutCancel={() => setLogoutConfirm(false)}
       onCopy={() => void copyUnsaved()}
@@ -1313,7 +1313,6 @@ export function TodoScreen({
             )}
             {topSlot}
             {manage && list === "ready" && <CarryOver api={manage} online={online || manage.localFirst === true} onCarried={onCarried} />}
-            {manage?.fetchDay && list === "ready" && <TextButton onClick={() => setPastOpen(true)}>{PAST_DAYS_TEXT.open}</TextButton>}
           </>
         ) : undefined
       }

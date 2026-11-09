@@ -384,7 +384,12 @@ describe("EveningEntry", () => {
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "오늘 기록 남기기" }));
     expect(onOpen).toHaveBeenCalled();
-    expect(screen.getByRole("region", { name: "오늘 기록" })).toBeTruthy();
+    // 고침10 E(50:72): 카드 전체가 하나의 단추(알약 「오늘 기록 남기기」는 없다). 이름 = 「오늘 기록 남기기」, 설명 = 질문 글, 오른쪽 「›」
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(document.querySelector(".entry-card .btn")).toBeNull();
+    const card = screen.getByRole("button", { name: "오늘 기록 남기기" });
+    expect(document.getElementById(card.getAttribute("aria-describedby")!)!.textContent).toBe("오늘 몇 시간 썼어요?");
+    expect(card.querySelector(".entry-go")?.textContent).toBe("›");
     rerender(<EveningEntry evening={false} onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy(); // 옛판은 낮에 숨김 — Figma 50:28 · 50:52는 늘 보임
     expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글

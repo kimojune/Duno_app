@@ -27,6 +27,7 @@ vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }) }));
 
 import { SAVE_TIMEOUT_MS, SAVING_HINT_DELAY_MS, TodoScreen } from "../../components/todo-screen";
+import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 
 const DAY: TodoDay = { date: "2026-11-05", year: 2026, month: 11, dayOfMonth: 5, weekday: 4 };
 const ID_A = "11111111-1111-4111-8111-111111111111";
@@ -71,7 +72,7 @@ function deferred<T>() {
 
 async function renderLoaded(todos: TodoItem[] = []) {
   fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos }));
-  render(<TodoScreen />);
+  render(<TodoScreenWithLogout />);
   await screen.findByText(/개 중 \d개 끝냄/);
 }
 
@@ -107,7 +108,7 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
   it("T1 불러오는 동안 목록 자리는 aria-busy, 뼈대는 aria-hidden이고, 끝나면 개수가 보인다", async () => {
     const d = deferred<TodoResult<{ day: TodoDay; todos: TodoItem[] }>>();
     fetchTodayTodos.mockReturnValue(d.promise);
-    const { container } = render(<TodoScreen />);
+    const { container } = render(<TodoScreenWithLogout />);
     expect(container.querySelector("main")?.getAttribute("aria-busy")).toBe("true");
     expect(container.querySelector(".todo-skeleton")?.getAttribute("aria-hidden")).toBe("true");
     d.resolve(ok({ day: DAY, todos: [item(ID_A, "첫 글")] }));
@@ -125,7 +126,7 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
     const example = screen.getByRole("region", { name: "예시" });
     expect(example.querySelectorAll("li")).toHaveLength(2);
     expect(example.textContent).toContain("토익 단어 50개");
-    expect(example.textContent).toContain("포트폴리오 2장 고치기");
+    expect(example.textContent).toContain("글 한 편 초고 쓰기");
     expect(example.querySelectorAll("button, input, a, [tabindex]")).toHaveLength(0);
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     // 흐림은 모양에만: 예시 글은 보조 글 색 클래스, 흐린 점은 opacity 규칙을 받는 클래스
@@ -157,14 +158,14 @@ describe("할 일 화면 (T1~T4, 풀 수 없는 행)", () => {
         todos: [item(ID_A, "멀쩡한 글"), { id: ID_B, readable: false, text: null, done: false, createdAt: "2026-11-05T02:00:00.000Z", categoryId: null }],
       }),
     );
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     expect(await screen.findByText("읽을 수 없는 할 일")).toBeTruthy();
     expect(screen.getByText("멀쩡한 글")).toBeTruthy();
   });
 
   it("T9 불러오기 실패는 role=alert와 「다시 불러오기」, 누르면 다시 불러온다", async () => {
     fetchTodayTodos.mockResolvedValueOnce(fail("unavailable"));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     const alert = await screen.findByText("할 일을 불러오지 못했어요.");
     expect(alert.closest("[role=alert]")).toBeTruthy();
     fetchTodayTodos.mockResolvedValueOnce(ok({ day: DAY, todos: [item(ID_A, "돌아온 글")] }));
@@ -374,7 +375,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
 
   it("T13 저장 못 한 글이 없으면 복사 단추와 「사라져요」 문장 없이 짧은 안내만", async () => {
     fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     const alert = await screen.findByText("로그인이 풀렸어요. 다시 로그인해 주세요.");
     expect(alert.closest("[role=alert]")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "저장 안 된 글 복사" })).toBeNull();
@@ -385,7 +386,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
   it("T16 칸에 글이 있으면 확인 창(고침10 B 「로그아웃할까요?」)을 먼저 보이고, 「계속 쓰기」면 사라지며, 비었으면 바로 로그아웃한다", async () => {
     await renderLoaded([]);
     write("적던 글");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     const dialog = confirmDialog(LOGOUT.title);
     expectConfirmShape(dialog, LOGOUT.top, LOGOUT.bottom);
     expect(dialog.getAttribute("aria-describedby")).toBeTruthy();
@@ -394,7 +395,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: LOGOUT.bottom }));
     expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
     expect(signOut).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     const top = within(confirmDialog(LOGOUT.title)).getByRole("button", { name: LOGOUT.top });
     fireEvent.click(top);
     fireEvent.click(top); // 연타해도 한 번
@@ -403,7 +404,7 @@ describe("로그인 풀림 (T13), 로그아웃 (T16)", () => {
 
     signOut.mockClear();
     write("");
-    fireEvent.click(screen.getAllByRole("button", { name: "로그아웃" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(signOut).toHaveBeenCalledTimes(1);
   });
 });
@@ -425,7 +426,7 @@ describe("다시 불러오기 (D10), 새 하루 (T15), 기기 저장 없음 (D6)
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(new Date("2026-11-05T18:59:00Z")); // 서울 11월 6일 03:59 → 두노 하루는 11월 5일
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "어제 글")] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
     expect(screen.getByText(/11월 5일/)).toBeTruthy();
     write("밤에 쓰던 글");
@@ -570,7 +571,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
 
   it("R1 확인 2: 처음부터 로그인이 풀렸으면 빈 문구·개수 없이 안내만 있고 머리 줄은 날짜만이다", async () => {
     fetchTodayTodos.mockResolvedValue(fail("unauthenticated"));
-    const { container } = render(<TodoScreen />);
+    const { container } = render(<TodoScreenWithLogout />);
     await screen.findByText("로그인이 풀렸어요. 다시 로그인해 주세요.");
     expect(screen.queryByText("오늘 적은 할 일이 없어요.")).toBeNull();
     expect(screen.queryByText("아래 칸에 적어 보세요.")).toBeNull();
@@ -610,7 +611,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     press();
     await findOneVisible("저장하지 못했어요.");
     expect(input().value).toBe("");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmDialog(LOGOUT.title)).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -620,7 +621,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
     addTodo.mockReturnValue(new Promise(() => {}));
     write("저장 중인 글");
     press();
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmDialog(LOGOUT.title)).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -628,7 +629,7 @@ describe("디자인 검토 1차 최우선 (R1·R2·R3·R11)", () => {
   it("R11 글자 수 넘음과 오프라인으로 막히면 도움말과 같은 글을 LiveRegion에도 넣는다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
     write("가".repeat(230));
     press();
@@ -657,7 +658,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
   it("R5 저장 실패와 체크 실패 안내를 LiveRegion에도 넣는다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [item(ID_A, "체크할 글")] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 안 될 글");
@@ -677,7 +678,7 @@ describe("디자인 검토 1차 권장 (R5·R6·L1)", () => {
   it("R6 15초 안에 답이 없으면 그 줄을 T7로 바꾸고, 「다시」는 같은 id이며, 늦은 성공이 오면 줄은 하나로 저장됨이 된다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
     const first = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
     addTodo.mockReturnValueOnce(first.promise);
@@ -744,7 +745,7 @@ describe("다듬기 1회차 P1 「저장하는 중」은 1초 뒤에만 보인�
   async function renderFake() {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
   }
   const hint = () => screen.getByText("저장하는 중");
@@ -830,30 +831,30 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     // 입력 칸만
     await renderLoaded([]);
     write("입력 칸에만 있는 글");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmBox()).toBeTruthy();
     cleanup();
 
     // 저장 중 줄만
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await screen.findByText(/개 중 \d개 끝냄/);
     addTodo.mockReturnValue(new Promise(() => {}));
     write("저장 중인 글");
     press();
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmBox()).toBeTruthy();
     cleanup();
 
     // 저장 못 한 줄만
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos: [] }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await screen.findByText(/개 중 \d개 끝냄/);
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
     await findOneVisible("저장하지 못했어요.");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmBox()).toBeTruthy();
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -870,13 +871,13 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(visibleTexts("저장하지 못했어요.")).toHaveLength(1); // 줄 안의 문구는 그대로
   });
 
-  it("③ 확인이 뜬 동안 목록은 inert(「빼기」에 닿지 않음). Esc = 「계속 쓰기」로 닫히면 초점은 머리 「로그아웃」, 그 뒤 실패 줄을 빼면 포커스가 다음 줄 체크 칸(없으면 입력 칸)", async () => {
+  it("③ 확인이 뜬 동안 목록은 inert(「빼기」에 닿지 않음). Esc = 「계속 쓰기」로 닫히면 초점은 연 단추(로그아웃 요청), 그 뒤 실패 줄을 빼면 포커스가 다음 줄 체크 칸(없으면 입력 칸)", async () => {
     await renderLoaded([item(ID_A, "서버에 있던 글")]);
     addTodo.mockResolvedValue(fail("unavailable"));
     write("저장 못 한 글");
     press();
     await findOneVisible("저장하지 못했어요.");
-    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    const logoutButton = screen.getByRole("button", { name: LOGOUT_REQUEST_NAME });
     logoutButton.focus();
     fireEvent.click(logoutButton);
     expect(confirmBox()).toBeTruthy();
@@ -900,7 +901,7 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     write("혼자 있는 글");
     press();
     await findOneVisible("저장하지 못했어요.");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
     await waitFor(() => expect(confirmBox()).toBeNull());
     expect(document.activeElement).toBe(input());
@@ -921,13 +922,13 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: "둘째 실패" }));
   });
 
-  it("④ 확인 안 「계속 쓰기」에 포커스가 있는 채 저장 중이던 줄이 저장되면 확인이 사라지고 포커스가 머리 「로그아웃」으로 간다", async () => {
+  it("④ 확인 안 「계속 쓰기」에 포커스가 있는 채 저장 중이던 줄이 저장되면 확인이 사라지고 포커스가 확인을 연 단추(내 정보의 로그아웃을 흉내 낸 요청 단추)로 돌아간다 — body로 떨어지지 않는다", async () => {
     await renderLoaded([]);
     const d = deferred<TodoResult<{ day: TodoDay; todo: TodoItem }>>();
     addTodo.mockReturnValue(d.promise);
     write("저장 중인 글");
     press();
-    const logoutButton = screen.getByRole("button", { name: "로그아웃" });
+    const logoutButton = screen.getByRole("button", { name: LOGOUT_REQUEST_NAME });
     logoutButton.focus(); // 브라우저는 누른 단추에 초점을 둔다(fireEvent.click은 옮기지 않는다)
     fireEvent.click(logoutButton);
     const cancel = within(confirmBox()!).getByRole("button", { name: LOGOUT.bottom });
@@ -935,13 +936,13 @@ describe("다듬기 1회차 P2 로그아웃 확인 정리와 포커스", () => {
     expect(document.activeElement).toBe(cancel);
     d.resolve(ok({ day: DAY, todo: item(addTodo.mock.calls[0][0], "저장 중인 글") }));
     await waitFor(() => expect(confirmBox()).toBeNull());
-    expect(document.activeElement).toBe(document.getElementById("logout-button"));
+    expect(document.activeElement).toBe(logoutButton);
   });
 
   it("입력 칸을 비우면 확인이 닫히고, 다시 글을 적어도 확인이 저절로 되살아나지 않는다", async () => {
     await renderLoaded([]);
     write("적던 글");
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(confirmBox()).toBeTruthy();
     write("");
     await waitFor(() => expect(confirmBox()).toBeNull());
@@ -955,7 +956,7 @@ describe("MO-17 LOW 고침", () => {
   async function renderFake(todos: TodoItem[] = []) {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     fetchTodayTodos.mockResolvedValue(ok({ day: DAY, todos }));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     await act(async () => {});
   }
 
@@ -1087,7 +1088,7 @@ describe("MO-17 LOW 고침", () => {
 
   it("사라지는 단추의 포커스: 「다시 불러오기」를 누르면 안내가 사라져도 포커스가 body가 아니라 「할 일 적기」 단추에 있다(창이 닫혀 있을 때)", async () => {
     fetchTodayTodos.mockResolvedValueOnce(fail("unavailable"));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     const reloadButton = await screen.findByRole("button", { name: "다시 불러오기" });
     fetchTodayTodos.mockReturnValueOnce(new Promise(() => {})); // 불러오는 중에 머문다
     reloadButton.focus();

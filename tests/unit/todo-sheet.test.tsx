@@ -30,6 +30,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 
 import { resetChipRowMemory } from "../../components/chip-scroller";
 import { CATEGORY_ADD_TIMEOUT_MS, SAVE_TIMEOUT_MS, TodoScreen } from "../../components/todo-screen";
+import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 import { TodoView, type TodoViewProps } from "../../components/todo-view";
 
 const DAY: TodoDay = { date: "2026-11-05", year: 2026, month: 11, dayOfMonth: 5, weekday: 4 };
@@ -82,7 +83,7 @@ function deferred<T>() {
 const added = (id: string, name: string): AddCategoryResult => ({ ok: true, data: { category: cat(id, name) } });
 
 function renderScreen(initial: TodayRead = read([])) {
-  return render(<TodoScreen initial={initial} />);
+  return render(<TodoScreenWithLogout initial={initial} />);
 }
 const openButton = () => screen.getByRole("button", { name: /^(할 일 적기|적던 글 이어 적기)$/ });
 const todoInput = () => screen.getByRole("textbox", { name: "할 일 적기" }) as HTMLInputElement;
@@ -195,11 +196,10 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
     expect(screen.getByRole("form", { name: "할 일 적기" })).toBeTruthy();
   });
 
-  it("포커스 순서(DOM 순서, 고침 4바퀴): 로그아웃 → 목록 → 창(닫기 → 할 일 칸 → 적기 → 칩 → + 분야)", () => {
+  it("포커스 순서(DOM 순서, 고침 4바퀴·고침10 E): 목록 → 창(닫기 → 할 일 칸 → 적기 → 칩 → + 분야)", () => {
     renderScreen(read([item(ID_A, "목록 글")]));
     open();
     const order = [
-      document.getElementById("logout-button")!,
       screen.getByRole("checkbox", { name: "목록 글" }),
       screen.getByRole("button", { name: "닫기" }),
       todoInput(),
@@ -263,7 +263,7 @@ describe("C1 기본(창 닫힘)·C5 창 열림", () => {
 describe("C2·C3·C4 목록 상태와 칩 줄(C9·C10·C11)", () => {
   it("C2 불러오는 중에도 단추로 적을 수 있고, 창의 칩 줄은 C9(「+ 분야」 없음), 이때 적은 할 일은 기타", async () => {
     fetchToday.mockReturnValue(new Promise(() => {}));
-    render(<TodoScreen />);
+    render(<TodoScreenWithLogout />);
     expect(document.querySelector(".todo-skeleton")).toBeTruthy();
     open();
     expect(screen.getByText("분야를 불러오는 중").getAttribute("role")).toBe("status");
@@ -280,7 +280,7 @@ describe("C2·C3·C4 목록 상태와 칩 줄(C9·C10·C11)", () => {
     const example = screen.getByRole("region", { name: "예시" });
     expect(within(example).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
       "예시: 토익 단어 50개분야 어학",
-      "예시: 포트폴리오 2장 고치기분야 포트폴리오",
+      "예시: 글 한 편 초고 쓰기분야 글쓰기",
     ]);
     expect(screen.queryByText("아래 단추를 눌러 적어 보세요.")).toBeNull();
     open();
@@ -1015,7 +1015,7 @@ describe("로그아웃 확인이 닫힌 창의 글도 센다 (D-125 ④, C-D9)",
     open();
     typeTodo("닫힌 창의 글");
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expectConfirmShape(confirmByTitle(LOGOUT.title), LOGOUT.top, LOGOUT.bottom);
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -1027,13 +1027,13 @@ describe("로그아웃 확인이 닫힌 창의 글도 센다 (D-125 ④, C-D9)",
     typeCategory("이름만");
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     leaveViaConfirm(); // 고침9 O-3
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     fireEvent.click(within(confirmByTitle(LOGOUT.title)).getByRole("button", { name: LOGOUT.bottom }));
     expect(signOut).not.toHaveBeenCalled();
     open();
     fireEvent.click(screen.getByRole("button", { name: "취소" })); // 새 분야 줄을 닫으면 이름은 버려진다
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
-    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME }));
     expect(signOut).toHaveBeenCalledTimes(1);
   });
 });
@@ -1253,7 +1253,6 @@ describe("C-D11 scroll-padding-bottom을 창 높이에 맞춰 다시 잰다(Todo
     onRetry: noop,
     onRemove: noop,
     onReload: noop,
-    onLogout: noop,
     onLogoutConfirm: noop,
     onLogoutCancel: noop,
     onCopy: noop,

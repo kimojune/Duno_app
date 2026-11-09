@@ -44,8 +44,8 @@ test("S2 할 일 · 빈 목록(50:28): 이름표 「예시」 + 예시 줄 둘, 
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText("토익 단어 50개");
   await expect(rows.nth(0)).toContainText("어학");
-  await expect(rows.nth(1)).toContainText("포트폴리오 2장 고치기");
-  await expect(rows.nth(1)).toContainText("포트폴리오");
+  await expect(rows.nth(1)).toContainText("글 한 편 초고 쓰기");
+  await expect(rows.nth(1)).toContainText("글쓰기");
   await expect(page.getByText("아래 단추를 눌러 적어 보세요.")).toHaveCount(0);
   await expect(example.locator("button, input, a")).toHaveCount(0);
   const sub = await tokenColor(page, "--color-text-sub");

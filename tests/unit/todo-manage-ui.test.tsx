@@ -549,14 +549,36 @@ describe("어제 못 끝낸 할 일 가져오기", () => {
     });
     render(<TodoScreen initial={initial([])} manage={api} />);
     fireEvent.click(await screen.findByRole("button", { name: "어제 못 끝낸 할 일 2개 보기" }));
-    const take = screen.getByRole("button", { name: "고른 0개 가져오기" }) as HTMLButtonElement;
-    expect(take.disabled).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox", { name: "어제 못 한 일 하나" }));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "고른 1개 가져오기" })));
+    // 고침10 E(148:108): 처음엔 모두 고른 채, 주 단추 「n개 가져오기」(막지 않는다), 설명 글 없음
+    expect((screen.getByRole("checkbox", { name: "어제 못 한 일 하나" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "어제 못 한 일 둘" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("button", { name: "2개 가져오기" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText(/오늘로 가져올 것을 골라요/)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "어제 못 한 일 둘" })); // 풀기
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "1개 가져오기" })));
     expect(api.carryOver).toHaveBeenCalledWith([{ from: y1.id, id: expect.stringMatching(/^[0-9a-f-]{36}$/) }]);
     // 오늘 목록에 붙었다(체크 칸)
     expect(screen.getByRole("checkbox", { name: "어제 못 한 일 하나" })).toBeTruthy();
     // 남은 후보는 하나
+    expect(screen.getByRole("button", { name: "어제 못 끝낸 할 일 1개 보기" })).toBeTruthy();
+  });
+
+  it("고침10 E: 모두 풀면 주 단추 자리에 글 「고른 할 일 없음」(단추 아님), 접기 글 단추는 그대로. 접은 줄은 카드 줄 + 「›」", async () => {
+    const y1 = item("aaaaaaa1-1111-4111-8111-111111111111", "어제 못 한 일 하나");
+    const api = fakeApi({ fetchYesterday: vi.fn(async () => ({ ok: true as const, data: { todos: [y1] } })) });
+    render(<TodoScreen initial={initial([])} manage={api} />);
+    const row = await screen.findByRole("button", { name: "어제 못 끝낸 할 일 1개 보기" });
+    expect(row.className).toContain("carry-row"); // 접힌 줄 = 카드 줄(알약 아님)
+    expect(row.querySelector(".carry-row-go")?.textContent).toBe("›");
+    fireEvent.click(row);
+    expect(screen.getByRole("button", { name: "1개 가져오기" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "어제 못 한 일 하나" })); // 모두 풀기
+    expect(screen.queryByRole("button", { name: /가져오기/ })).toBeNull();
+    const none = screen.getByText("고른 할 일 없음");
+    expect(none.tagName).toBe("P");
+    expect(none.closest("button")).toBeNull(); // 단추가 아니다
+    fireEvent.click(screen.getByRole("button", { name: "접기" }));
+    expect(screen.queryByText("고른 할 일 없음")).toBeNull();
     expect(screen.getByRole("button", { name: "어제 못 끝낸 할 일 1개 보기" })).toBeTruthy();
   });
 
@@ -568,8 +590,7 @@ describe("어제 못 끝낸 할 일 가져오기", () => {
     });
     render(<TodoScreen initial={initial([])} manage={api} />);
     fireEvent.click(await screen.findByRole("button", { name: /어제 못 끝낸 할 일 1개 보기/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "어제 못 한 일 하나" }));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "고른 1개 가져오기" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "1개 가져오기" })));
     expect(screen.getByText("가져오지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
     expect((screen.getByRole("checkbox", { name: "어제 못 한 일 하나" }) as HTMLInputElement).checked).toBe(true);
   });
