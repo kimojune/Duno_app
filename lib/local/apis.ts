@@ -23,6 +23,7 @@ import type { TodoItem, TodoResult } from "../todos/types";
 import { checkTodoText } from "../todos/validation";
 import { addDays } from "../week";
 import {
+  deriveCategoryDays,
   deriveEveningState,
   deriveFocusState,
   deriveGoalSummary,
@@ -225,6 +226,12 @@ export function createLocalApis(runtime: Runtime): LocalApis {
     async fetchCategoryPage(categoryId) {
       const key = categoryId ?? "other";
       const cached = categoryPageCache.get(key);
+      // 날짜별 시간(고침8)은 기기 사본의 오늘 기록에서 서버와 같은 규칙으로 다시 센다(보내지 않은 기록도 바로 보이게). 할 일 묶음은 서버 것 그대로
+      const withDevice = (res: Awaited<ReturnType<GrowthApi["fetchCategoryPage"]>>): typeof res => {
+        if (!res.ok) return res;
+        const days = deriveCategoryDays(mirror(), categoryId, res.data.days);
+        return days ? { ok: true, data: { ...res.data, days } } : res;
+      };
       const fresh = getJson<Awaited<ReturnType<GrowthApi["fetchCategoryPage"]>>>(`/category?id=${encodeURIComponent(key)}`).then((res) => {
         if (res.ok) categoryPageCache.set(key, res);
         return res;
@@ -232,9 +239,9 @@ export function createLocalApis(runtime: Runtime): LocalApis {
       // 열어 본 적이 있으면 그것을 먼저 보여 주고 뒤에서 새로 받아 둔다(다음에 열 때 새것). 처음이면 서버를 기다린다
       if (cached && cached.ok) {
         void fresh;
-        return cached;
+        return withDevice(cached);
       }
-      return fresh;
+      return fresh.then(withDevice);
     },
     async recordView(input) {
       runtime.enqueue({ kind: "view.record", id: input.id, screen: input.screen, entry: input.entry });

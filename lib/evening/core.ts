@@ -188,6 +188,25 @@ export async function saveEveningLogForUser(deps: EveningDeps, input: unknown): 
 }
 
 /**
+ * 분야 페이지 날짜별 시간(원샷 v2 고침8)이 쓰는 읽기. 세션 확인은 부르는 쪽(readCategoryPage)이 이미 했고, userId는 그 세션의 user id다.
+ * user_id로 거른다(앱 코드 필터 + RLS 두 겹). fromDay가 있으면 그 날부터, 최근 것부터 limit행. 날마다 가장 늦은 것(latestPerDay)으로 돌려준다.
+ */
+export async function readLatestLogsForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  opts: { fromDay?: string | null; limit: number },
+): Promise<RecordResult<EveningLog[]>> {
+  let query = supabase.from("evening_logs").select(LOG_COLUMNS).eq("user_id", userId);
+  if (opts.fromDay) {
+    if (!isDayString(opts.fromDay)) return recordFail("invalid_input");
+    query = query.gte("target_day", opts.fromDay);
+  }
+  const { data, error } = await query.order("target_day", { ascending: false }).order("saved_at", { ascending: false }).limit(opts.limit);
+  if (error) return recordFail(mapRecordDbError(error));
+  return { ok: true, data: latestPerDay(((data ?? []) as LogRow[]).map(toLog)) };
+}
+
+/**
  * 최근 날들의 저녁 기록(날마다 가장 늦게 저장한 것). 상태보기가 쓴다. from은 그 날부터(포함).
  * 임시: 최근 것부터 최대 2000행을 읽는다(넘으면 가장 오래된 기록이 빠진다). 쌓이면 SQL 집계로 옮긴다.
  */

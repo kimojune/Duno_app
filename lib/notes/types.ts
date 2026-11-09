@@ -12,7 +12,11 @@ export type CategoryPageTodo = {
   done: boolean;
   notes: NoteItem[];
 };
-export type CategoryPageDay = { day: string; todos: CategoryPageTodo[] };
+/**
+ * minutes = 그날 가장 늦은 오늘 기록에서 이 분야 분(없으면 0, 고침8). 날짜 목록은 할 일이 있는 날 ∪ 이 분야 시간이 있는 날이라
+ * 시간만 있는 날은 todos가 빈 목록이다
+ */
+export type CategoryPageDay = { day: string; minutes: number; todos: CategoryPageTodo[] };
 
 /** categoryId가 null이면 「기타」 페이지 */
 export type CategoryPageData = { categoryId: string | null; days: CategoryPageDay[] };

@@ -130,7 +130,8 @@ export function GrowthScreen({
   /** 탭을 열 때마다 하나씩 커지는 값(열 때마다 다시 읽고 본 것을 한 번 남긴다) */
   activation: number;
   entry: ViewEntry;
-  onOpenCategory: (categoryId: string | null, name: string) => void;
+  /** 분야를 누르면. growth = 지금 그린 GrowthData(분야 페이지 요약 카드가 새 서버 호출 없이 쓴다, 고침8) */
+  onOpenCategory: (categoryId: string | null, name: string, growth: GrowthData) => void;
   /** 이번 주 기록이 없을 때 빈 자리의 「오늘 기록」(B17). 없으면 단추를 그리지 않는다 */
   onOpenEvening?: () => void;
   /** 목표를 세우지 않은 주의 이번 주 목표 뷰 「이번 주 목표 정하기」. 없으면 단추를 그리지 않는다 */
@@ -286,9 +287,9 @@ export function GrowthScreen({
           </div>
           <div className="growth-body" role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
             {tab === "goal" ? (
-              <GoalPanel data={data} onOpenCategory={onOpenCategory} onOpenEvening={onOpenEvening} onOpenGoal={onOpenGoal} />
+              <GoalPanel data={data} onOpenCategory={(id, name) => onOpenCategory(id, name, data)} onOpenEvening={onOpenEvening} onOpenGoal={onOpenGoal} />
             ) : (
-              <RatioPanel data={data} pref={pref} choose={choose} onOpenCategory={onOpenCategory} onOpenEvening={onOpenEvening} />
+              <RatioPanel data={data} pref={pref} choose={choose} onOpenCategory={(id, name) => onOpenCategory(id, name, data)} onOpenEvening={onOpenEvening} />
             )}
           </div>
         </>

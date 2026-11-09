@@ -37,6 +37,27 @@ const CAT_WORK = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CAT_GYM = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const CAT_CS = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
+/**
+ * 화면에 보이는 글만 센다(화면 읽기용 안내 영역 .sr-only는 뺀다 — todo-offline.test.tsx와 같은 방식, 고침8 검토).
+ * 실패·끊김 안내는 보이는 줄과 안내 영역이 같은 글을 담는데, 안내 영역은 announce(…, { again: true })가 비운 뒤 100ms 뒤에 채운다.
+ * 그래서 시험이 빠르면 한 곳, 느리면(전체 시험이 몰려 도는 때) 두 곳에서 잡혀 getByText가 「여러 개」로 가끔 실패했다.
+ * 보이는 줄은 정확히 하나여야 한다(개수를 단언한다). 「없다」도 보이는 줄 0개로 센다: 안내 영역은 앞서 알린 글을 늦게 채워 남겨 두므로
+ * (그 내용은 liveText()로 따로 본다) 전체 queryByText(…).toBeNull()은 느린 실행에서만 걸렸다(todo-offline.test.tsx 131줄과 같은 방식).
+ */
+function visibleTexts(text: string): HTMLElement[] {
+  return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
+}
+/** 보이는 줄이 정확히 하나일 때 그것 */
+function oneVisible(text: string): HTMLElement {
+  const found = visibleTexts(text);
+  expect(found).toHaveLength(1);
+  return found[0];
+}
+/** 보이는 줄이 정확히 하나가 될 때까지 기다린다(findByText 대신) */
+async function findOneVisible(text: string): Promise<HTMLElement> {
+  await waitFor(() => expect(visibleTexts(text)).toHaveLength(1));
+  return visibleTexts(text)[0];
+}
 function cat(id: string, name: string): CategoryItem {
   return { id, readable: true, name, createdAt: "2026-11-01T00:00:00.000Z" };
 }
@@ -345,7 +366,7 @@ describe("C6 분야 고름·C7 적은 뒤 (D-125 ①)", () => {
     fireEvent.click(chip("취업 준비"));
     typeTodo("이력서 고치기");
     pressWrite();
-    await screen.findByText("저장하지 못했어요.");
+    await findOneVisible("저장하지 못했어요.");
     addTodo.mockReturnValueOnce(new Promise(() => {}));
     fireEvent.click(screen.getByRole("button", { name: "다시" }));
     expect(addTodo.mock.calls[1]).toEqual([addTodo.mock.calls[0][0], "이력서 고치기", CAT_WORK]);
@@ -763,7 +784,7 @@ describe("C21 오프라인·C22·C23 긴 글과 이름·C24 칩 줄", () => {
     expect(addCategory).not.toHaveBeenCalled();
     expect(screen.getByText("인터넷에 연결되면 분야를 더할 수 있어요. 적은 이름은 그대로 있어요.").getAttribute("role")).toBe("status");
     expect(newCategoryInput().value).toBe("자격증");
-    expect(screen.getByText("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
+    expect(oneVisible("인터넷 연결이 끊겼어요. 연결되면 적고 끝냄 표시를 할 수 있어요.").closest("[role=status]")).toBeTruthy();
   });
 
   it("C22 분야 표시가 붙은 200자 할 일: 표시는 글 아래(DOM 순서), 줄바꿈 클래스", () => {
@@ -931,7 +952,7 @@ describe("악용 시나리오(화면 쪽)", () => {
     fireEvent.click(chip("운동"));
     typeTodo("남의 분야로 보내진 글");
     pressWrite();
-    expect(await screen.findByText("저장하지 못했어요.")).toBeTruthy();
+    await findOneVisible("저장하지 못했어요.");
     expect(screen.getByText("남의 분야로 보내진 글")).toBeTruthy();
   });
 

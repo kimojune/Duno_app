@@ -350,9 +350,10 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     const onOpenCategory = vi.fn();
     const { container } = await mount(fakeApi(spec()), { onOpenCategory });
     fireEvent.click(within(items(container)[1]).getByRole("button"));
-    expect(onOpenCategory).toHaveBeenCalledWith(G2, "포트폴리오");
+    // 고침8: 지금 그린 GrowthData도 같이 넘긴다(분야 페이지 요약 카드가 새 서버 호출 없이 쓴다)
+    expect(onOpenCategory).toHaveBeenCalledWith(G2, "포트폴리오", spec());
     fireEvent.click(within(items(container)[4]).getByRole("button"));
-    expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타");
+    expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타", spec());
   });
 
   it("목표를 세우지 않은 주에 이 탭을 고르면 카드 하나 안에 위→아래 이름표 「예시」 → 흐린 막대 둘 → 「분야마다 시간 · 1시간 단위」 → 「이번 주 목표 정하기」(카드 끝, 고침6 ②), 누르면 목표 창을 연다", async () => {

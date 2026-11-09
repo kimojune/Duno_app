@@ -26,6 +26,7 @@ import type { ViewEntry } from "../lib/views/core-types";
 import type { GoalSummary } from "../lib/goals/types";
 import { useTabbarHeight } from "../lib/use-tabbar-height";
 import { CategoryPage } from "./category-page";
+import type { GrowthData } from "../lib/growth/types";
 import { EveningEntry, EveningRecord } from "./evening-record";
 import { GoalEditor, GoalLine } from "./goal";
 import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
@@ -278,7 +279,7 @@ function MainShell({
   // 예전 방식(기기 먼저 저장이 꺼짐): 오늘 기록의 「오늘 할 일」 시트가 서버에 쓴 뒤 할 일 탭이 다시 읽게 한다(고침 5바퀴)
   const [todoRefresh, setTodoRefresh] = useState(0);
   const [meCategories, setMeCategories] = useState<Entry[] | null>(null);
-  const [category, setCategory] = useState<{ id: string | null; name: string } | null>(null);
+  const [category, setCategory] = useState<{ id: string | null; name: string; growth: GrowthData } | null>(null);
   // 오늘 먼저 할 일 카드(⑤): 앱을 열 때 한 번 건네받는다. 반응이 없는(new) 것만 보인다
   const [cardOffer, setCardOffer] = useState<Offer | null>(null);
   // 카드 제시를 처음 받기 전에는 카드 자리를 비워 둔다(B16)
@@ -454,7 +455,7 @@ function MainShell({
           active={tab === "growth"}
           activation={growthActivation}
           entry={growthEntry}
-          onOpenCategory={(id, name) => setCategory({ id, name })}
+          onOpenCategory={(id, name, growth) => setCategory({ id, name, growth })}
           onOpenEvening={() => setEveningOpen(true)}
           onOpenGoal={(d) => setGoalEditor({ weekStart: d.weekStart, goal: d.goal?.items ?? null, thisWeek: d.thisWeek, categories: d.categories })}
           refreshKey={goalVersion}
@@ -556,7 +557,7 @@ function MainShell({
           onSaved={() => setGoalVersion((n) => n + 1)}
         />
       )}
-      {category && <CategoryPage api={local ? local.apis.growth : defaultGrowthApi} categoryId={category.id} name={category.name} onClose={() => setCategory(null)} />}
+      {category && <CategoryPage api={local ? local.apis.growth : defaultGrowthApi} categoryId={category.id} name={category.name} growth={category.growth} onClose={() => setCategory(null)} />}
     </div>
   );
 }

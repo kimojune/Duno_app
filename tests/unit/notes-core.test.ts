@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addNoteForUser, checkNoteText, deleteNoteForUser, listNotesForTodo, NOTE_MAX_LENGTH, readCategoryPage } from "../../lib/notes/core";
+import { addNoteForUser, CATEGORY_PAGE_TODO_LIMIT, checkNoteText, deleteNoteForUser, listNotesForTodo, NOTE_MAX_LENGTH, readCategoryPage } from "../../lib/notes/core";
 import { decryptTodoText, encryptCategoryName, encryptTodoText, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
 
@@ -175,5 +175,146 @@ describe("readCategoryPage (분야 페이지)", () => {
     const client = fakeTablesClient(store, { sub: ME });
     expect(await readCategoryPage({ supabase: client, key: KEY }, "x")).toEqual({ ok: false, error: "invalid_input" });
     expect(await readCategoryPage({ supabase: client, key: KEY }, undefined)).toEqual({ ok: false, error: "invalid_input" });
+  });
+});
+
+describe("readCategoryPage 날짜별 시간(고침8): 오늘 기록을 세션 user id로만 읽는다", () => {
+  const OCAT = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const seedLog = (store: FakeStore, user: string, targetDay: string, savedAt: string, items: { categoryId: string | null; minutes: number }[]) =>
+    store.seed("evening_logs", { user_id: user, target_day: targetDay, total_minutes: items.reduce((s, i) => s + i.minutes, 0), items, save_mode: "edited", saved_at: savedAt, client_saved_at: null });
+
+  it("정상: 그날 가장 늦은 기록의 이 분야 분, 시간만 있는 날도 날짜에 든다(최근 날 먼저)", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "단어", "2026-11-06", CAT);
+    seedTodo(T2, "듣기", "2026-11-04", CAT);
+    seedLog(store, ME, "2026-11-06", "2026-11-06T10:00:00.000Z", [{ categoryId: CAT, minutes: 30 }]);
+    seedLog(store, ME, "2026-11-06", "2026-11-06T13:00:00.000Z", [{ categoryId: CAT, minutes: 90 }, { categoryId: null, minutes: 20 }]);
+    seedLog(store, ME, "2026-11-05", "2026-11-05T13:00:00.000Z", [{ categoryId: CAT, minutes: 45 }]);
+    const client = fakeTablesClient(store, { sub: ME });
+    const page = await readCategoryPage({ supabase: client, key: KEY }, CAT);
+    expect(page.ok).toBe(true);
+    if (!page.ok) return;
+    expect(page.data.days.map((d) => [d.day, d.minutes, d.todos.map((t) => t.id)])).toEqual([
+      ["2026-11-06", 90, [T1]],
+      ["2026-11-05", 45, []],
+      ["2026-11-04", 0, [T2]],
+    ]);
+    // 기타 페이지는 categoryId null의 분
+    const other = await readCategoryPage({ supabase: client, key: KEY }, null);
+    expect(other.ok && other.data.days.map((d) => [d.day, d.minutes])).toEqual([["2026-11-06", 20]]);
+  });
+
+  it("남의 오늘 기록 행은 RLS가 꺼져 있어도(앱 필터만으로) minutes에 섞이지 않고, 쿼리는 세션 user id로 거른다", async () => {
+    const { store, seedTodo } = setup();
+    store.rules.evening_logs = { ...store.rules.evening_logs, noUser: true }; // RLS 없이 앱 코드 필터만 남긴 상태
+    seedTodo(T1, "단어", "2026-11-06", CAT);
+    seedLog(store, ME, "2026-11-06", "2026-11-06T10:00:00.000Z", [{ categoryId: CAT, minutes: 30 }]);
+    // 남의 기록: 같은 날 더 늦게 저장(가장 늦은 것을 빼앗으면 안 된다) + 내 분야 번호를 적은 행 + 다른 날
+    seedLog(store, OTHER, "2026-11-06", "2026-11-06T23:00:00.000Z", [{ categoryId: CAT, minutes: 600 }]);
+    seedLog(store, OTHER, "2026-11-03", "2026-11-03T23:00:00.000Z", [{ categoryId: CAT, minutes: 300 }]);
+    const client = fakeTablesClient(store, { sub: ME });
+    const page = await readCategoryPage({ supabase: client, key: KEY }, CAT);
+    expect(page.ok && page.data.days.map((d) => [d.day, d.minutes])).toEqual([["2026-11-06", 30]]);
+    const logCalls = store.calls.filter((c) => c.table === "evening_logs" && c.op === "select");
+    expect(logCalls.length).toBe(1);
+    expect(logCalls[0].filters).toContainEqual(["eq", "user_id", ME]);
+    expect(logCalls[0].filters.some(([op, col, val]) => col === "user_id" && (op !== "eq" || val !== ME))).toBe(false);
+  });
+
+  it("남의 분야 번호: 지금과 같이 빈 결과(할 일 없음, 남의 기록 분 없음). 세션이 없으면 읽지 않는다", async () => {
+    const { store, seedTodo } = setup();
+    store.rules.evening_logs = { ...store.rules.evening_logs, noUser: true };
+    store.seed("categories", { id: OCAT, user_id: OTHER, name_encrypted: encryptCategoryName("남의 분야", OTHER, KEY!), archived_at: null });
+    seedTodo("55555555-5555-4555-8555-555555555555", "남의 할 일", "2026-11-06", OCAT, OTHER);
+    seedLog(store, OTHER, "2026-11-06", "2026-11-06T23:00:00.000Z", [{ categoryId: OCAT, minutes: 240 }]);
+    seedLog(store, ME, "2026-11-06", "2026-11-06T10:00:00.000Z", [{ categoryId: CAT, minutes: 30 }]);
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, OCAT);
+    expect(page).toEqual({ ok: true, data: { categoryId: OCAT, days: [] } });
+    const before = store.calls.length;
+    const anon = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: null }), key: KEY }, CAT);
+    expect(anon.ok).toBe(false);
+    expect(store.calls.slice(before).some((c) => c.table === "evening_logs")).toBe(false);
+  });
+
+  it("범위: 할 일을 상한(500)까지 읽으면 그 가장 오래된 날 앞의 기록은 읽지 않는다(gte 필터), 상한 밑이면 날짜 필터 없음", async () => {
+    const { store, seedTodo } = setup();
+    for (let i = 0; i < CATEGORY_PAGE_TODO_LIMIT; i += 1) seedTodo(`${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`, `일 ${i}`, "2026-11-06", CAT);
+    seedLog(store, ME, "2026-11-06", "2026-11-06T10:00:00.000Z", [{ categoryId: CAT, minutes: 30 }]);
+    seedLog(store, ME, "2026-11-01", "2026-11-01T10:00:00.000Z", [{ categoryId: CAT, minutes: 50 }]);
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, CAT);
+    expect(page.ok && page.data.days.map((d) => [d.day, d.minutes])).toEqual([["2026-11-06", 30]]);
+    const logCall = store.calls.filter((c) => c.table === "evening_logs").at(-1)!;
+    expect(logCall.filters).toContainEqual(["gte", "target_day", "2026-11-06"]);
+
+    const small = setup();
+    small.seedTodo(T1, "단어", "2026-11-06", CAT);
+    seedLog(small.store, ME, "2026-11-01", "2026-11-01T10:00:00.000Z", [{ categoryId: CAT, minutes: 50 }]);
+    const page2 = await readCategoryPage({ supabase: fakeTablesClient(small.store, { sub: ME }), key: KEY }, CAT);
+    expect(page2.ok && page2.data.days.map((d) => [d.day, d.minutes])).toEqual([["2026-11-06", 0], ["2026-11-01", 50]]);
+    expect(small.store.calls.filter((c) => c.table === "evening_logs").at(-1)!.filters.some(([op]) => op === "gte")).toBe(false);
+  });
+});
+
+describe("readCategoryPage: 오늘 기록 읽기가 실패해도 분야 페이지는 열린다(고침8 검토 LOW)", () => {
+  /** evening_logs만 실패시키는 감싼 클라이언트. error = 오류 응답, throw = 쿼리 만들기에서 예외 */
+  function failingLogs(client: ReturnType<typeof fakeTablesClient>, mode: "error" | "throw") {
+    const failing = () => {
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "gte", "order", "limit"]) {
+        q[m] = () => {
+          if (mode === "throw") throw new Error("network down");
+          return q;
+        };
+      }
+      q.then = (ok: (v: unknown) => unknown, bad: (e: unknown) => unknown) => Promise.resolve({ data: null, error: { code: "57014", message: "canceling statement" } }).then(ok, bad);
+      return q;
+    };
+    return new Proxy(client, {
+      get(target, prop, receiver) {
+        if (prop === "from") return (table: string) => (table === "evening_logs" ? failing() : target.from(table));
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+  const seedLog = (store: FakeStore, targetDay: string, minutes: number) =>
+    store.seed("evening_logs", { user_id: ME, target_day: targetDay, total_minutes: minutes, items: [{ categoryId: CAT, minutes }], save_mode: "edited", saved_at: `${targetDay}T10:00:00.000Z`, client_saved_at: null });
+
+  for (const mode of ["error", "throw"] as const) {
+    it(`오늘 기록 읽기 ${mode === "error" ? "오류 응답" : "예외"} → 응답 ok, 할 일 묶음 그대로, minutes 0(시간만 있는 날은 없음)`, async () => {
+      const { store, seedTodo } = setup();
+      seedTodo(T1, "단어", "2026-11-06", CAT, ME, true);
+      seedTodo(T2, "듣기", "2026-11-04", CAT);
+      seedLog(store, "2026-11-06", 90);
+      seedLog(store, "2026-11-05", 45);
+      const page = await readCategoryPage({ supabase: failingLogs(fakeTablesClient(store, { sub: ME }), mode), key: KEY }, CAT);
+      expect(page.ok).toBe(true);
+      if (!page.ok) return;
+      expect(page.data.days.map((d) => [d.day, d.minutes, d.todos.map((t) => [t.id, t.text, t.done])])).toEqual([
+        ["2026-11-06", 0, [[T1, "단어", true]]],
+        ["2026-11-04", 0, [[T2, "듣기", false]]],
+      ]);
+    });
+  }
+
+  it("정상(같은 자료, 감싸지 않음) → 값 그대로", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "단어", "2026-11-06", CAT, ME, true);
+    seedTodo(T2, "듣기", "2026-11-04", CAT);
+    seedLog(store, "2026-11-06", 90);
+    seedLog(store, "2026-11-05", 45);
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, CAT);
+    expect(page.ok && page.data.days.map((d) => [d.day, d.minutes, d.todos.length])).toEqual([
+      ["2026-11-06", 90, 1],
+      ["2026-11-05", 45, 0],
+      ["2026-11-04", 0, 1],
+    ]);
+  });
+
+  it("할 일 읽기가 실패하면 지금처럼 실패다(오늘 기록 실패만 너그럽게 본다)", async () => {
+    const { store, seedTodo } = setup();
+    seedTodo(T1, "단어", "2026-11-06", CAT);
+    store.alwaysError = { code: "57014" };
+    const page = await readCategoryPage({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY }, CAT);
+    expect(page.ok).toBe(false);
   });
 });
