@@ -81,7 +81,7 @@ describe("다이얼과 상태보기가 같은 분야에 같은 색을 준다", (
       expect(fills(".growth-dot", "background"), `${view.id} 색점`).toEqual(want);
       if (view.id === "band") {
         // 목표 비율 줄은 분야만(기타 0), 이번 주 줄은 기타까지
-        expect(fills(".growth-band-seg", "background")).toEqual([...EXPECTED, ...want]);
+        expect(fills(".growth-band-cell", "background")).toEqual([...EXPECTED, ...want]);
       }
       if (view.id === "pie") expect(fills("svg.growth-pie path", "fill")).toEqual([...EXPECTED, ...want]);
       unmount();

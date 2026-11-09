@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 /**
  * 원샷 v2 화면 사진과 치수 확인(고침 1바퀴 B10). 개발 서버(next dev, 3200 포트)의 /dev/v2에서만 돈다: npm run screens
- * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 빈 안내의 「저녁 기록 남기기」(B17), 상태보기 기간 × 보기 방식(고침 4바퀴 C), 새 전체 화면 창 넷(B6·B7).
+ * 대상: 아래 탭 줄 + 내 정보 탭(B1·B8·B9), 상태보기 기록 없음의 「오늘 기록」(B17), 상태보기 두 뷰(고침5: 목표 한 줄·탭 둘·이번 주 목표·목표 비율 띠/원), 새 전체 화면 창 넷(B6·B7).
  * 파일 이름: v2-<상태>-<크기>.png. 글자 200%는 screens.spec.ts와 같은 방법으로 흉내 낸다(토큰의 px를 두 배로).
  * 고침 1바퀴에서는 작성만 했고, 고침 2바퀴에서 돌려 실패를 가렸다(docs/oneshot-v2/보고.md 「고침 2바퀴」).
  */
@@ -23,6 +23,7 @@ const TEXT200_CSS = `:root{
   --font-body: 400 32px/48px var(--font-family);
   --font-sub: 400 28px/40px var(--font-family);
   --font-google: 500 28px/40px var(--font-family);
+  --font-goal-line: 700 40px/56px var(--font-family);
 }`;
 
 async function open(page: Page, state: string, size: SizeTag) {
@@ -81,24 +82,10 @@ test("tabbar: 내 정보 안 포커스가 탭 줄 밑으로 들어가지 않는�
   expect(save.y + save.height).toBeLessThanOrEqual(bar.y + 0.5);
 });
 
-// ---- 상태보기 빈 안내 (B17) ----
-for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-  test(`growth-empty ${size}: 빈 안내 아래에 「저녁 기록 남기기」`, async ({ page }) => {
-    await open(page, "growth-empty", size);
-    await shot(page, `growth-empty-${size}`);
-    const text = page.getByText(/아직 이번 주 저녁 기록이 없어요/);
-    const button = page.getByRole("button", { name: "저녁 기록 남기기" });
-    await expect(button).toBeVisible();
-    const t = (await text.boundingBox())!;
-    const b = (await button.boundingBox())!;
-    expect(b.y).toBeGreaterThanOrEqual(t.y + t.height - 0.5);
-    expect(b.height).toBeGreaterThanOrEqual(48);
-  });
-}
-
-// ---- 상태보기 기간 × 보기 방식 (고침 4바퀴 C 2단계) ----
-// 대표 상태: 이번 주 분야별 줄 막대(처음 상태, PM 확정 11-09) · 띠그래프 · 원그래프 · 총 시간 · 기록 없음 · 분야 50개.
-// 모두 가로로 넘치지 않는다(scrollWidth ≤ clientWidth, 위 창들과 같은 측정). 360px 폭과 글자 200% 흉내에서 잰다.
+// ---- 상태보기 두 뷰(원샷 v2 고침5, 명세 ③-S + ⑩ PM 8) ----
+// 대표 상태: growth-goal(목표 한 줄 + 이번 주 목표 뷰) · growth-ratio(목표 비율 뷰 띠) · growth-pie(목표 비율 뷰 원)
+//            · growth-week(목표 없는 주 → 목표 비율 탭이 처음) · growth-empty(기록 없음) · growth-many(분야 50개).
+// 모두 가로로 넘치지 않는다(scrollWidth ≤ clientWidth). 360px 폭·320px·글자 200% 흉내에서 잰다.
 async function noHorizontalScroll(page: Page, what: string) {
   const sw = await scrollSizes(page);
   expect(sw.scrollWidth, `${what}: 가로 스크롤 없음`).toBeLessThanOrEqual(sw.clientWidth);
@@ -110,46 +97,202 @@ async function insideViewport(page: Page, selector: string, what: string) {
   expect(rights.length, `${what}: 요소가 있다`).toBeGreaterThan(0);
   expect(Math.max(...rights), `${what}: 화면 폭 안`).toBeLessThanOrEqual(width + 0.5);
 }
+/** :root 변수 값을 실제 색(rgb)으로: 요소가 칠해진 색과 견줄 때 */
+async function rootColor(page: Page, name: string) {
+  return page.evaluate((n) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${n})`;
+    document.body.appendChild(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  }, name);
+}
 
-for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
-  test(`growth-week ${size}: 이번 주 분야별 줄 막대(처음) → 띠그래프 → 원그래프 → 총 시간, 모두 가로로 넘치지 않는다`, async ({ page }) => {
-    await open(page, "growth-week", size);
-    // 처음 상태: 기간 이번 주 · 보기 분야별 줄 막대(기억한 값이 없을 때). 「최근 1주」 단추는 없다
-    await expect(page.getByRole("button", { name: "이번 주" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("button", { name: "분야별 줄 막대" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("button", { name: "최근 1주" })).toHaveCount(0);
-    await expect(page.locator(".growth-bar")).toHaveCount(4);
-    await expect(page.locator(".growth-band")).toHaveCount(0);
-    await shot(page, `growth-rows-${size}`);
-    await noHorizontalScroll(page, "분야별 줄 막대");
-    await insideViewport(page, ".growth-bar", "막대");
-
-    await page.getByRole("button", { name: "띠그래프" }).click();
-    await expect(page.getByRole("button", { name: "띠그래프" })).toHaveAttribute("aria-pressed", "true");
+// 기록 없음(B17 → 고침5): 글은 남기고(PM 11:1x) 예시 값 — 목표 비율 띠 + 빈 띠 「0시간」 + 「오늘 기록」 단추
+for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
+  test(`growth-empty ${size}: 목표 비율 띠 + 빈 띠 「0시간」 + 안내 글 아래 「오늘 기록」, 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-empty", size);
+    await expect(page.getByRole("tab", { name: "목표 비율" })).toHaveAttribute("aria-selected", "true");
+    await shot(page, `growth-empty-${size}`);
     await expect(page.locator(".growth-band")).toHaveCount(2);
-    await shot(page, `growth-band-${size}`);
-    await noHorizontalScroll(page, "띠그래프");
-    await insideViewport(page, ".growth-band", "띠");
-
-    await page.getByRole("button", { name: "원그래프" }).click();
-    await expect(page.getByRole("button", { name: "원그래프" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("svg.growth-pie")).toHaveCount(2);
-    await shot(page, `growth-pie-${size}`);
-    await noHorizontalScroll(page, "원그래프");
-    await insideViewport(page, "svg.growth-pie", "원");
-
+    await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
+    await expect(page.getByRole("button", { name: "원그래프로 보기" })).toHaveCount(0);
+    const text = page.getByText(/아직 이번 주 오늘 기록이 없어요/);
+    const button = page.getByRole("button", { name: "오늘 기록", exact: true });
+    await expect(button).toBeVisible();
+    await expect(page.getByRole("button", { name: "저녁 기록 남기기" })).toHaveCount(0);
+    const t = (await text.boundingBox())!;
+    const b = (await button.boundingBox())!;
+    expect(b.y).toBeGreaterThanOrEqual(t.y + t.height - 0.5);
+    expect(b.height).toBeGreaterThanOrEqual(48);
+    await noHorizontalScroll(page, "기록 없음 이번 주");
     await page.getByRole("button", { name: "총 시간" }).click();
-    await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
-    await shot(page, `growth-total-${size}`);
-    await noHorizontalScroll(page, "총 시간");
-    // 고르는 단추는 누르는 면 높이 48 이상(--tap-min)
-    const heights = await page.$$eval(".detail-chips .chip", (els) => els.map((el) => el.getBoundingClientRect().height));
-    expect(heights.length, "고르는 단추가 있다(없으면 Math.min이 Infinity라 그냥 통과한다)").toBeGreaterThan(0);
-    expect(Math.min(...heights)).toBeGreaterThanOrEqual(48);
+    await noHorizontalScroll(page, "기록 없음 총 시간");
   });
 }
 
-// 비교 보기(D-093, 남겨 둔 보기): 분야 줄마다 이번 주·지난주·지난달·쌓인 것 나란히. 분야 50개·긴 이름에서도 가로로 넘치지 않는다
+for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
+  test(`growth-goal ${size}: 목표 한 줄(20/28 Bold·낱말 감쌈) · 탭 둘(48, 켜진 탭 3px 밑줄 + Bold) · 이번 주 목표 카드, 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-goal", size);
+    const s = SIZES[size];
+    // 목표 한 줄: 제목 아래·탭 위, 글자색, Bold, 20/28(글자 200% 흉내는 40/56), 낱말 단위 감쌈, 말줄임 없음
+    const line = page.locator(".growth-goal-line");
+    await expect(line).toBeVisible();
+    const st = await line.evaluate((el) => {
+      const c = getComputedStyle(el);
+      // 글 높이 = 상자 높이 − 위아래 여백(줄 수를 잴 때)
+      return { size: c.fontSize, lh: c.lineHeight, weight: c.fontWeight, wb: c.wordBreak, overflow: c.textOverflow, color: c.color, h: el.clientHeight - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom), sw: el.scrollWidth, cw: el.clientWidth };
+    });
+    expect(st.size).toBe(s.text200 ? "40px" : "20px");
+    expect(st.lh).toBe(s.text200 ? "56px" : "28px");
+    expect(st.weight).toBe("700");
+    expect(st.wb).toBe("keep-all");
+    expect(st.overflow).not.toBe("ellipsis");
+    expect(st.color).toBe(await rootColor(page, "--color-text"));
+    expect(st.sw).toBeLessThanOrEqual(st.cw + 0.5);
+    const lineH = s.text200 ? 56 : 28;
+    expect(st.h).toBeGreaterThanOrEqual(lineH - 0.5); // 한 줄 이상
+    if (size === "360x800") expect(st.h).toBeLessThanOrEqual(2 * lineH + 0.5); // 360px 보통 글자에서 이 예시 글은 두 줄 안
+    const lineBox = (await line.boundingBox())!;
+    const tabsBox = (await page.getByRole("tablist").boundingBox())!;
+    const titleBox = (await page.getByRole("heading", { level: 1, name: "상태보기" }).boundingBox())!;
+    expect(lineBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height - 0.5);
+    expect(tabsBox.y).toBeGreaterThanOrEqual(lineBox.y + lineBox.height - 0.5);
+
+    // 탭 둘: 높이 48 이상, 폭은 탭 줄의 반, 켜진 탭 = 글자색 3px 밑줄 + Bold, 꺼진 탭 = 보조색
+    const tabs = await page.$$eval('[role="tab"]', (els) =>
+      els.map((el) => {
+        const c = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return { name: el.textContent, selected: el.getAttribute("aria-selected"), w: r.width, h: r.height, bw: c.borderBottomWidth, bc: c.borderBottomColor, weight: c.fontWeight, color: c.color };
+      }),
+    );
+    expect(tabs.map((t) => [t.name, t.selected])).toEqual([["이번 주 목표", "true"], ["목표 비율", "false"]]);
+    expect(Math.min(...tabs.map((t) => t.h))).toBeGreaterThanOrEqual(48);
+    expect(Math.abs(tabs[0].w - tabs[1].w)).toBeLessThanOrEqual(1);
+    expect(tabs[0].w + tabs[1].w).toBeGreaterThanOrEqual(tabsBox.width - 32 - 1); // 탭 줄 안쪽 폭(좌우 16 여백)을 둘이 나눈다
+    expect(tabs[0].bw).toBe("3px");
+    expect(tabs[0].bc).toBe(await rootColor(page, "--color-text"));
+    expect(tabs[0].weight).toBe("700");
+    expect(tabs[1].bw).toBe("1px");
+    expect(tabs[1].color).toBe(await rootColor(page, "--color-text-sub"));
+    expect(tabs[1].color).not.toBe(tabs[0].color);
+
+    // 이번 주 목표 카드: 머리 글, 흰 카드 둥근 모서리 16, 줄 다섯(만든 순서 · 기타 끝), 칩 없음
+    await expect(page.locator(".growth-card-title")).toHaveText("목표 15시간 중 12시간");
+    const card = await page.locator(".growth-card").evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { radius: c.borderTopLeftRadius, bg: c.backgroundColor };
+    });
+    expect(card.radius).toBe("16px");
+    expect(card.bg).toBe(await rootColor(page, "--color-surface"));
+    expect(card.bg).not.toBe(await rootColor(page, "--color-bg"));
+    await expect(page.locator(".growth-item .growth-name")).toHaveText(["어학", "포트폴리오", "자격증", "운동", "기타"]);
+    await expect(page.locator("[aria-pressed]")).toHaveCount(0);
+    // 막대: 채움은 6px 이상 + 1px 윤곽, 어학의 빈 자리는 점선, 눈금은 글자색
+    const fills = await page.$$eval(".growth-goal-fill", (els) => els.map((el) => ({ w: el.getBoundingClientRect().width, bw: getComputedStyle(el).borderTopWidth, bs: getComputedStyle(el).borderTopStyle })));
+    expect(fills.length).toBe(5);
+    expect(Math.min(...fills.map((f) => f.w))).toBeGreaterThanOrEqual(6);
+    expect(fills.every((f) => f.bw === "1px" && f.bs === "solid")).toBe(true);
+    const gaps = await page.$$eval(".growth-goal-gap", (els) => els.map((el) => ({ w: el.getBoundingClientRect().width, bs: getComputedStyle(el).borderTopStyle, bg: getComputedStyle(el).backgroundColor })));
+    expect(gaps.length).toBe(1);
+    expect(gaps[0].bs).toBe("dashed");
+    expect(gaps[0].w).toBeGreaterThan(10);
+    expect(gaps[0].bg).toBe("rgba(0, 0, 0, 0)"); // 빈 자리는 채우지 않는다(살구 채움 없음)
+    await shot(page, `growth-goal-${size}`);
+    await noHorizontalScroll(page, "이번 주 목표 뷰");
+    await insideViewport(page, ".growth-goal-bar", "막대");
+    await insideViewport(page, ".growth-row-value", "오른쪽 숫자");
+  });
+
+  test(`growth-ratio ${size}: 띠 두 줄(위 점선·아래 실선 윤곽, 칸 안 %, 좁은 칸은 숫자 숨김) · 목록, 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-ratio", size);
+    await expect(page.getByRole("tab", { name: "목표 비율" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(".growth-card-total")).toHaveText("20시간");
+    await expect(page.locator(".growth-band")).toHaveCount(2);
+    const outline = await rootColor(page, "--color-text");
+    const segs = await page.$$eval(".growth-band-cell", (els) =>
+      els.map((el) => {
+        const c = getComputedStyle(el);
+        const label = el.querySelector(".growth-seg-label")!;
+        return { line: el.parentElement!.getAttribute("data-line"), style: c.borderTopStyle, width: c.borderTopWidth, color: c.borderTopColor, w: el.getBoundingClientRect().width, labelShown: getComputedStyle(label).display !== "none", text: label.textContent };
+      }),
+    );
+    expect(segs.filter((x) => x.line === "ratio").map((x) => x.style)).toEqual(["dashed", "dashed", "dashed", "dashed"]);
+    expect(segs.filter((x) => x.line === "spent").map((x) => x.style)).toEqual(["solid", "solid", "solid", "solid", "solid"]);
+    // 1.5px 테두리는 기기 픽셀에 맞춰진다: DPR 2 이상(폰)은 1.5px, DPR 1은 1px
+    const dpr = await page.evaluate(() => window.devicePixelRatio);
+    expect(segs.every((x) => x.width === (dpr >= 2 ? "1.5px" : "1px") && x.color === outline)).toBe(true);
+    // 워커 A의 공통 윤곽 규칙(inset box-shadow)이 칸에 덧그려지지 않는다
+    expect(await page.$$eval(".growth-band-cell", (els) => els.every((el) => getComputedStyle(el).boxShadow === "none"))).toBe(true);
+    // 칸이 28px보다 좁으면 숫자는 숨기고(아래 목록에만), 넓으면 보인다. 둘 다 있는 예시다(이번 주 운동 5%)
+    const narrow = segs.filter((x) => x.w < 28);
+    const wide = segs.filter((x) => x.w >= 28);
+    expect(narrow.length).toBeGreaterThan(0);
+    expect(wide.length).toBeGreaterThan(0);
+    expect(narrow.every((x) => !x.labelShown)).toBe(true);
+    expect(wide.every((x) => x.labelShown)).toBe(true);
+    await expect(page.locator(".growth-item .growth-row-value")).toHaveText(["10% / 목표 30%", "60% / 목표 40%", "15% / 목표 20%", "5% / 목표 10%", "10%"]);
+    await expect(page.locator(".growth-legend-item")).toHaveText(["목표 비율", "이번 주"]);
+    // 기간 칩: 보이는 면 둥근 999, 누름 영역 48
+    const chips = await page.$$eval(".growth-period", (els) => els.map((el) => ({ h: el.getBoundingClientRect().height, r: getComputedStyle(el.querySelector(".growth-period-face")!).borderTopLeftRadius })));
+    expect(chips.length).toBe(3);
+    expect(Math.min(...chips.map((c) => c.h))).toBeGreaterThanOrEqual(48);
+    expect(chips.every((c) => parseFloat(c.r) >= 16)).toBe(true);
+    await shot(page, `growth-ratio-${size}`);
+    await noHorizontalScroll(page, "목표 비율 띠");
+    await insideViewport(page, ".growth-band", "띠");
+    await insideViewport(page, ".growth-row-value", "오른쪽 %");
+  });
+
+  test(`growth-pie ${size}: 원 둘 나란히(같은 크기), 조각 실선 1px 윤곽, 조각마다 %, 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-pie", size);
+    await expect(page.locator("svg.growth-pie")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "띠그래프로 보기" })).toBeVisible();
+    const boxes = await page.$$eval("svg.growth-pie", (els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
+    expect(Math.abs(boxes[0].w - boxes[1].w)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThanOrEqual(0.5); // 한 줄에 나란히
+    expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].w - 0.5);
+    // 360px에서 원 지름 약 132 안팎(그림 칸 폭에 맞춘다)
+    const diameter = (boxes[0].w * 200) / 256; // 원 지름 = 그림 칸의 200/256(바깥 % 자리)
+    expect(diameter).toBeGreaterThanOrEqual(80);
+    expect(diameter).toBeLessThanOrEqual(140);
+    const slices = await page.$$eval("path.growth-pie-slice", (els) => els.map((el) => ({ s: getComputedStyle(el).stroke, w: getComputedStyle(el).strokeWidth, d: getComputedStyle(el).strokeDasharray })));
+    expect(slices.length).toBe(9);
+    const outline = await rootColor(page, "--color-text");
+    expect(slices.every((x) => x.s === outline && x.w === "1px" && x.d === "none")).toBe(true);
+    await expect(page.locator("svg.growth-pie").nth(1).locator("text")).toHaveText(["10%", "60%", "15%", "5%", "10%"]);
+    await expect(page.locator(".growth-pie-label.is-outside line")).toHaveCount(1); // 5%만 이끌 선으로 원 밖
+    await shot(page, `growth-pie-${size}`);
+    await noHorizontalScroll(page, "원그래프");
+    await insideViewport(page, "svg.growth-pie", "원");
+  });
+
+  test(`growth-week ${size}: 목표 없는 주 → 목표 비율 탭·띠그래프가 처음, 원그래프·총 시간 · 이번 주 목표 탭(정하기 + 예시)도 가로로 넘치지 않는다`, async ({ page }) => {
+    await open(page, "growth-week", size);
+    await expect(page.getByRole("tab", { name: "목표 비율" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("button", { name: "이번 주" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "최근 1주" })).toHaveCount(0);
+    await expect(page.locator(".growth-band")).toHaveCount(2);
+    await noHorizontalScroll(page, "띠그래프");
+    await page.getByRole("button", { name: "원그래프로 보기" }).click();
+    await expect(page.locator("svg.growth-pie")).toHaveCount(2);
+    await noHorizontalScroll(page, "원그래프");
+    await page.getByRole("button", { name: "총 시간" }).click();
+    await expect(page.getByRole("button", { name: "총 시간" })).toHaveAttribute("aria-pressed", "true");
+    await noHorizontalScroll(page, "총 시간");
+    await page.getByRole("tab", { name: "이번 주 목표" }).click();
+    await expect(page.getByRole("group", { name: "예시" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "이번 주 목표 정하기" })).toHaveCount(1);
+    const opacity = await page.locator(".growth-example-list").evaluate((el) => getComputedStyle(el).opacity);
+    expect(opacity).toBe("0.4");
+    await shot(page, `growth-nogoal-${size}`);
+    await noHorizontalScroll(page, "목표 없는 주의 이번 주 목표 탭");
+  });
+}
+
+// 비교 보기(D-093, 남겨 둔 보기): 분야 줄마다 이번 주·지난주·지난달·총 시간 나란히. 분야 50개·긴 이름에서도 가로로 넘치지 않는다
 for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   for (const state of ["growth-week", "growth-many"]) {
     test(`${state} ${size}: 비교 보기가 가로로 넘치지 않는다`, async ({ page }) => {
@@ -158,6 +301,7 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
       await expect(page.getByRole("button", { name: "비교" })).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("heading", { name: "분야마다 나란히" })).toBeVisible();
       await expect(page.locator(".growth-compare")).toHaveCount(state === "growth-many" ? 51 : 4);
+      await expect(page.getByText("쌓인 것")).toHaveCount(0);
       await shot(page, `${state}-compare-${size}`);
       await noHorizontalScroll(page, "비교");
       await insideViewport(page, ".growth-compare", "비교 줄");
@@ -165,26 +309,40 @@ for (const size of ["360x800", "text200-sim", "320x640"] as SizeTag[]) {
   }
 }
 
-// 키보드만: Tab으로 기간 → 보기 방식 단추를 차례로 지나고, Enter와 Space로 바뀐다(진짜 브라우저의 Tab 차례·키 동작)
-test("growth-week 키보드: Tab으로 기간·보기 방식 단추를 차례로 지나고 Enter·Space로 바꾼다", async ({ page }) => {
+// 키보드만: 탭은 좌우·Home/End로 고르고(켜진 탭만 Tab 차례), Tab으로 기간 → 보기 바꾸기를 지나며 Enter·Space로 바꾼다(진짜 브라우저)
+test("growth-week 키보드: 탭 좌우·Home/End, Tab으로 기간·보기 바꾸기 단추를 차례로 지나고 Enter·Space로 바꾼다", async ({ page }) => {
   await open(page, "growth-week", "360x800");
   const name = (n: string) => page.getByRole("button", { name: n, exact: true });
-  await name("이번 주").focus();
-  for (const next of ["총 시간", "비교", "띠그래프", "원그래프", "분야별 줄 막대"]) {
+  const tab = (n: string) => page.getByRole("tab", { name: n });
+  await tab("목표 비율").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(tab("이번 주 목표")).toBeFocused();
+  await expect(tab("이번 주 목표")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("End");
+  await expect(tab("목표 비율")).toBeFocused();
+  await expect(tab("목표 비율")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  await expect(tab("이번 주 목표")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(tab("목표 비율")).toHaveAttribute("aria-selected", "true");
+  // 켜진 탭 다음 Tab은 꺼진 탭을 건너뛰고 기간 칩으로
+  for (const next of ["이번 주", "총 시간", "비교", "원그래프로 보기"]) {
     await page.keyboard.press("Tab");
     await expect(name(next)).toBeFocused();
   }
-  await page.keyboard.press("Shift+Tab");
-  await expect(name("원그래프")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(name("원그래프")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("svg.growth-pie")).toHaveCount(2);
-  await expect(name("원그래프")).toBeFocused(); // 바꿔도 포커스가 단추에 그대로
-  await page.keyboard.press("Tab");
+  await expect(name("띠그래프로 보기")).toBeFocused(); // 바꿔도 포커스가 같은 단추에(글만 바뀜)
   await page.keyboard.press("Space");
-  await expect(name("분야별 줄 막대")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".growth-bar")).toHaveCount(4);
-  for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+Tab"); // 분야별 줄 막대 → 원그래프 → 띠그래프 → 비교
+  await expect(page.locator(".growth-band")).toHaveCount(2);
+  for (let i = 0; i < 2; i++) await page.keyboard.press("Shift+Tab"); // 보기 바꾸기 → 비교 → 총 시간
+  await expect(name("총 시간")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(tab("목표 비율")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
   await expect(name("비교")).toBeFocused();
   await page.keyboard.press("Space");
   await expect(name("비교")).toHaveAttribute("aria-pressed", "true");
@@ -192,30 +350,13 @@ test("growth-week 키보드: Tab으로 기간·보기 방식 단추를 차례로
 });
 
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
-  test(`growth-empty ${size}: 기록 없음에서 보기를 바꿔도 가로로 넘치지 않는다`, async ({ page }) => {
-    await open(page, "growth-empty", size);
-    await noHorizontalScroll(page, "기록 없음 줄 막대(처음 보기)");
-    await page.getByRole("button", { name: "띠그래프" }).click();
-    await expect(page.locator(".growth-band")).toHaveCount(2);
-    await expect(page.locator(".growth-band.is-empty")).toHaveCount(1); // 쓴 시간 줄만 비어 있다(처음 정한 비율 줄은 있다)
-    await noHorizontalScroll(page, "기록 없음 띠그래프");
-    await page.getByRole("button", { name: "원그래프" }).click();
-    await shot(page, `growth-empty-pie-${size}`);
-    await noHorizontalScroll(page, "기록 없음 원그래프");
-    await page.getByRole("button", { name: "총 시간" }).click();
-    await noHorizontalScroll(page, "기록 없음 총 시간");
-  });
-
-  test(`growth-many ${size}: 분야 50개(꺾쇠·아주 긴 이름)에서도 보기 셋과 총 시간이 가로로 넘치지 않는다`, async ({ page }) => {
+  test(`growth-many ${size}: 분야 50개(꺾쇠·아주 긴 이름)에서도 띠·원·총 시간이 가로로 넘치지 않는다`, async ({ page }) => {
     await open(page, "growth-many", size);
     await expect(page.locator(".growth-item")).toHaveCount(51);
-    await expect(page.getByRole("button", { name: "분야별 줄 막대" })).toHaveAttribute("aria-pressed", "true"); // 처음 보기
-    await shot(page, `growth-many-rows-${size}`);
-    await noHorizontalScroll(page, "분야 50개 줄 막대");
-    await page.getByRole("button", { name: "띠그래프" }).click();
+    await expect(page.locator(".growth-band")).toHaveCount(2); // 처음 보기
     await shot(page, `growth-many-band-${size}`);
     await noHorizontalScroll(page, "분야 50개 띠그래프");
-    await page.getByRole("button", { name: "원그래프" }).click();
+    await page.getByRole("button", { name: "원그래프로 보기" }).click();
     await noHorizontalScroll(page, "분야 50개 원그래프");
     await insideViewport(page, "svg.growth-pie", "원");
     await page.getByRole("button", { name: "총 시간" }).click();

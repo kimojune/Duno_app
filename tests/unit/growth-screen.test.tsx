@@ -132,7 +132,7 @@ describe("상태보기 (7-4, ③)", () => {
     await mount(fakeApi(growth({ thisWeek: [], loggedDaysThisWeek: 0 })));
     expect(screen.getByText("아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.")).toBeTruthy();
     expect(document.querySelector(".growth-band.is-empty")?.textContent).toBe("0시간");
-    expect(Array.from(document.querySelectorAll(".growth-band-seg")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
+    expect(Array.from(document.querySelectorAll(".growth-band-cell")).map((el) => el.textContent)).toEqual(["60%", "40%"]);
     expect(document.body.textContent).not.toContain("채울");
   });
 

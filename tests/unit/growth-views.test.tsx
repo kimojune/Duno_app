@@ -417,8 +417,8 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
     const captions = Array.from(container.querySelectorAll(".growth-band-line .growth-line-caption")).map((el) => el.textContent);
     expect(captions).toEqual(["목표 비율", "이번 주"]);
     const [ratioBand, spentBand] = Array.from(container.querySelectorAll<HTMLElement>(".growth-band"));
-    const ratioSegs = Array.from(ratioBand.querySelectorAll<HTMLElement>(".growth-band-seg"));
-    const spentSegs = Array.from(spentBand.querySelectorAll<HTMLElement>(".growth-band-seg"));
+    const ratioSegs = Array.from(ratioBand.querySelectorAll<HTMLElement>(".growth-band-cell"));
+    const spentSegs = Array.from(spentBand.querySelectorAll<HTMLElement>(".growth-band-cell"));
     expect(ratioSegs.length).toBe(4);
     expect(spentSegs.length).toBe(5);
     expect(ratioSegs.every((s) => s.style.borderStyle === "dashed")).toBe(true);
@@ -431,10 +431,10 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
   it("두 띠의 분야 순서가 같고(만든 순서), 기타는 아래 띠 끝. 같은 분야 = 같은 색(옅게 하지 않음)", async () => {
     const { container } = await mount(fakeApi(noGoal()));
     const [ratioBand, spentBand] = Array.from(container.querySelectorAll<HTMLElement>(".growth-band"));
-    const cats = (b: HTMLElement) => Array.from(b.querySelectorAll<HTMLElement>(".growth-band-seg")).map((s) => s.dataset.category);
+    const cats = (b: HTMLElement) => Array.from(b.querySelectorAll<HTMLElement>(".growth-band-cell")).map((s) => s.dataset.category);
     expect(cats(ratioBand)).toEqual([G1, G2, G3, G4]);
     expect(cats(spentBand)).toEqual([G1, G2, G3, G4, "other"]);
-    const colors = (b: HTMLElement) => Array.from(b.querySelectorAll<HTMLElement>(".growth-band-seg")).map((s) => s.style.background);
+    const colors = (b: HTMLElement) => Array.from(b.querySelectorAll<HTMLElement>(".growth-band-cell")).map((s) => s.style.background);
     expect(colors(spentBand).slice(0, 4)).toEqual(colors(ratioBand));
     expect(colors(spentBand)[4]).toBe("var(--color-category-other)");
     expect(container.innerHTML).not.toContain("opacity");
@@ -454,7 +454,8 @@ describe("목표 비율 뷰(명세 ③-S ②, PM d-101 · d-102 · 8)", () => {
     expect(container.querySelector(".growth-list strong, .growth-list b, .growth-list .is-left")).toBeNull();
     const dots = Array.from(container.querySelectorAll<HTMLElement>(".growth-dot"));
     expect(dots).toHaveLength(5);
-    expect(dots.every((d) => d.style.borderColor === "var(--color-chart-outline, var(--color-text))")).toBe(true);
+    expect(dots.every((d) => d.style.boxShadow === "inset 0 0 0 1px var(--color-chart-outline, var(--color-text))")).toBe(true);
+    expect(dots.every((d) => d.style.borderStyle === "")).toBe(true); // 테두리를 겹쳐 2px가 되지 않게
   });
 
   it("카드 앞 숨은 요약 하나(줄 순서 = 화면 줄 순서)", async () => {
@@ -556,12 +557,12 @@ describe("기록 없음 · 처음 쓰는 사람(분야 하나)", () => {
     expect(screen.getByText("오늘 기록 0일")).toBeTruthy();
     const lines = Array.from(container.querySelectorAll<HTMLElement>(".growth-band-line"));
     expect(lines.map((l) => l.querySelector(".growth-line-caption")?.textContent)).toEqual(["목표 비율", "이번 주"]);
-    const ratioSegs = Array.from(lines[0].querySelectorAll<HTMLElement>(".growth-band-seg"));
+    const ratioSegs = Array.from(lines[0].querySelectorAll<HTMLElement>(".growth-band-cell"));
     expect(ratioSegs.map((s) => [s.textContent, s.style.borderStyle])).toEqual([["100%", "dashed"]]);
     const empty = lines[1].querySelector<HTMLElement>(".growth-band.is-empty")!;
     expect(empty.style.borderStyle).toBe("solid");
     expect(empty.textContent).toBe("0시간");
-    expect(empty.querySelector(".growth-band-seg")).toBeNull();
+    expect(empty.querySelector(".growth-band-cell")).toBeNull();
     expect(container.querySelector(".growth-card-total")?.textContent).toBe("0시간");
     // 그림 아래 목록·보기 바꾸기는 없다(띠 둘 + 단추)
     expect(container.querySelector(".growth-list")).toBeNull();
@@ -742,7 +743,7 @@ describe("색: 한 군데(categoryColorValue)에서만 정한다", () => {
         Array.from(container.querySelectorAll<HTMLElement | SVGElement>(selector)).map((el) => (el as HTMLElement).style[prop]);
       expect(colorsOf(".growth-goal-fill", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
       fireEvent.click(tab("목표 비율"));
-      expect(colorsOf(".growth-band-seg", "background")).toEqual(Array(9).fill("rgb(1, 2, 3)"));
+      expect(colorsOf(".growth-band-cell", "background")).toEqual(Array(9).fill("rgb(1, 2, 3)"));
       expect(colorsOf(".growth-dot", "background")).toEqual(Array(5).fill("rgb(1, 2, 3)"));
       fireEvent.click(chip("원그래프로 보기"));
       expect(colorsOf("svg.growth-pie path", "fill")).toEqual(Array(9).fill("rgb(1, 2, 3)"));
@@ -833,7 +834,7 @@ describe("분야 이름은 사용자 입력이다", () => {
     expect(items(container)).toHaveLength(50);
     fireEvent.click(tab("목표 비율"));
     expect(items(container)).toHaveLength(51); // 분야 50 + 기타
-    const segs = Array.from(container.querySelectorAll<HTMLElement>(".growth-band-seg"));
+    const segs = Array.from(container.querySelectorAll<HTMLElement>(".growth-band-cell"));
     expect(segs.length).toBeGreaterThan(40);
     expect(segs.every((el) => el.style.background !== "")).toBe(true);
     fireEvent.click(chip("원그래프로 보기"));
@@ -868,8 +869,8 @@ describe("모양 규칙(CSS 출처 값, app/globals.css) — 실제 칠해짐은
     expect(growth.length).toBeGreaterThan(1000);
     expect(growth).not.toMatch(/ellipsis|--color-accent/);
   });
-  it("띠 칸이 28px보다 좁으면 칸 안 숫자를 숨긴다(컨테이너 쿼리)", () => {
-    expect(rule(".growth-band-seg")).toContain("container-type: inline-size");
-    expect(css).toMatch(/@container \(max-width: 27\.98px\) \{ \.growth-seg-label \{ display: none; \} \}/);
+  it("띠 칸이 28px보다 좁으면 칸 안 숫자를 숨긴다(컨테이너 쿼리, 테두리 안쪽 폭 25 = 28 − 1.5 × 2)", () => {
+    expect(rule(".growth-band-cell")).toContain("container-type: inline-size");
+    expect(css).toMatch(/@container \(max-width: 24\.98px\) \{ \.growth-seg-label \{ display: none; \} \}/);
   });
 });

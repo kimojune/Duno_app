@@ -21,9 +21,10 @@ import type { SettingsData } from "../../../lib/settings/types";
 
 /**
  * 원샷 v2 화면 모음(개발용, B10). 서버 Action·DB·네트워크를 부르지 않고 진짜 화면 컴포넌트에 가짜 데이터만 넣는다.
- * 쓰는 법: /dev/v2?s=tabbar | growth-empty | growth-week | growth-many | goal | evening | category | detail
+ * 쓰는 법: /dev/v2?s=tabbar | growth-empty | growth-week | growth-many | growth-goal | growth-ratio | growth-pie | goal | evening | category | detail
  *          | ratio-onboarding | ratio-onboarding-many | me-ratio | me-ratio-many | evening-split | evening-split-many (고침4 2단계: 원형 다이얼)
- *  - growth-week: 상태보기에 한 주 쓴 기록이 있는 것(이번 주·분야별 줄 막대가 처음. 기간·보기 방식은 화면 시험이 눌러서 바꾼다)
+ *  - growth-week: 상태보기에 한 주 쓴 기록이 있고 이번 주 목표는 없는 것(목표 비율 탭·띠그래프가 처음. 기간·보기 방식은 화면 시험이 눌러서 바꾼다)
+ *  - growth-goal | growth-ratio | growth-pie: 상태보기 두 뷰(고침5) — 목표 한 줄 + 이번 주 목표 뷰 / 목표 비율 뷰 띠 / 목표 비율 뷰 원(기억한 탭·보기로 연다)
  *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
@@ -108,7 +109,8 @@ const eveningSplitApi = (categories: { id: string; name: string }[]): EveningApi
   }),
   save: never,
 });
-const growthApi = (data: GrowthData): GrowthApi => ({
+const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
+  ...(pref === undefined ? {} : { viewPref: { load: async () => pref, save: async () => {} } }),
   fetchGrowth: async () => ({ ok: true, data }),
   fetchCategoryPage: async () => ({
     ok: true,
@@ -155,6 +157,7 @@ const EMPTY_GROWTH: GrowthData = {
   loggedDaysThisWeek: 0,
   loggedDaysTotal: 0,
   goal: null,
+  goalText: null,
 };
 
 /** 한 주 쓴 사람: 처음 정한 비율 50·30·20인데 이번 주는 어학과 기타로 쏠림 */
@@ -167,6 +170,54 @@ const WEEK_GROWTH: GrowthData = {
   loggedDaysThisWeek: 6,
   loggedDaysTotal: 20,
 };
+
+/**
+ * 상태보기 두 뷰(고침5): 명세 ③-S 예와 같은 값. 이번 주 목표 15시간 중 12시간(어학 2/5 · 포트폴리오 12/6 · 자격증 3/3 · 운동 1/1 · 기타 2),
+ * 목표 비율 어학 30 · 포트폴리오 40 · 자격증 20 · 운동 10 → 이번 주 10 · 60 · 15 · 5 · 기타 10
+ */
+const G = ["a1", "a2", "a3", "a4"].map((k) => `${k}${k}${k}${k}-0000-4000-8000-000000000000`);
+const GOAL_GROWTH: GrowthData = {
+  ...EMPTY_GROWTH,
+  categories: [
+    { id: G[0], name: "어학" },
+    { id: G[1], name: "포트폴리오" },
+    { id: G[2], name: "자격증" },
+    { id: G[3], name: "운동" },
+  ],
+  ratios: [
+    { categoryId: G[0], percent: 30 },
+    { categoryId: G[1], percent: 40 },
+    { categoryId: G[2], percent: 20 },
+    { categoryId: G[3], percent: 10 },
+  ],
+  thisWeek: [
+    { categoryId: G[0], minutes: 120 },
+    { categoryId: G[1], minutes: 720 },
+    { categoryId: G[2], minutes: 180 },
+    { categoryId: G[3], minutes: 60 },
+    { categoryId: null, minutes: 120 },
+  ],
+  cumulative: [
+    { categoryId: G[0], minutes: 1200 },
+    { categoryId: G[1], minutes: 2400 },
+    { categoryId: G[2], minutes: 600 },
+    { categoryId: G[3], minutes: 300 },
+    { categoryId: null, minutes: 240 },
+  ],
+  loggedDaysThisWeek: 5,
+  loggedDaysTotal: 21,
+  goal: {
+    weekStart: "2026-11-02",
+    items: [
+      { categoryId: G[0], minutes: 300 },
+      { categoryId: G[1], minutes: 360 },
+      { categoryId: G[2], minutes: 180 },
+      { categoryId: G[3], minutes: 60 },
+    ],
+  },
+  goalText: "토익 900점 넘기고 포트폴리오 사이트 열기",
+};
+const RATIO_PREF = (view: "band" | "pie") => ({ period: "week", view, tab: "ratio", tabWeek: "2026-11-02" });
 
 /** 분야 50개(꺾쇠·긴 이름 포함): 화면이 가로로 넘치지 않는지 본다. 이름은 모두 지어낸 예시 */
 const MANY_IDS = Array.from({ length: 50 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
@@ -264,7 +315,7 @@ export function V2Gallery({ id }: { id: string }) {
   if (id === "growth-empty") {
     return (
       <Shell>
-        <GrowthScreen api={growthApi(EMPTY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} />
+        <GrowthScreen api={growthApi(EMPTY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
         <TabBar tabs={TABS} current="growth" onSelect={noop} />
       </Shell>
     );
@@ -272,7 +323,16 @@ export function V2Gallery({ id }: { id: string }) {
   if (id === "growth-week" || id === "growth-many") {
     return (
       <Shell>
-        <GrowthScreen api={growthApi(id === "growth-week" ? WEEK_GROWTH : MANY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} />
+        <GrowthScreen api={growthApi(id === "growth-week" ? WEEK_GROWTH : MANY_GROWTH)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
+        <TabBar tabs={TABS} current="growth" onSelect={noop} />
+      </Shell>
+    );
+  }
+  if (id === "growth-goal" || id === "growth-ratio" || id === "growth-pie") {
+    const pref = id === "growth-ratio" ? RATIO_PREF("band") : id === "growth-pie" ? RATIO_PREF("pie") : undefined;
+    return (
+      <Shell>
+        <GrowthScreen api={growthApi(GOAL_GROWTH, pref)} active activation={1} entry="self" onOpenCategory={noop} onOpenEvening={noop} onOpenGoal={noop} />
         <TabBar tabs={TABS} current="growth" onSelect={noop} />
       </Shell>
     );
@@ -313,6 +373,9 @@ export function V2Gallery({ id }: { id: string }) {
           "growth-empty",
           "growth-week",
           "growth-many",
+          "growth-goal",
+          "growth-ratio",
+          "growth-pie",
           "goal",
           "evening",
           "category",

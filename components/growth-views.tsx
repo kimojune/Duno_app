@@ -18,6 +18,12 @@ import { bandSegments, pieLabels, pieSlices, type ChartCategoryId, type GoalChar
 /** 분야 색 그림의 윤곽 색(새 토큰, 대체값 = 지금 글자색) */
 export const CHART_OUTLINE = "var(--color-chart-outline, var(--color-text))";
 
+/**
+ * 색 점의 1px 윤곽. 워커 A의 공통 윤곽 규칙(globals.css 끝 「.growth-dot … { box-shadow: inset 0 0 0 1px var(--color-chart-outline) }」)과 같은 값이라
+ * 그 규칙이 합쳐져 와도 두 겹이 되지 않는다(테두리를 쓰면 1px + 1px = 2px가 된다)
+ */
+export const OUTLINE_SHADOW = "inset 0 0 0 1px var(--color-chart-outline, var(--color-text))";
+
 /** 보기들이 쓰는 글(화면의 GROWTH_TEXT가 넘긴다) */
 export type GrowthViewText = {
   /** 위 띠·왼쪽 원 이름표 「목표 비율」 */
@@ -67,7 +73,7 @@ export function RatioList({ chart, text, nameOf, onOpenCategory }: StatusViewPro
           <li key={keyOf(r.categoryId)} className="growth-item">
             <button type="button" className="growth-row" onClick={() => onOpenCategory(r.categoryId, name)}>
               <span className="growth-name">
-                <span className="growth-dot" aria-hidden="true" style={{ background: colorOf(order, r.categoryId), borderColor: CHART_OUTLINE }} />
+                <span className="growth-dot" aria-hidden="true" style={{ background: colorOf(order, r.categoryId), boxShadow: OUTLINE_SHADOW }} />
                 {name}
               </span>
               <span className="growth-row-value">{ratioRowValue(chart, r.categoryId, text)}</span>
@@ -92,7 +98,7 @@ function BandLine({ chart, line, empty, caption, kind, text }: { chart: StatusCh
         {bandSegments(line).map((seg) => {
           const style: CSSProperties = { inlineSize: `${seg.percent}%`, background: colorOf(order, seg.categoryId), borderStyle, borderColor: CHART_OUTLINE };
           return (
-            <span key={keyOf(seg.categoryId)} className="growth-band-seg" data-category={keyOf(seg.categoryId)} style={style}>
+            <span key={keyOf(seg.categoryId)} className="growth-band-cell" data-category={keyOf(seg.categoryId)} style={style}>
               <span className="growth-seg-label">{text.percent(seg.percent)}</span>
             </span>
           );
@@ -154,7 +160,7 @@ export function EmptyBands({ chart, text, periodName, zeroText }: { chart: Statu
 
 /** 원그래프 반지름(그림 단위). 그림 칸은 원 밖 % 글 자리만큼 더 넓다 */
 const PIE_RADIUS = 100;
-const PIE_BOX = 150;
+const PIE_BOX = 128;
 
 function Pie({ chart, line, empty, caption, text }: { chart: StatusChart; line: Line; empty: boolean; caption: string; text: GrowthViewText }) {
   const order = chartOrder(chart);
