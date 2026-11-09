@@ -5,10 +5,14 @@ import {
   classifySaveMode,
   compactItems,
   diffItems,
+  initialSelection,
+  NEW_CHIP_MINUTES,
   notSplitItems,
-  prefillItems,
+  otherOf,
+  pickChip,
   sameItems,
   sumMinutes,
+  unpickChip,
 } from "../../lib/evening/logic";
 import { encryptCategoryName, encryptTodoText, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
@@ -24,31 +28,85 @@ const L2 = "20202020-2020-4020-8020-202020202020";
 const L3 = "30303030-3030-4030-8030-303030303030";
 const NOW = new Date("2026-11-07T14:00:00.000Z"); // 서울 23:00 → 두노 하루 2026-11-07
 
-describe("prefillItems (미리 채우기 임시 규칙)", () => {
-  it("타이머 시간은 그 분야에, 나머지는 끝낸 할 일의 분야에 똑같이(5분 단위), 조각은 기타로", () => {
-    const items = prefillItems({ totalMinutes: 205, timer: { [C1]: 30 }, doneCategoryIds: [C1, C2, null, C2] });
-    // 나머지 175분 → 두 분야에 각 85분(5분 단위 바닥), 남은 5분은 기타
-    expect(items).toEqual([
-      { categoryId: C1, minutes: 115 },
-      { categoryId: C2, minutes: 85 },
-      { categoryId: null, minutes: 5 },
-    ]);
-    expect(sumMinutes(items)).toBe(205);
+describe("initialSelection (나누기 처음 값 — 고침 5바퀴, d-115 나 · d-116 가)", () => {
+  const CAT = [C1, C2, C3];
+  it("타이머도 끝낸 할 일도 없으면 기타 100%, 골라진 칩 없음", () => {
+    const r = initialSelection({ totalMinutes: 120, timer: {}, doneCategoryIds: [], catalogOrder: CAT });
+    expect(r.total).toBe(120);
+    expect(r.perCategory).toEqual({});
+    expect(r.items).toEqual([{ categoryId: null, minutes: 120 }]);
   });
-  it("끝낸 할 일의 분야가 없으면 나머지는 전부 기타", () => {
-    expect(prefillItems({ totalMinutes: 90, timer: {}, doneCategoryIds: [null] })).toEqual([{ categoryId: null, minutes: 90 }]);
-    expect(prefillItems({ totalMinutes: 90, timer: { [C1]: 30 }, doneCategoryIds: [] })).toEqual([
-      { categoryId: C1, minutes: 30 },
-      { categoryId: null, minutes: 60 },
-    ]);
+  it("타이머로 잰 분야만 그 시간만큼 채우고 칩이 골라진다. 나머지는 기타(남은 시간을 나눠 채우지 않는다)", () => {
+    const r = initialSelection({ totalMinutes: 205, timer: { [C1]: 45 }, doneCategoryIds: [], catalogOrder: CAT });
+    expect(r.perCategory).toEqual({ [C1]: 45 });
+    expect(r.items).toEqual([{ categoryId: C1, minutes: 45 }, { categoryId: null, minutes: 160 }]);
   });
-  it("총시간이 타이머 합보다 작으면 타이머 합이 총시간이 된다", () => {
-    const items = prefillItems({ totalMinutes: 10, timer: { [C1]: 25, [C2]: 20 }, timerOther: 5, doneCategoryIds: [C3] });
-    expect(sumMinutes(items)).toBe(50);
-    expect(items.find((i) => i.categoryId === C3)).toBeUndefined();
+  it("끝낸 할 일의 분야는 만든 순서대로 기타에서 30분씩. 타이머와 겹친 분야는 타이머 시간만, 기타(null)·목록 밖 분야는 칩을 만들지 않는다", () => {
+    const OUT = "c9c9c9c9-c9c9-4c9c-8c9c-c9c9c9c9c9c9";
+    const r = initialSelection({ totalMinutes: 200, timer: { [C2]: 20 }, doneCategoryIds: [C3, null, C2, OUT, C1, C3], catalogOrder: CAT });
+    expect(r.perCategory).toEqual({ [C1]: 30, [C2]: 20, [C3]: 30 });
+    expect(Object.keys(r.perCategory)).not.toContain(OUT);
+    expect(sumMinutes(r.items)).toBe(200);
+    expect(r.items.find((i) => i.categoryId === null)?.minutes).toBe(120);
   });
-  it("총시간 0, 타이머도 없으면 빈 목록", () => {
-    expect(prefillItems({ totalMinutes: 0, timer: {}, doneCategoryIds: [C1] })).toEqual([]);
+  it("가장자리: 기타가 30분보다 적으면 남은 만큼, 0분이면 칩만 골라진 0분(만든 순서대로 뗀다)", () => {
+    const r = initialSelection({ totalMinutes: 80, timer: { [C3]: 40 }, doneCategoryIds: [C2, C1], catalogOrder: CAT });
+    // 타이머 C3 40 → 기타 40 → C1 30(만든 순서가 먼저) → C2 10
+    expect(r.perCategory).toEqual({ [C1]: 30, [C2]: 10, [C3]: 40 });
+    const z = initialSelection({ totalMinutes: 30, timer: { [C1]: 30 }, doneCategoryIds: [C2], catalogOrder: CAT });
+    expect(z.perCategory).toEqual({ [C1]: 30, [C2]: 0 });
+    expect(z.items).toEqual([{ categoryId: C1, minutes: 30 }]); // 0분은 미리 채운 값(저장 방식 기준)에서 빠진다
+  });
+  it("총시간이 타이머 합보다 작으면 타이머 합이 총시간이 된다(분야 없는 타이머는 기타)", () => {
+    const r = initialSelection({ totalMinutes: 10, timer: { [C1]: 25, [C2]: 20 }, timerOther: 5, doneCategoryIds: [C3], catalogOrder: CAT });
+    expect(r.total).toBe(50);
+    expect(r.perCategory).toEqual({ [C1]: 25, [C2]: 20, [C3]: 5 });
+    expect(sumMinutes(r.items)).toBe(50);
+  });
+  it("총시간 0, 타이머도 없으면 빈 목록(끝낸 할 일 칩은 0분으로 골라짐)", () => {
+    const r = initialSelection({ totalMinutes: 0, timer: {}, doneCategoryIds: [C1], catalogOrder: CAT });
+    expect(r.items).toEqual([]);
+    expect(r.perCategory).toEqual({ [C1]: 0 });
+  });
+});
+
+describe("칩 고르기·풀기 (PM 10 — 합 고정)", () => {
+  it("고르면 기타에서 30분, 기타가 적으면 기타 전부, 0분이면 0분. 이미 고른 칩은 그대로", () => {
+    expect(NEW_CHIP_MINUTES).toBe(30);
+    expect(pickChip(120, {}, C1)).toEqual({ perCategory: { [C1]: 30 }, taken: 30 });
+    expect(pickChip(120, { [C1]: 100 }, C2)).toEqual({ perCategory: { [C1]: 100, [C2]: 20 }, taken: 20 });
+    expect(pickChip(120, { [C1]: 120 }, C2)).toEqual({ perCategory: { [C1]: 120, [C2]: 0 }, taken: 0 });
+    const same = { [C1]: 40 };
+    expect(pickChip(120, same, C1).perCategory).toBe(same);
+  });
+  it("풀면 그 분야 값이 지워지고 시간은 기타로(기타 = 쓴 시간 − 나눈 합)", () => {
+    const next = unpickChip({ [C1]: 40, [C2]: 30 }, C1);
+    expect(next).toEqual({ [C2]: 30 });
+    expect(otherOf(120, next)).toBe(90);
+    const none = { [C2]: 30 };
+    expect(unpickChip(none, C1)).toBe(none);
+  });
+  it("악용: 어떤 고르기·풀기 순서에도 합(분야 + 기타) = 쓴 시간이고 값은 0 이상 정수", () => {
+    const ids = [C1, C2, C3];
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    let checked = 0;
+    for (const total of [0, 5, 29, 62, 120, 1440]) {
+      let per: Record<string, number> = {};
+      for (let step = 0; step < 200; step++) {
+        const id = ids[Math.floor(rand() * ids.length)];
+        per = id in per ? unpickChip(per, id) : pickChip(total, per, id).perCategory;
+        const built = buildItems(total, per);
+        expect(built.total).toBe(total);
+        expect(sumMinutes(built.items)).toBe(total);
+        expect(Object.values(per).every((m) => Number.isInteger(m) && m >= 0)).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked).toBe(1200);
   });
 });
 

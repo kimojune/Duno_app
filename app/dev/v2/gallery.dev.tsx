@@ -325,6 +325,15 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
+  if (id === "evening-split-blank") {
+    // 고침 5바퀴: 타이머·끝낸 할 일이 없는 날 — 나누기에 들어가면 기타 100%(칩 고르기 전)
+    const blank: EveningApi = {
+      fetchState: async () => ({ ok: true, data: { today: "2026-11-07", day: "2026-11-07", existing: null, doneCategoryIds: [], timerByCategory: [], categories: CATEGORIES } }),
+      save: never,
+      addCategory: async () => ({ ok: false, error: "unavailable" }),
+    };
+    return <Opener render={(close) => <EveningRecord api={blank} onClose={close} />} />;
+  }
   if (id === "evening-split" || id === "evening-split-many") {
     const cats = id === "evening-split" ? CATEGORIES : MANY;
     return <Opener render={(close) => <EveningRecord api={eveningSplitApi(cats)} onClose={close} />} />;
@@ -422,6 +431,7 @@ export function V2Gallery({ id }: { id: string }) {
           "me-ratio-many",
           "evening-split",
           "evening-split-many",
+          "evening-split-blank",
         ].map((s) => (
           <li key={s}>
             <a href={`/dev/v2?s=${s}`}>{s}</a>

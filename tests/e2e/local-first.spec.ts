@@ -76,7 +76,7 @@ test("끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 �
     await input.press("Escape");
 
     // 저녁 기록: 끊겨도 열리고(기기에서 읽는다) 저장되며 「바뀐 분야별 시간」이 보인다
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "나누지 않고 저장" })).toBeVisible({ timeout: 2_000 });
     // 그날 이미 남긴 기록이 있으면 그 값에서 시작하므로, 이번에 정한 시간을 직접 적는다(이번 실행마다 다른 값)
@@ -165,7 +165,7 @@ test("누르면 서버 응답 전에 화면이 바뀐다(서버 Action 요청을
     await input.press("Escape");
 
     // 저녁 기록 저장도 서버 답 없이 끝난다
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "나누지 않고 저장" })).toBeVisible({ timeout: 1_500 });
     const t2 = Date.now();
@@ -285,7 +285,7 @@ async function restoreRatios(client: SupabaseClient, before: RatioState) {
   fail("update", (await client.from("user_settings").update({ ratio_other_percent: before.other }).eq("user_id", userId)).error);
 }
 
-test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) 저장 → 연결 → 서버에 한 번, 나눈 값 그대로", async ({ browser }) => {
+test("끊긴 채 저녁 기록 「분야마다 나누기」(칩으로 넣고 Stepper로 나눔) 저장 → 연결 → 서버에 한 번, 나눈 값 그대로", async ({ browser }) => {
   test.setTimeout(150_000);
   const env = loadIntegrationEnv();
   const A = accountA(env);
@@ -302,7 +302,7 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) �
     const page = await openApp(ctx);
     await ctx.setOffline(true);
 
-    await page.getByRole("button", { name: "저녁 기록 남기기" }).click();
+    await page.getByRole("button", { name: "오늘 기록 남기기" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "분야마다 나누기" })).toBeVisible({ timeout: 2_000 });
     await dialog.getByLabel("시간", { exact: true }).fill(String(hours));
@@ -311,11 +311,21 @@ test("끊긴 채 저녁 기록 「분야마다 나누기」(Stepper로 나눔) �
     await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible({ timeout: 2_000 });
     await expect(dialog.locator("svg.dial")).toBeVisible(); // 다이얼이 같이 보인다
 
-    // 분야마다 Stepper: 미리 채운 값을 모두 0으로 두고 첫 분야에만 piece분(그날 이미 남긴 기록이 있어도 같은 결과)
-    const fields = dialog.locator(".ratio-row input.stepper-input");
-    const count = await fields.count();
-    expect(count, "시험 계정 A에 분야가 하나 이상 있어야 나누기를 시험할 수 있다").toBeGreaterThan(0);
-    for (let i = 0; i < count; i += 1) await fields.nth(i).fill("0");
+    // 고침 5바퀴(PM 10): 줄은 칩으로 고른 분야에만 있다. 처음 골라진 칩(타이머·끝낸 할 일·그날 이미 남긴 기록의 분야)을 모두 풀어
+    // 기타 100%로 만든 뒤, 첫 분야 칩을 골라 줄을 만들고 그 줄의 Stepper에 piece분(그날 이미 남긴 기록이 있어도 같은 결과)
+    const chips = dialog.locator(".evening-chips button.chip[aria-pressed]"); // 「+ 분야」는 aria-pressed가 없다
+    expect(await chips.count(), "시험 계정 A에 분야가 하나 이상 있어야 나누기를 시험할 수 있다").toBeGreaterThan(0);
+    const pressedChips = dialog.locator('.evening-chips button.chip[aria-pressed="true"]');
+    for (let n = await pressedChips.count(); n > 0; n = await pressedChips.count()) await pressedChips.first().click();
+    const categoryRows = dialog.locator('.ratio-list li.evening-row:not([data-row-key="other"])');
+    await expect(categoryRows).toHaveCount(0);
+    const firstChip = chips.first();
+    await firstChip.click();
+    await expect(firstChip).toHaveAttribute("aria-pressed", "true");
+    await expect(categoryRows).toHaveCount(1);
+    const fields = categoryRows.locator("input.stepper-input");
+    await expect(fields).toHaveCount(1);
+    await expect(fields.first()).toHaveValue("30"); // 새 칩 = 기타에서 30분
     await fields.first().fill(String(piece));
     await expect(fields.first()).toHaveValue(String(piece));
     await dialog.getByRole("button", { name: "저장", exact: true }).click();

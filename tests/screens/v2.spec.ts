@@ -379,10 +379,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
 }
 
 // ---- 새 전체 화면 창 넷 (B6·B7) ----
-// title = 창 맨 위 제목(h2, 창의 이름). 저녁 기록 창의 h2는 질문이고 「저녁 기록」은 그 밑 작은 글이다(eyebrow).
+// title = 창 맨 위 제목(h2, 창의 이름). 오늘 기록 창의 h2는 질문이고 「오늘 기록」은 그 밑 작은 글이다(eyebrow).
 const WINDOWS: { id: string; title: string; eyebrow?: string }[] = [
   { id: "goal", title: "이번 주 목표" },
-  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "저녁 기록" },
+  { id: "evening", title: "오늘 몇 시간 썼어요?", eyebrow: "오늘 기록" },
   { id: "category", title: "어학" },
   { id: "detail", title: "할 일 자세히" },
 ];

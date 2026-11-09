@@ -162,6 +162,8 @@ export function createLocalApis(runtime: Runtime): LocalApis {
       if (!log) return { ok: false, error: "unavailable" };
       return { ok: true, data: { log, delta: diffItems(previous, log.items) } };
     },
+    // 나누기 「+ 분야」(고침 5바퀴): 내 정보·처음 설정과 같은 기기 먼저 분야 더하기(settings.addCategory)를 그대로 부른다
+    addCategory: (id, name) => settings.addCategory(id, name),
   };
 
   const focus: FocusApi = {

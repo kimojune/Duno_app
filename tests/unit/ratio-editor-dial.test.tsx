@@ -237,7 +237,7 @@ describe("키보드만으로 조각 고르기와 바꾸기", () => {
     act(() => svg.focus());
     fireEvent.keyDown(svg, { key: "ArrowRight" });
     expect(screen.getByRole("button", { name: "코딩", pressed: true })).toBeTruthy();
-    expect(document.getElementById("ratio-dial-changes")!.textContent).toBe("코딩 고름, 30%");
+    expect(document.getElementById("ratio-dial-changes")!.textContent).toBe("코딩 30%, 고름");
     // 다이얼 다음 탭 자리는 손잡이(고른 조각의 앞, 뒤)
     const tabbables = [...document.querySelectorAll('[tabindex="0"]')];
     expect(tabbables[0]).toBe(svg);
