@@ -27,7 +27,7 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  * - 맨 위(제목 아래·뷰 탭 위): 처음 설정에서 받은 목표 한 문장(두 뷰 공통). 비었으면 줄을 두지 않는다. 모자란 분야 큰 글·숫자 줄은 없다(PM 8).
  * - 뷰 탭 둘(role=tablist): 「이번 주 목표」(시간·분야별 막대) / 「목표 비율」(%·띠그래프/원그래프).
  *   처음 탭은 이번 주 목표를 세운 주 → 이번 주 목표, 세우지 않은 주 → 목표 비율. 고른 탭은 그 주 동안 이 기기·이 사용자에 기억한다(api.viewPref).
- * - 이번 주 목표 뷰: 흰 카드 「목표 15시간 중 12시간」(lib/goals goalProgress) + 분야별 막대. 칩 없음, 기간은 이번 주만. 목표가 없는 주는 「이번 주 목표 정하기」 단추만.
+ * - 이번 주 목표 뷰: 흰 카드 「목표 15시간 중 12시간」(lib/goals goalProgress) + 분야별 막대. 칩 없음, 기간은 이번 주만. 목표가 없는 주는 카드 안에 예시 → 보조 줄 → 「이번 주 목표 정하기」(고침6).
  * - 목표 비율 뷰: 흰 카드 합계 · 기간 칩(이번 주 / 총 시간 / 비교) · 글 단추 하나로 띠그래프 ↔ 원그래프(D-049). 「비교」는 D-093의 옛 보기(결정 대기).
  * - 「채울 시간」 카드·놓친 분야 문장·「쌓인 것」·살구 강조는 없다(PM 8). 재촉·평가·경고 색 없이 숫자로(D-141).
  * - 카드 앞에 숨은 요약 한 줄(화면 읽기, INF-05). 분야 줄을 누르면 그 분야의 페이지로 간다(G13-a).
@@ -66,7 +66,7 @@ export const GROWTH_TEXT = {
   goalOf: (goal: number | null) => (goal === null ? "목표 없음" : `목표 ${formatMinutes(goal)}`),
   legendGoal: "목표",
   legendGap: "빈 자리",
-  goalSetHint: "분야마다 시간 · 1시간 단위", // 목표 없는 주 단추 아래(창구 덧붙임 11-09 11:3x)
+  goalSetHint: "분야마다 시간 · 1시간 단위", // 목표 없는 주 카드: 예시 막대 아래 · 단추 바로 위(고침6 ②)
   example: "예시",
   zero: "0시간",
   // 화면 읽기 요약(카드 앞 숨은 글 하나, 순서는 화면 줄 순서와 같다)
@@ -92,8 +92,8 @@ export const GROWTH_TEXT = {
   reload: "다시 불러오기",
 } as const;
 
-/** 저장 직후 한 줄(오늘 기록 화면, AfterSaveShortfall)의 글. 상태보기 화면 글이 아니다(저장 뒤 판 고치기는 이 작업 밖) */
-export const AFTER_SAVE_TEXT = { heading: "채울 시간" } as const;
+/** 저장 직후 한 줄(오늘 기록 화면, AfterSaveShortfall)의 글. 상태보기 화면 글이 아니다. 분야 줄 아래 「2시간 30분 더」(고침6 ④-①, 「채울 시간」 제목은 없앰) */
+export const AFTER_SAVE_TEXT = { more: (minutes: number) => `${formatMinutes(minutes)} 더` } as const;
 
 const VIEW_IDS = STATUS_VIEWS.map((v) => v.id);
 const PERIOD_LABEL: Record<StatusPeriod, "modeWeek" | "modeTotal" | "modeCompare"> = { week: "modeWeek", total: "modeTotal", compare: "modeCompare" };
@@ -336,12 +336,17 @@ function GoalPanel({
   onOpenGoal?: (data: GrowthData) => void;
 }) {
   if (!hasWeekGoal(data) || !data.goal) {
-    // 목표를 세우지 않은 주: 카드 자리에 「이번 주 목표 정하기」 단추 + 「분야마다 시간 · 1시간 단위」 + 「예시」 흐린 막대 둘(창구 덧붙임 11-09 11:3x, Figma 50:741)
+    // 목표를 세우지 않은 주(고침6 ②, Figma 50:741): 흰 카드 하나 안에 위→아래 = 이름표 「예시」 + 흐린 막대 둘 → 「분야마다 시간 · 1시간 단위」(가운데)
+    // → 「이번 주 목표 정하기」 주 단추(폭 가득, 카드 끝). 무엇이 채워질지 먼저 보이고 행동은 끝에 온다. 주 단추는 하나
     return (
       <div className="growth-goal-set">
-        {onOpenGoal && <PrimaryButton onClick={() => onOpenGoal(data)}>{GOAL_TEXT.set}</PrimaryButton>}
-        <p className="growth-goal-hint">{GROWTH_TEXT.goalSetHint}</p>
         <GoalExample label={GROWTH_TEXT.example} goalOf={GROWTH_TEXT.goalOf} />
+        <p className="growth-goal-hint">{GROWTH_TEXT.goalSetHint}</p>
+        {onOpenGoal && (
+          <PrimaryButton className="growth-goal-set-button" onClick={() => onOpenGoal(data)}>
+            {GOAL_TEXT.set}
+          </PrimaryButton>
+        )}
       </div>
     );
   }
@@ -485,7 +490,11 @@ function CompareView({ data, onOpenCategory }: { data: GrowthData; onOpenCategor
   );
 }
 
-/** 오늘 기록 저장 직후 한 줄 아래에 얹는 부족 시간 한 줄(F4 ㄴ). 오늘 기록 화면에 놓인다(상태보기 화면이 아니다) */
+/**
+ * 오늘 기록 저장 직후 한 줄 아래에 얹는 남은 시간(F4 ㄴ, 고침6 ④-① — Figma 49:142·59:2). 오늘 기록 화면에 놓인다(상태보기 화면이 아니다).
+ * 남은 시간이 있는 분야만 한 줄씩: 분야 이름 줄 아래 「n시간 더」(12 보조). 기준은 목표를 세운 주 = 이번 주 목표까지, 세우지 않은 주 = 목표 비율(fillTimeFor 그대로).
+ * 제목(옛 「채울 시간」)은 두지 않는다. 남은 분야가 없으면 아무것도 그리지 않는다.
+ */
 export function AfterSaveShortfall({ api }: { api: GrowthApi }) {
   const [data, setData] = useState<GrowthData | null>(null);
   useEffect(() => {
@@ -504,11 +513,18 @@ export function AfterSaveShortfall({ api }: { api: GrowthApi }) {
     goalItems: data.goal?.items ?? null,
     thisWeek: data.thisWeek,
   });
-  if (items.length === 0) return null;
+  const rows = items.filter((s) => s.minutes > 0);
+  if (rows.length === 0) return null;
   return (
-    <div className="after-save-line">
-      <span className="after-save-title">{AFTER_SAVE_TEXT.heading}</span>
-      <span className="after-save-text">{items.map((s) => `${nameFor(data, s.categoryId)} ${formatMinutes(s.minutes)}`).join(" · ")}</span>
+    <div className="after-save-line after-save-short">
+      <ul className="after-save-rows">
+        {rows.map((s) => (
+          <li key={s.categoryId ?? "other"} className="after-save-row">
+            <span className="after-save-name">{nameFor(data, s.categoryId)}</span>
+            <span className="after-save-more">{AFTER_SAVE_TEXT.more(s.minutes)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

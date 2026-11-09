@@ -553,6 +553,11 @@ select.input { appearance: auto; }
 button.after-save-line { cursor: pointer; }
 button.after-save-line:active { background: var(--color-notice-bg); }
 .after-save-title { font: var(--font-sub); color: var(--color-text-sub); }
+/* 저장 직후 남은 시간(고침6 ④-①): 분야 이름 줄 아래 「n시간 더」(12 보조). 남은 분야만 */
+.after-save-rows { display: grid; gap: var(--space-2); width: 100%; margin: 0; padding: 0; list-style: none; }
+.after-save-row { display: flex; flex-direction: column; min-width: 0; }
+.after-save-name { overflow-wrap: anywhere; }
+.after-save-more { font: 400 12px/16px var(--font-family); color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
 .after-save-text { overflow-wrap: anywhere; }
 .after-save-go { font: var(--font-sub); color: var(--color-primary); }
 /* ---- 고침 5바퀴: 오늘 기록 시간 단계의 「오늘 할 일 n/m ›」 줄과 「오늘 할 일」 시트(명세 ⑩ PM 11). 새 토큰은 var(이름, 대체값) ---- */
@@ -635,6 +640,28 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth, .me { max-width: var(--page-max); margin: 0 auto; padding-bottom: calc(var(--tabbar-h, 0px) + var(--space-6)); }
 /* 내 정보의 글 칸·고르기 칸은 flex 밖이라 기본 폭(글자 수 기준)을 가진다. 글자 200%에서 화면보다 넓어지지 않게 자리 폭에 맞춘다 */
 .me .input:not(.stepper-input) { width: 100%; }
+/* 내 정보 첫 카드(고침6 ③): 카드 전체가 단추 하나(누름 48 이상). 이름표 「이루고 싶은 것」(12 Medium 보조) + 목표 한 문장(20/28 Bold,
+   낱말 단위로 감쌈, 말줄임 없음 — 상태보기 맨 위 줄과 같은 무게) + 오른쪽 「›」. 비었으면 「목표 적기」(16 Medium) */
+.me-goal-card {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--tap-min);
+  padding: var(--space-4); border: 0; border-radius: var(--radius-card, 16px); background: var(--color-surface);
+  color: var(--color-text); text-align: left; cursor: pointer;
+}
+.me-goal-card:active { background: var(--color-notice-bg); }
+.me-goal-body { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 auto; min-width: 0; }
+.me-goal-label { font: 500 12px/16px var(--font-family); color: var(--color-text-sub); }
+.me-goal-text { font: var(--font-goal-line, 700 20px/28px var(--font-family)); color: var(--color-text); word-break: keep-all; overflow-wrap: anywhere; }
+.me-goal-empty { font: 500 16px/24px var(--font-family); color: var(--color-text); }
+.me-goal-chevron { flex: none; font: var(--font-title); color: var(--color-text-sub); }
+/* 겹침 화면 머리 왼쪽 위 「‹」(S8-b): 누름 48×48, 화면 읽기 이름 「이전」 */
+.overlay-head { display: flex; align-items: center; min-height: var(--tap-min); margin: calc(-1 * var(--space-3)) 0 var(--space-2) calc(-1 * var(--space-3)); }
+.overlay-back {
+  display: inline-flex; align-items: center; justify-content: center; inline-size: var(--tap-min); block-size: var(--tap-min);
+  padding: 0; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-text); cursor: pointer;
+  font: 400 32px/1 var(--font-family);
+}
+.overlay-back:active { background: var(--color-notice-bg); }
+.goal-sentence-actions { display: grid; margin-top: var(--space-6); }
 .growth-body { padding: 0 var(--page-x); }
 .growth-sub-title { margin: var(--space-6) 0 var(--space-1); font: var(--font-body); font-weight: 700; }
 /* ---- 상태보기 두 뷰(원샷 v2 고침5, 명세 ③-S + ⑩ PM 8). 새 토큰(--font-goal-line·--radius-card·--radius-pill·--color-chart-outline)은
@@ -680,12 +707,16 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .growth-empty { margin-top: var(--space-3); }
 .growth-period-title { margin-top: 0; }
 .growth-days { margin-bottom: var(--space-3); }
-.growth-goal-set { display: grid; gap: var(--space-2); padding: var(--space-2) 0; }
-.growth-goal-hint { margin: 0; font: 400 12px/16px var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
-/* 목표 없는 주의 예시 막대(고정 예시 글, 누를 수 없음): 이름표 「예시」 + 흐린(불투명 40%) 막대.
+/* 목표 없는 주의 이번 주 목표 탭(고침6 ②, Figma 50:741): 흰 카드 하나. 위→아래 = 이름표 「예시」 → 막대 둘 → 보조 줄 → 주 단추(카드 끝).
+   간격 = 카드 위 16 · 이름표→막대 6 · 막대→보조 줄 12 · 보조 줄→단추 16 · 카드 아래 16 */
+.growth-goal-set { display: flex; flex-direction: column; padding: var(--space-4); border-radius: var(--radius-card, 16px); background: var(--color-surface); }
+.growth-goal-hint { margin: var(--space-3) 0 0; font: 400 12px/16px var(--font-family); color: var(--color-text-sub); text-align: center; overflow-wrap: anywhere; }
+.growth-goal-set-button { width: 100%; margin-top: var(--space-4); }
+/* 예시 막대(고정 예시 글, 누를 수 없음): 이름표 「예시」(12 Medium 보조) + 흐린(불투명 40%) 막대.
    PM d-125: 흐림은 막대(채움·점선·눈금)에만 건다. 예시 글(분야 이름·「목표 n시간」)은 보조 글 색 그대로(흰 바탕 5.88:1, 기준 4.5:1) */
-.growth-example { margin-top: var(--space-2); padding: var(--space-4); border-radius: var(--radius-card, 16px); background: var(--color-surface); }
-.growth-example-label { margin: 0; font: var(--font-sub); color: var(--color-text-sub); }
+.growth-example { margin: 0; }
+.growth-example-label { margin: 0; font: 500 12px/16px var(--font-family); color: var(--color-text-sub); }
+.growth-list.growth-example-list { margin-top: 6px; } /* .growth-list(뒤에 있음)의 8을 이긴다 */
 .growth-example-item { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); padding: var(--space-2) 0; font: var(--font-body); color: var(--color-text-sub); }
 .growth-example-item .growth-goal-bar { opacity: 0.4; }
 /* 분야 줄: 윗줄 이름 · 오른쪽 값(넘치면 다음 줄로, 말줄임 없음), 아래 막대·글은 전체 폭 */

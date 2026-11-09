@@ -152,6 +152,19 @@ describe("처음 탭 규칙(명세 ③-S 뷰 고르기)", () => {
     await mount(fakeApi(spec(), { load: async () => ({ period: "week", view: "band", tab: "ratio", tabWeek: "2026-10-26" }), save: vi.fn(async () => {}) }));
     expect(selected("이번 주 목표")).toBe("true");
   });
+
+  it("고침6 ①: 지난주에 「이번 주 목표」를 골라 두었어도, 이번 주 목표가 없으면 처음은 「목표 비율」 탭. 이번 주 안에 고른 「이번 주 목표」는 그 주 동안 기억한다", async () => {
+    const lastWeek = await mount(fakeApi(noGoal(), { load: async () => ({ period: "week", view: "band", tab: "goal", tabWeek: "2026-10-26" }), save: vi.fn(async () => {}) }));
+    expect(selected("목표 비율")).toBe("true");
+    expect(lastWeek.container.querySelectorAll(".growth-band")).toHaveLength(2);
+    expect(lastWeek.container.querySelector(".growth-goal-set")).toBeNull();
+    lastWeek.unmount();
+    cleanup();
+    // 같은 주에 사용자가 고른 탭은 목표가 없어도 그 탭으로 연다(명세 「고른 탭은 그 주 동안 기억」)
+    const sameWeek = await mount(fakeApi(noGoal(), { load: async () => ({ period: "week", view: "band", tab: "goal", tabWeek: WEEK }), save: vi.fn(async () => {}) }));
+    expect(selected("이번 주 목표")).toBe("true");
+    expect(sameWeek.container.querySelector(".growth-goal-set")).not.toBeNull();
+  });
 });
 
 describe("탭 꼴과 키보드(role=tablist, 좌우·Home/End)", () => {
@@ -341,7 +354,7 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     expect(onOpenCategory).toHaveBeenLastCalledWith(null, "기타");
   });
 
-  it("목표를 세우지 않은 주에 이 탭을 고르면 카드 자리에 「이번 주 목표 정하기」 단추 + 「분야마다 시간 · 1시간 단위」 + 「예시」 흐린 막대 둘, 누르면 목표 창을 연다", async () => {
+  it("목표를 세우지 않은 주에 이 탭을 고르면 카드 하나 안에 위→아래 이름표 「예시」 → 흐린 막대 둘 → 「분야마다 시간 · 1시간 단위」 → 「이번 주 목표 정하기」(카드 끝, 고침6 ②), 누르면 목표 창을 연다", async () => {
     const onOpenGoal = vi.fn();
     const d = noGoal();
     const { container } = await mount(fakeApi(d), { onOpenGoal });
@@ -350,17 +363,30 @@ describe("이번 주 목표 뷰(명세 ③-S ①, PM 8 · d-110)", () => {
     // 누를 수 있는 것은 단추 하나뿐(예시 막대는 누를 수 없다)
     expect(within(panel).getAllByRole("button").map((b) => b.textContent)).toEqual([GOAL_TEXT.set]);
     expect(container.querySelector(".growth-card")).toBeNull();
-    expect(within(panel).getByText("분야마다 시간 · 1시간 단위")).toBeTruthy();
+    // 카드는 하나, 그 안에 넷이 이 순서로(이름표 < 막대 < 보조 줄 < 단추), 단추가 카드의 마지막 요소
+    const cards = panel.querySelectorAll(".growth-goal-set");
+    expect(cards).toHaveLength(1);
+    const card = cards[0] as HTMLElement;
+    const label = card.querySelector(".growth-example-label")!;
+    const bars = Array.from(card.querySelectorAll(".growth-example-item .growth-goal-bar"));
+    const hint = within(card).getByText("분야마다 시간 · 1시간 단위");
+    const button = within(card).getByRole("button", { name: GOAL_TEXT.set });
+    expect(label.textContent).toBe("예시");
+    expect(bars).toHaveLength(2);
+    const after = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(after(label, bars[0])).toBe(true);
+    expect(after(bars[1], hint)).toBe(true);
+    expect(after(hint, button)).toBe(true);
+    expect(card.lastElementChild).toBe(button);
     const example = within(panel).getByRole("group", { name: "예시" });
+    expect(card.contains(example)).toBe(true);
     const rows = Array.from(example.querySelectorAll<HTMLElement>(".growth-example-item"));
     expect(rows.map((li) => li.querySelector(".growth-name")?.textContent)).toEqual(["포트폴리오", "어학"]);
     expect(rows.map((li) => li.querySelector(".growth-goal-of")?.textContent)).toEqual(["목표 6시간", "목표 5시간"]);
     // 흐림(불투명 40%)은 막대에만 거는 CSS(PM d-125 — 예시 글은 흐리지 않는다). 줄마다 막대가 하나씩 있다
     expect(rows.map((li) => li.querySelectorAll(".growth-goal-bar").length)).toEqual([1, 1]);
     expect(example.querySelector("button, a, [tabindex]")).toBeNull();
-    // 예시 막대는 단추 아래
-    expect(screen.getByRole("button", { name: GOAL_TEXT.set }).compareDocumentPosition(example) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: GOAL_TEXT.set }));
+    fireEvent.click(button);
     expect(onOpenGoal).toHaveBeenCalledWith(d);
   });
 
