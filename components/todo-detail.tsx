@@ -7,6 +7,7 @@ import type { NoteItem } from "../lib/notes/types";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOverlayWindow } from "../lib/use-overlay-window";
+import { ChipScroller } from "./chip-scroller";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -250,7 +251,7 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
           <span id="detail-category-label" className="input-label">
             {DETAIL_TEXT.categoryLabel}
           </span>
-          <div className="detail-chips" role="group" aria-labelledby="detail-category-label">
+          <ChipScroller aria-labelledby="detail-category-label">
             <button type="button" className="chip" aria-pressed={categoryId === null} onClick={() => setCategoryId(null)}>
               <span className="chip-face">
                 <span className="chip-label">{DETAIL_TEXT.none}</span>
@@ -263,7 +264,7 @@ export function TodoDetail({ todo, chips, api, online, onClose, onEdited, onDele
                 </span>
               </button>
             ))}
-          </div>
+          </ChipScroller>
           <div className="detail-actions">
             <PrimaryButton type="submit" busy={busy === "save"} disabled={!canSave}>
               {busy === "save" ? DETAIL_TEXT.saving : DETAIL_TEXT.save}

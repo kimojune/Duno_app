@@ -8,6 +8,7 @@ import type { FocusSession, FocusSurface } from "../lib/focus/types";
 import type { TodayRead } from "../lib/today-types";
 import { formatMinutes, formatTimer } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
+import { ChipScroller } from "./chip-scroller";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
 
 /**
@@ -309,7 +310,7 @@ export function TimerScreen({
               </label>
             </fieldset>
             {effectiveChoice.kind === "none" && (
-              <div className="detail-chips" role="group" aria-label={TIMER_TEXT.categoryGroup}>
+              <ChipScroller aria-label={TIMER_TEXT.categoryGroup}>
                 <button type="button" className="chip" aria-pressed={noneCategory === null} onClick={() => setNoneCategory(null)}>
                   <span className="chip-face">
                     <span className="chip-label">{TIMER_TEXT.other}</span>
@@ -322,7 +323,7 @@ export function TimerScreen({
                     </span>
                   </button>
                 ))}
-              </div>
+              </ChipScroller>
             )}
             <div className="detail-actions">
               <PrimaryButton busy={busy === "start"} disabled={busy !== null} onClick={() => void start()}>

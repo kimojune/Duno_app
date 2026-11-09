@@ -8,8 +8,10 @@ import { GrowthScreen } from "../../../components/growth-screen";
 import { MeScreen } from "../../../components/me-screen";
 import { Onboarding } from "../../../components/onboarding";
 import { TabBar, type TabId } from "../../../components/tab-bar";
+import { TimerScreen } from "../../../components/timer-screen";
 import { TodoDetail } from "../../../components/todo-detail";
 import type { EveningApi } from "../../../lib/evening-api";
+import type { FocusApi } from "../../../lib/focus-api";
 import type { GoalsApi } from "../../../lib/goals-api";
 import type { GrowthApi } from "../../../lib/growth-api";
 import type { GrowthData } from "../../../lib/growth/types";
@@ -18,6 +20,7 @@ import type { SettingsApi } from "../../../lib/onboarding-api";
 import type { PushApi } from "../../../lib/push/subscribe";
 import { useTabbarHeight } from "../../../lib/use-tabbar-height";
 import type { SettingsData } from "../../../lib/settings/types";
+import type { TodayRead } from "../../../lib/today-types";
 
 /**
  * 원샷 v2 화면 모음(개발용, B10). 서버 Action·DB·네트워크를 부르지 않고 진짜 화면 컴포넌트에 가짜 데이터만 넣는다.
@@ -28,6 +31,7 @@ import type { SettingsData } from "../../../lib/settings/types";
  *  - growth-many: 분야 50개(꺾쇠·아주 긴 이름 포함)의 상태보기. 가로로 넘치지 않는지 본다
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
+ *  - timer-many · detail-many(고침 5바퀴): 분야 10개(긴 이름 포함)의 타이머 「할 일 없이 시작」 칩 줄 · 할 일 자세히 칩 줄. 한 줄 + 옆으로 넘김을 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
  */
 
@@ -238,6 +242,17 @@ const MANY_GROWTH: GrowthData = {
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
 
+/** 타이머(고침 5바퀴 칩 줄): 켜진 타이머 없음, 오늘 할 일 없음 → 「할 일 없이 시작」과 분야 칩 줄이 처음부터 보인다 */
+const focusApi: FocusApi = {
+  fetchState: async () => ({ ok: true, data: { serverNow: new Date().toISOString(), active: null, today: [] } }),
+  start: never,
+  end: never,
+};
+const timerToday = async (): Promise<TodayRead> => ({
+  todos: { ok: true, data: { day: { date: "2026-11-09", year: 2026, month: 11, dayOfMonth: 9, weekday: 1 }, todos: [] } },
+  categories: { ok: true, data: { categories: MANY.map((c) => ({ ...c, readable: true as const, createdAt: "x" })) } },
+});
+
 /** 실제 앱(AppShell)과 같은 탭 줄 높이 측정을 쓴다: 글자 200%에서 탭 줄이 두 줄이 돼도 여백이 따라 늘어난다 */
 function Shell({ children }: { children: ReactNode }) {
   const { shellRef, shellStyle } = useTabbarHeight();
@@ -356,13 +371,21 @@ export function V2Gallery({ id }: { id: string }) {
   if (id === "category") {
     return <Opener render={(close) => <CategoryPage api={growthApi(EMPTY_GROWTH)} categoryId={C1} name="어학" onClose={close} />} />;
   }
-  if (id === "detail") {
+  if (id === "timer-many") {
+    return (
+      <Shell>
+        <TimerScreen api={focusApi} fetchToday={timerToday} active activation={1} onActiveChange={noop} />
+        <TabBar tabs={TABS} current="timer" onSelect={noop} />
+      </Shell>
+    );
+  }
+  if (id === "detail" || id === "detail-many") {
     return (
       <Opener
         render={(close) => (
           <TodoDetail
             todo={{ id: "t1", text: "이력서 고치기", categoryId: C2, canMoveUp: true, canMoveDown: true }}
-            chips={CATEGORIES}
+            chips={id === "detail" ? CATEGORIES : MANY}
             api={manageApi}
             online
             onClose={close}
@@ -391,6 +414,8 @@ export function V2Gallery({ id }: { id: string }) {
           "evening",
           "category",
           "detail",
+          "detail-many",
+          "timer-many",
           "ratio-onboarding",
           "ratio-onboarding-many",
           "me-ratio",

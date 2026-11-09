@@ -307,23 +307,72 @@ button, input { font: inherit; color: inherit; }
 /* 적는 창의 「분야」 라벨: 글 칸 도움말 아래, 칩 줄 위 */
 .sheet-category-label { margin-top: var(--space-1); }
 
-/* 칩 줄(CategoryChipRow): 줄바꿈으로 감싸고 두 줄까지 보인다(고침 4바퀴). 칩이 두 줄을 넘으면 줄 안에서 세로로 민다
-   (더 보기 단추 없이, 모든 칩에 탭으로 닿고 포커스가 가면 그 칩이 보이게 밀린다). 가로로는 넘치지 않는다.
-   높이 상한 = 두 줄(칩 누름 영역 48 × 2) + 셋째 줄이 있다는 것이 보이게 16. 칩이 두 줄 이하면 상한에 닿지 않아 내용 높이다.
-   안쪽 좌우 4(포커스 고리가 잘리지 않게). 칩 위아래의 투명 8이 줄 간격 역할을 해 줄 사이 간격은 0 */
+/* 분야 칩 줄(ChipScroller, components/chip-scroller.tsx — 고침 5바퀴, 명세 ⑦-1·④-2): 한 줄로만 놓고 넘치면 옆으로 끌어 넘긴다.
+   두 줄 감싸기 없음. 줄 높이 = 칩 하나 높이. 스크롤 막대는 숨기고(옅어지는 띠와 「‹」「›」가 넘김을 알린다)
+   손가락·트랙패드 가로 스크롤은 그대로 된다. 안쪽 좌우 4(포커스 고리가 잘리지 않게).
+   scroll-padding 24 = 옅어지는 띠 폭: 키보드로 옮긴 칩이 띠 밖(다 보이는 자리)으로 나온다 */
+/* container-type: 칩 최대 폭을 바깥 틀(.chip-scroller) 폭으로 잰다(아래 .chip-row > .chip). 바깥 틀 폭은 「‹」「›」가 나고 들어도 바뀌지 않는다 */
+.chip-scroller { display: flex; align-items: center; min-width: 0; container-type: inline-size; }
 .chip-row {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  align-content: flex-start;
   gap: 0 var(--space-2);
   min-height: var(--tap-min);
-  max-height: calc(var(--tap-min) * 2 + var(--space-4));
   padding: 0 var(--space-1);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 24px;
+  scrollbar-width: none;
 }
+.chip-row::-webkit-scrollbar { display: none; }
+/* 칩 줄 안 칩의 최대 폭 = 바깥 틀 폭 − 「‹」「›」 두 칸 − 줄 안쪽 좌우 4 − 옅어지는 띠 두 개(24 × 2).
+   - 바깥 틀로 잰다: 칩 줄 폭(100%)으로 재면 단추가 나며 줄이 좁아질 때 긴 이름 칩도 같이 줄어 넘침 양이 바뀌고,
+     단추가 사라졌다 다시 나기를 끝없이 되풀이한다(고침 5바퀴 화면 시험에서 찾음)
+   - 띠 두 개를 뺀다: 긴 이름 칩도 키보드로 옮기면 띠 밖에 다 보인다(scroll-padding 24 안쪽에 들어간다) */
+.chip-row > .chip { max-width: calc(100cqi - 2 * var(--tap-min) - 2 * var(--space-1) - 48px); }
+/* 넘친 쪽 끝 24px이 뒤 바탕으로 옅어진다(뒤가 종이색이면 종이색으로, 흰 창 안이면 흰색으로). black·transparent는 칠하는 색이 아니라 가림(mask)의 불투명도다 */
+.chip-scroller[data-more-end] > .chip-row {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
+.chip-scroller[data-more-start] > .chip-row {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px);
+  mask-image: linear-gradient(to right, transparent, black 24px);
+}
+.chip-scroller[data-more-start][data-more-end] > .chip-row {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+/* 「‹」「›」(WCAG 2.5.7 끌지 않는 길): 누름 48×48, 보이는 면 32. 칩 줄 밖 제 칸이라 칩을 가리지 않는다 */
+.chip-nav {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--tap-min);
+  block-size: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.chip-nav-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-surface);
+}
+.chip-nav svg { display: block; }
+.chip-nav:active .chip-nav-face { background: var(--color-notice-bg); }
 /* 칩(CategoryChip·AddCategoryChip): 누름 영역 48×48 이상(위아래 투명 8), 보이는 면은 높이 32 */
 .chip {
   flex: none;
@@ -332,7 +381,7 @@ button, input { font: inherit; color: inherit; }
   justify-content: center;
   min-width: var(--tap-min);
   min-height: var(--tap-min);
-  /* 칩 최대 폭 = 칩 줄 안쪽 폭(감싸기라 긴 이름도 한 줄을 넘지 않는다). 긴 이름은 칩 글에서 한 줄 말줄임 */
+  /* 칩 최대 폭 = 칩 줄 안쪽 폭(긴 이름 칩 하나가 줄 폭을 넘지 않는다). 긴 이름은 칩 글에서 한 줄 말줄임 */
   max-width: 100%;
   padding: var(--space-2) 0;
   border: 0;
