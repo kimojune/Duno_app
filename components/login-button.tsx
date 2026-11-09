@@ -107,14 +107,17 @@ export function DemoCodeView({ value, notice, busy, disabled = false, onChange, 
           {busy ? DEMO_TEXT.busy : DEMO_TEXT.button}
         </SecondaryButton>
       </div>
-      {invalid && (
-        <p id={errorId} role="alert" className="demo-error">
-          <span className="demo-error-icon" aria-hidden="true">
-            !
-          </span>
-          <span>{DEMO_TEXT[notice]}</span>
-        </p>
-      )}
+      {/* 고침10 QA1 ①(Fig 141:13 · UI-03): 오류 줄 자리를 처음부터 비워 둔다 — 오류가 나와도 칸·Google 단추가 안 움직인다 */}
+      <div className="demo-error-slot">
+        {invalid && (
+          <p id={errorId} role="alert" className="demo-error">
+            <span className="demo-error-icon" aria-hidden="true">
+              !
+            </span>
+            <span>{DEMO_TEXT[notice]}</span>
+          </p>
+        )}
+      </div>
     </form>
   );
 }

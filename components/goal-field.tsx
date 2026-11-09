@@ -50,7 +50,7 @@ export function GoalField({
       </label>
       <input
         id={inputId}
-        className="input"
+        className="input goal-input"
         type="text"
         value={value}
         placeholder={placeholder}

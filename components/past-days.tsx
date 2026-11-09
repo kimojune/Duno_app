@@ -7,7 +7,7 @@ import { describeTodoDay } from "../lib/todos/day";
 import type { TodayTodos } from "../lib/todos/types";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { addDays } from "../lib/week";
-import { dayText } from "./todo-view";
+import { CategoryTag, dayText } from "./todo-view";
 import { BackHeader } from "./back-header";
 import { Notice, SecondaryButton } from "./ui";
 
@@ -43,7 +43,10 @@ function composing(event: KeyboardEvent): boolean {
   return event.nativeEvent.isComposing || event.keyCode === 229;
 }
 
-export function PastDays({ api, today, onClose }: { api: ManageApi; today: string; onClose: () => void }) {
+/** 줄마다 붙일 분야(점 색 + 이름). 모르면 null(붙이지 않는다) */
+export type PastCategoryTag = { name: string; color?: string } | null;
+
+export function PastDays({ api, today, onClose, categoryOf }: { api: ManageApi; today: string; onClose: () => void; categoryOf?: (categoryId: string | null) => PastCategoryTag }) {
   const rootRef = useOverlayWindow<HTMLDivElement>(onClose);
   const yesterday = addDays(today, -1);
   const [date, setDate] = useState(yesterday);
@@ -156,13 +159,21 @@ export function PastDays({ api, today, onClose }: { api: ManageApi; today: strin
               <li key={todo.id} className="past-todo">
                 <span className={todo.done ? "past-dot is-done" : "past-dot"} aria-hidden="true" />
                 <span className="sr-only">{todo.done ? PAST_DAYS_TEXT.done : PAST_DAYS_TEXT.notDone}: </span>
-                <span className="past-todo-text">{todo.readable ? todo.text : PAST_DAYS_TEXT.unreadable}</span>
+                <span className="past-todo-body">
+                  <span className="past-todo-text">{todo.readable ? todo.text : PAST_DAYS_TEXT.unreadable}</span>
+                  {/* 고침10 QA1 ④(Fig 148:56): 줄마다 분야 점 10 + 이름 12 */}
+                  {(() => {
+                    const tag = categoryOf?.(todo.categoryId) ?? null;
+                    return tag ? <CategoryTag id={`past-tag-${todo.id}`} name={tag.name} color={tag.color} /> : null;
+                  })()}
+                </span>
               </li>
             ))}
           </ul>
         )}
         {/* 이날 기록 카드 = 그날 합계 숫자만 */}
         {load.status === "ready" && record !== null && (
+          // 고침10 QA1 ④(Fig 148:90): 한 줄 56 — 글 왼쪽 · 숫자 오른쪽 Bold
           <section className="card-box past-record" aria-labelledby="past-record-title">
             <h3 id="past-record-title" className="past-record-title">
               {PAST_DAYS_TEXT.recordTitle}

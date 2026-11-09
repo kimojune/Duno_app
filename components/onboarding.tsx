@@ -100,6 +100,15 @@ function timeOptions(): number[] {
   return Array.from({ length: 48 }, (_, i) => i * 30);
 }
 
+/** 고른 칩 앞 ✓(S5 칩과 같은 꼴) */
+function ChipCheck() {
+  return (
+    <svg className="chip-check" width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
 export function Onboarding({
   api,
   categories,
@@ -332,6 +341,7 @@ export function Onboarding({
               {catalog.map((c, index) => (
                 <button key={c.id} type="button" className="chip" aria-pressed={selected.includes(c.id)} onClick={() => toggleCategory(c.id)}>
                   <span className="chip-face">
+                    {selected.includes(c.id) && <ChipCheck />}
                     <span className="chip-dot" style={{ background: categoryColorValue(index) }} aria-hidden="true" />
                     <span className="chip-label">{c.name}</span>
                   </span>

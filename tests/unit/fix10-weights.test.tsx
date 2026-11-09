@@ -30,8 +30,8 @@ describe("고침10 C 단추 글 굵기 · 선", () => {
 
   it("보조 단추 테두리 1.5, 입력 칸 테두리는 1 --color-border-input 그대로", () => {
     expect(rule(".btn-secondary")).toMatch(/border-width: 0; box-shadow: inset 0 0 0 1\.5px var\(--color-primary\);/);
-    // 「+ 5분」 같은 입력 꼴 단추(1px 회색 테두리)는 보조 단추 선을 받지 않는다
-    expect(rule(".time-wheel-nudge-btn")).toMatch(/border-width: 1px; box-shadow: none; border-color: var\(--color-border-input\);/);
+    // 고침10 QA1 ⑧: 「− 5분」「+ 5분」은 보조 단추 꼴(Bold · 1.5 #1C2340)을 그대로 받는다 — 선을 덮어쓰지 않는다(겹선 없이 한 겹)
+    expect(rule(".time-wheel-nudge-btn")).not.toMatch(/box-shadow|border-width|border-color|font:/);
     expect(CSS).toMatch(/\.input \{[^}]*border: 1px solid var\(--color-border-input\)/);
   });
 

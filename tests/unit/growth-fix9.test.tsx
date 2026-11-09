@@ -461,12 +461,13 @@ describe("S6 빈 상태(Figma 50:598 · 111:79 · 121:240): 카드 밖 안내 �
     expect(rule(".growth-seg-label")).toContain("font: 500 12px/16px var(--font-family)");
     expect(rule(".growth-band")).toContain("block-size: 36px");
     expect(rule(".growth-graph.is-empty .growth-band")).toContain("block-size: 28px");
-    // 「오늘 기록」 보조 단추: 보이는 면 높이 40 · 테두리 · 폭 가득, 누름 영역 48(.btn)
+    // 「오늘 기록」 보조 단추(고침10 QA1 ⑧): 보조 단추 꼴 그대로(Bold · 1.5 #1C2340, 높이 48) — 선·그림자를 덮어쓰지 않고 안 글은 단추 글을 따른다
     const face = rule(".growth-evening-face");
-    expect(face).toContain("min-height: 40px");
-    expect(face).toContain("border: 1px solid var(--color-border-input)");
-    expect(face).toContain("width: 100%");
-    expect(rule(".btn.growth-evening-button")).toContain("width: 100%");
+    expect(face).toContain("font: inherit");
+    expect(face).not.toMatch(/border|box-shadow|min-height/);
+    const button = rule(".btn.growth-evening-button");
+    expect(button).toContain("width: 100%");
+    expect(button).not.toMatch(/box-shadow|border:|background/);
   });
 
   it("원 보기 빈 상태 둘(121:240 · 121:315): 오른쪽 빈 고리(또는 총 시간 원) + 아래 목록 + 카드 끝 「오늘 기록」, 원은 가운데 구멍", async () => {

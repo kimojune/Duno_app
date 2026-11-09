@@ -105,9 +105,15 @@ export function CarryOver({
   }
   return (
     <section className="carry carry-open" aria-labelledby="carry-title">
-      <h2 id="carry-title" className="carry-title">
-        {CARRY_TEXT.title}
-      </h2>
+      {/* 고침10 QA1 ③(Fig 148:108): 「접기」는 제목 줄 오른쪽(보조색 14 Medium), 「n개 가져오기」는 폭 가득 */}
+      <div className="carry-head">
+        <h2 id="carry-title" className="carry-title">
+          {CARRY_TEXT.title}
+        </h2>
+        <TextButton className="carry-close" onClick={() => setOpen(false)}>
+          {CARRY_TEXT.close}
+        </TextButton>
+      </div>
       <ul className="carry-list">
         {items.map((item) => (
           <li key={item.id} className="carry-item">
@@ -133,9 +139,6 @@ export function CarryOver({
         ) : (
           <p className="carry-none">{CARRY_TEXT.none}</p>
         )}
-        <TextButton className="carry-close" onClick={() => setOpen(false)}>
-          {CARRY_TEXT.close}
-        </TextButton>
       </div>
     </section>
   );
