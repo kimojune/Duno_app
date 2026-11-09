@@ -5,6 +5,13 @@ import { loadIntegrationEnv } from "../integration/load-env";
 import { accountA, contextFor, markOnboardingDone, nodeClient, pollUntil, sessionCookies } from "./helpers";
 import { fillWheel } from "./wheel";
 
+/** 고침10 E: 할 일 머리의 「로그아웃」은 없다. 로그아웃은 내 정보 탭 맨 아래 단추 한 곳 — 누르면 할 일 탭의 로그아웃 흐름(확인 창 · 막힘)을 건다 */
+async function logoutFromMe(page: import("@playwright/test").Page) {
+  await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "내 정보" }).click();
+  await page.locator("#me-logout-button").click();
+}
+
+
 /**
  * 기기 먼저 저장(고침 3바퀴)의 실제 흐름(운영 빌드 + duno_dev 시험 계정):
  *  1) 끊긴 채 할 일 적기·저녁 기록 저장 → 연결 → 서버에 한 번씩 들어간다.
@@ -214,7 +221,7 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
     await page.getByRole("textbox", { name: "할 일 적기" }).press("Escape");
 
     // 끊긴 채 로그아웃: 먼저 보내 보고(못 보냄), 확인 창 「로그아웃할까요?」(고침10 B)를 띄운다. 「계속 쓰기」면 그대로
-    await page.getByRole("button", { name: "로그아웃" }).first().click();
+    await logoutFromMe(page);
     const logoutConfirm = page.getByRole("alertdialog", { name: "로그아웃할까요?" });
     await expect(logoutConfirm).toBeVisible({ timeout: 15_000 });
     await expect(logoutConfirm.getByRole("button")).toHaveText(["로그아웃", "계속 쓰기"]);
@@ -226,7 +233,7 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
     await ctx.setOffline(false);
     const arrived = await pollUntil(async () => fresh(await ids(nodeA, "todos"), beforeTodos).length === 1, 60_000, 250);
     expect(arrived).toBeGreaterThanOrEqual(0);
-    await page.getByRole("button", { name: "로그아웃" }).first().click();
+    await logoutFromMe(page);
     await expect(page.getByRole("button", { name: "Google로 로그인" })).toBeVisible({ timeout: 30_000 });
     const left = await page.evaluate(
       () =>

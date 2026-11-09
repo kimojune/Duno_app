@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import type { ManageApi } from "../lib/manage-api";
 import { NOTE_MAX_LENGTH_PUBLIC, countNoteChars } from "../lib/notes/public";
 import type { NoteItem } from "../lib/notes/types";
+import { describeTodoDay } from "../lib/todos/day";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOverlayWindow } from "../lib/use-overlay-window";
@@ -39,6 +40,7 @@ export const DETAIL_TEXT = {
   doneLabel: "끝냄",
   dayLabel: "하는 날",
   saving: "저장 중",
+  /** 머리의 저장 상태: 고치기·작업 기록을 서버가 받았으면(또는 아직 고친 것이 없으면) 「저장됨」(12 보조, 147:58) */
   saved: "저장됨",
   saveFailedShort: "저장 안 됨",
   saveFailedRetry: "저장 안 됨 · 다시 시도",
@@ -52,9 +54,10 @@ export const DETAIL_TEXT = {
   notesTitle: "작업 기록",
   notesLoading: "작업 기록을 불러오는 중",
   notesFailed: "작업 기록을 불러오지 못했어요.",
-  noteLabel: "작업 기록 쓰기",
-  noteAdd: "작업 기록 남기기",
+  // 고침10 F(147:58 · 51:55): 쓰기 칸의 이름표는 위의 「작업 기록」(칸 안 흐린 글 없음). 단추 「남기기」(막지 않는다), 빈 칸에서 누르면 칸 아래 안내
+  noteAdd: "남기기",
   noteAdding: "남기는 중",
+  noteEmpty: "작업 기록을 적어 주세요",
   noteAddFailed: "기록을 남기지 못했어요. 다시 눌러 주세요.",
   noteDelete: "지우기",
   noteDeleteFailed: "기록을 지우지 못했어요.",
@@ -140,6 +143,11 @@ export function TodoDetail({
   const [noteDraft, setNoteDraft] = useState("");
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteMessage, setNoteMessage] = useState("");
+  /** 빈 칸에서 「남기기」를 눌렀다: 칸 아래 안내(12 Medium)를 보이고 칸에 초점을 준다 */
+  const [noteEmpty, setNoteEmpty] = useState(false);
+  /** 「남기기」 연타·Enter 연타에도 저장 호출은 한 번(상태는 다음 그림에서야 바뀌므로 ref로 막는다) */
+  const noteBusyRef = useRef(false);
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
   const noteIdRef = useRef<{ id: string; text: string } | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
@@ -255,20 +263,35 @@ export function TodoDetail({
 
   async function addNote(event?: FormEvent) {
     event?.preventDefault();
-    if (noteBusy || !noteChecked || noteOver || !online) return;
+    if (noteBusyRef.current || noteOver || !online) return; // 진행 중이면 무시(두 번 눌러도 한 번 저장)
+    if (!noteChecked) {
+      // 막지 않는다: 빈 칸·띄어쓰기만이면 저장하지 않고 칸에 초점 + 칸 아래 안내
+      setNoteEmpty(true);
+      noteInputRef.current?.focus();
+      return;
+    }
     const body = noteDraft.trim();
     // 같은 글로 다시 누르면 같은 id(서버가 한 번만 만든다)
     const previous = noteIdRef.current;
     const id = previous && previous.text === body ? previous.id : crypto.randomUUID();
     noteIdRef.current = { id, text: body };
+    noteBusyRef.current = true;
     setNoteBusy(true);
     setNoteMessage("");
-    const res = await api.addNote(id, todo.id, body);
-    setNoteBusy(false);
+    let res: Awaited<ReturnType<ManageApi["addNote"]>>;
+    try {
+      res = await api.addNote(id, todo.id, body);
+    } catch {
+      res = { ok: false, error: "unavailable" };
+    } finally {
+      noteBusyRef.current = false; // 던져도 막힘이 남지 않게
+      setNoteBusy(false);
+    }
     if (res.ok) {
       noteIdRef.current = null;
       setNotes((prev) => (prev.some((n) => n.id === res.data.note.id) ? prev : [...prev, res.data.note]));
       setNoteDraft("");
+      setSaveState("saved");
     } else {
       setNoteMessage(DETAIL_TEXT.noteAddFailed);
     }
@@ -283,8 +306,10 @@ export function TodoDetail({
     setNoteMessage("");
     const res = await api.deleteNote(id);
     setConfirmNote(null);
-    if (res.ok || res.error === "not_found") setNotes((prev) => prev.filter((n) => n.id !== id));
-    else setNoteMessage(DETAIL_TEXT.noteDeleteFailed);
+    if (res.ok || res.error === "not_found") {
+      setNotes((prev) => prev.filter((n) => n.id !== id)); // 지운 그 카드만 사라진다
+      setSaveState("saved");
+    } else setNoteMessage(DETAIL_TEXT.noteDeleteFailed);
   }
 
   const currentChip = categoryId === null ? null : chips.find((c) => c.id === categoryId);
@@ -323,7 +348,8 @@ export function TodoDetail({
   }
 
   const failed = saveState === "failed";
-  const statusText = saveState === "saving" ? DETAIL_TEXT.saving : saveState === "saved" ? DETAIL_TEXT.saved : failed ? DETAIL_TEXT.saveFailedShort : "";
+  // 고침10 F(147:58): 저장 상태는 늘 보인다 — 아직 고친 것이 없으면 「저장됨」(자동 저장 페이지)
+  const statusText = saveState === "saving" ? DETAIL_TEXT.saving : failed ? DETAIL_TEXT.saveFailedShort : DETAIL_TEXT.saved;
 
   return (
     <div
@@ -351,7 +377,7 @@ export function TodoDetail({
             )}
             {/* O-8: 저장 상태는 이 한 곳(polite)에서 한 문장. 초점은 옮기지 않는다 */}
             <span className="sr-only" role="status">
-              {statusText || message}
+              {message || statusText}
             </span>
             <div className="detail-menu-wrap">
               <button
@@ -366,6 +392,7 @@ export function TodoDetail({
               >
                 <span aria-hidden="true">⋯</span>
               </button>
+              {menuOpen && <div className="detail-menu-scrim" aria-hidden="true" onClick={() => closeMenu()} />}
               {menuOpen && (
                 <ul id="detail-menu" className="detail-menu" role="menu" aria-label={DETAIL_TEXT.menuName} onKeyDown={onMenuKeyDown}>
                   <li role="none">
@@ -515,47 +542,57 @@ export function TodoDetail({
             </Notice>
           )}
           {notes.length > 0 && (
-            <ul className="note-list">
-              {notes.map((note) => (
-                <li key={note.id} className="note-item">
-                  <p className="todo-sub">{note.day}</p>
-                  <p className="note-text">{note.readable ? note.text : DETAIL_TEXT.unreadable}</p>
-                  <TextButton
-                    id={`note-delete-${note.id}`}
-                    className="btn-flush-start text-tap"
-                    aria-label={`${DETAIL_TEXT.noteDelete}: ${note.day} 기록`}
-                    disabled={!online}
-                    onClick={() => setConfirmNote(note.id)}
-                  >
-                    {DETAIL_TEXT.noteDelete}
-                  </TextButton>
-                </li>
-              ))}
+            <ul className="note-list note-cards">
+              {notes.map((note) => {
+                const dayName = noteDayText(note.day);
+                return (
+                  <li key={note.id} className="note-item note-card">
+                    {/* 고침10 F(147:95): 흰 카드(모서리 12, 안쪽 12/16) · 날짜 12 Medium 보조색 + 오른쪽 「지우기」 14 Medium 보조색(누름 44) · 글 16 Regular */}
+                    <div className="note-card-head">
+                      <p className="note-day">{dayName}</p>
+                      <TextButton
+                        id={`note-delete-${note.id}`}
+                        className="note-delete text-tap"
+                        aria-label={`${DETAIL_TEXT.noteDelete}: ${dayName} 기록`}
+                        disabled={!online}
+                        onClick={() => setConfirmNote(note.id)}
+                      >
+                        {DETAIL_TEXT.noteDelete}
+                      </TextButton>
+                    </div>
+                    <p className="note-text">{note.readable ? note.text : DETAIL_TEXT.unreadable}</p>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <form onSubmit={addNote} noValidate>
-            <label htmlFor="note-input" className="sr-only">
-              {DETAIL_TEXT.noteLabel}
-            </label>
+            {/* 칸의 이름표는 위의 「작업 기록」(h3). 칸 안 흐린 글(placeholder) 없음 · 높이 96 · 크기 조절 손잡이 없음 */}
             <textarea
               id="note-input"
+              ref={noteInputRef}
               className="note-input detail-note-input"
               rows={3}
+              aria-labelledby="notes-title"
               value={noteDraft}
               onChange={(e) => {
                 setNoteDraft(e.target.value);
                 setNoteMessage("");
+                setNoteEmpty(false);
               }}
-              aria-invalid={noteOver ? true : undefined}
+              aria-invalid={noteOver || noteEmpty ? true : undefined}
               aria-describedby="note-help"
             />
-            <p id="note-help" className="input-help" role="status">
+            <p id="note-help" className="input-help note-help" role="status">
               {noteOver
                 ? `${NOTE_MAX_LENGTH_PUBLIC}자까지 적을 수 있어요. 지금 ${countNoteChars(noteDraft)}자예요.`
-                : noteMessage}
+                : noteEmpty
+                  ? DETAIL_TEXT.noteEmpty
+                  : noteMessage}
             </p>
-            <div className="detail-actions">
-              <SecondaryButton type="submit" busy={noteBusy} disabled={noteBusy || !noteChecked || noteOver || !online}>
+            <div className="detail-actions note-actions">
+              {/* 보조 단추 80×44, 칸 오른쪽 아래. 막지 않는다(빈 칸이어도 눌린다 — 안내로 답한다). 누른 뒤 응답 전에는 「남기는 중」으로 막힌다 */}
+              <SecondaryButton type="submit" className="note-add-btn" busy={noteBusy} disabled={noteBusy || noteOver || !online}>
                 {noteBusy ? DETAIL_TEXT.noteAdding : DETAIL_TEXT.noteAdd}
               </SecondaryButton>
             </div>
@@ -604,6 +641,16 @@ export function TodoDetail({
   );
 }
 
+/** 작업 기록 카드의 날짜 「11월 9일」(옛 「2026-11-09」). 읽을 수 없는 값이면 받은 글 그대로 */
+function noteDayText(day: string): string {
+  try {
+    const d = describeTodoDay(day);
+    return `${d.month}월 ${d.dayOfMonth}일`;
+  } catch {
+    return day;
+  }
+}
+
 /** 분야 순서(0부터) → 색. 칩 목록은 이름을 읽을 수 있는 분야를 만든 순서로 담고 있다(상태보기·다이얼과 같은 순서). 기타는 기타 색 */
 function colorOf(chips: Chip[], id: string | null): string {
   if (id === null) return categoryColorValue(null);
@@ -613,8 +660,9 @@ function colorOf(chips: Chip[], id: string | null): string {
 
 function CheckMark() {
   return (
-    <svg className="category-sheet-check" width={16} height={12} viewBox="0 0 16 12" aria-hidden="true" focusable="false">
-      <path d="M1 6L6 11L15 1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    // 고침10 J(77:18): 체크 24 선 아이콘(선 2, 끝 둥글게)
+    <svg className="category-sheet-check" width={24} height={24} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 12.5L10 17.5L19 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

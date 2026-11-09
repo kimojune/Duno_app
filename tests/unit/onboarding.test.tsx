@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AddCategoryResult } from "../../lib/categories/types";
 import type { HomeRead } from "../../lib/home-types";
@@ -117,10 +117,15 @@ describe("처음 설정 (7-1, ①)", () => {
     mount(api, []);
     click("다음");
     expect(screen.queryByRole("button", { name: /학교 과제|회사 업무/ })).toBeNull();
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "+ 어학" })));
+    // 고침10 J(49:194): 안 고른 예시 칩 앞에 「+」가 없다 — 이름 + 색 점 10
+    const examples = within(screen.getByRole("group", { name: "예시" }));
+    expect(examples.queryByRole("button", { name: "+ 어학" })).toBeNull();
+    expect(examples.getByRole("button", { name: "어학" }).querySelector(".chip-dot")).toBeTruthy();
+    await act(async () => fireEvent.click(examples.getByRole("button", { name: "어학" })));
     expect(api.addCategory).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f-]{36}$/), "어학");
     expect(screen.getByRole("button", { name: "어학", pressed: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "+ 어학" })).toBeNull(); // 이미 있으니 예시에서 빠진다
+    expect(within(screen.getByRole("group", { name: "예시" })).queryByRole("button", { name: "어학" })).toBeNull(); // 이미 있으니 예시에서 빠진다
+    expect(screen.getByRole("button", { name: "어학", pressed: true }).querySelector(".chip-dot")).toBeTruthy(); // 고른 칩도 이름 + 색 점
   });
 
   it("새 분야를 적어 더하고, 같은 이름·기타는 막는다", async () => {
@@ -375,8 +380,10 @@ describe("처음 설정: 예시 칩 이름과 기타 비율 (고침 3바퀴, PM 
   it("분야 예시 칩은 마감 없는 이름이다: 「글쓰기」가 있고 「포트폴리오」는 없다", () => {
     mount(fakeApi(), []);
     click("다음");
-    expect(screen.getByRole("button", { name: "+ 글쓰기" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "+ 포트폴리오" })).toBeNull();
+    const examples = within(screen.getByRole("group", { name: "예시" }));
+    expect(examples.getByRole("button", { name: "글쓰기" })).toBeTruthy();
+    expect(examples.queryByRole("button", { name: "포트폴리오" })).toBeNull();
+    expect(examples.queryAllByRole("button").every((b) => !/^\+/.test(b.textContent ?? ""))).toBe(true); // 안 고른 칩 앞 「+」 없음
   });
   it("비율 단계에는 고른 분야 줄 뒤에 기타 줄이 있고 처음에는 0%다(분야끼리 균등 배분, 합 100)", () => {
     mount(fakeApi());

@@ -18,7 +18,7 @@ vi.mock("../../lib/read-client", () => ({
 vi.mock("../../app/actions", () => ({ signOut: (...a: unknown[]) => signOut(...a) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { TodoScreen } from "../../components/todo-screen";
+import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 
 const DAY: TodoDay = { date: "2026-11-07", year: 2026, month: 11, dayOfMonth: 7, weekday: 6 };
 const ID_OLD = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -67,7 +67,7 @@ function visibleTexts(text: string): HTMLElement[] {
   return screen.queryAllByText(text).filter((el) => !el.closest(".sr-only"));
 }
 async function mount(outbox: Outbox | undefined, initial: TodayRead = INITIAL) {
-  render(<TodoScreen initial={initial} outbox={outbox} />);
+  render(<TodoScreenWithLogout initial={initial} outbox={outbox} />);
   await act(async () => {});
 }
 
@@ -229,7 +229,7 @@ describe("오프라인으로 할 일 적기 (PRD 10절)", () => {
     await mount(box);
     setOnline(false);
     await write("지워질 글");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     // 저장 안 된 글이 있어 확인이 뜬다
     await act(async () => fireEvent.click(screen.getAllByRole("button", { name: "로그아웃" }).at(-1)!));
     expect(signOut).toHaveBeenCalled();

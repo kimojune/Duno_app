@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { APP_CONFIG } from "../lib/app-config";
 import { CATEGORY_LIMIT, checkCategoryName, countCategoryChars, sameCategoryName } from "../lib/categories/validation";
 import type { AddCategoryResult } from "../lib/categories/types";
-import { buildItems, classifySaveMode, initialSelection, notSplitItems, otherOf, pickChip, unpickChip, type EveningItem } from "../lib/evening/logic";
+import { buildItems, classifySaveMode, initialSelection, notSplitItems, otherOf, splitEvenly, type EveningItem } from "../lib/evening/logic";
 import type { EveningState, SavedEvening } from "../lib/evening/types";
 import type { EveningApi } from "../lib/evening-api";
 import { formatMinutes } from "../lib/time-format";
@@ -36,20 +36,23 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  * - 나누기 단계(고침 5바퀴, PM 10 — d-114 가 · d-115 나 · d-116 가):
  *   - 위에 분야 칩 줄(이름표 「분야」). 칩 = 다이얼에 넣을 분야 고르기(여럿). 맨 끝 「+ 분야」는 그 자리에서 새 분야를 더하고 골라진 칩이 된다.
  *   - 다이얼과 아래 −/+ 줄 = 고른 분야 조각 + 맨 끝 기타 조각만. 고르지 않은 분야는 조각도 줄도 없다. 12시 고정(첫 조각 시작·기타 끝이 12시).
- *   - 칩을 새로 고르면 기타에서 30분(기타가 적으면 기타 전부)을 떼어 그 분야 조각이 생기고 그 조각이 골라진다. 칩을 풀면 그 시간이 기타로 돌아간다. 합(쓴 시간)은 늘 그대로.
- *   - 0분 조각(기타가 0분일 때 고른 칩 등)은 다이얼에 칠하지 않고(폭 0) 줄에서만 보인다. 0분으로 생긴 칩은 다이얼 고름을 옮기지 않아
+ *   - 칩을 고르거나 풀 때마다(PM d-180, 고침10) 타이머로 잰 분야는 잰 시간 그대로 두고, 고른 나머지 분야끼리 남은 시간(쓴 시간 − 타이머 분야 잰 시간)을
+ *     똑같이 나눈다(분야 없이 잰 타이머 시간도 빼서 기타에 둔다 — d-205. 5분 단위로 내리고 나머지는 기타 — lib/evening/logic.ts splitEvenly). 고른 분야가 없으면 남은 시간 전부 기타. 합(쓴 시간)은 늘 그대로.
+ *     손잡이·−/+로 맞춘 뒤 칩을 더 고르거나 풀면 다시 똑같이 나뉜다(맞춘 값이 덮인다). 「균등 배분」 단추는 없다(자동으로 나눌 뿐).
+ *   - 0분 조각(남은 시간이 적어 0분이 된 고른 칩 등)은 다이얼에 칠하지 않고(폭 0) 줄에서만 보인다. 0분으로 생긴 칩은 다이얼 고름을 옮기지 않아
  *     12시에 0분 조각·손잡이가 새로 서지 않는다(E1 판단).
  *   - 손잡이(고침6 PM d-129 ②, RatioDial skipZero): 0분이 아닌 조각 사이 경계에만 서고 0분 조각은 건너뛴다. 그래서 기타 0분이면 마지막 분야의 끝(12시)에 손잡이가 없다.
  *     0분 조각을 고르면 그 자리가 0분 아닌 두 조각 사이일 때만 겹친 손잡이 하나가 서고(끌어 키움), 12시 자리면 손잡이가 없다 — 줄의 +가 키운다.
  *     기타 0분에서 마지막 분야를 기타로 돌려주는 끌기 길은 없다: 줄의 −(Stepper)가 줄인 몫을 기타로 돌려준다.
  *   - 조각 고르기는 칩이 아니라 조각이나 아래 줄을 눌러서. 고른 줄 = 연한 면 바탕 + 이름 Bold.
- *   - 처음 값: 기타 100%(가운데 「{합계}」「기타」, 손잡이 없음). 타이머로 잰 분야와 그날 끝낸 할 일의 분야만 칩이 골라진 채 시작(lib/evening/logic.ts initialSelection).
- *     나누기 단계에 들어갈 때 나눈 값을 고친 적이 없으면 그때의 끝낸 할 일(state.doneCategoryIds)로 다시 만든다. 고친 뒤에는 덮지 않는다.
- *   - 이미 남긴 기록을 고치러 오면 그 기록의 분야(0분 넘는 것)가 골라진 채 시작한다.
+ *   - 처음 값: 기타 100%(가운데 「{합계}」「기타」, 손잡이 없음). 타이머로 잰 분야와 그날 끝낸 할 일의 분야는 칩이 골라진 채 시작하고 같은 규칙으로 똑같이 나뉜다
+ *     (lib/evening/logic.ts initialSelection · 규칙 4). 나누기 단계에 들어갈 때 나눈 값을 건드린 적이 없으면 그때의 끝낸 할 일(state.doneCategoryIds)로 다시 만든다.
+ *   - 이미 남긴 기록을 고치러 오면 그 기록의 값 그대로(분야 0분 넘는 것이 골라진 채) 열고, 칩을 고르거나 풀 때부터 똑같이 나눈다(d-181).
  *   다이얼과 줄의 Stepper는 같은 값을 쓴다(Stepper는 끌지 않는 길, WCAG 2.5.7). 손잡이 한 걸음은 minuteStep(5분), 끌기도 5분 단위.
  *   나눈 합은 쓴 시간을 넘지 못한다(PM 확정 11-08): Stepper도 기타에 남은 만큼까지만 늘어난다. 쓴 시간 0분이면 다이얼을 그리지 않는다.
- * - 나눈 뒤 앞 단계로 돌아가 쓴 시간을 고치면: 나눈 값을 고친 적이 없으면 새 쓴 시간으로 처음 값을 다시 만들고,
+ * - 나눈 뒤 앞 단계로 돌아가 쓴 시간을 고치면(d-183): 손잡이·−/+로 고친 적이 없으면 새 쓴 시간으로 똑같이 다시 나누고(고른 칩은 그대로),
  *   고친 적이 있거나 이미 남긴 기록이면 비율을 지키며 5분 단위로 다시 나눈다(남는 것은 기타).
+ * - 타이머로 잰 시간이 쓴 시간보다 크면 남은 시간은 0으로 본다(고른 분야 0분 · 기타 0분, 타이머 분야는 잰 시간 그대로, d-182).
  * 연결이 끊기면 저장하지 않고(이번 범위는 할 일만 오프라인) 안내한다. 입력한 값은 그대로 둔다.
  * 모든 글(분야 이름 포함)은 React 텍스트로만 그린다.
  */
@@ -66,7 +69,6 @@ export const EVENING_TEXT = {
   total: (m: number) => `합계 ${formatMinutes(m)}`,
   /** 고침 5바퀴: 타이머로 미리 채웠을 때 시간 입력 아래 작은 표시. 고침6 PM d-129 ④: 옛 알림 글 「타이머로 n 미리 채웠어요.」는 빼고 이 띠만 남긴다 */
   timerChip: (m: number) => `타이머 ${formatMinutes(m)}`,
-  existing: "이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.",
   skipSplit: "나누지 않고 저장",
   split: "분야마다 나누기",
   splitHeading: "분야마다 나눠 주세요",
@@ -188,6 +190,10 @@ export function EveningRecord({
   const splitBaseRef = useRef<number | null>(null);
   /* 나누기 단계에서 사용자가 값을 고쳤나(칩 고르기·풀기 포함. 고친 값은 처음 값으로 다시 덮지 않는다) */
   const editedRef = useRef(false);
+  /* 손잡이·−/+로 값을 맞췄나(칩 고르기·풀기는 아니다). 맞춘 값은 쓴 시간이 바뀌면 비율을 지키고, 칩을 고르거나 풀면 똑같이 나뉘며 덮인다 */
+  const tunedRef = useRef(false);
+  /* 마지막으로 값을 바꾼 것이 칩 고르기·풀기(자동으로 똑같이 나눔)이고 그 뒤 맞춘 적이 없나 */
+  const evenRef = useRef(false);
   const [dialPick, setDialPick] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -221,6 +227,8 @@ export function EveningRecord({
       setDialPick(OTHER_KEY);
     }
     editedRef.current = false;
+    tunedRef.current = false;
+    evenRef.current = false;
     dirtyRef.current = false;
     setAdded([]);
     setNewCatOpen(false);
@@ -274,6 +282,11 @@ export function EveningRecord({
   const colorOf = (id: string) => categoryColorValue(catalogIds.indexOf(id));
   const names = new Map(catalog.map((c) => [c.id, c.name]));
   const timerSum = state ? state.timerByCategory.reduce((s, t) => s + t.minutes, 0) : 0;
+  // 타이머로 잰 분야별 시간(분야 없이 켠 타이머는 기타라 뺀다)
+  const timerMap: Record<string, number> = {};
+  let timerOtherSum = 0; // 분야 없이 잰 타이머(기타 타이머): 나눌 몫에서 빼고 기타에 둔다(PM d-205)
+  if (state) for (const t of state.timerByCategory) if (t.categoryId !== null) timerMap[t.categoryId] = (timerMap[t.categoryId] ?? 0) + t.minutes;
+    else timerOtherSum += t.minutes;
   // 저장 항목은 분야 순서(만든 순서) → 숨은 분야 → 기타. 칩을 고른 순서와 상관없이 화면 줄 순서와 같다
   const built = buildItems(total, {
     ...Object.fromEntries(catalogIds.filter((id) => has(perCategory, id)).map((id) => [id, perCategory[id]])),
@@ -295,8 +308,8 @@ export function EveningRecord({
     if (!state) return;
     setMessage("");
     const base = splitBaseRef.current;
-    if (base !== null && (state.existing || editedRef.current)) {
-      // 이미 나눈 값이 있다: 쓴 시간이 바뀌었으면 비율을 지키며 5분 단위로 다시 나누고 남는 것은 기타(나눈 합 ≤ 쓴 시간). 고른 칩은 그대로
+    if (base !== null && (tunedRef.current || (state.existing && !evenRef.current))) {
+      // 손잡이·−/+로 맞춘 값(또는 칩을 건드리지 않은 이미 남긴 기록): 쓴 시간이 바뀌었으면 비율을 지키며 5분 단위로 다시 나누고 남는 것은 기타(나눈 합 ≤ 쓴 시간). 고른 칩은 그대로
       if (base !== total) {
         const ids = Object.keys(perCategory);
         const next = rescaleSplit(
@@ -308,8 +321,16 @@ export function EveningRecord({
         setPerCategory(Object.fromEntries(ids.map((id, i) => [id, next[i]])));
         splitBaseRef.current = total;
       }
+    } else if (base !== null && evenRef.current) {
+      // 칩만 고르고 푼 값(d-183): 고친 적이 없으니 새 쓴 시간으로 고른 칩끼리 똑같이 다시 나눈다
+      if (base !== total) {
+        const next = evenFor(Object.keys(perCategory).filter((id) => names.has(id)), perCategory);
+        perRef.current = next;
+        setPerCategory(next);
+        splitBaseRef.current = total;
+      }
     } else if (!state.existing) {
-      // 처음 값(나눈 값을 고친 적이 없을 때마다 그때의 끝낸 할 일·타이머로 다시 만든다): 기타 100% + 타이머 분야 + 끝낸 할 일 분야 30분씩
+      // 처음 값(나눈 값을 건드린 적이 없을 때마다 그때의 끝낸 할 일·타이머로 다시 만든다): 타이머 분야 + 끝낸 할 일 분야가 골라진 채 똑같이 나뉜다
       const timer: Record<string, number> = {};
       let timerOther = 0;
       for (const t of state.timerByCategory) {
@@ -322,21 +343,31 @@ export function EveningRecord({
       setPerCategory(init.perCategory);
       splitBaseRef.current = init.total;
       editedRef.current = false;
+      evenRef.current = false;
+      tunedRef.current = false;
       setDialPick(initialPick(catalogIds, init.perCategory));
     }
     setPhase("split");
   }
 
-  /** 칩을 고른다: 기타에서 30분(적으면 전부)을 떼어 조각을 만들고, 0분이 아니면 그 조각을 고른다 */
+  /** 고른 칩(ids)끼리 남은 시간을 똑같이 나눈 값(타이머 분야는 잰 시간 그대로, 칩이 없는 숨은 분야는 prev 값 그대로) */
+  function evenFor(ids: string[], prev: Record<string, number>): Record<string, number> {
+    const hidden = Object.fromEntries(Object.entries(prev).filter(([id]) => !names.has(id)));
+    return splitEvenly({ totalMinutes: total, chosenIds: ids, timer: timerMap, hidden, timerOther: timerOtherSum });
+  }
+
+  /** 칩을 고른다: 고른 칩끼리 남은 시간을 똑같이 다시 나눈다(손잡이·−/+로 맞춘 값은 덮인다). 0분이 아니면 그 조각을 고른다 */
   function chooseChip(id: string) {
     const prev = perRef.current;
     if (has(prev, id)) return;
-    const res = pickChip(total, prev, id);
+    const next = evenFor([...Object.keys(prev).filter((k) => names.has(k)), id], prev);
     editedRef.current = true;
+    evenRef.current = true;
+    tunedRef.current = false;
     dirtyRef.current = true;
-    perRef.current = res.perCategory;
-    setPerCategory(res.perCategory);
-    if (res.taken > 0) setDialPick(id);
+    perRef.current = next;
+    setPerCategory(next);
+    if ((next[id] ?? 0) > 0) setDialPick(id);
   }
   function toggleChip(id: string) {
     dirtyRef.current = true;
@@ -346,9 +377,11 @@ export function EveningRecord({
       chooseChip(id);
       return;
     }
-    // 칩을 푼다: 그 시간은 기타로 돌아가고 조각·줄이 사라진다. 고른 조각이었으면 고름도 풀린다(남은 칩이 없으면 기타 — 기타 100%)
+    // 칩을 푼다: 남은 고른 칩끼리 다시 똑같이 나눈다(타이머 분야를 풀면 그 시간은 남은 시간으로 돌아간다). 고른 조각이었으면 고름도 풀린다(남은 칩이 없으면 기타 — 기타 100%)
     editedRef.current = true;
-    const next = unpickChip(prev, id);
+    evenRef.current = true;
+    tunedRef.current = false;
+    const next = evenFor(Object.keys(prev).filter((k) => k !== id && names.has(k)), prev);
     perRef.current = next;
     setPerCategory(next);
     if (dialPick === id) setDialPick(catalogIds.some((c) => c !== id && has(next, c)) ? null : OTHER_KEY);
@@ -532,7 +565,6 @@ export function EveningRecord({
               <h2 className="evening-ask" tabIndex={-1} ref={titleRef}>
                 {ask}
               </h2>
-              {state.existing && <p className="todo-sub">{EVENING_TEXT.existing}</p>}
               {!online && <Notice role="status">{EVENING_TEXT.offline}</Notice>}
               <TimeWheel id="evening-wheel" total={total} onChange={changeTotal} disabled={saving} />
               {!state.existing && timerSum > 0 && (
@@ -645,6 +677,8 @@ export function EveningRecord({
                       onSelect={setDialPick}
                       onChange={(values) => {
                         editedRef.current = true;
+                        tunedRef.current = true;
+                        evenRef.current = false;
                         dirtyRef.current = true;
                         setPerCategory((prev) => ({ ...prev, ...Object.fromEntries(chosen.map((c, i) => [c.id, values[i]])) }));
                       }}
@@ -679,6 +713,8 @@ export function EveningRecord({
                         step={APP_CONFIG.minuteStep}
                         onChange={(m) => {
                           editedRef.current = true;
+                          tunedRef.current = true;
+                          evenRef.current = false;
                           dirtyRef.current = true;
                           setPerCategory((prev) => ({ ...prev, [c.id]: m }));
                         }}
@@ -757,13 +793,18 @@ export const EVENING_ENTRY_LABEL = `${EVENING_TEXT.title} 남기기`;
 /** 할 일 화면 위에 얹는 오늘 기록 입구. 저녁(오후 6시~새벽 4시 전)에는 질문 글을 앞세운다 */
 export function EveningEntry({ onOpen }: { evening?: boolean; onOpen: () => void }) {
   return (
-    <section className="entry-card" aria-label={EVENING_TEXT.title}>
-      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만). 두 줄 글은 한 묶음, 단추는 오른쪽 한 줄 */}
-      <div className="entry-text">
-        <p className="entry-title">{EVENING_TEXT.title}</p>
-        <p className="todo-sub entry-ask">{EVENING_TEXT.askToday}</p>
-      </div>
-      <SecondaryButton onClick={onOpen}>{EVENING_ENTRY_LABEL}</SecondaryButton>
-    </section>
+    // 고침10 E(50:72): 카드 전체가 누름 — 오른쪽 「›」, 알약 「오늘 기록 남기기」는 없다. 화면 읽기 이름은 단추 이름(EVENING_ENTRY_LABEL) + 설명(질문 글)
+    <button type="button" id="evening-entry" className="entry-card entry-card-button" aria-label={EVENING_ENTRY_LABEL} aria-describedby="evening-entry-ask" onClick={onOpen}>
+      {/* 고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」를 늘 보인다(Figma 50:28 · 50:52 — 옛판은 저녁에만) */}
+      <span className="entry-text">
+        <span className="entry-title">{EVENING_TEXT.title}</span>
+        <span id="evening-entry-ask" className="todo-sub entry-ask">
+          {EVENING_TEXT.askToday}
+        </span>
+      </span>
+      <span className="entry-go" aria-hidden="true">
+        ›
+      </span>
+    </button>
   );
 }

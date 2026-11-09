@@ -23,6 +23,8 @@ export type LocalTodos = {
   refresh(): void;
   /** 로그인이 풀려 서버에 보내지 못하고 있는가 */
   isAuthLost(): boolean;
+  /** 아직 서버가 받지 않은 「적기」의 할 일 번호들(보낼 줄에 todo.add가 남은 것) — 줄에 「저장 대기」 원을 그린다(고침10, Figma 128:87) */
+  pendingAddIds(): ReadonlySet<string>;
   /** 로그아웃 직전: 기기의 보낼 줄(다른 탭 것 포함)을 서버에 보내 보고(최대 limitMs), 기기에 남은 못 보낸 쓰기 수를 돌려준다 */
   flushBeforeSignOut(): Promise<number>;
   /** 로그아웃: 이 사용자의 기기 저장소(거울·보낼 줄·고른 값·받지 않은 쓰기 보관)를 지우고 다른 탭에 알린다 */
@@ -49,6 +51,7 @@ export function createLocalTodos(runtime: Runtime, apis: LocalApis): LocalTodos 
       void runtime.pull();
     },
     isAuthLost: runtime.isAuthLost,
+    pendingAddIds: () => new Set(runtime.pendingOps().flatMap((q) => (q.op.kind === "todo.add" ? [q.op.id] : []))),
     flushBeforeSignOut: async () => {
       // 다른 탭이 적어 둔 보낼 줄도 함께 보내 보고, 못 보낸 수는 기기 저장소의 이 사용자 줄 칸으로 센다(F1: 로그아웃이 다른 탭의 줄까지 지운다)
       let timer: ReturnType<typeof setTimeout> | undefined;

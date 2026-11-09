@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { checkCategoryName, sameCategoryName } from "../lib/categories/validation";
+import { categoryColorValue } from "../lib/category-color";
 import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { evenRatios } from "../lib/settings/validation";
@@ -327,9 +328,11 @@ export function Onboarding({
             </h1>
             <p className="onboarding-sub">{ONBOARDING_TEXT.categorySub}</p>
             <ChipScroller aria-label={ONBOARDING_TEXT.categoryGroup}>
-              {catalog.map((c) => (
+              {/* 고침10 J(49:194): 칩 = 색 점 10 + 이름. 안 고른 칩 앞에 「+」를 붙이지 않는다 */}
+              {catalog.map((c, index) => (
                 <button key={c.id} type="button" className="chip" aria-pressed={selected.includes(c.id)} onClick={() => toggleCategory(c.id)}>
                   <span className="chip-face">
+                    <span className="chip-dot" style={{ background: categoryColorValue(index) }} aria-hidden="true" />
                     <span className="chip-label">{c.name}</span>
                   </span>
                 </button>
@@ -337,10 +340,12 @@ export function Onboarding({
             </ChipScroller>
             {examples.length > 0 && (
               <ChipScroller aria-label={ONBOARDING_TEXT.exampleGroup}>
-                {examples.map((name) => (
+                {examples.map((name, index) => (
                   <button key={name} type="button" className="chip chip-add" onClick={() => void addNamed(name)} disabled={addingName !== null}>
                     <span className="chip-face">
-                      <span className="chip-label">+ {name}</span>
+                      {/* 점 색 = 이 칩이 분야가 되면 갖게 될 자리의 색(지금 분야 수 + 예시 순서). 이름 앞 「+」는 없다 */}
+                      <span className="chip-dot" style={{ background: categoryColorValue(catalog.length + index) }} aria-hidden="true" />
+                      <span className="chip-label">{name}</span>
                     </span>
                   </button>
                 ))}

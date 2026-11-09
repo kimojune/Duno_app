@@ -5,6 +5,13 @@ import { expect, test, type BrowserContext, type Cookie, type Page } from "@play
 import { cleanupTodos } from "../integration/cleanup";
 import { loadIntegrationEnv, type IntegrationEnv } from "../integration/load-env";
 
+/** 고침10 E: 할 일 머리의 「로그아웃」은 없다. 로그아웃은 내 정보 탭 맨 아래 단추 한 곳 — 누르면 할 일 탭의 로그아웃 흐름(확인 창 · 막힘)을 건다 */
+async function logoutFromMe(page: import("@playwright/test").Page) {
+  await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "내 정보" }).click();
+  await page.locator("#me-logout-button").click();
+}
+
+
 /**
  * 적는 창 칩 줄을 모두 보이게 한다(고침9 칩 두 줄 부품 components/chip-scroller.tsx: 셋째 줄로 넘치면 「+n」으로 접히고
  * 「+ 분야」·뒤 칩이 숨는다 — 시험 계정에 분야가 쌓이면 접힌다). 접혔으면 「분야 n개 더 보기」를 눌러 펼치고 「분야 접기」가 뜬 것까지 본다.
@@ -234,7 +241,7 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     // 뒤로 갈 기록이 확실히 있게, 서로 다른 주소(?from=todo)의 할 일 화면에서 로그아웃한다
     await page.goto("/?from=todo");
     await expect(page.getByText(marker, { exact: false }).first()).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: "로그아웃" }).click();
+    await logoutFromMe(page);
     await expect(page.getByRole("button", { name: "Google로 로그인" })).toBeVisible({ timeout: 20_000 });
     expect(page.url()).not.toContain("from=todo"); // 로그아웃 뒤에는 "/"
     // 뒤로 가기: 실패를 삼키지 않는다. 실제로 이전 주소로 갔는지(history가 있었다는 것)를 먼저 본다.

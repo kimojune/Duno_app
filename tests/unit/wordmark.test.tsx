@@ -47,7 +47,6 @@ const base: TodoViewProps = {
   onRetry: noop,
   onRemove: noop,
   onReload: noop,
-  onLogout: noop,
   onLogoutConfirm: noop,
   onLogoutCancel: noop,
   onCopy: noop,

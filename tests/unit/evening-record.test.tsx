@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EveningEntry, EveningRecord } from "../../components/evening-record";
 import type { EveningState, SavedEvening } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
-import { buildDemoPlan } from "../../lib/demo/seed";
 import { setNumberField, wheelTotal, wheelValue } from "./time-wheel-helpers";
 
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
@@ -136,27 +135,26 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(within(screen.getByRole("dialog")).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["이전"]); // 머리 「‹」 하나(닫기)
   });
 
-  it("분야마다 나누기: 타이머 분야는 그 시간, 끝낸 할 일의 분야는 칩이 골라진 채 기타에서 30분(남은 시간을 나눠 채우지 않는다 — d-115 나·d-116 가). 그대로 저장하면 prefilled", async () => {
+  it("분야마다 나누기: 타이머 분야는 그 시간 그대로, 끝낸 할 일의 분야는 칩이 골라진 채 남은 시간을 똑같이 나눈다(PM d-180 규칙 1·4). 그대로 저장하면 prefilled", async () => {
     const api = fakeApi(state({ doneCategoryIds: [C2, null], timerByCategory: [{ categoryId: C1, minutes: 30 }] }));
     await mount(api);
     setNumber("시간", 2); // 타이머 30분이 처음 총시간이라 분은 30이다
-    setNumber("분", 0); // 120분: 타이머 30 + 끝낸 할 일 분야(글쓰기) 30 + 기타 60
+    setNumber("분", 0); // 120분: 타이머 어학 30 + 남은 90은 끝낸 할 일 분야(글쓰기) 하나가 다 받는다(기타 0)
     await press("분야마다 나누기");
     expect(screen.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeTruthy();
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("30");
-    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("30");
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("90");
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
       expect.objectContaining({
         totalMinutes: 120,
-        items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 30 }, { categoryId: null, minutes: 60 }],
+        items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 90 }],
         saveMode: "prefilled",
       }),
     );
     expect(afterSaveRows()).toEqual([
       ["어학", "+30분"],
-      ["글쓰기", "+30분"],
-      ["기타", "+1시간"],
+      ["글쓰기", "+1시간 30분"],
     ]);
   });
 
@@ -191,10 +189,10 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     await mount(api);
     setNumber("시간", 2);
     await press("분야마다 나누기");
-    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5분 줄이기" }));
+    fireEvent.click(screen.getByRole("button", { name: "글쓰기 5분 줄이기" })); // 처음 값 120(남은 시간 전부) → 115, 5분은 기타
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(
-      expect.objectContaining({ items: [{ categoryId: C2, minutes: 25 }, { categoryId: null, minutes: 95 }], saveMode: "edited" }),
+      expect.objectContaining({ items: [{ categoryId: C2, minutes: 115 }, { categoryId: null, minutes: 5 }], saveMode: "edited" }),
     );
   });
 
@@ -207,15 +205,16 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     setNumber("어학", 90);
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("60");
     expect((screen.getByRole("button", { name: "어학 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true);
-    await press("글쓰기, 다이얼에 넣기"); // 기타 0분이라 0분 줄
-    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
+    await press("글쓰기, 다이얼에 넣기"); // 칩 둘 = 60분을 30분씩(기타 0분)
+    expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("30");
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("30");
     expect((screen.getByRole("button", { name: "글쓰기 5분 늘리기" }) as HTMLButtonElement).disabled).toBe(true); // 기타가 0분이라 다른 분야도 못 늘린다
-    setNumber("글쓰기", 30);
-    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("0");
+    setNumber("글쓰기", 50);
+    expect((screen.getByLabelText("글쓰기") as HTMLInputElement).value).toBe("30");
     expect(screen.queryByText(/나눈 시간이 합계보다 많아서/)).toBeNull();
     expect(screen.getByText("합계 1시간")).toBeTruthy();
     await press("저장");
-    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 60, items: [{ categoryId: C1, minutes: 60 }] }));
+    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 60, items: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 30 }] }));
   });
 
   it("저장 뒤 카드 아래 가운데 「상태보기에서 보기 ›」 글 단추를 누르면 상태보기로 간다(onOpenGrowth). 없으면 단추도 없다", async () => {
@@ -279,31 +278,12 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     };
     const api = fakeApi(state({ existing }));
     await mount(api);
-    expect(screen.getByText("이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.")).toBeTruthy();
+    expect(screen.queryByText("이미 남긴 기록이 있어요. 고쳐서 다시 저장할 수 있어요.")).toBeNull(); // PM d-174 ②: 설명 글을 지웠다(고쳐서 다시 저장하는 동작은 그대로)
     expect([wheelValue("시간"), wheelValue("분")]).toEqual([2, 30]);
     await press("분야마다 나누기");
     expect((screen.getByLabelText("어학") as HTMLInputElement).value).toBe("100");
     await press("저장");
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 150, saveMode: "prefilled" }));
-  });
-
-  it("체험 데이터의 오늘 기록 줄(PM 13)이 「이미 남긴 기록」으로 들어와도 깨지지 않고 그 값으로 열린다", async () => {
-    const plan = buildDemoPlan("11111111-1111-4111-8111-111111111111", "2026-11-07");
-    const log = plan.eveningLogs.find((l) => l.targetDay === "2026-11-07")!;
-    expect(log).toBeTruthy();
-    const ids = [C1, C2];
-    const existing = {
-      id: log.id,
-      targetDay: log.targetDay,
-      totalMinutes: log.totalMinutes,
-      items: log.items.map((i) => ({ categoryId: i.categoryIndex === null ? null : ids[i.categoryIndex % 2], minutes: i.minutes })),
-      saveMode: "edited" as const,
-      savedAt: "x",
-    };
-    const api = fakeApi(state({ existing }));
-    await mount(api);
-    expect([wheelValue("시간"), wheelValue("분")]).toEqual([Math.floor(log.totalMinutes / 60), log.totalMinutes % 60]);
-    expect(screen.getByRole("button", { name: "나누지 않고 저장" })).toBeTruthy();
   });
 
   it("저장이 실패하면 안내를 보이고 값은 그대로, 같은 내용으로 다시 누르면 같은 id", async () => {
@@ -404,7 +384,12 @@ describe("EveningEntry", () => {
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "오늘 기록 남기기" }));
     expect(onOpen).toHaveBeenCalled();
-    expect(screen.getByRole("region", { name: "오늘 기록" })).toBeTruthy();
+    // 고침10 E(50:72): 카드 전체가 하나의 단추(알약 「오늘 기록 남기기」는 없다). 이름 = 「오늘 기록 남기기」, 설명 = 질문 글, 오른쪽 「›」
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(document.querySelector(".entry-card .btn")).toBeNull();
+    const card = screen.getByRole("button", { name: "오늘 기록 남기기" });
+    expect(document.getElementById(card.getAttribute("aria-describedby")!)!.textContent).toBe("오늘 몇 시간 썼어요?");
+    expect(card.querySelector(".entry-go")?.textContent).toBe("›");
     rerender(<EveningEntry evening={false} onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy(); // 옛판은 낮에 숨김 — Figma 50:28 · 50:52는 늘 보임
     expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글

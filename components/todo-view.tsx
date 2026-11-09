@@ -30,7 +30,8 @@ import { Wordmark } from "./wordmark";
 
 export const TODO_TEXT = {
   title: "오늘",
-  logout: "로그아웃",
+  /** 고침10 E(50:52, d-173): 날짜 줄 오른쪽 원 단추 「‹」의 화면 읽기 이름(아이콘만 보인다). 「›」 하루 뒤는 없다 */
+  pastDays: "지난 날 보기",
   label: "할 일 적기",
   add: "적기",
   unreadable: "읽을 수 없는 할 일", // (임시)
@@ -38,9 +39,9 @@ export const TODO_TEXT = {
   // 고침9 ⑬ 9: 빈 목록 = 이름표 「예시」 + 흐린 예시 할 일 줄 둘(옛 「아래 단추를 눌러 적어 보세요.」 대신). 누를 수 없고 목록·개수에 안 섞인다
   exampleLabel: "예시",
   examples: [
-    // colorOrder: 분야 색 순서(0부터) — Figma 50:28의 점 색(어학 = 분야 색 2, 포트폴리오 = 분야 색 1)
+    // colorOrder: 분야 색 순서(0부터) — Figma 50:28의 점 색(어학 = 분야 색 2, 글쓰기 = 분야 색 1)
     { text: "토익 단어 50개", category: "어학", colorOrder: 1 },
-    { text: "포트폴리오 2장 고치기", category: "포트폴리오", colorOrder: 0 },
+    { text: "글 한 편 초고 쓰기", category: "글쓰기", colorOrder: 0 },
   ],
   /** 고침9 PM 2-B: 할 일 글 바로 뒤 종이 아이콘의 화면 읽기 이름(옛 글 「기록 있음」) */
   hasNotes: "작업 기록 있음",
@@ -169,6 +170,8 @@ export type RowView = {
   failed: boolean;
   /** 오프라인으로 적어 기기에 둔 줄: 연결되면 저장한다(PRD 10절) */
   queued?: boolean;
+  /** 기기 먼저 저장: 서버가 아직 받지 않은 줄(끊긴 동안). 줄 오른쪽에 「저장 대기」 원만 그린다 — 「빼기」 단추는 없다(기기 보낼 줄은 빼지 않는다) */
+  pending?: boolean;
   checkFailed: boolean;
   /** 분야 표시 글(CategoryTag). null이면 기타라 붙이지 않는다. 풀 수 없는 분야는 TODO_TEXT.unreadableCategory */
   category?: string | null;
@@ -194,6 +197,8 @@ export type TodoViewProps = {
   sessionLost: boolean;
   /** 로그인 풀림 안내에서 「저장 안 된 글 복사」를 보일지(복사할 글이 있는가, 12-5) */
   hasUnsaved: boolean;
+  /** 날짜 줄 오른쪽 원 단추 「‹」(지난 날 보기, d-173). 없으면 단추를 그리지 않는다(지난 날을 읽을 길이 없을 때) */
+  onOpenPast?: () => void;
   /** 로그아웃 확인 창(고침10 B)이 떠 있나 */
   logoutConfirm: boolean;
   /** 로그아웃을 걸었다(확인 창 「로그아웃 중」 막힘) */
@@ -235,7 +240,6 @@ export type TodoViewProps = {
   onRetry: (id: string) => void;
   onRemove: (id: string) => void;
   onReload: () => void;
-  onLogout: () => void;
   /** 확인 창 「로그아웃」. Promise면 끝날 때까지 확인 창이 막힌다 */
   onLogoutConfirm: () => void | Promise<unknown>;
   onLogoutCancel: () => void;
@@ -384,7 +388,7 @@ function Row({
   const tagId = `todo-tag-${row.id}`;
   const noteId = `todo-note-${row.id}`;
   // 저장 중·저장 못 한 줄은 서버에 아직 없다: 체크 칸은 보이되 눌러도 바뀌지 않고, 그 줄의 안내에 잇는다
-  const notSaved = row.saving || row.failed || row.queued === true;
+  const notSaved = row.saving || row.failed || row.queued === true || row.pending === true;
   const describedBy = [row.category ? tagId : null, row.hasNotes ? noteId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
   return (
     <li className="todo-row" id={`row-${row.id}`}>
@@ -439,7 +443,7 @@ function Row({
         )}
       </div>
       {/* 고침9: 저장 대기는 할 일 글 줄 세로 가운데, 줄 오른쪽에 16px 도는 원(글 「연결되면 저장해요」 대신) */}
-      {row.queued && <SavePending id={statusId} />}
+      {(row.queued || row.pending) && <SavePending id={statusId} />}
       {/* 저장된 줄에만, 줄 오른쪽 「›」(고침9 Figma 50:52 — 할 일 페이지로). 누름 48. 그림 글자라 접근 이름은 「자세히 보기: 할 일 글」 */}
       {onOpenDetail && !notSaved && (
         <div className="row-actions row-detail">
@@ -746,14 +750,20 @@ export function TodoView(props: TodoViewProps) {
 
   const header = (
     <header className="today-header">
-      <div>
-        <Wordmark className="today-wordmark" />
-        <h1 className="today-title">{TODO_TEXT.title}</h1>
+      <Wordmark className="today-wordmark" />
+      <h1 className="today-title">{TODO_TEXT.title}</h1>
+      {/* 고침10 E(50:52 · d-173): 머리의 「로그아웃」은 없다(로그아웃은 내 정보 한 곳). 날짜 줄 오른쪽에 원 단추 「‹」 하나 = 지난 날 보기
+          (보이는 원 32 · 누름 48 — 공통 .step-btn). 「›」 하루 뒤는 없다 */}
+      <div className="today-date-row">
         <p className="today-date">{dateLine}</p>
+        {props.onOpenPast && (
+          <button type="button" id="past-days-button" className="step-btn today-past-btn" aria-label={TODO_TEXT.pastDays} onClick={props.onOpenPast}>
+            <span className="step-btn-face" aria-hidden="true">
+              ‹
+            </span>
+          </button>
+        )}
       </div>
-      <TextButton id="logout-button" onClick={props.onLogout}>
-        {TODO_TEXT.logout}
-      </TextButton>
     </header>
   );
 
@@ -815,6 +825,8 @@ export function TodoView(props: TodoViewProps) {
           </ul>
         )}
       </main>
+      {/* 고침10 J: 적는 창 = 위 모서리 16 + 손잡이 줄 40×4 + 뒤의 막(먹남색 45%). 적는 창은 모달이 아니므로(C-D1) 막은 보이기만 한다 — 누름은 막을 지나 목록에 닿는다 */}
+      {sheetOpen && <div className="todo-sheet-scrim" aria-hidden="true" />}
       {sheetOpen ? <TodoSheet {...props} sheetRef={sheetRef} /> : <AddTodoButton resume={props.resume} onOpen={props.onOpenSheet} />}
       <LiveRegion message={props.live} />
       {props.overlay}

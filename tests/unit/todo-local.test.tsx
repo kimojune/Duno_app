@@ -24,7 +24,7 @@ vi.mock("../../app/offers/actions", () => ({ requestOffer: vi.fn(), dismissOffer
 vi.mock("../../lib/push/subscribe", () => ({ defaultPushApi: { enable: vi.fn(async () => "ok") } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
-import { TodoScreen } from "../../components/todo-screen";
+import { LOGOUT_REQUEST_NAME, TodoScreenWithLogout } from "./logout-request-helper";
 import { expectConfirmShape, LOGOUT, queryConfirmDialog } from "./confirm-helpers";
 import { createLocalApis } from "../../lib/local/apis";
 import { createMemoryKv, kvKeys } from "../../lib/local/kv";
@@ -74,7 +74,7 @@ async function mount(mirror: Partial<Mirror> = {}) {
   await runtime.boot();
   const apis = createLocalApis(runtime);
   const local = createLocalTodos(runtime, apis);
-  render(<TodoScreen initial={local.read()} manage={apis.manage} local={local} />);
+  render(<TodoScreenWithLogout initial={local.read()} manage={apis.manage} local={local} />);
   return { apis, local };
 }
 
@@ -222,7 +222,7 @@ describe("서버와 맞추기: 되돌림·받기", () => {
     await runtime.boot();
     const apis = createLocalApis(runtime);
     const local = createLocalTodos(runtime, apis);
-    render(<TodoScreen initial={local.read()} manage={apis.manage} local={local} />);
+    render(<TodoScreenWithLogout initial={local.read()} manage={apis.manage} local={local} />);
     expect(screen.getByText("할 일을 불러오지 못했어요.")).toBeTruthy();
     expect(screen.queryByText("오늘 적은 할 일이 없어요.")).toBeNull();
   });
@@ -232,7 +232,7 @@ describe("로그아웃·로그인 풀림", () => {
   it("보낼 줄이 없으면 먼저 보내 보고 기기 저장소를 지운 뒤 바로 로그아웃한다", async () => {
     await mount();
     document.cookie = "duno-device=" + USER + "; path=/";
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(await kvRef.keys("base/")).toEqual([]);
     expect(document.cookie).not.toContain("duno-device"); // 이 기기에 거울이 없어졌다는 표시도 지운다
@@ -243,7 +243,7 @@ describe("로그아웃·로그인 풀림", () => {
     fireEvent.click(openButton());
     typeTodo("못 보낸 글");
     pressWrite();
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     const dialog = await screen.findByRole("alertdialog", { name: LOGOUT.title });
     expectConfirmShape(dialog, LOGOUT.top, LOGOUT.bottom);
     expect(signOut).not.toHaveBeenCalled();
@@ -252,13 +252,13 @@ describe("로그아웃·로그인 풀림", () => {
     expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
     expect(runtime.pendingCount()).toBe(1);
     // Esc = 「계속 쓰기」(악용 시나리오: 저장 안 된 기록을 실수로 잃지 않는다 — 로그아웃 호출 0)
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     fireEvent.keyDown(await screen.findByRole("alertdialog", { name: LOGOUT.title }), { key: "Escape" });
     expect(queryConfirmDialog(LOGOUT.title)).toBeNull();
     expect(signOut).not.toHaveBeenCalled();
     expect(runtime.pendingCount()).toBe(1);
     // 다시 로그아웃 → 확인에서 로그아웃(연타해도 한 번)
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     const again = await screen.findByRole("alertdialog", { name: LOGOUT.title });
     const top = within(again).getByRole("button", { name: LOGOUT.top });
     await act(async () => {
@@ -274,7 +274,7 @@ describe("로그아웃·로그인 풀림", () => {
     fireEvent.click(openButton());
     typeTodo("보내질 글");
     pressWrite();
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "로그아웃" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: LOGOUT_REQUEST_NAME })));
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(sent.map((q) => q.op.kind)).toContain("todo.add");
     expect(screen.queryByRole("alertdialog")).toBeNull();

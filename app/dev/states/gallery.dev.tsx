@@ -343,7 +343,6 @@ export function StateGallery({ id, sheet }: { id: string; sheet: "open" | "close
     onRetry: noop,
     onRemove: noop,
     onReload: noop,
-    onLogout: noop,
     onLogoutConfirm: noop,
     onLogoutCancel: noop,
     onCopy: noop,

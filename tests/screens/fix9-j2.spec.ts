@@ -44,8 +44,8 @@ test("S2 할 일 · 빈 목록(50:28): 이름표 「예시」 + 예시 줄 둘, 
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText("토익 단어 50개");
   await expect(rows.nth(0)).toContainText("어학");
-  await expect(rows.nth(1)).toContainText("포트폴리오 2장 고치기");
-  await expect(rows.nth(1)).toContainText("포트폴리오");
+  await expect(rows.nth(1)).toContainText("글 한 편 초고 쓰기");
+  await expect(rows.nth(1)).toContainText("글쓰기");
   await expect(page.getByText("아래 단추를 눌러 적어 보세요.")).toHaveCount(0);
   await expect(example.locator("button, input, a")).toHaveCount(0);
   const sub = await tokenColor(page, "--color-text-sub");
@@ -277,7 +277,7 @@ test("S2-b 할 일 페이지(51:55) · S2-b′ 분야 고르기 시트(77:18): �
     return { bottom: r.bottom, w: r.width, radius: getComputedStyle(el).borderTopLeftRadius };
   });
   expect(sheetBox.bottom, "아래에서 올라온 판").toBeGreaterThanOrEqual(799);
-  expect(sheetBox.radius).toBe("24px");
+  expect(sheetBox.radius).toBe("16px"); // 고침10 J: 시트 위 모서리 16(옛 24)
   await noOverflow(page);
   await photo(page, "S2-b′-분야고르기시트(77-18)");
 

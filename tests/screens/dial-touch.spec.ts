@@ -152,7 +152,8 @@ test("오늘 기록 「분야마다 나누기」 다이얼: 손가락 끌기가 
   await fillWheel(dialog, "시간", 3);
   await dialog.getByRole("button", { name: "분야마다 나누기" }).click();
   await expect(dialog.getByRole("heading", { name: "분야마다 나눠 주세요" })).toBeVisible();
-  await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click(); // 어학 30분 · 기타 2시간 30분, 어학을 고른 채
+  await dialog.getByRole("button", { name: "어학, 다이얼에 넣기" }).click(); // 칩 하나 = 남은 시간 전부(PM d-180) — 어학 3시간, 기타 0분
+  await dialog.getByLabel("어학", { exact: true }).fill("30"); // 끌 손잡이가 서도록 어학 30분 · 기타 2시간 30분으로 맞춘다(−/+·숫자 칸 길)
   const S = "svg.dial"; // 이 화면의 다이얼은 하나
   await center(page, S);
   await watch(page, S);

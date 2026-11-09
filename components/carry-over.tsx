@@ -3,19 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { ManageApi } from "../lib/manage-api";
 import type { TodoItem } from "../lib/todos/types";
-import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Notice, PrimaryButton, TextButton } from "./ui";
 
 /**
  * 어제 못 끝낸 할 일 가져오기(PRD 0번, 기획서 7-2: 넘길지는 사용자가 고른다. 앱이 알아서 다 넘기지 않는다).
  * 어제 못 끝낸 것이 있을 때만 한 줄로 나타나고, 누르면 고를 목록이 펼쳐진다. 가져와도 어제 것은 그대로 둔다.
+ * 고침10 E(Figma 148:108 · 50:69): 접힌 줄 = 카드 줄 40 + 「›」. 펼치면 고르기는 할 일과 같은 체크 원 24, 처음엔 모두 고른 채,
+ * 「n개 가져오기」 주 단추(막지 않는다 — 고른 것이 있을 때만 보이고, 모두 풀면 그 자리에 글 「고른 할 일 없음」이 온다) · 「접기」 글 단추.
+ * 설명 글(「오늘로 가져올 것을 골라요…」)은 없다.
  * 같은 요청을 다시 눌러도 새로 만들지 않게 가져올 줄마다 화면이 uuid를 만들어 둔다(서버가 같은 id는 한 번만 만든다).
  */
 
 export const CARRY_TEXT = {
   open: (n: number) => `어제 못 끝낸 할 일 ${n}개 보기`,
   title: "어제 못 끝낸 할 일",
-  hint: "오늘로 가져올 것을 골라요. 어제 것은 그대로 남아요.",
-  take: (n: number) => `고른 ${n}개 가져오기`,
+  take: (n: number) => `${n}개 가져오기`,
+  /** 모두 풀면 주 단추 자리에 놓는 글(단추가 아니다, 14 보조색) */
+  none: "고른 할 일 없음",
   taking: "가져오는 중",
   failed: "가져오지 못했어요. 다시 눌러 주세요.",
   offline: "인터넷에 연결되면 가져올 수 있어요.",
@@ -45,7 +49,10 @@ export function CarryOver({
     let alive = true;
     void api.fetchYesterday().then((res) => {
       if (!alive) return;
-      if (res.ok) setItems(res.data.todos);
+      if (res.ok) {
+        setItems(res.data.todos);
+        setPicked(new Set(res.data.todos.map((t) => t.id))); // 처음엔 모두 고른 채
+      }
       setLoaded(true);
     });
     return () => {
@@ -75,8 +82,9 @@ export function CarryOver({
     setBusy(false);
     if (res.ok) {
       onCarried(res.data.todos);
-      setItems((prev) => prev.filter((i) => !picked.has(i.id)));
-      setPicked(new Set());
+      const rest = items.filter((i) => !picked.has(i.id));
+      setItems(rest);
+      setPicked(new Set(rest.map((i) => i.id))); // 남은 것도 다시 펼치면 모두 고른 채
       setOpen(false);
     } else {
       setFailed(true);
@@ -86,33 +94,48 @@ export function CarryOver({
   if (!open) {
     return (
       <div className="carry">
-        <SecondaryButton onClick={() => setOpen(true)}>{CARRY_TEXT.open(items.length)}</SecondaryButton>
+        <button type="button" className="carry-row" onClick={() => setOpen(true)}>
+          <span className="carry-row-text">{CARRY_TEXT.open(items.length)}</span>
+          <span className="carry-row-go" aria-hidden="true">
+            ›
+          </span>
+        </button>
       </div>
     );
   }
   return (
-    <section className="carry" aria-labelledby="carry-title">
+    <section className="carry carry-open" aria-labelledby="carry-title">
       <h2 id="carry-title" className="carry-title">
         {CARRY_TEXT.title}
       </h2>
-      <p className="todo-sub">{CARRY_TEXT.hint}</p>
       <ul className="carry-list">
         {items.map((item) => (
           <li key={item.id} className="carry-item">
-            <label className="carry-label">
-              <input type="checkbox" checked={picked.has(item.id)} onChange={() => toggle(item.id)} />
-              <span>{item.readable ? item.text : CARRY_TEXT.unreadable}</span>
+            {/* 할 일 줄과 같은 체크 원 24(.check-hit · .check-box). 글은 체크 칸의 이름 */}
+            <label className="check-hit">
+              <input type="checkbox" checked={picked.has(item.id)} onChange={() => toggle(item.id)} aria-labelledby={`carry-text-${item.id}`} />
+              <span className="check-box" aria-hidden="true" />
             </label>
+            <span id={`carry-text-${item.id}`} className="carry-text">
+              {item.readable ? item.text : CARRY_TEXT.unreadable}
+            </span>
           </li>
         ))}
       </ul>
       {!online && <Notice role="status">{CARRY_TEXT.offline}</Notice>}
       {failed && <Notice role="alert">{CARRY_TEXT.failed}</Notice>}
-      <div className="detail-actions">
-        <PrimaryButton busy={busy} disabled={busy || picked.size === 0 || !online} onClick={() => void take()}>
-          {busy ? CARRY_TEXT.taking : CARRY_TEXT.take(picked.size)}
-        </PrimaryButton>
-        <TextButton onClick={() => setOpen(false)}>{CARRY_TEXT.close}</TextButton>
+      <div className="detail-actions carry-actions">
+        {/* 막지 않는다: 고른 것이 있으면 주 단추(연결이 없을 때만 막힘), 모두 풀면 단추가 아니라 글 */}
+        {picked.size > 0 ? (
+          <PrimaryButton busy={busy} disabled={busy || !online} onClick={() => void take()}>
+            {busy ? CARRY_TEXT.taking : CARRY_TEXT.take(picked.size)}
+          </PrimaryButton>
+        ) : (
+          <p className="carry-none">{CARRY_TEXT.none}</p>
+        )}
+        <TextButton className="carry-close" onClick={() => setOpen(false)}>
+          {CARRY_TEXT.close}
+        </TextButton>
       </div>
     </section>
   );
