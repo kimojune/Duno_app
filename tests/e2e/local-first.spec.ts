@@ -229,6 +229,9 @@ test("끊긴 채 못 보낸 기록이 있으면 로그아웃이 알리고, 연�
     await expect(logoutConfirm.getByRole("button")).toHaveText(["로그아웃", "계속 쓰기"]);
     await logoutConfirm.getByRole("button", { name: "계속 쓰기" }).click();
     await expect(logoutConfirm).toHaveCount(0);
+    // 고침10 QA1 확인 2: 확인 창은 「내 정보」 위에 뜨고 탭을 옮기지 않는다 — 목록을 보려면 「할 일」 탭으로 간다
+    await expect(page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "내 정보" })).toHaveAttribute("aria-current", "page");
+    await page.getByRole("navigation", { name: "화면 이동" }).getByRole("button", { name: "할 일" }).click();
     await expect(page.getByText(`${marker} 못 보낸 글`, { exact: true })).toBeVisible();
 
     // 연결되면 보내고, 그 뒤 로그아웃하면 확인 없이 로그아웃하고 기기 저장소가 비워진다
