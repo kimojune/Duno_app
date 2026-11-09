@@ -79,6 +79,14 @@ afterAll(async () => {
 });
 
 describe("category_ratio_history (목표 비율이 바뀐 기록, 쌓기만)", () => {
+  it("표가 있다(마이그레이션 20261109150000 적용 확인 — 없으면 아래 시험이 뜻 없이 실패하므로 먼저 이 이름으로 실패한다)", async () => {
+    // 앱 키로는 pg_catalog를 못 보므로 표 자체를 한 번 읽는다. 없는 표면 PostgREST가 PGRST205(스키마 캐시에 없음)나 42P01을 준다.
+    // RLS·grant·상한 트리거가 있는지는 아래 시험이 행동으로 본다(42501 거절 · P0001 category_ratio_history_limit).
+    const probe = await a.from(HISTORY).select("id", { count: "exact", head: true }).eq("user_id", aId);
+    expect(probe.error?.code ?? null, "category_ratio_history 표가 없다: 마이그레이션 20261109150000을 이 DB에 적용했는지 본다").toBeNull();
+    expect(typeof probe.count).toBe("number");
+  });
+
   it("흉내가 실제로 A·B로 돈다(세션 사용자 번호가 다르다)", async () => {
     const ua = await a.auth.getUser();
     const ub = await b.auth.getUser();
