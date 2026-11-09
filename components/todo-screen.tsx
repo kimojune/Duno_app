@@ -33,7 +33,7 @@ import {
 import { CarryOver } from "./carry-over";
 import { PAST_DAYS_TEXT, PastDays } from "./past-days";
 import { Notice, TextButton } from "./ui";
-import { TodoDetail } from "./todo-detail";
+import { TodoDetail, type DetailCategoryAdd } from "./todo-detail";
 
 /**
  * 할 일 화면의 진짜 동작(디자인 명세 12절 방향 C).
@@ -60,6 +60,8 @@ type LocalRow = {
   checkFailed: boolean;
   /** 분야 번호. null이면 기타 */
   categoryId: string | null;
+  /** 작업 기록이 하나라도 있나(고침9 PM 2-B 할 일 줄 아이콘) */
+  hasNotes?: boolean;
 };
 
 /** 화면이 아는 분야 하나. name이 null이면 이름을 풀 수 없다(칩에 보이지 않고, 목록 표시는 「읽을 수 없는 분야」) */
@@ -74,6 +76,7 @@ function fromItem(item: TodoItem): LocalRow {
     status: "saved",
     checkFailed: false,
     categoryId: item.categoryId ?? null,
+    hasNotes: item.hasNotes === true,
   };
 }
 
@@ -685,6 +688,45 @@ export function TodoScreen({
     setNewCategoryHelp("failed"); // C19
   }
 
+  /**
+   * 고침9 PM 3: 할 일 페이지 분야 고르기 시트의 「+ 분야」. 적는 창과 같은 분야 더하기 길을 쓴다
+   * (이름 검사 checkCategoryName · 화면이 아는 같은 이름은 요청 없이 그 분야 · 한도 50이면 요청 없음 · 기기 먼저 저장이면 local.addCategory · 아니면 Server Action).
+   * 「기타」라는 이름은 분야 행을 만들지 않고 기타(null)로 고른다. 성공한 분야는 칩 목록 끝에 붙는다.
+   */
+  async function addCategoryFromDetail(raw: string): Promise<DetailCategoryAdd> {
+    const checked = checkCategoryName(raw);
+    if (!checked.ok) {
+      if (checked.error === "reserved") return { ok: true, category: null };
+      return { ok: false, reason: checked.error === "too_long" ? "too_long" : "empty" };
+    }
+    const name = checked.name;
+    const existing = readableChips().find((c) => sameCategoryName(c.name, name));
+    if (existing) return { ok: true, category: existing };
+    if (categoriesRef.current.length >= CATEGORY_LIMIT) return { ok: false, reason: "limit" };
+    if (!navigator.onLine && !local) return { ok: false, reason: "offline" };
+    const requestId = crypto.randomUUID();
+    const res = await safely<AddCategoryResult>(() => (local ? local.addCategory(requestId, name) : addCategory(requestId, name)), UNAVAILABLE);
+    if (res.ok) {
+      if (!res.data.category.readable) return { ok: false, reason: "failed" };
+      const entry = { id: res.data.category.id, name: res.data.category.name };
+      rememberCategory(entry);
+      return { ok: true, category: entry };
+    }
+    if (res.error === "duplicate") {
+      rememberCategory(res.existing);
+      return { ok: true, category: res.existing };
+    }
+    if (res.error === "reserved") return { ok: true, category: null };
+    if (res.error === "category_limit") return { ok: false, reason: "limit" };
+    if (res.error === "unauthenticated") setSessionLost(true);
+    return { ok: false, reason: "failed" };
+  }
+
+  /** 할 일 페이지가 알려 준 작업 기록 있음/없음을 그 줄에 반영(고침9 PM 2-B) */
+  const onNotesChange = useCallback((todoId: string, hasNotes: boolean) => {
+    setRows((prev) => (prev.some((r) => r.id === todoId && (r.hasNotes === true) !== hasNotes) ? prev.map((r) => (r.id === todoId ? { ...r, hasNotes } : r)) : prev));
+  }, []);
+
   // ---- 할 일 ----
 
   const send = useCallback(
@@ -1106,6 +1148,7 @@ export function TodoScreen({
     queued: r.status === "queued",
     checkFailed: r.checkFailed,
     category: categoryText(r.categoryId),
+    hasNotes: r.status === "saved" && r.hasNotes === true,
   }));
   const chips: ChipView[] = categories.filter((c): c is ChipView => c.name !== null);
   const unsavedRows = rows.some((r) => r.status !== "saved");
@@ -1219,6 +1262,9 @@ export function TodoScreen({
             onEdited={onEdited}
             onDeleted={onDeleted}
             onMove={moveRow}
+            onAddCategory={addCategoryFromDetail}
+            categoryLimitReached={categories.length >= CATEGORY_LIMIT}
+            onNotesChange={onNotesChange}
           />
         ) : undefined
       }

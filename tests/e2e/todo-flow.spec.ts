@@ -131,7 +131,7 @@ test("실제 흐름: A가 적고 체크하면 새로고침 뒤에도 남고, B�
     await page.getByRole("button", { name: "+ 분야" }).click();
     await page.getByRole("textbox", { name: "새 분야 이름" }).fill(categoryName);
     await page.getByRole("button", { name: "더하기" }).click();
-    const chip = page.getByRole("group", { name: "분야 (고르지 않으면 기타)" }).getByRole("button", { name: categoryName });
+    const chip = page.getByRole("group", { name: "분야" }).getByRole("button", { name: categoryName });
     await expect(chip).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
     await expect(todoInput).toBeFocused();
 

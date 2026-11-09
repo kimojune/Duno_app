@@ -149,7 +149,11 @@ const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
   recordView: async () => ({ ok: true }),
 });
 const manageApi: ManageApi = {
-  editTodo: never,
+  // 고침9: 분야 고르기 시트에서 고르면 바로 저장되는 것을 보이도록 고치기는 곧바로 성공한다(갤러리 데이터만)
+  editTodo: async (id, patch) => ({
+    ok: true,
+    data: { todo: { id, readable: true, text: patch.text ?? "이력서 고치기", done: false, createdAt: "x", categoryId: patch.categoryId ?? null } },
+  }),
   deleteTodo: never,
   reorderTodos: never,
   addNote: never,
@@ -448,6 +452,7 @@ export function V2Gallery({ id }: { id: string }) {
             onEdited={noop}
             onDeleted={noop}
             onMove={async () => true}
+            onAddCategory={async (name) => ({ ok: true, category: { id: "c-new", name } })}
           />
         )}
       />

@@ -171,6 +171,33 @@ describe("타이머 탭 (7-6, ④)", () => {
     expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ todoId: null, categoryId: C2, surface: "manual" }));
   });
 
+  it("고침9 ⑬ 13·15: 이름표 「분야」 + 맨 앞 「기타」가 골라진 채 시작, 고른 칩을 다시 누르면 기타로, 기타로 시작하면 분야 없음(null). 기록 없음은 「0개」", async () => {
+    const api = fakeApi();
+    await mount(api, todayRead([]));
+    expect(document.getElementById("timer-category-label")!.textContent).toBe("분야");
+    expect(screen.queryByText(/고르지 않으면 기타/)).toBeNull();
+    const group = screen.getByRole("group", { name: "분야" });
+    const chips = () => [...group.querySelectorAll("button[aria-pressed]")];
+    expect(chips().map((b) => b.textContent)).toEqual(["기타", "어학", "포트폴리오"]);
+    expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+    fireEvent.click(screen.getByRole("button", { name: "포트폴리오" }));
+    expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false", "true"]);
+    fireEvent.click(screen.getByRole("button", { name: "포트폴리오" })); // 다시 눌러 풀면 기타
+    expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+    fireEvent.click(screen.getByRole("button", { name: "어학" }));
+    fireEvent.click(screen.getByRole("button", { name: "기타" })); // 기타를 누르면 고른 분야가 풀림
+    expect(chips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+    await press("30분 시작");
+    expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ todoId: null, categoryId: null, surface: "manual" }));
+  });
+
+  it("고침9 ⑬ 15: 오늘 시작한 타이머가 없으면 「0개」(옛 「아직 없어요」)", async () => {
+    await mount(fakeApi(), todayRead([]));
+    const section = screen.getByRole("heading", { name: "오늘 시작한 타이머" }).closest("section")!;
+    expect(section.querySelector("p")!.textContent).toBe("0개");
+    expect(screen.queryByText("아직 없어요")).toBeNull();
+  });
+
   it("시작이 실패하면 안내를 보이고 같은 고름으로 다시 누르면 같은 id", async () => {
     const start = vi
       .fn()
