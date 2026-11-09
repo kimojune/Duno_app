@@ -62,7 +62,18 @@ export function ratioRowValue(chart: StatusChart, id: ChartCategoryId, text: Gro
   return text.ratioValue(r?.spentPercent ?? 0, ratioOf(chart, id));
 }
 
-/** 띠 아래 목록: 색 점(1px 윤곽) · 이름 · 오른쪽 「10% / 목표 30%」. 순서 = 만든 순서, 기타 끝. 굵은 줄 없음(PM 8). 누르면 그 분야 페이지 */
+/**
+ * 줄 오른쪽 「›」(고침9, Figma 51:9~51:18): 누르면 그 분야 페이지로 간다는 표시. 줄 단추 안에 두되 화면 읽기에는 숨긴다(줄 이름은 분야 이름·값 그대로)
+ */
+export function RowChevron() {
+  return (
+    <span className="growth-chevron" aria-hidden="true">
+      ›
+    </span>
+  );
+}
+
+/** 띠 아래 목록: 색 점(1px 윤곽) · 이름 · 오른쪽 「10% / 목표 30%」 · 「›」. 순서 = 만든 순서, 기타 끝. 굵은 줄 없음(PM 8). 줄 사이 선 없음(고침9, Figma 50:193). 누르면 그 분야 페이지 */
 export function RatioList({ chart, text, nameOf, onOpenCategory }: StatusViewProps) {
   const order = chartOrder(chart);
   return (
@@ -77,6 +88,7 @@ export function RatioList({ chart, text, nameOf, onOpenCategory }: StatusViewPro
                 {name}
               </span>
               <span className="growth-row-value">{ratioRowValue(chart, r.categoryId, text)}</span>
+              <RowChevron />
             </button>
           </li>
         );
@@ -142,11 +154,11 @@ function BandView(props: StatusViewProps) {
   );
 }
 
-/** 기록 없음(이 기간 0시간) 보기들이 받는 값 */
-export type EmptyViewProps = { chart: StatusChart; text: GrowthViewText; periodName: string; zeroText: string };
+/** 기록 없음(이 기간 0시간) 보기들이 받는 값. 이름·누름은 원 보기의 아래 목록(Figma 121:240)이 쓴다 */
+export type EmptyViewProps = StatusViewProps & { zeroText: string };
 
 /**
- * 기록 없음 빈 상태(창구 덧붙임 11-09 11:3x, Figma 50:598): 글 대신 예시 값 — 목표 비율 띠 한 줄(점선 윤곽, 칸에 %) + 기간 빈 띠 「0시간」.
+ * 기록 없음 빈 상태(창구 덧붙임 11-09 11:3x, Figma 50:598): 글 대신 예시 값 — 목표 비율 띠 한 줄(점선 윤곽, 칸에 %) + 기간 빈 띠 「0시간」(연한 면 + 점선, 고침9).
  * 목표 비율이 없으면 그리지 않는다(화면은 단추만 둔다). 그림이라 글로 읽지 않는다(숨은 요약이 준다)
  */
 export function EmptyBands({ chart, text, periodName, zeroText }: EmptyViewProps) {
@@ -156,8 +168,9 @@ export function EmptyBands({ chart, text, periodName, zeroText }: EmptyViewProps
       <BandLine chart={chart} line={chart.ratio} empty={false} caption={text.ratioLine} kind="ratio" text={text} />
       <div className="growth-band-line">
         <span className="growth-line-caption">{periodName}</span>
-        <div className="growth-band is-empty" data-line="spent" style={{ borderStyle: "solid", borderColor: CHART_OUTLINE }}>
-          <span className="growth-seg-label">{zeroText}</span>
+        {/* 「이번 주」 빈 띠(고침9, Figma 91:637): 연한 면 채움(--color-notice-bg) + 1px 점선 테두리(--color-border-input), 가운데 「0시간」 12 Medium 보조색 */}
+        <div className="growth-band is-empty is-zero" data-line="spent">
+          <span className="growth-seg-label growth-zero-label">{zeroText}</span>
         </div>
       </div>
     </div>
@@ -166,6 +179,11 @@ export function EmptyBands({ chart, text, periodName, zeroText }: EmptyViewProps
 
 /** 원그래프 반지름(그림 단위). 그림 칸은 원 밖 % 글 자리만큼 더 넓다 */
 const PIE_RADIUS = 100;
+/**
+ * 가운데 구멍 반지름(고침9, Figma 50:260·121:240·121:315 — 원 지름 약 116 중 구멍 약 32 → 0.28). 조각 % 글(반지름 0.62)은 구멍 밖 고리 안에 남는다.
+ * 구멍은 카드 바탕(--color-surface) 원 + 1px 윤곽으로 조각 위에 덮는다(조각 경로는 그대로)
+ */
+export const PIE_HOLE_RATIO = 0.28;
 const PIE_BOX = 128;
 
 function Pie({ chart, line, empty, caption, text }: { chart: StatusChart; line: Line; empty: boolean; caption: string; text: GrowthViewText }) {
@@ -193,6 +211,7 @@ function Pie({ chart, line, empty, caption, text }: { chart: StatusChart; line: 
                 />
               ),
             )}
+            <circle r={PIE_RADIUS * PIE_HOLE_RATIO} className="growth-pie-hole" fill="var(--color-surface)" stroke={CHART_OUTLINE} strokeWidth={1} vectorEffect="non-scaling-stroke" />
             {pieLabels(slices, PIE_RADIUS).map((l) => (
               <g key={keyOf(l.categoryId)} className={l.inside ? "growth-pie-label is-inside" : "growth-pie-label is-outside"}>
                 {l.leader && <line x1={l.leader.x1} y1={l.leader.y1} x2={l.leader.x2} y2={l.leader.y2} className="growth-pie-leader" stroke={CHART_OUTLINE} vectorEffect="non-scaling-stroke" />}
@@ -216,25 +235,30 @@ export const EMPTY_RING = "var(--color-border-input)";
 
 /**
  * 기록 없음 빈 상태의 원그래프(고침7 ③, PM 15:1x): 왼쪽 「목표 비율」 원은 데이터 있는 판과 같고, 오른쪽 기간 원 = 회색 빈 고리 1px + 가운데 「0시간」.
+ * 고침9(PM d-148 가, Figma 121:240): 원 아래 목록도 둔다(「0% / 목표 40%」 · 기타 「0%」 · 「›」 — 데이터 있는 판과 같은 목록).
  * 목표 비율이 없으면 그리지 않는다(띠와 같은 규칙). 그림이라 글로 읽지 않는다(숨은 요약이 준다)
  */
-export function EmptyPies({ chart, text, periodName, zeroText }: EmptyViewProps) {
+export function EmptyPies(props: EmptyViewProps) {
+  const { chart, text, periodName, zeroText } = props;
   if (chart.ratioEmpty) return null;
   return (
-    <div className="growth-graph" aria-hidden="true">
-      <div className="growth-pies">
-        <Pie chart={chart} line={chart.ratio} empty={false} caption={text.ratioLine} text={text} />
-        <div className="growth-pie-box">
-          <span className="growth-line-caption">{periodName}</span>
-          <svg className="growth-pie" viewBox={`${-PIE_BOX} ${-PIE_BOX} ${2 * PIE_BOX} ${2 * PIE_BOX}`} focusable="false" data-line="spent">
-            <circle r={PIE_RADIUS} className="growth-pie-ring" fill="none" stroke={EMPTY_RING} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-            <text x={0} y={0} textAnchor="middle" dominantBaseline="central" className="growth-pie-text growth-pie-zero">
-              {zeroText}
-            </text>
-          </svg>
+    <>
+      <div className="growth-graph" aria-hidden="true">
+        <div className="growth-pies">
+          <Pie chart={chart} line={chart.ratio} empty={false} caption={text.ratioLine} text={text} />
+          <div className="growth-pie-box">
+            <span className="growth-line-caption">{periodName}</span>
+            <svg className="growth-pie" viewBox={`${-PIE_BOX} ${-PIE_BOX} ${2 * PIE_BOX} ${2 * PIE_BOX}`} focusable="false" data-line="spent">
+              <circle r={PIE_RADIUS} className="growth-pie-ring" fill="none" stroke={EMPTY_RING} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              <text x={0} y={0} textAnchor="middle" dominantBaseline="central" className="growth-pie-text growth-pie-zero">
+                {zeroText}
+              </text>
+            </svg>
+          </div>
         </div>
       </div>
-    </div>
+      <RatioList {...props} />
+    </>
   );
 }
 
@@ -281,12 +305,13 @@ export type GoalViewText = {
 };
 
 /**
- * 목표를 세우지 않은 주의 예시(창구 덧붙임 11-09 11:3x, Figma 50:741): 이름표 「예시」 + 흐린(불투명 40%) 막대 둘 — 고정 예시 글(포트폴리오 목표 6시간 · 어학 목표 5시간).
+ * 목표를 세우지 않은 주의 예시(창구 덧붙임 11-09 11:3x, Figma 50:741 91:641): 이름표 「예시」 + 흐린(불투명 40%) 막대 둘 — 고정 예시 글(포트폴리오 목표 6시간 · 어학 목표 5시간).
+ * 고침9: 막대 = 점선 막대(처음부터 눈금까지) + 눈금만. 채움(분야 색)은 없다. 흐림은 막대 모양에만, 글은 보조 글 색(--color-text-sub).
  * 실제 분야·값과 섞지 않는다(사용자 데이터를 받지 않는다). 누를 수 없고(단추 아님), 화면 읽기는 묶음 이름 「예시」로 시작해 실제 요약과 섞이지 않는다
  */
 export const GOAL_EXAMPLE = [
-  { name: "포트폴리오", goalMinutes: 360, colorOrder: 0 },
-  { name: "어학", goalMinutes: 300, colorOrder: 1 },
+  { name: "포트폴리오", goalMinutes: 360 },
+  { name: "어학", goalMinutes: 300 },
 ] as const;
 
 export function GoalExample({ label, goalOf }: { label: string; goalOf: (goalMinutes: number | null) => string }) {
@@ -302,10 +327,9 @@ export function GoalExample({ label, goalOf }: { label: string; goalOf: (goalMin
           return (
             <li key={e.name} className="growth-example-item">
               <span className="growth-name">{e.name}</span>
-              <span className="growth-goal-bar" aria-hidden="true">
-                <span className="growth-goal-fill" style={{ inlineSize: `${tick / 3}%`, background: categoryColorValue(e.colorOrder), borderColor: CHART_OUTLINE }} />
-                <span className="growth-goal-gap" style={{ insetInlineStart: `${tick / 3}%`, insetInlineEnd: `${100 - tick}%`, borderColor: CHART_OUTLINE, borderStyle: "dashed" }} />
-                <span className="growth-goal-tick" style={{ insetInlineStart: `clamp(0px, calc(${tick}% - 1px), calc(100% - 2px))`, background: CHART_OUTLINE }} />
+              <span className="growth-goal-bar growth-example-bar" aria-hidden="true">
+                <span className="growth-goal-gap" style={{ insetInlineStart: 0, insetInlineEnd: `${100 - tick}%`, borderColor: CHART_OUTLINE, borderStyle: "dashed" }} />
+                <span className="growth-goal-tick" style={{ insetInlineStart: `clamp(0px, calc(${tick}% - 2px), calc(100% - 2px))`, background: CHART_OUTLINE }} />
               </span>
               <span className="growth-goal-of">{goalOf(e.goalMinutes)}</span>
             </li>
@@ -321,7 +345,7 @@ export const GOAL_FILL_MIN_PX = 6;
 
 /**
  * 분야별 막대(이번 주 목표 뷰). 분야마다 한 줄: 윗줄 이름 · 오른쪽 값, 막대(축 = 이 화면에서 가장 큰 값, 채움 = 쓴 시간, 눈금 = 목표,
- * 채움 끝에서 눈금까지 점선 빈 자리 — 채움 없음), 막대 아래 「목표 n시간」/「목표 없음」. 누르면 그 분야 페이지
+ * 채움 끝에서 눈금까지 점선 빈 자리 — 채움 없음), 막대 아래 「목표 n시간」/「목표 없음」, 오른쪽 「›」. 줄 사이 선 없음(고침9, Figma 50:137). 누르면 그 분야 페이지
  */
 export function GoalBars({
   chart,
@@ -372,6 +396,7 @@ export function GoalBars({
                   )}
                 </span>
                 <span className="growth-goal-of">{text.goalOf(r.goalMinutes)}</span>
+                <RowChevron />
               </button>
             </li>
           );

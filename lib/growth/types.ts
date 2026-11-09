@@ -23,6 +23,11 @@ export type GrowthData = {
   /** 저녁 기록이 있는 날 수 */
   loggedDaysThisWeek: number;
   loggedDaysTotal: number;
+  /**
+   * 오늘 기록이 이어진 주 수(명세 ⑦-9, 고침9 — lib/growth/streak.ts streakWeeks). 위 logs(자기 오늘 기록)의 대상 날로만 계산한다(새 읽기 없음).
+   * 화면은 2주 이상일 때만 「n주 이어서 기록」을 보인다
+   */
+  streakWeeks: number;
   /** 이번 주 목표(없으면 null). 시간은 분 */
   goal: { weekStart: string; items: CategoryMinutes[] } | null;
   /**

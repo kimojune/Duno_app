@@ -3,6 +3,7 @@ import { countLoggedDays, sumRange } from "./logic";
 import type { EveningLog } from "../evening/types";
 import type { RatioItem } from "../settings/types";
 import { addDays, previousMonthRange, weekDates, weekStartFor } from "../week";
+import { streakWeeks } from "./streak";
 import type { GrowthData } from "./types";
 import type { GoalSummary } from "../goals/types";
 
@@ -40,6 +41,7 @@ export function computeGrowth(args: {
     cumulative: sumRange(args.logs),
     loggedDaysThisWeek: countLoggedDays(args.logs, weekStart, weekEnd),
     loggedDaysTotal: countLoggedDays(args.logs),
+    streakWeeks: streakWeeks(args.today, args.logs.map((l) => l.targetDay)),
     goal: args.goalItems ? { weekStart, items: args.goalItems } : null,
     goalText: args.goalText ?? null,
   };

@@ -20,12 +20,20 @@ import { formatDeltaMinutes, formatMinutes } from "../lib/time-format";
 import type { ViewEntry } from "../lib/views/core-types";
 import { EVENING_TEXT } from "./evening-record";
 import { GOAL_TEXT } from "./goal";
-import { GoalBars, GoalExample, ratioOf, STATUS_VIEWS } from "./growth-views";
+import { visibleStreak } from "../lib/growth/streak";
+import { PeriodMenu } from "./growth-period-menu";
+import { GoalBars, GoalExample, ratioOf, RowChevron, STATUS_VIEWS } from "./growth-views";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
+import { Wordmark } from "./wordmark";
 
 /**
  * 상태보기(성장 화면, PRD 7-4). 원샷 v2 고침5: 뷰 둘(PM d-99·d-101·d-102, 의견 8, 덧붙임 d-110 — 명세 ③-S, ⑩이 본문보다 이김).
- * - 맨 위(제목 아래·뷰 탭 위): 처음 설정에서 받은 목표 한 문장(두 뷰 공통). 비었으면 줄을 두지 않는다. 모자란 분야 큰 글·숫자 줄은 없다(PM 8).
+ * 고침9(Figma 정합 A5 · S6 공통, Figma 50:137·50:193·50:260·50:598·50:741·51:107·111:79·121:240·121:315):
+ * - 맨 위 = 워드마크(고리 18 + 「duno」) → 목표 한 줄 → 뷰 탭. 보이는 큰 제목 「상태보기」는 없고, 화면 읽기용 숨은 제목 h1만 둔다(페이지 제목 구조).
+ * - 탭 바로 아래가 카드다(카드 위 머리 줄 「이번 주 내 시간이 …」·「오늘 기록 n일」 없음). 기간은 카드 머리 합계 옆 칩 하나(PeriodMenu).
+ * - 목록 줄마다 오른쪽 「›」(숨김), 카드 아래 연속 기록 줄 「◯ n주 이어서 기록」(2주 이상만, 명세 ⑦-9).
+ * - 빈 상태의 「오늘 기록」은 카드 안 끝 폭 가득 보조 단추. 카드 밖 안내 글은 없다(⑬ 20).
+ * - 맨 위(워드마크 아래·뷰 탭 위): 처음 설정에서 받은 목표 한 문장(두 뷰 공통). 비었으면 줄을 두지 않는다. 모자란 분야 큰 글·숫자 줄은 없다(PM 8).
  * - 뷰 탭 둘(role=tablist): 「이번 주 목표」(시간·분야별 막대) / 「목표 비율」(%·띠그래프/원그래프).
  *   처음 탭은 이번 주 목표를 세운 주 → 이번 주 목표, 세우지 않은 주 → 목표 비율. 고른 탭은 그 주 동안 이 기기·이 사용자에 기억한다(api.viewPref).
  * - 이번 주 목표 뷰: 흰 카드 「목표 15시간 중 12시간」(lib/goals goalProgress) + 분야별 막대. 칩 없음, 기간은 이번 주만. 목표가 없는 주는 카드 안에 예시 → 보조 줄 → 「이번 주 목표 정하기」(고침6).
@@ -53,12 +61,10 @@ export const GROWTH_TEXT = {
   toPie: "원그래프로 보기", // d-106 ⑦-10, D-049(칩 아님)
   toBand: "띠그래프로 보기",
   other: "기타",
-  weekHeading: "이번 주 내 시간이 어느 분야에 쓰였나", // 안내 글(PM 11-09 11:1x 「설명 글 지우지 않기」로 남김)
-  totalHeading: "분야마다 쌓인 시간",
-  compareHeading: "분야마다 나란히",
-  days: (n: number) => `오늘 기록 ${n}일`,
-  empty: "아직 이번 주 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.", // 이번 주 빈 안내(지우기는 발표 뒤 PM 7, 지금은 옛 이름만 「오늘 기록」으로)
-  emptyTotal: "아직 오늘 기록이 없어요. 오늘 기록을 남기면 여기에 쌓여요.",
+  // 고침9(Figma 정합 S6 공통): 카드 위 머리 줄(「이번 주 내 시간이 어느 분야에 쓰였나」·「분야마다 쌓인 시간」·「오늘 기록 n일」)과
+  // 카드 밖 빈 안내 글(「아직 이번 주 오늘 기록이 없어요. …」, ⑬ 20 — PM d-143 가)은 없앴다. 탭 바로 아래가 카드다
+  /** 카드 아래 연속 기록 줄(명세 ⑦-9): 「**3주** 이어서 기록」(숫자 Bold) */
+  streak: (weeks: number) => ({ count: `${weeks}주`, rest: " 이어서 기록" }),
   ratioLine: "목표 비율",
   percent: (n: number) => `${n}%`,
   ratioValue: (spent: number, ratio: number | null) => (ratio === null ? `${spent}%` : `${spent}% / 목표 ${ratio}%`),
@@ -235,12 +241,11 @@ export function GrowthScreen({
 
   return (
     <section className="growth" aria-labelledby="growth-title" aria-busy={load.status === "loading"}>
-      <header className="today-header">
-        <div>
-          <h1 id="growth-title" className="today-title">
-            {GROWTH_TEXT.title}
-          </h1>
-        </div>
+      <header className="growth-head">
+        <h1 id="growth-title" className="sr-only">
+          {GROWTH_TEXT.title}
+        </h1>
+        <Wordmark className="growth-wordmark" />
       </header>
       {data && data.goalText && (
         <p className="growth-goal-line">
@@ -290,6 +295,7 @@ export function GrowthScreen({
             ) : (
               <RatioPanel data={data} pref={pref} choose={choose} onOpenCategory={onOpenCategory} onOpenEvening={onOpenEvening} />
             )}
+            <StreakLine weeks={data.streakWeeks} />
           </div>
         </>
       )}
@@ -301,13 +307,34 @@ function nameFor(data: GrowthData, id: string | null): string {
   return id === null ? GROWTH_TEXT.other : (data.categories.find((c) => c.id === id)?.name ?? GROWTH_TEXT.other);
 }
 
-/** 기록 없음의 빈 상태 단추 「오늘 기록」(누르면 오늘 기록이 열린다) */
+/** 기록 없음의 빈 상태 단추 「오늘 기록」(누르면 오늘 기록이 열린다). 카드 안 끝, 폭 가득 보조 단추(테두리, 보이는 높이 40 — Figma 51:24·111:149) */
 function EveningButton({ onOpenEvening }: { onOpenEvening?: () => void }) {
   if (!onOpenEvening) return null;
   return (
-    <div className="detail-actions">
-      <SecondaryButton onClick={onOpenEvening}>{EVENING_TEXT.title}</SecondaryButton>
+    <div className="growth-evening">
+      <SecondaryButton className="growth-evening-button" onClick={onOpenEvening}>
+        <span className="growth-evening-face">{EVENING_TEXT.title}</span>
+      </SecondaryButton>
     </div>
+  );
+}
+
+/**
+ * 카드 아래 연속 기록 한 줄(명세 ⑦-9, Figma 60:4~60:6): 보조색 고리 14 + 「**3주** 이어서 기록」(14, 숫자 Bold).
+ * 2주 이상일 때만 그린다. 끊기면 줄이 조용히 사라진다(알림·「끊겼어요」·경고 색 없음)
+ */
+function StreakLine({ weeks }: { weeks: number }) {
+  const n = visibleStreak(weeks);
+  if (n === null) return null;
+  const text = GROWTH_TEXT.streak(n);
+  return (
+    <p className="growth-streak">
+      <svg className="growth-streak-ring" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="3" />
+      </svg>
+      <strong className="growth-streak-count">{text.count}</strong>
+      {text.rest}
+    </p>
   );
 }
 
@@ -370,9 +397,9 @@ function GoalPanel({
         <div className="growth-card-head" aria-hidden="true">
           <p className="growth-card-title">
             {head.before}
-            <strong>{head.target}</strong>
+            {head.target}
             {head.middle}
-            <strong>{head.done}</strong>
+            {head.done}
           </p>
         </div>
         <GoalBars
@@ -382,8 +409,9 @@ function GoalPanel({
           nameOf={nameOf}
           onOpenCategory={onOpenCategory}
         />
+        {/* 목표를 세운 주 · 기록 없음(Figma 51:107): 막대는 모두 빈 칸. 「오늘 기록」은 빈 상태 공통 자리(카드 안 끝)에 둔다 — 51:107 그림에는 단추가 없다(보고에 적음) */}
+        {noRecord && <EveningButton onOpenEvening={onOpenEvening} />}
       </div>
-      {noRecord && <EveningButton onOpenEvening={onOpenEvening} />}
     </>
   );
 }
@@ -392,7 +420,7 @@ function GoalPanel({
  * 목표 비율 뷰: 카드 머리(합계 · 기간 칩 · 보기 바꾸기 글 단추) + 띠/원 + 목록. 「비교」는 옛 보기.
  * 빈 상태는 셋(고침7, PM 15:1x · 23 S6 빈 상태):
  * 1) 이번 주 0시간 + 쌓인 시간 있음 → 「총 시간」으로 시작(칩에서 이번 주를 고르지 않았다면), 머리 아래 「이번 주 0시간」, 카드 끝 「오늘 기록」
- * 2) 고른 기간에 기록 0 → 같은 머리(「0시간」 · 칩 셋 · 글 단추) + 예시 값(목표 비율 띠 + 빈 띠 「0시간」) + 안내 글 + 「오늘 기록」
+ * 2) 고른 기간에 기록 0 → 같은 머리(「0시간」 · 기간 칩 · 글 단추) + 예시 값(목표 비율 띠 + 빈 띠 「0시간」) + 카드 안 끝 「오늘 기록」(카드 밖 안내 글 없음, 고침9)
  * 3) 2)에서 원그래프 → 왼쪽 목표 비율 원 + 오른쪽 회색 빈 고리 「0시간」. 1)의 원그래프는 오른쪽이 「총 시간」 원
  */
 function RatioPanel({
@@ -431,29 +459,28 @@ function RatioPanel({
   const canSwitch = !compare && !(empty && chart.ratioEmpty);
   return (
     <>
-      <h2 className="growth-sub-title growth-period-title">{compare ? GROWTH_TEXT.compareHeading : week ? GROWTH_TEXT.weekHeading : GROWTH_TEXT.totalHeading}</h2>
-      <p className="todo-sub growth-days">{GROWTH_TEXT.days(week ? data.loggedDaysThisWeek : data.loggedDaysTotal)}</p>
       {!compare && <p className="sr-only">{ratioSummary(chart, periodName, nameOf, weekZero)}</p>}
       <div className="growth-card">
-        <div className="growth-card-head">
+        {/* 카드 머리 한 줄(Figma 50:208·50:212·60:8): 합계(16 Bold) · 기간 칩 「이번 주 ▾」 · 오른쪽 끝 보기 바꾸기 글 단추(누름 48) */}
+        <div className="growth-card-head growth-ratio-head">
           {!compare && (
             <p className="growth-card-total" aria-hidden="true">
               {empty ? GROWTH_TEXT.zero : formatMinutes(chart.spentTotalMinutes)}
             </p>
           )}
-          <div className="growth-periods" role="group" aria-label={GROWTH_TEXT.periodGroup}>
-            {STATUS_PERIODS.map((p) => (
-              <button key={p} type="button" className="growth-period" aria-pressed={period === p} onClick={() => choose({ ...pref, period: p, periodWeek: data.weekStart })}>
-                <span className="growth-period-face">{GROWTH_TEXT[PERIOD_LABEL[p]]}</span>
-              </button>
-            ))}
-          </div>
+          <PeriodMenu
+            value={period}
+            options={STATUS_PERIODS}
+            labelOf={(p) => GROWTH_TEXT[PERIOD_LABEL[p]]}
+            groupLabel={GROWTH_TEXT.periodGroup}
+            onSelect={(p) => choose({ ...pref, period: p, periodWeek: data.weekStart })}
+          />
+          {canSwitch && (
+            <TextButton className="growth-switch" onClick={() => choose({ ...pref, view: nextView.id })}>
+              {GROWTH_TEXT[view.switchLabel]}
+            </TextButton>
+          )}
         </div>
-        {canSwitch && (
-          <div className="growth-switch">
-            <TextButton onClick={() => choose({ ...pref, view: nextView.id })}>{GROWTH_TEXT[view.switchLabel]}</TextButton>
-          </div>
-        )}
         {weekZero && (
           <p className="growth-week-zero" aria-hidden="true">
             {GROWTH_TEXT.weekZero}
@@ -462,18 +489,12 @@ function RatioPanel({
         {compare ? (
           <CompareView data={data} onOpenCategory={onOpenCategory} />
         ) : empty ? (
-          <Empty chart={chart} text={GROWTH_TEXT} periodName={periodName} zeroText={GROWTH_TEXT.zero} />
+          <Empty chart={chart} text={GROWTH_TEXT} periodName={periodName} zeroText={GROWTH_TEXT.zero} nameOf={nameOf} onOpenCategory={onOpenCategory} />
         ) : (
           <View chart={chart} text={GROWTH_TEXT} periodName={periodName} nameOf={nameOf} onOpenCategory={onOpenCategory} />
         )}
-        {weekZero && <EveningButton onOpenEvening={onOpenEvening} />}
+        {(weekZero || empty) && <EveningButton onOpenEvening={onOpenEvening} />}
       </div>
-      {empty && (
-        <>
-          <p className="todo-sub growth-empty">{week ? GROWTH_TEXT.empty : GROWTH_TEXT.emptyTotal}</p>
-          <EveningButton onOpenEvening={onOpenEvening} />
-        </>
-      )}
     </>
   );
 }
@@ -481,7 +502,7 @@ function RatioPanel({
 function CompareView({ data, onOpenCategory }: { data: GrowthData; onOpenCategory: (id: string | null, name: string) => void }) {
   const rows = [...data.categories.map((c) => ({ id: c.id as string | null, name: c.name })), { id: null, name: GROWTH_TEXT.other }];
   return (
-    <ul className="growth-list">
+    <ul className="growth-list is-compare">
       {rows.map((r) => {
         const now = minutesOf(data.thisWeek, r.id);
         const last = minutesOf(data.lastWeek, r.id);
@@ -510,6 +531,7 @@ function CompareView({ data, onOpenCategory }: { data: GrowthData; onOpenCategor
               <span className="todo-sub">
                 {GROWTH_TEXT.vsLastWeek} {formatDeltaMinutes(now - last)}
               </span>
+              <RowChevron />
             </button>
           </li>
         );
