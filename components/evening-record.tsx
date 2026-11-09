@@ -66,7 +66,8 @@ export const EVENING_TEXT = {
   skipSplit: "나누지 않고 저장",
   split: "분야마다 나누기",
   splitHeading: "분야마다 나눠 주세요",
-  splitHint: "미리 채운 값을 확인하고 고쳐요. 나누지 않은 시간은 기타로 들어가요.",
+  // 고침6 PM d-129 ③: 한 줄만(앞 문장 「미리 채운 값을 확인하고 고쳐요.」를 뺐다). 분야 줄 아래 12 보조 글
+  splitHint: "나누지 않은 시간은 기타로 들어가요.",
   other: "기타",
   otherRemain: (m: number) => formatMinutes(m),
   // 나누기 아래 기타 줄의 이름 아래 작은 글(창구 덧붙임 11-09 11:3x)
@@ -576,7 +577,6 @@ export function EveningRecord({
 
         {state && phase === "split" && (
           <div className="detail-section">
-            <p className="todo-sub">{EVENING_TEXT.splitHint}</p>
             <p id="evening-category-label" className="input-label sheet-category-label">
               {EVENING_TEXT.categoryLabel}
             </p>
@@ -711,6 +711,7 @@ export function EveningRecord({
                 <span className="ratio-value">{EVENING_TEXT.otherRemain(otherMinutes)}</span>
               </li>
             </ul>
+            <p className="evening-split-hint">{EVENING_TEXT.splitHint}</p>
             <p className="ratio-total" role="status">
               {EVENING_TEXT.total(built.total)}
             </p>

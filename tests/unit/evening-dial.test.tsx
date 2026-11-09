@@ -478,8 +478,17 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     const otherRow = document.querySelector('.ratio-list [data-row-key="other"]')!;
     expect(otherRow.querySelector(".evening-other-sub")!.textContent).toBe("나누지 않은 시간");
     expect(otherRow.querySelector(".ratio-name")!.textContent).toBe("기타나누지 않은 시간");
-    // 설명 글은 지우지 않는다(PM 11-09 11:1x)
-    expect(screen.getByText("미리 채운 값을 확인하고 고쳐요. 나누지 않은 시간은 기타로 들어가요.")).toBeTruthy();
+    // 안내 글(고침6 PM d-129 ③): 「나누지 않은 시간은 기타로 들어가요.」 한 줄만, 분야 줄(목록) 아래 · 합계 위. 앞 문장은 없다
+    const hint = screen.getByText("나누지 않은 시간은 기타로 들어가요.");
+    expect(hint.className).toBe("evening-split-hint");
+    expect(screen.queryByText(/미리 채운 값을 확인하고 고쳐요/)).toBeNull();
+    const list = document.querySelector("ul.ratio-list")!;
+    expect(list.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hint.previousElementSibling).toBe(list);
+    expect(hint.nextElementSibling!.textContent).toBe("합계 2시간");
+    // 12 보조 글: CSS 규칙(글자 크기 0.75rem = 12, 보조 색 토큰)
+    const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
+    expect(css).toMatch(/\.evening-split-hint \{[^}]*font: 400 0\.75rem\/1rem var\(--font-family\);[^}]*color: var\(--color-text-sub\);/);
     expect(screen.getByText("합계 2시간")).toBeTruthy();
   });
 

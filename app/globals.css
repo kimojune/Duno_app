@@ -530,6 +530,8 @@ button, input { font: inherit; color: inherit; }
 /* 기타 줄: 이름 아래 작은 글 「나누지 않은 시간」(12, 보조 색 — 굵게 하지 않는다) */
 .evening-other-name { display: flex; flex-direction: column; }
 .evening-other-sub { font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); } /* 12 = 0.75rem(글자 키우기를 따른다) */
+/* 고침6 PM d-129 ③: 분야 줄 아래 안내 한 줄 「나누지 않은 시간은 기타로 들어가요.」(12, 보조 색) */
+.evening-split-hint { margin: var(--space-2) 0 var(--space-3); font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; } /* 12 = 0.75rem(글자 키우기를 따른다) */
 .notify-row { margin-top: var(--space-4); }
 .notify-toggle { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap-min); }
 .notify-toggle input { flex: none; inline-size: 24px; block-size: 24px; margin: 0; }
