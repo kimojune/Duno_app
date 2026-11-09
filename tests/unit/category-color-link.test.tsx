@@ -24,6 +24,7 @@ import type { PushApi } from "../../lib/push/subscribe";
 import type { NotifySettings } from "../../lib/settings/types";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
+import { typeWheel } from "./time-wheel-helpers";
 
 /**
  * 분야 색 잇기(고침4 합치기): 같은 분야는 처음 정한 비율 다이얼·저녁 나누기 다이얼·상태보기(띠·원·분야 줄·색점)에서 같은 색 변수를 쓴다.
@@ -112,8 +113,8 @@ describe("다이얼과 상태보기가 같은 분야에 같은 색을 준다", (
     const NOW = new Date("2026-11-07T14:00:00.000Z");
     render(<EveningRecord api={api} now={() => NOW} onClose={vi.fn()} />);
     await screen.findByRole("button", { name: "분야마다 나누기" });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("분"), { target: { value: "0" } });
+    typeWheel("시간", 2);
+    typeWheel("분", 0);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
     // 분야마다 10분 = 100분, 쓴 시간 120분이라 기타 20분
     expect(fills(".dial-slice", "fill")).toEqual([...EXPECTED, OTHER]);
@@ -243,8 +244,8 @@ describe("읽을 수 없는 분야·보관한 분야가 끼어도 네 화면이 
     const api: EveningApi = { fetchState: vi.fn(async (day?: string) => ({ ok: true as const, data: { ...state, day: day ?? state.today } })), save: vi.fn() };
     render(<EveningRecord api={api} now={() => new Date("2026-11-07T14:00:00.000Z")} onClose={vi.fn()} />);
     await screen.findByRole("button", { name: "분야마다 나누기" });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "5" } });
-    fireEvent.change(screen.getByLabelText("분"), { target: { value: "0" } });
+    typeWheel("시간", 5);
+    typeWheel("분", 0);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
     // 분야마다 10분이라 분야 11개가 모두 조각이고, 남은 시간(300 − 110)은 기타
     expect(fills(".dial-slice", "fill")).toEqual([...WANT, OTHER]);

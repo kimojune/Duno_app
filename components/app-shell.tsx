@@ -28,7 +28,8 @@ import { useTabbarHeight } from "../lib/use-tabbar-height";
 import { CategoryPage } from "./category-page";
 import { EveningEntry, EveningRecord } from "./evening-record";
 import { GoalEditor, GoalLine } from "./goal";
-import { AfterSaveShortfall, GrowthScreen } from "./growth-screen";
+import { GrowthScreen } from "./growth-screen";
+import { AfterSave } from "./after-save";
 import { MeScreen } from "./me-screen";
 import { OfferCard } from "./offer-card";
 import { Onboarding, pushOutcomeText, type OnboardingResult } from "./onboarding";
@@ -544,7 +545,7 @@ function MainShell({
             setEveningOpen(false);
             openTab("growth", "after_save");
           }}
-          renderAfterSave={() => <AfterSaveShortfall api={local ? local.apis.growth : defaultGrowthApi} />}
+          renderAfterSave={(saved, state) => <AfterSave api={local ? local.apis.growth : defaultGrowthApi} delta={saved.delta} fallback={state.categories} />}
         />
       )}
       {goalEditor && (

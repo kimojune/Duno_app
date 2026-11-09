@@ -502,6 +502,9 @@ button, input { font: inherit; color: inherit; }
 .dial-center-name { font: var(--font-sub); fill: var(--color-text-sub); pointer-events: none; }
 .dial-center-value { font: var(--font-body); fill: var(--color-text); pointer-events: none; }
 .dial-center-unit { font: var(--font-sub); fill: var(--color-text-sub); }
+/* 고침9 오늘 기록 나누기(valueFirst, Figma 87:96): 값 24 Bold 위 · 이름 12 보조 아래 */
+.dial-center-big { font: var(--font-title); font-variant-numeric: tabular-nums; }
+.dial-center-small { font: 400 0.75rem/1rem var(--font-family); }
 .dial-handle { touch-action: none; cursor: grab; }
 .dial-handle.dragging { cursor: grabbing; }
 .dial-ring { fill: var(--color-surface); stroke: var(--color-text); stroke-width: 2; } /* 손잡이: 흰 원 + 2px, 보이는 지름 22(r 10 + 테두리) */
@@ -562,22 +565,65 @@ select.input { appearance: auto; }
 .time-wheel-nudge { display: flex; justify-content: center; gap: var(--space-3); margin-top: var(--space-1); }
 .time-wheel-nudge-btn { flex: 0 1 120px; min-width: 0; background: var(--color-surface); border-color: var(--color-border-input); color: var(--color-text); font: var(--font-sub); font-weight: 500; font-variant-numeric: tabular-nums; }
 .time-wheel-nudge-btn:disabled { opacity: 0.5; cursor: default; }
-.after-save-line {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
-  width: 100%; min-height: var(--tap-min); padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border-input); border-radius: var(--radius-control);
-  background: var(--color-surface); color: var(--color-text); text-align: left; font: var(--font-body);
+/* ---- 고침9 오늘 기록 화면 꼴(Figma 49:5 · 87:2 · 49:142 · 59:2). 머리 A1·아래 단추 A2·흰 카드 A4는 공통 부품 CSS ---- */
+/* 「어제」 「오늘」 테두리 알약 76×36, 사이 8. 켜진 쪽 2px 먹남색 + Bold(채움 없음), 꺼진 쪽 1px 선 색 + 보조 글. 누름 48은 위아래 투명 여백으로 */
+.evening-days { display: flex; gap: var(--space-2); }
+.evening-day {
+  position: relative; z-index: 0; display: inline-flex; align-items: center; justify-content: center; min-inline-size: 76px; min-block-size: var(--tap-min);
+  padding: 6px var(--space-4); border: 0; background: none; cursor: pointer; font: var(--font-sub); color: var(--color-text-sub);
 }
-button.after-save-line { cursor: pointer; }
-button.after-save-line:active { background: var(--color-notice-bg); }
-.after-save-title { font: var(--font-sub); color: var(--color-text-sub); }
-/* 저장 직후 남은 시간(고침6 ④-①): 분야 이름 줄 아래 「n시간 더」(12 보조). 남은 분야만 */
-.after-save-rows { display: grid; gap: var(--space-2); width: 100%; margin: 0; padding: 0; list-style: none; }
-.after-save-row { display: flex; flex-direction: column; min-width: 0; }
-.after-save-name { overflow-wrap: anywhere; }
-.after-save-more { font: 400 12px/16px var(--font-family); color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
-.after-save-text { overflow-wrap: anywhere; }
-.after-save-go { font: var(--font-sub); color: var(--color-primary); }
+.evening-day::after { content: ""; position: absolute; inset: 6px 0; z-index: -1; border: 1px solid var(--color-border-input); border-radius: var(--radius-pill); background: var(--color-surface); }
+.evening-day[aria-pressed="true"] { color: var(--color-text); font-weight: 700; }
+.evening-day[aria-pressed="true"]::after { border: 2px solid var(--color-primary); }
+.evening-day:focus-visible { outline: none; }
+.evening-day:focus-visible::after { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.evening-day:disabled { cursor: default; }
+/* 머리 아래 큰 제목 24 Bold */
+.evening-ask { margin: var(--space-6) 0 0; font: var(--font-title); color: var(--color-text); overflow-wrap: anywhere; }
+.evening-ask:focus { outline: none; }
+.evening-days + .evening-ask { margin-top: var(--space-6); }
+.screen-head + .screen-fill-body > .evening-split-head > .evening-ask, .screen-head + .screen-fill-body > .evening-saved { margin-top: var(--space-2); }
+.evening-timer-row { margin: var(--space-3) 0 0; text-align: center; }
+.evening-timer-row > .evening-timer-chip { margin: 0; padding: 4px var(--space-4); }
+/* 나누기: 제목 + 같은 줄 오른쪽 「합계 n」(12 보조) */
+.evening-split-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: var(--space-3); }
+.evening-split-total { margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.evening-split-card { margin-top: var(--space-3); padding-block: var(--space-1) var(--space-3); }
+.evening-category-label { margin: 0; font: 500 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.evening-split-card .input-help:empty { min-height: 0; margin: 0; }
+.evening-rows { margin: var(--space-2) 0 0; }
+.evening-rows .ratio-row { border-bottom: 0; min-height: 40px; border-radius: 10px; padding-block: 0; }
+.evening-split-card .evening-row { margin-inline: calc(-1 * var(--space-3) + 2px); padding-inline: calc(var(--space-3) - 2px) 0; }
+.evening-row .stepper-label { font: var(--font-sub); }
+.evening-other-row .ratio-name { flex: 1 1 auto; font: var(--font-sub); }
+/* 기타 줄 = 오른쪽 끝 값만(14 Medium, 고정폭 숫자 — PM d-148 가). −/+ 줄의 숫자 칸 끝(+ 단추 자리)까지 비우지 않고 줄 끝에 붙인다 */
+.evening-row .evening-other-value { min-width: 0; margin-inline-start: auto; padding-inline-end: var(--space-3); text-align: end; font: 500 0.875rem/1.25rem var(--font-family); font-variant-numeric: tabular-nums; color: var(--color-text); }
+.evening-raised { margin-top: var(--space-3); }
+/* 저장 뒤 판: 「✓ 저장했어요」(체크 원 22 + 14 보조) · 「이번 주」 카드 · 가운데 「상태보기에서 보기 ›」 글 단추(14 Medium, 누름 48) */
+.evening-saved { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; font: var(--font-sub); color: var(--color-text-sub); }
+.evening-saved:focus { outline: none; }
+.evening-saved-icon { flex: none; display: block; color: var(--color-text); }
+.evening-open-growth { align-self: center; margin-top: var(--space-3); font: 500 0.875rem/1.25rem var(--font-family); color: var(--color-text); }
+.after-save-card { margin-top: var(--space-4); }
+.after-save-week { margin: 0; font: var(--font-body); font-weight: 700; color: var(--color-text); }
+.after-save-rows { display: grid; width: 100%; margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.after-save-row { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding-block: var(--space-3); }
+.after-save-row:first-child { padding-top: 0; }
+.after-save-row:last-child { padding-bottom: 0; }
+.after-save-row + .after-save-row { border-top: 1px solid var(--color-divider); }
+.after-save-row-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font: var(--font-sub); color: var(--color-text); }
+.after-save-row-head .chip-dot { inline-size: 12px; block-size: 12px; }
+.after-save-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.after-save-value { flex: none; font-variant-numeric: tabular-nums; }
+.after-save-delta { font-weight: 700; }
+/* 막대(높이 16): 축 = 연한 면, 앞 칸 = 분야 색 + 1px 윤곽, 뒤 칸 = 같은 분야 색 위 먹남색 사선 빗금(옅게 하지 않음) + 1px 윤곽, 목표 눈금 2px(막대 위아래 4씩 넘침) */
+.after-save-bar { position: relative; display: flex; block-size: 16px; background: var(--color-notice-bg); }
+.after-save-fill { flex: none; block-size: 100%; box-shadow: inset 0 0 0 1px var(--color-chart-outline); }
+.after-save-hatch { background-image: repeating-linear-gradient(135deg, var(--color-chart-outline) 0 1px, transparent 1px 5px); }
+.after-save-tick { position: absolute; inset-block: -4px; inline-size: 2px; margin-inline-start: -1px; background: var(--color-text); }
+.after-save-more { margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.after-save-others { margin: var(--space-3) 0 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.after-save-empty { margin: var(--space-2) 0 0; font: var(--font-sub); color: var(--color-text-sub); }
 /* ---- 고침 5바퀴: 오늘 기록 시간 단계의 「오늘 할 일 n/m ›」 줄과 「오늘 할 일」 시트(명세 ⑩ PM 11). 새 토큰은 var(이름, 대체값) ---- */
 /* 타이머로 미리 채웠을 때만 시간 입력 아래 작은 표시(12 Medium, 연한 면 둥근 띠). 「오늘 할 일」 줄은 그 아래 24 */
 .evening-timer-chip {
@@ -585,16 +631,18 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   border-radius: var(--radius-pill, 999px); background: var(--color-notice-bg);
   font: var(--font-chip, 500 12px/16px var(--font-family)); color: var(--color-text); overflow-wrap: anywhere;
 }
+/* 고침9(Figma 49:5 · 88:2): 흰 카드 줄(테두리 없음, radius 16 = --radius-card) · 왼쪽 체크 원 22 · 글 14 · 오른쪽 「›」 22 보조 */
 .evening-todo-line {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  display: flex; align-items: center; gap: var(--space-3);
   width: 100%; min-height: var(--tap-min); margin-top: var(--space-6); padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border-input); border-radius: var(--radius-control);
-  background: var(--color-surface); color: var(--color-text); text-align: start; font: var(--font-body); cursor: pointer;
+  border: 0; border-radius: var(--radius-card);
+  background: var(--color-surface); color: var(--color-text); text-align: start; font: var(--font-sub); cursor: pointer;
 }
 .evening-todo-line:active { background: var(--color-notice-bg); }
-.evening-todo-line-text { min-width: 0; overflow-wrap: anywhere; }
-.evening-todo-count { font-weight: 700; }
-.evening-todo-go { flex: none; font: var(--font-title); line-height: 1; color: var(--color-text-sub); }
+.evening-todo-line-icon { flex: none; display: block; color: var(--color-text); }
+.evening-todo-line-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.evening-todo-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.evening-todo-go { flex: none; font: var(--font-title); font-weight: 400; line-height: 1; color: var(--color-text-sub); }
 /* 시트: 오늘 기록 창(.detail, z 5) 위에 아래에서 올라온 판. 본문 폭 480 안, 보이는 화면보다 높아지면 판 안이 스크롤된다 */
 .evening-todo-layer { position: fixed; inset: 0; z-index: 6; display: flex; flex-direction: column; justify-content: flex-end; }
 .evening-todo-backdrop { position: absolute; inset: 0; background: var(--color-scrim, color-mix(in srgb, var(--color-text) 40%, transparent)); }
@@ -603,8 +651,11 @@ button.after-save-line:active { background: var(--color-notice-bg); }
   overflow-y: auto; overscroll-behavior: contain;
   padding: var(--space-4) var(--page-x) calc(var(--space-6) + env(safe-area-inset-bottom));
   border-radius: var(--radius-sheet, 16px) var(--radius-sheet, 16px) 0 0;
-  background: var(--color-surface);
+  background: var(--color-bg); /* 고침9(Figma 88:48): 종이색 판 위에 흰 카드 목록 */
 }
+/* 손잡이 막대 40×4(꾸밈) · 시트 제목 18 Bold(토큰에 18이 없어 --font-body 16 Bold — 보고에 적음) */
+.evening-todo-grip { display: block; inline-size: 40px; block-size: 4px; margin: calc(-1 * var(--space-2)) auto var(--space-2); border-radius: 2px; background: var(--color-category-other); }
+.evening-todo-title { font: var(--font-body); font-weight: 700; }
 .evening-todo-sheet .btn-flush-end { margin-inline-end: calc(-1 * var(--space-3)); }
 /* 닫기 전 확인(PM d-126, components/close-confirm.tsx): 오늘 기록·시트 위 가운데 흰 카드. 「계속 적기」(주 단추) 위 · 「닫기」 아래, 둘 다 전체 폭 */
 .close-confirm-layer { position: fixed; inset: 0; z-index: 7; display: flex; align-items: center; justify-content: center; padding: var(--space-4) var(--page-x); }
@@ -616,14 +667,32 @@ button.after-save-line:active { background: var(--color-notice-bg); }
 .close-confirm-title { margin: 0; font: var(--font-title); color: var(--color-text); overflow-wrap: anywhere; }
 .close-confirm-actions { display: grid; gap: var(--space-2); margin-top: var(--space-6); }
 .evening-todo-sheet > .notice { margin-top: var(--space-2); }
-.evening-todo-list { margin-top: var(--space-2); }
+/* 목록 = 흰 카드 하나(A4), 줄 사이 1px 선. 줄 높이 56 */
+.evening-todo-list { margin-top: var(--space-2); border-radius: var(--radius-card); background: var(--color-surface); overflow: hidden; }
+.evening-todo-list > .todo-row { min-height: 56px; padding: 0 var(--space-3) 0 0; }
+.evening-todo-list > .todo-row + .todo-row { border-top: 1px solid var(--color-notice-bg); }
+.evening-todo-body { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+/* 체크 = 원 24(누름 48 그대로): 안 함 = 2px 먹남색 테두리 원, 끝냄 = 먹남색 채운 원 + 흰 체크 */
+.check-circle { position: absolute; top: 12px; left: 12px; inline-size: 24px; block-size: 24px; pointer-events: none; }
+.check-circle svg { display: block; }
+.check-circle-ring { fill: none; stroke: var(--color-primary); stroke-width: 2; }
+.check-circle-mark { fill: none; stroke: transparent; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.evening-todo-check input:checked + .check-circle .check-circle-ring { fill: var(--color-primary); }
+.evening-todo-check input:checked + .check-circle .check-circle-mark { stroke: var(--color-on-primary); }
+.evening-todo-check input:focus-visible + .check-circle { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: 50%; }
 .evening-todo-empty { margin: var(--space-4) 0 var(--space-2); }
 .evening-todo-category { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
-.evening-todo-category .category-tag-line { margin-top: 0; min-width: 0; }
+/* 분야 = 색 점 10 + 이름 12 보조(바탕 없음) */
+.evening-todo-category-name { min-width: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); overflow-wrap: anywhere; }
 /* 분야 점: 분야 색 + 1px 윤곽(분야 색은 흰 바탕 3:1 미만이라 윤곽이 경계 대비를 맡는다, 명세 ①) */
 .evening-todo-dot { flex: none; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }
 .evening-todo-add { margin-top: var(--space-2); margin-inline-start: calc(-1 * var(--space-3)); }
 .evening-todo-form { margin-top: var(--space-3); }
+/* 「+ 할 일」 연 상태(88:71~88:92): 글 칸 radius 12(토큰에 12가 없어 글자 값 — 보고에 적음) · 포커스 2px · 이름표 「분야」 12 Medium 보조 · 「더하기」 폭 가득 */
+.evening-todo-input { display: block; inline-size: 100%; border-radius: 12px; }
+.evening-todo-input:focus { outline: none; border: 2px solid var(--color-primary); padding-inline: calc(var(--space-3) - 1px); }
+.evening-todo-category-label { display: block; margin-top: var(--space-2); font: 500 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.evening-todo-submit { display: flex; inline-size: 100%; margin-top: var(--space-4); }
 /* 목록 위 카드(오늘 먼저 할 일·저녁 기록 입구)는 한 줄 줄이다(고침 4바퀴): 글은 왼쪽, 단추는 오른쪽에 한 줄로 놓고,
    폭이 모자라거나 글자가 커지면 단추가 아래 줄로 감싼다(글을 줄이거나 자르지 않는다). 카드 안 구조·글은 그대로, 규칙만 바꿨다 */
 .entry-card { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-3); row-gap: var(--space-1); margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-4); border-radius: var(--radius-card); background: var(--color-notice-bg); }

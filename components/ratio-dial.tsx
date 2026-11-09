@@ -72,6 +72,10 @@ interface Props {
   center?: string;
   /** 폭 0 조각을 건너뛰는 손잡이 규칙(고침6 PM d-129 ②, 오늘 기록 나누기). 기본 false(이웃 조각 사이마다 — 처음 정한 비율) */
   skipZero?: boolean;
+  /** 가운데 표시 순서(고침9 오늘 기록 나누기, Figma 87:96): true면 값 24 Bold 위 · 이름 12 보조 아래. 기본 false(이름 위 · 값 아래) */
+  valueFirst?: boolean;
+  /** 12시 작은 세로 눈금(고침9 오늘 기록 나누기는 끔 — Figma에 없음). 기본 true */
+  noonMark?: boolean;
 }
 
 const R = 100;
@@ -184,6 +188,8 @@ export function RatioDial({
   sub,
   center,
   skipZero = false,
+  valueFirst = false,
+  noonMark = true,
 }: Props) {
   const n = slices.length;
   const raw = slices.map((s) => s.value);
@@ -389,9 +395,18 @@ export function RatioDial({
           ) : null,
         )}
         <circle r={INNER - DIAL_OUTLINE} className="dial-hole" />
-        {n >= 2 && <line className="dial-noon" id={`${id}-noon`} x1={0} y1={-R - 3} x2={0} y2={-R - 11} aria-hidden="true" />}
+        {noonMark && n >= 2 && <line className="dial-noon" id={`${id}-noon`} x1={0} y1={-R - 3} x2={0} y2={-R - 11} aria-hidden="true" />}
         {/* 가운데 표시: 줄인 이름이라 읽어 주지 않는다(전체 이름은 손잡이 이름·바뀐 내용 안내에 있다) */}
-        {sel ? (
+        {sel && valueFirst ? (
+          <>
+            <text textAnchor="middle" className="dial-center-value dial-center-big" y={4} aria-hidden="true">
+              {numText}
+            </text>
+            <text textAnchor="middle" className="dial-center-name dial-center-small" y={26} aria-hidden="true">
+              {shortName(sel.name)}
+            </text>
+          </>
+        ) : sel ? (
           <>
             <text textAnchor="middle" className="dial-center-name" y={-12} aria-hidden="true">
               {shortName(sel.name)}
@@ -402,7 +417,7 @@ export function RatioDial({
             </text>
           </>
         ) : (
-          <text textAnchor="middle" className="dial-center-value" y={5} aria-hidden="true">
+          <text textAnchor="middle" className={valueFirst ? "dial-center-value dial-center-big" : "dial-center-value"} y={valueFirst ? 9 : 5} aria-hidden="true">
             {center ?? ""}
           </text>
         )}

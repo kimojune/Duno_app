@@ -35,6 +35,7 @@ import { createLocalTodos, type LocalTodos } from "../../lib/local/todos";
 import type { Mirror, MirrorTodo, QueuedOp } from "../../lib/local/types";
 import type { TodayRead } from "../../lib/today-types";
 import { FakeHistory } from "./fake-history";
+import { typeWheel, wheelTotal, wheelValue } from "./time-wheel-helpers";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const T1 = "11111111-1111-4111-8111-111111111111";
@@ -149,9 +150,12 @@ describe("시간 단계의 「오늘 할 일 n/m ›」 줄", () => {
     expect(button.textContent).toBe("오늘 할 일 1/2›");
     expect(button.querySelector("b")?.textContent).toBe("1/2");
     expect(button.getAttribute("aria-label")).toBe("오늘 할 일 1/2, 2개 중 1개 끝냄");
-    // 시간 입력(합계 줄) 아래에 있다
-    const total = screen.getByText("합계 0분");
-    expect(total.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // 시간 입력(두 줄 휠) 아래에 있다. 흰 카드 줄 + 왼쪽 체크 원 아이콘 22(꾸밈, 고침9 Figma 88:2)
+    const wheel = document.querySelector(".time-wheel")!;
+    expect(wheel.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const icon = button.querySelector("svg.evening-todo-line-icon")!;
+    expect([icon.getAttribute("width"), icon.getAttribute("height"), icon.getAttribute("aria-hidden")]).toEqual(["22", "22", "true"]);
+    expect(button.firstElementChild).toBe(icon);
   });
 
   it("할 일이 없으면 「오늘 할 일 0/0 ›」이고, 시트에서 더할 수 있다", async () => {
@@ -180,15 +184,16 @@ describe("시간 단계의 「오늘 할 일 n/m ›」 줄", () => {
     const chip = screen.getByText("타이머 2시간 30분");
     expect(chip.className).toBe("evening-timer-chip");
     expect(screen.queryByText(/미리 채웠어요/)).toBeNull(); // 옛 알림 글 없음(PM d-129 ④)
-    expect(screen.getAllByText(/2시간 30분/).map((e) => e.textContent)).toEqual(["합계 2시간 30분", "타이머 2시간 30분"]); // 2시간 30분은 합계와 띠, 두 번만
-    expect(screen.getByText("합계 2시간 30분").compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByText(/2시간 30분/).map((e) => e.textContent)).toEqual(["타이머 2시간 30분"]); // 합계 줄은 없앴다(고침9) — 띠 하나뿐
+    expect([wheelValue("시간"), wheelValue("분")]).toEqual([2, 30]); // 휠이 타이머 합으로 미리 채워짐
+    expect(document.querySelector(".time-wheel")!.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chip.compareDocumentPosition(line()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("타이머가 0분이면 타이머 표시가 없다", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
-    expect(screen.getByText("합계 0분")).toBeTruthy();
+    expect(wheelTotal()).toBe(0);
     expect(screen.queryByText(/^타이머 /)).toBeNull();
     expect(document.querySelector(".evening-timer-chip")).toBeNull();
   });
@@ -212,11 +217,15 @@ describe("「오늘 할 일」 시트 열기·닫기(겹친 창 규칙)", () => 
     expect(sheetCheck("단어 외우기").checked).toBe(false);
     expect(sheetCheck("빨래").checked).toBe(true);
     const row = dialog.querySelector(`#evening-todo-row-${T1}`)!;
-    expect(row.querySelector(".category-tag")?.textContent).toBe("분야 어학");
+    // 분야 = 색 점 10 + 이름 12 보조(바탕 없는 글 — 알약 .category-tag 아님, 고침9 Figma 88:12). 화면 읽기 앞말 「분야 」
+    const tag = row.querySelector(".evening-todo-category-name")!;
+    expect(tag.textContent).toBe("분야 어학");
+    expect(tag.querySelector(".sr-only")!.textContent).toBe("분야 ");
+    expect(row.querySelector(".category-tag")).toBeNull();
     const dot = row.querySelector<HTMLElement>(".evening-todo-dot")!;
     expect(dot.style.background).toBe("var(--color-category-1)");
     // 기타 할 일에는 분야 표시가 없다
-    expect(dialog.querySelector(`#evening-todo-row-${T2} .category-tag`)).toBeNull();
+    expect(dialog.querySelector(`#evening-todo-row-${T2} .evening-todo-category-name`)).toBeNull();
     // 오늘 기록 창의 다른 것(시간 입력)은 시트가 열린 동안 inert
     expect(screen.getByRole("button", { name: "분야마다 나누기", hidden: true }).closest("[inert]")).not.toBeNull();
     expect(dialog.closest("[inert]")).toBeNull();
@@ -226,7 +235,7 @@ describe("「오늘 할 일」 시트 열기·닫기(겹친 창 규칙)", () => 
     expect(document.activeElement).toBe(line());
     expect(screen.getByRole("button", { name: "분야마다 나누기" }).closest("[inert]")).toBeNull();
     // 오늘 기록 창은 그대로
-    expect(screen.getByRole("dialog", { name: "오늘 몇 시간 썼어요?" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "오늘 기록" })).toBeTruthy();
   });
 
   it("Esc는 시트만 닫는다(오늘 기록은 닫히지 않음). 포커스는 줄로", async () => {
@@ -315,7 +324,7 @@ describe("체크·되돌림: 할 일 탭과 같은 저장 길(기기 먼저 저�
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: "끊긴 채 적은 글" } });
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(within(sheet()).getByText("끊긴 채 적은 글")).toBeTruthy();
     expect(runtime.pendingOps().map((o) => o.op.kind)).toEqual(["todo.done", "todo.add"]);
     expect(sent).toEqual([]); // 아직 보내지 않았다
@@ -361,12 +370,17 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     expect(label.textContent).toBe("할 일");
     expect(label.className).not.toContain("sr-only");
     expect(input.getAttribute("placeholder")).toBeNull();
-    const chips = within(sheet()).getByRole("group", { name: "분야 (고르지 않으면 기타)" });
-    expect(within(chips).getAllByRole("button").map((b) => b.textContent)).toEqual(["어학", "포트폴리오"]);
+    // 이름표 「분야」 + 칩 줄 맨 앞 「기타」가 골라진 채(고침9 Figma 88:73)
+    const chips = within(sheet()).getByRole("group", { name: "분야" });
+    expect(within(chips).getAllByRole("button").map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+      ["기타", "true"],
+      ["어학", "false"],
+      ["포트폴리오", "false"],
+    ]);
 
     fireEvent.change(input, { target: { value: "  면접 준비  " } });
     fireEvent.click(within(chips).getByRole("button", { name: "포트폴리오" }));
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(local.addTodo).toHaveBeenCalledTimes(1);
     const arg = vi.mocked(local.addTodo).mock.calls[0][0];
     expect(arg).toEqual({ id: expect.stringMatching(UUID), text: "면접 준비", categoryId: C2 });
@@ -398,7 +412,7 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     await openSheet();
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: "한 번만" } });
-    const write = within(sheet()).getByRole("button", { name: "적기" });
+    const write = within(sheet()).getByRole("button", { name: "더하기" });
     await act(async () => {
       fireEvent.click(write);
       fireEvent.click(write);
@@ -417,12 +431,12 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     const input = within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "가".repeat(201) } });
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(local.addTodo).not.toHaveBeenCalled();
     expect(within(sheet()).getAllByText("200자까지 적을 수 있어요. 지금 201자예요.").length).toBeGreaterThan(0);
     expect(input.value).toBe("가".repeat(201)); // 몰래 자르지 않는다
     fireEvent.change(input, { target: { value: "가".repeat(200) } });
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(local.addTodo).toHaveBeenCalledTimes(1);
     expect(vi.mocked(local.addTodo).mock.calls[0][0].text).toBe("가".repeat(200));
   });
@@ -434,7 +448,7 @@ describe("「+ 할 일」로 적기: 할 일 탭과 같은 저장 함수·같은
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     const evil = "<img src=x onerror=alert(1)>";
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: evil } });
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(vi.mocked(local.addTodo).mock.calls[0][0].text).toBe(evil);
     expect(within(sheet()).getByText(evil).tagName).toBe("P");
     expect(document.querySelector("img")).toBeNull();
@@ -472,7 +486,7 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
     expect(onDone).toHaveBeenCalledTimes(5);
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: "새 글" } });
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(onDone).toHaveBeenCalledTimes(6);
     expect(onDone).toHaveBeenLastCalledWith([]);
   });
@@ -480,7 +494,7 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
   it("오늘 기록에 이어진다: 시트에서 체크한 분야가 나누기 처음 값에 들어가고, 되돌리면 빠진다", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "1" } });
+    typeWheel("시간", 1);
     await openSheet();
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
@@ -498,8 +512,8 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
   it("오늘 기록에 이어진다: 기타가 30분보다 적으면 남은 만큼만 들어간다(쓴 시간 15분 → 어학 15분, 기타 0분)", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "0" } });
-    fireEvent.change(screen.getByLabelText("분"), { target: { value: "15" } });
+    typeWheel("시간", 0);
+    typeWheel("분", 15);
     await openSheet();
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "닫기" })));
@@ -511,7 +525,7 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
   it("체크하지 않으면 그 분야는 나누기 처음 값에 없다(위 시험의 대조)", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "1" } });
+    typeWheel("시간", 1);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "분야마다 나누기" })));
     expect(screen.queryByRole("spinbutton", { name: "어학" }), "체크하지 않으면 줄이 없다").toBeNull();
     expect(screen.getByRole("button", { name: /^어학, 다이얼에 넣기/ }).getAttribute("aria-pressed")).toBe("false");
@@ -521,7 +535,7 @@ describe("끝낸 할 일 분야 목록(나누기 처음 값의 재료, d-116 가
   it("체크했다가 되돌리면 나누기 처음 값에서 빠진다(기타가 1시간 그대로)", async () => {
     const local = await makeLocal();
     await mountEvening({ local });
-    fireEvent.change(screen.getByLabelText("시간"), { target: { value: "1" } });
+    typeWheel("시간", 1);
     await openSheet();
     await act(async () => fireEvent.click(sheetCheck("단어 외우기")));
     await act(async () => fireEvent.click(sheetCheck("단어 외우기"))); // 되돌림
@@ -601,14 +615,14 @@ describe("예전 방식(기기 먼저 저장 꺼짐): 할 일 탭과 같은 GET�
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: "발음 연습" } });
     fireEvent.click(within(sheet()).getByRole("button", { name: "어학" }));
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(addTodo).toHaveBeenCalledTimes(1);
     const first = addTodo.mock.calls[0];
     expect(first).toEqual([expect.stringMatching(UUID), "발음 연습", C1]);
     expect(within(sheet()).getByText("저장하지 못했어요.")).toBeTruthy();
     expect((within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement).value).toBe("발음 연습");
     expect(onChanged).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(addTodo).toHaveBeenCalledTimes(2);
     expect(addTodo.mock.calls[1]).toEqual([first[0], "발음 연습", C1]); // 같은 id
     expect(within(sheet()).getByText("발음 연습")).toBeTruthy();
@@ -627,7 +641,7 @@ describe("예전 방식(기기 먼저 저장 꺼짐): 할 일 탭과 같은 GET�
     expect(sheetCheck("단어 외우기").checked).toBe(false);
     await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "+ 할 일" })));
     fireEvent.change(within(sheet()).getByRole("textbox", { name: "할 일" }), { target: { value: "나중에" } });
-    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "적기" })));
+    await act(async () => fireEvent.click(within(sheet()).getByRole("button", { name: "더하기" })));
     expect(addTodo).not.toHaveBeenCalled();
     expect(within(sheet()).getByText("인터넷에 연결되면 적을 수 있어요. 적은 글은 그대로 있어요.")).toBeTruthy();
     expect((within(sheet()).getByRole("textbox", { name: "할 일" }) as HTMLInputElement).value).toBe("나중에");
@@ -638,9 +652,10 @@ describe("예전 방식(기기 먼저 저장 꺼짐): 할 일 탭과 같은 GET�
 describe("닫기 전 확인(PM d-126)", () => {
   const confirmBox = () => screen.getByRole("alertdialog", { name: "저장하지 않고 나갈까요?" });
   const confirms = () => screen.queryAllByRole("alertdialog");
-  const recordDialog = () => screen.queryByRole("dialog", { name: /몇 시간 썼어요\?|분야마다 나눠 주세요|저장했어요/ });
+  const recordDialog = () => screen.queryByRole("dialog", { name: "오늘 기록" });
   const headClose = () => within(recordDialog()!).getAllByRole("button", { name: "닫기" })[0];
-  const plusHour = () => act(async () => fireEvent.click(screen.getByRole("button", { name: "시간 1시간 늘리기" })));
+  /** 휠 「시간」 열을 위 화살표로 한 칸(1시간) — 사용자가 쓴 시간을 바꾼 것 */
+  const plusHour = () => act(async () => fireEvent.keyDown(screen.getByRole("spinbutton", { name: "시간" }), { key: "ArrowUp" }));
   const keep = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "계속 적기" })));
   const closeInConfirm = () => act(async () => fireEvent.click(within(confirmBox()).getByRole("button", { name: "나가기" })));
 
@@ -686,7 +701,7 @@ describe("닫기 전 확인(PM d-126)", () => {
   it("오늘 기록: 쓴 시간을 바꾸면 「닫기」가 확인을 띄운다 — alertdialog·제목 이름·처음 포커스 「계속 적기」. 「계속 적기」면 값 그대로 열린 채, 포커스는 「닫기」로", async () => {
     const { onClosed, api } = await mountHost();
     await plusHour();
-    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(60);
     const close = headClose();
     close.focus();
     await act(async () => fireEvent.click(close));
@@ -704,7 +719,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     await keep();
     expect(confirms()).toHaveLength(0);
     expect(recordDialog()).not.toBeNull();
-    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(60);
     expect(document.activeElement).toBe(close);
     expect(close.closest("[inert]")).toBeNull();
     expect(onClosed).not.toHaveBeenCalled();
@@ -729,7 +744,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(confirms()).toHaveLength(1);
     await act(async () => fireEvent.keyDown(confirmBox(), { key: "Escape" }));
     expect(confirms()).toHaveLength(0);
-    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(60);
     expect(onClosed).not.toHaveBeenCalled();
     await act(async () => fireEvent.keyDown(screen.getByRole("heading", { name: "오늘 몇 시간 썼어요?" }), { key: "Escape" }));
     await closeInConfirm();
@@ -800,7 +815,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     expect(confirms()).toHaveLength(1); // 돌아온 popstate는 확인을 닫거나 겹치지 않는다
     await keep();
     expect(recordDialog()).not.toBeNull();
-    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(60);
 
     // 다시 뒤로 가기 → 다시 확인(먹히지 않는다)
     await act(async () => history.userBack());
@@ -906,7 +921,7 @@ describe("닫기 전 확인(PM d-126)", () => {
     // 이제 뒤로 가기는 오늘 기록의 확인(바꾼 시간이 있다)
     await act(async () => history.userBack());
     expect(confirms()).toHaveLength(1);
-    expect(screen.getByText("합계 1시간")).toBeTruthy();
+    expect(wheelTotal()).toBe(60);
     history.flush();
     expect(history.index).toBe(1);
     expect(history.leftApp).toBe(false);

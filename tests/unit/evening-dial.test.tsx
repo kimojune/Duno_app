@@ -19,6 +19,7 @@ import type { EveningState } from "../../lib/evening/types";
 import type { EveningApi, EveningSaveInput } from "../../lib/evening-api";
 import { encryptCategoryName, parseTodoKey } from "../../lib/todos/crypto";
 import { FakeStore, fakeTablesClient, v2Rules } from "./fake-tables";
+import { setNumberField } from "./time-wheel-helpers";
 
 /**
  * 저녁 기록 「분야마다 나누기」의 원형 다이얼(고침4 2단계). 원 전체 = 쓴 시간, 조각 = 분야마다 분, 맨 끝 = 기타.
@@ -73,7 +74,8 @@ async function mount(api: EveningApi) {
   await screen.findByRole("button", { name: "분야마다 나누기" });
   return { onClose };
 }
-const setNumber = (label: string, value: number) => fireEvent.change(screen.getByLabelText(label), { target: { value: String(value) } });
+/** 「시간」「분」은 두 줄 휠의 숫자 바로 쓰기(고침9), 그 밖(분야 줄)은 숫자 칸 */
+const setNumber = setNumberField;
 const press = (name: string | RegExp) => act(async () => fireEvent.click(screen.getByRole("button", { name })));
 const key = (el: Element, k: string) => fireEvent.keyDown(el, { key: k });
 const dial = () => document.querySelector("svg.dial") as unknown as HTMLElement | null;
@@ -223,26 +225,29 @@ describe("저녁 기록 나누기 다이얼 (고침4 2단계)", () => {
     expect(results).toEqual([true]);
   });
 
-  it("쓴 시간이 5의 배수가 아닐 때(62분): 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
-    const { sent, results } = await openSplit120();
-    key(dial()!, "ArrowRight");
-    key(handle("end"), "PageUp"); // 30 · 60 · 기타 30
-    await press("이전");
-    setNumber("시간", 1);
-    setNumber("분", 2); // 62분
+  it("쓴 시간이 5의 배수가 아닐 때(타이머가 62분을 채움 — 고침9 휠은 손으로 5분 단위만 쓴다): 휠은 1시간 02분을 그대로 보이고, 나눈 값은 5분 단위, 남는 2분은 기타. 끝까지 밀면 기타 2분까지 다 가져갈 수 있다", async () => {
+    const { sent, results } = await (async () => {
+      const r = realApi(state({ timerByCategory: [{ categoryId: null, minutes: 62 }] }));
+      await mount(r.api);
+      return r;
+    })();
+    expect(screen.getByRole("spinbutton", { name: "시간" }).getAttribute("aria-valuenow")).toBe("1");
+    expect(screen.getByRole("spinbutton", { name: "분" }).getAttribute("aria-valuenow")).toBe("2");
+    expect(screen.getByRole("spinbutton", { name: "분" }).querySelector(".time-wheel-center")!.textContent).toBe("02");
     await press("분야마다 나누기");
-    expect(stepper("어학")).toBe(15);
+    expect(otherText()).toBe("1시간 2분"); // 기타 100%
+    await press("어학, 다이얼에 넣기"); // 기타에서 30분
+    await press("포트폴리오, 다이얼에 넣기"); // 기타에서 30분 → 기타 2분
+    expect(stepper("어학")).toBe(30);
     expect(stepper("포트폴리오")).toBe(30);
-    expect(otherText()).toBe("17분");
-    expect(handle("end").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오)은 단계를 오가도 그대로
-    key(handle("end"), "ArrowRight"); // 30 → 35 (5분 단위)
-    expect(stepper("포트폴리오")).toBe(35);
-    key(handle("end"), "End"); // 기타 12분을 다 가져간다
-    expect(stepper("포트폴리오")).toBe(47);
+    expect(otherText()).toBe("2분");
+    expect(handle("start").getAttribute("aria-valuenow")).toBe("30"); // 고른 조각(포트폴리오, 마지막으로 고른 칩)
+    key(handle("end"), "End"); // 기타 2분을 다 가져간다(5분 걸음이어도 끝은 끝값)
+    expect(stepper("포트폴리오")).toBe(32);
     expect(otherText()).toBe("0분");
     await press("저장");
     expect(sent[0].totalMinutes).toBe(62);
-    expect(sent[0].items.reduce((s, i) => s + i.minutes, 0)).toBe(62);
+    expect(sent[0].items).toEqual([{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 32 }]);
     expect(results).toEqual([true]);
   });
 
@@ -492,7 +497,13 @@ describe("오늘 기록 나누기: 칩으로 고른 분야만 다이얼에 (고�
     const list = document.querySelector("ul.ratio-list")!;
     expect(list.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hint.previousElementSibling).toBe(list);
-    expect(hint.nextElementSibling!.textContent).toBe("합계 2시간");
+    // 고침9(Figma 87:2): 안내 글이 흰 카드의 끝이고, 맨 아래 「합계」 줄은 없다 — 합계는 제목 같은 줄 오른쪽(12 보조)
+    expect(hint.nextElementSibling).toBeNull();
+    expect(hint.parentElement!.className).toBe("card-box evening-split-card");
+    const total = screen.getByText("합계 2시간");
+    expect(total.className).toBe("evening-split-total");
+    expect(total.previousElementSibling!.textContent).toBe("분야마다 나눠 주세요");
+    expect(screen.getAllByText(/^합계/)).toHaveLength(1);
     // 12 보조 글: CSS 규칙(글자 크기 0.75rem = 12, 보조 색 토큰)
     const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf-8");
     expect(css).toMatch(/\.evening-split-hint \{[^}]*font: 400 0\.75rem\/1rem var\(--font-family\);[^}]*color: var\(--color-text-sub\);/);

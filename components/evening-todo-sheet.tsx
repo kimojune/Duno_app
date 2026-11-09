@@ -152,6 +152,11 @@ export function EveningTodoLine({
         aria-label={list ? EVENING_TODO_TEXT.lineName(done, all) : EVENING_TODO_TEXT.line}
         onClick={() => setOpen(true)}
       >
+        {/* 왼쪽 체크 원 아이콘 22(꾸밈 — 이름은 줄 글) */}
+        <svg className="evening-todo-line-icon" width={22} height={22} viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+          <circle cx={11} cy={11} r={10} fill="none" stroke="currentColor" strokeWidth={1.5} />
+          <path d="M6.5 11.5l3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
         <span className="evening-todo-line-text">
           {EVENING_TODO_TEXT.line}
           {list && (

@@ -33,7 +33,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 
 import { AppShell } from "../../components/app-shell";
 import { CategoryPage } from "../../components/category-page";
-import { AfterSaveShortfall, GrowthScreen } from "../../components/growth-screen";
+import { GrowthScreen } from "../../components/growth-screen";
+import { typeWheel } from "./time-wheel-helpers";
 import { TabBar } from "../../components/tab-bar";
 
 const C1 = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
@@ -235,55 +236,7 @@ describe("상태보기 (7-4, ③)", () => {
   });
 });
 
-describe("저장 직후 남은 시간(고침6 ④-①: 분야 줄 아래 「n시간 더」, 「채울 시간」 제목 없음)", () => {
-  const rowsOf = () =>
-    Array.from(document.querySelectorAll(".after-save-row")).map((li) => [li.querySelector(".after-save-name")?.textContent, li.querySelector(".after-save-more")?.textContent]);
-
-  it("목표 없는 주: 목표 비율 기준으로 남은 분야만 줄마다 이름 아래 「n시간 더」. 「채울」 낱말이 없다", async () => {
-    const { rerender } = render(<AfterSaveShortfall api={fakeApi()} />);
-    expect(await screen.findByText("1시간 18분 더")).toBeTruthy();
-    expect(rowsOf()).toEqual([
-      ["어학", "1시간 18분 더"],
-      ["포트폴리오", "1시간 12분 더"],
-    ]);
-    // 이름 줄이 위, 「n시간 더」가 그 아래(같은 줄 안 순서)
-    const first = document.querySelector(".after-save-row")!;
-    expect(first.firstElementChild?.className).toBe("after-save-name");
-    expect(first.lastElementChild?.className).toBe("after-save-more");
-    expect(document.body.textContent).not.toContain("채울");
-    rerender(<AfterSaveShortfall api={fakeApi(growth({ thisWeek: [] }))} />);
-    await act(async () => {});
-    // 새 api라도 같은 컴포넌트가 다시 읽는다: 쓴 시간이 없으니 남은 시간 줄이 없다
-    expect(document.querySelector(".after-save-short")).toBeNull();
-    expect(document.body.textContent).not.toContain("더");
-  });
-
-  it("목표 세운 주: 목표까지 남은 분야만(2시간 30분 · 40분 · 2시간 꼴), 목표에 닿은 분야(0)는 줄이 없다. 모두 닿으면 아무것도 안 그린다", async () => {
-    const goal = { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 180 }, { categoryId: C2, minutes: 60 }] };
-    const { unmount } = render(<AfterSaveShortfall api={fakeApi(growth({ goal, thisWeek: [{ categoryId: C1, minutes: 30 }, { categoryId: C2, minutes: 60 }] }))} />);
-    expect(await screen.findByText("2시간 30분 더")).toBeTruthy();
-    expect(rowsOf()).toEqual([["어학", "2시간 30분 더"]]);
-    unmount();
-    const { unmount: u2 } = render(<AfterSaveShortfall api={fakeApi(growth({ goal, thisWeek: [{ categoryId: C1, minutes: 60 }, { categoryId: C2, minutes: 20 }] }))} />);
-    expect(await screen.findByText("2시간 더")).toBeTruthy();
-    expect(rowsOf()).toEqual([
-      ["어학", "2시간 더"],
-      ["포트폴리오", "40분 더"],
-    ]);
-    u2();
-    render(<AfterSaveShortfall api={fakeApi(growth({ goal, thisWeek: [{ categoryId: C1, minutes: 200 }, { categoryId: C2, minutes: 60 }] }))} />);
-    await act(async () => {});
-    expect(document.querySelector(".after-save-short")).toBeNull();
-    expect(document.body.textContent).not.toContain("채울");
-  });
-
-  it("분야 이름은 글자 그대로(img 요소 없음)", async () => {
-    const evil = '<img src=x onerror="window.__as=1">';
-    render(<AfterSaveShortfall api={fakeApi(growth({ categories: [{ id: C1, name: evil }, { id: C2, name: "포트폴리오" }] }))} />);
-    expect(await screen.findByText(evil)).toBeTruthy();
-    expect(document.querySelector("img[src='x']")).toBeNull();
-  });
-});
+// 저장 직후 「이번 주」 카드(옛 AfterSaveShortfall)의 시험은 고침9에서 tests/unit/after-save.test.tsx로 옮겼다(카드가 components/after-save.tsx로 옮겨 감)
 
 describe("분야 페이지 (G13-a)", () => {
   const page: CategoryPageData = {
@@ -431,7 +384,7 @@ describe("AppShell의 탭", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("저녁 기록을 저장하고 한 줄을 누르면 상태보기가 입구 after_save로 열린다. 한 줄 아래에 남은 시간(「n시간 더」)도 보인다", async () => {
+  it("오늘 기록을 저장하면 같은 창이 저장 뒤 판(「이번 주」 카드 — 상태보기 데이터로 막대·%)이 되고, 「상태보기에서 보기」를 누르면 상태보기가 입구 after_save로 열린다(고침9 S5-3)", async () => {
     stubFetch();
     saveEveningAction.mockImplementation(async (input: { id: string; items: { categoryId: string | null; minutes: number }[] }) => ({
       ok: true,
@@ -441,15 +394,22 @@ describe("AppShell의 탭", () => {
       },
     }));
     render(<AppShell home={home} initialOpen="evening" />);
-    const dialog = await screen.findByRole("dialog", { name: "오늘 몇 시간 썼어요?" });
-    fireEvent.change(within(dialog).getByLabelText("시간"), { target: { value: "1" } });
+    const dialog = await screen.findByRole("dialog", { name: "오늘 기록" });
+    await screen.findByRole("button", { name: "분야마다 나누기" });
+    typeWheel("시간", 1);
     await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "나누지 않고 저장" })));
-    expect(saveEveningAction).toHaveBeenCalledWith(expect.objectContaining({ saveMode: "not_split", targetDay: "2026-11-07" }));
-    expect(await screen.findByText("기타 +1시간")).toBeTruthy();
-    expect(await screen.findByText("1시간 18분 더")).toBeTruthy(); // 저장 직후 한 줄 아래: 어학 이름 줄 아래 「1시간 18분 더」(고침6 ④-①)
-    expect(document.querySelector(".after-save-row .after-save-name")?.textContent).toBe("어학");
+    expect(saveEveningAction).toHaveBeenCalledWith(expect.objectContaining({ saveMode: "not_split", targetDay: "2026-11-07", totalMinutes: 60 }));
+    // 저장 뒤 다시 읽은 상태보기(GET /growth — 이미 있는 길): 이번 주 기타 2시간 30분(30분 어학과 함께 180분 중 83%), 처음 정한 비율에 기타 몫 없음 → 0%
+    expect(await screen.findByText("이번 주 83% / 목표 0%")).toBeTruthy();
+    const row = document.querySelector(".after-save-card .after-save-row")!;
+    expect(row.querySelector(".after-save-name")!.textContent).toBe("기타");
+    expect(row.querySelector(".after-save-value")!.textContent).toBe("2시간 30분 +1시간");
+    expect(document.querySelectorAll(".after-save-card .after-save-row")).toHaveLength(1); // 바뀐 분야만(어학은 안 바뀜)
+    expect(Array.from(document.querySelectorAll('.after-save-card [role="status"]')).map((e) => e.textContent)).toEqual([
+      "저장했어요. 기타 1시간 더해서 이번 주 2시간 30분. 이번 주 83%, 목표 0%.",
+    ]);
     expect(document.body.textContent).not.toContain("채울");
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: /오늘 바뀐 분야별 시간/ })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "상태보기에서 보기" })));
     await screen.findByRole("heading", { name: "이번 주 내 시간이 어느 분야에 쓰였나" });
     expect(screen.queryByRole("dialog")).toBeNull(); // 저녁 기록 창은 닫혔다
     expect(screen.getByRole("button", { name: "상태보기" }).getAttribute("aria-current")).toBe("page");

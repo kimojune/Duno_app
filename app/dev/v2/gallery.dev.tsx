@@ -5,7 +5,8 @@ import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
 import { EveningTodoGallery } from "./evening-todo-gallery.dev";
 import { GoalEditor } from "../../../components/goal";
-import { AfterSaveShortfall, GrowthScreen } from "../../../components/growth-screen";
+import { GrowthScreen } from "../../../components/growth-screen";
+import { AfterSave } from "../../../components/after-save";
 import { MeScreen } from "../../../components/me-screen";
 import { Onboarding } from "../../../components/onboarding";
 import { TabBar, type TabId } from "../../../components/tab-bar";
@@ -34,7 +35,9 @@ import type { TodayRead } from "../../../lib/today-types";
  *  - tabbar: 내 정보 탭 + 아래 탭 줄(맨 아래까지 내려 저장 단추·로그아웃이 탭 줄에 가려지지 않는지 본다)
  *  - goal·evening·category·detail: 새 전체 화면 창 넷. 창 밖에는 본문·탭 줄 모양의 요소를 두어 inert를 본다
  *  - me-goal · me-goal-empty · me-goal-fail(고침6 ③): 내 정보 첫 카드(목표 있음·없음). 카드를 누르면 S8-b 「목표」. me-goal-fail은 저장이 늘 실패한다
- *  - after-save(고침6 ④-①): 오늘 기록을 「나누지 않고 저장」한 뒤의 한 줄 + 남은 시간(이번 주 목표 어학 5시간 중 2시간 → 「3시간 더」)
+ *  - after-save · after-save-ratio(고침9 S5-3, Figma 49:142 · 59:2): 오늘 기록을 저장한 뒤 「이번 주」 카드. 저장 결과는 늘 어학 +1시간 · 포트폴리오 +2시간.
+ *    after-save = 목표 세운 주(어학 2/5시간 → 「3시간 더」, 포트폴리오 12/6시간 → 「목표 6시간」), after-save-ratio = 목표 없는 주(어학 20%/30%, 포트폴리오 60%/40%)
+ *  - after-save-many: 바뀐 분야 여섯 → 큰 순 넷 + 「그 밖 2개」
  *  - timer-many · detail-many(고침 5바퀴): 분야 10개(긴 이름 포함)의 타이머 「할 일 없이 시작」 칩 줄 · 할 일 자세히 칩 줄. 한 줄 + 옆으로 넘김을 본다
  * 들어 있는 글·분야 이름은 모두 지어낸 예시다.
  */
@@ -117,17 +120,6 @@ const eveningSplitApi = (categories: { id: string; name: string }[]): EveningApi
   }),
   save: never,
 });
-/** 고침6 ④-①: 저장이 바로 되는 오늘 기록(저장 직후 한 줄을 보려고). 서버를 부르지 않는다 */
-const eveningSaveApi: EveningApi = {
-  ...eveningApi,
-  save: async (input) => ({
-    ok: true,
-    data: {
-      log: { id: input.id, targetDay: input.targetDay, totalMinutes: input.totalMinutes, items: input.items, saveMode: input.saveMode, savedAt: "2026-11-07T12:00:00.000Z" },
-      delta: input.items,
-    },
-  }),
-};
 const growthApi = (data: GrowthData, pref?: unknown): GrowthApi => ({
   ...(pref === undefined ? {} : { viewPref: { load: async () => pref, save: async () => {} } }),
   fetchGrowth: async () => ({ ok: true, data }),
@@ -355,14 +347,32 @@ export function V2Gallery({ id }: { id: string }) {
       </Shell>
     );
   }
-  if (id === "after-save") {
-    // 고침6 ④-①: 저장 직후 한 줄 아래 남은 시간(목표 세운 주: 어학 5시간 중 2시간 → 3시간 더, 포트폴리오 목표 1시간 중 1시간 30분 → 줄 없음)
-    const growth: GrowthData = {
-      ...EMPTY_GROWTH,
-      thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 90 }, { categoryId: null, minutes: 60 }],
-      goal: { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 60 }, { categoryId: C3, minutes: 100 }] },
+  if (id === "after-save" || id === "after-save-ratio" || id === "after-save-many") {
+    // 고침9 S5-3: 저장 결과(delta)는 고정, 상태보기 데이터는 저장 뒤 다시 읽은 값이라 이번 몫을 이미 품고 있다
+    const many = id === "after-save-many";
+    const cats = many ? MANY.slice(0, 6) : CATEGORIES;
+    const delta = many ? cats.map((c, i) => ({ categoryId: c.id, minutes: (6 - i) * 30 })) : [{ categoryId: C2, minutes: 120 }, { categoryId: C1, minutes: 60 }];
+    const growth: GrowthData =
+      id === "after-save"
+        ? { ...EMPTY_GROWTH, thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 720 }, { categoryId: null, minutes: 60 }], goal: { weekStart: "2026-11-02", items: [{ categoryId: C1, minutes: 300 }, { categoryId: C2, minutes: 360 }] } }
+        : many
+          ? { ...EMPTY_GROWTH, categories: cats, ratios: [], thisWeek: cats.map((c, i) => ({ categoryId: c.id, minutes: (6 - i) * 60 })) }
+          : { ...EMPTY_GROWTH, ratios: [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 40 }, { categoryId: C3, percent: 30 }], thisWeek: [{ categoryId: C1, minutes: 120 }, { categoryId: C2, minutes: 360 }, { categoryId: null, minutes: 120 }] };
+    const api: EveningApi = {
+      ...eveningApi,
+      fetchState: async () => ({ ok: true, data: { today: "2026-11-07", day: "2026-11-07", existing: null, doneCategoryIds: [], timerByCategory: [], categories: cats } }),
+      save: async (input) => ({
+        ok: true,
+        data: { log: { id: input.id, targetDay: input.targetDay, totalMinutes: input.totalMinutes, items: input.items, saveMode: input.saveMode, savedAt: "2026-11-07T12:00:00.000Z" }, delta },
+      }),
     };
-    return <Opener render={(close) => <EveningRecord api={eveningSaveApi} onClose={close} onOpenGrowth={noop} renderAfterSave={() => <AfterSaveShortfall api={growthApi(growth)} />} />} />;
+    return (
+      <Opener
+        render={(close) => (
+          <EveningRecord api={api} onClose={close} onOpenGrowth={noop} renderAfterSave={(saved, state) => <AfterSave api={growthApi(growth)} delta={saved.delta} fallback={state.categories} />} />
+        )}
+      />
+    );
   }
   if (id === "evening-split-blank") {
     // 고침 5바퀴: 타이머·끝낸 할 일이 없는 날 — 나누기에 들어가면 기타 100%(칩 고르기 전)
@@ -481,6 +491,8 @@ export function V2Gallery({ id }: { id: string }) {
           "me-goal-empty",
           "me-goal-fail",
           "after-save",
+          "after-save-ratio",
+          "after-save-many",
           "evening-split",
           "evening-split-many",
           "evening-split-blank",
