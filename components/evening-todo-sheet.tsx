@@ -13,7 +13,7 @@ import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { CloseConfirm } from "./close-confirm";
 import { ChipScroller } from "./chip-scroller";
-import { CategoryChip, CategoryTag, helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
+import { helpText, overLimitText, TODO_TEXT, type ChipView } from "./todo-view";
 import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
 
 /**
@@ -28,6 +28,9 @@ import { Notice, PrimaryButton, SecondaryButton, TextButton } from "./ui";
  *   state.doneCategoryIds로 받아 나누기 처음 값의 재료로 쓴다.
  * - 시트는 겹친 창 규칙(lib/use-overlay-window.ts)을 따른다: 안드로이드 뒤로 가기로 닫힘, 창 밖 inert, Esc, 닫으면 「오늘 할 일」 줄로 포커스가 돌아온다.
  * - 할 일 글·분야 이름은 React 텍스트로만 그린다.
+ * - 모양(고침9, Figma 88:12): 목록은 흰 카드 하나·줄 사이 1px 선. 체크 = 원 24(끝냄 = 먹남색 채운 원 + 흰 체크, 안 함 = 2px 테두리 원).
+ *   분야 = 색 점 10(1px 윤곽) + 이름 12 보조(바탕 없음). 「+ 할 일」을 열면 글 칸(radius 12) + 이름표 「분야」 + 칩 줄(맨 앞 「기타」가 골라진 채) + 「더하기」 폭 가득.
+ *   「기타」 칩은 분야를 고르지 않은 것(저장 값 분야 없음 = null)이다 — 새 분야를 만들지 않는다. 다른 칩을 다시 누르면 고름이 풀려 「기타」로 돌아간다.
  */
 
 export const EVENING_TODO_TEXT = {
@@ -38,7 +41,9 @@ export const EVENING_TODO_TEXT = {
   close: "닫기",
   add: "+ 할 일",
   inputLabel: "할 일",
-  write: "적기",
+  write: "더하기",
+  categoryLabel: "분야",
+  other: "기타",
   empty: "오늘 적은 할 일이 없어요.",
   loading: "할 일을 불러오는 중",
   saving: "저장하는 중",
@@ -168,6 +173,34 @@ export function EveningTodoLine({
 }
 
 type TodayState = ReturnType<typeof useTodayRead>;
+
+function SheetCheck() {
+  return (
+    <svg className="chip-check" width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+/** 시트 「+ 할 일」의 분야 칩(색 점 + 이름, 고르면 체크 + 2px 테두리 — 나누기 칩 줄과 같은 꼴). id null = 기타 */
+function SheetChip({ id, name, color, pressed, onPress }: { id: string | null; name: string; color: string; pressed: boolean; onPress: () => void }) {
+  return (
+    <button
+      type="button"
+      className="chip"
+      aria-pressed={pressed}
+      data-chip-id={id ?? "other"}
+      onClick={onPress}
+      onFocus={(e) => e.currentTarget.scrollIntoView?.({ inline: "nearest", block: "nearest" })}
+    >
+      <span className="chip-face">
+        {pressed && <SheetCheck />}
+        <span className="chip-dot" style={{ background: color }} aria-hidden="true" />
+        <span className="chip-label">{name}</span>
+      </span>
+    </button>
+  );
+}
 
 function EveningTodoSheet({
   todos,
@@ -371,8 +404,9 @@ function EveningTodoSheet({
     <div ref={rootRef} className="evening-todo-layer" onKeyDown={onKeyDown}>
       <div className="evening-todo-backdrop" aria-hidden="true" onClick={requestClose} />
       <div className="evening-todo-sheet" role="dialog" aria-modal="true" aria-labelledby="evening-todo-title">
+        <span className="evening-todo-grip" aria-hidden="true" />
         <div className="detail-head">
-          <h2 id="evening-todo-title" className="detail-title" tabIndex={-1} ref={titleRef}>
+          <h2 id="evening-todo-title" className="detail-title evening-todo-title" tabIndex={-1} ref={titleRef}>
             {EVENING_TODO_TEXT.title}
           </h2>
           <TextButton className="btn-flush-end" onClick={requestClose}>
@@ -401,7 +435,7 @@ function EveningTodoSheet({
               const category = categoryOf(row.categoryId);
               return (
                 <li key={row.id} className="todo-row" id={`evening-todo-row-${row.id}`}>
-                  <label className="check-hit">
+                  <label className="check-hit evening-todo-check">
                     <input
                       type="checkbox"
                       checked={row.done}
@@ -409,16 +443,24 @@ function EveningTodoSheet({
                       aria-labelledby={textId}
                       aria-describedby={category ? tagId : undefined}
                     />
-                    <span className="check-box" aria-hidden="true" />
+                    <span className="check-circle" aria-hidden="true">
+                      <svg width={24} height={24} viewBox="0 0 24 24" focusable="false">
+                        <circle className="check-circle-ring" cx={12} cy={12} r={11} />
+                        <path className="check-circle-mark" d="M7.5 12.5l3 3 6-6.5" />
+                      </svg>
+                    </span>
                   </label>
-                  <div className="todo-body">
-                    <p id={textId} className={row.done ? "todo-text is-done" : "todo-text"}>
+                  <div className="todo-body evening-todo-body">
+                    <p id={textId} className={row.done ? "todo-text evening-todo-text is-done" : "todo-text evening-todo-text"}>
                       {row.readable ? row.text : TODO_TEXT.unreadable}
                     </p>
                     {category && (
                       <div className="evening-todo-category">
                         {category.color && <span className="evening-todo-dot" style={{ background: category.color }} aria-hidden="true" />}
-                        <CategoryTag id={tagId} name={category.name} />
+                        <span id={tagId} className="evening-todo-category-name">
+                          <span className="sr-only">{TODO_TEXT.categoryPrefix}</span>
+                          {category.name}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -435,39 +477,46 @@ function EveningTodoSheet({
               <label htmlFor="evening-todo-input" className="input-label">
                 {EVENING_TODO_TEXT.inputLabel}
               </label>
-              <div className="input-row">
-                {/* maxLength를 걸지 않는다: 몰래 자르지 않는다(할 일 탭과 같다). 길이는 서버가 다시 본다 */}
-                <input
-                  id="evening-todo-input"
-                  ref={inputRef}
-                  className="input"
-                  type="text"
-                  value={draft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    setMessage("");
-                  }}
-                  onKeyDown={onInputKeyDown}
-                  aria-describedby="evening-todo-help"
-                  aria-invalid={over ? true : undefined}
-                  autoComplete="off"
-                  enterKeyHint="send"
-                />
-                <PrimaryButton type="submit" className="add-btn" busy={adding}>
-                  {adding ? EVENING_TODO_TEXT.saving : EVENING_TODO_TEXT.write}
-                </PrimaryButton>
-              </div>
+              {/* maxLength를 걸지 않는다: 몰래 자르지 않는다(할 일 탭과 같다). 길이는 서버가 다시 본다 */}
+              <input
+                id="evening-todo-input"
+                ref={inputRef}
+                className="input evening-todo-input"
+                type="text"
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  setMessage("");
+                }}
+                onKeyDown={onInputKeyDown}
+                aria-describedby="evening-todo-help"
+                aria-invalid={over ? true : undefined}
+                autoComplete="off"
+                enterKeyHint="send"
+              />
               <p id="evening-todo-help" className="input-help">
                 {help}
               </p>
-              <span id="evening-todo-category-label" className="sheet-label sheet-category-label">
-                {TODO_TEXT.categoryLabel}
+              <span id="evening-todo-category-label" className="evening-todo-category-label">
+                {EVENING_TODO_TEXT.categoryLabel}
               </span>
-              <ChipScroller aria-labelledby="evening-todo-category-label">
+              <ChipScroller className="evening-chips" aria-labelledby="evening-todo-category-label">
+                {/* 맨 앞 「기타」 = 분야를 고르지 않음(저장 값 null). 처음에 골라져 있다 */}
+                <SheetChip id={null} name={EVENING_TODO_TEXT.other} color={categoryColorValue(null)} pressed={selected === null} onPress={() => setSelected(null)} />
                 {chips.map((chip) => (
-                  <CategoryChip key={chip.id} chip={chip} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
+                  <SheetChip
+                    key={chip.id}
+                    id={chip.id}
+                    name={chip.name}
+                    color={categoryColorValue(order.get(chip.id) ?? 0)}
+                    pressed={chip.id === selected}
+                    onPress={() => setSelected((prev) => (prev === chip.id ? null : chip.id))}
+                  />
                 ))}
               </ChipScroller>
+              <PrimaryButton type="submit" className="evening-todo-submit" busy={adding}>
+                {adding ? EVENING_TODO_TEXT.saving : EVENING_TODO_TEXT.write}
+              </PrimaryButton>
             </form>
           ) : (
             <TextButton id="evening-todo-add" className="evening-todo-add" onClick={openForm}>

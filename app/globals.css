@@ -543,6 +543,25 @@ select.input { appearance: auto; }
 .stepper-input { flex: none; inline-size: 5.5em; text-align: center; padding: 0 var(--space-2); }
 .stepper-unit { font: var(--font-sub); color: var(--color-text-sub); min-width: 2em; }
 .evening-time { display: flex; flex-direction: column; gap: var(--space-2); }
+/* ---- 고침9: 두 줄 휠(components/time-wheel.tsx, Figma 49:5 · 66:170). 열 둘(폭 108씩)을 붙여 가운데 띠 선이 216 한 줄로 이어진다 ---- */
+.time-wheel { margin-top: var(--space-4); }
+.time-wheel-cols { display: flex; justify-content: center; }
+.time-wheel-col { display: flex; flex-direction: column; align-items: center; inline-size: 108px; min-width: 0; }
+.time-wheel-label { margin-bottom: var(--space-2); font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.time-wheel-window { position: relative; inline-size: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.time-wheel-window:active { cursor: grabbing; }
+.time-wheel-window:focus-visible { outline: var(--focus-ring); outline-offset: calc(-1 * var(--focus-offset)); }
+.time-wheel-track { display: flex; flex-direction: column; align-items: stretch; will-change: transform; }
+/* 흐린 값: 가운데 바로 위아래 24, 그 바깥 20(보조 글 색). 가운데 32 Bold. 숫자는 고정폭(O-10) */
+.time-wheel-row { display: flex; align-items: center; justify-content: center; min-block-size: 44px; font: var(--font-title); font-weight: 400; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.time-wheel-row.is-far { font: var(--font-goal-line); font-weight: 400; }
+.time-wheel-center { min-block-size: 52px; border-block: 1px solid var(--color-divider); font: var(--font-name); color: var(--color-text); cursor: text; }
+.time-wheel-input { inline-size: 68px; min-height: 48px; padding: 0; text-align: center; font: var(--font-name); font-variant-numeric: tabular-nums; color: var(--color-text); }
+.time-wheel-input:focus { outline: none; border: 2px solid var(--color-primary); }
+/* 「− 5분」「+ 5분」: 120×48 알약 둘, 사이 12(끌지 않는 길) */
+.time-wheel-nudge { display: flex; justify-content: center; gap: var(--space-3); margin-top: var(--space-1); }
+.time-wheel-nudge-btn { flex: 0 1 120px; min-width: 0; background: var(--color-surface); border-color: var(--color-border-input); color: var(--color-text); font: var(--font-sub); font-weight: 500; font-variant-numeric: tabular-nums; }
+.time-wheel-nudge-btn:disabled { opacity: 0.5; cursor: default; }
 .after-save-line {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
   width: 100%; min-height: var(--tap-min); padding: var(--space-3) var(--space-4);
