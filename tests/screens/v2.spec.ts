@@ -102,7 +102,7 @@ async function rootColor(page: Page, name: string) {
   }, name);
 }
 
-// 기록 없음(B17 → 고침5): 글은 남기고(PM 11:1x) 예시 값 — 목표 비율 띠 + 빈 띠 「0시간」 + 「오늘 기록」 단추
+// 기록 없음(B17 → 고침5 → 고침7): 글은 남기고(PM 11:1x) 예시 값 — 목표 비율 띠 + 빈 띠 「0시간」 + 「오늘 기록」 단추, 머리(합계·칩·보기 바꾸기)는 데이터 있는 판과 같다
 for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
   test(`growth-empty ${size}: 목표 비율 띠 + 빈 띠 「0시간」 + 안내 글 아래 「오늘 기록」, 가로로 넘치지 않는다`, async ({ page }) => {
     await open(page, "growth-empty", size);
@@ -110,7 +110,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await shot(page, `growth-empty-${size}`);
     await expect(page.locator(".growth-band")).toHaveCount(2);
     await expect(page.locator(".growth-band.is-empty")).toHaveText("0시간");
-    await expect(page.getByRole("button", { name: "원그래프로 보기" })).toHaveCount(0);
+    // 고침7 ②: 빈 상태에도 머리에 합계 「0시간」 · 칩 셋 · 보기 바꾸기 글 단추(데이터 있는 판과 같은 자리)
+    await expect(page.locator(".growth-card-total")).toHaveText("0시간");
+    await expect(page.getByRole("group", { name: "기간" }).getByRole("button")).toHaveText(["이번 주", "총 시간", "비교"]);
+    await expect(page.locator(".growth-card > .growth-switch").getByRole("button", { name: "원그래프로 보기" })).toBeVisible();
     const text = page.getByText(/아직 이번 주 오늘 기록이 없어요/);
     const button = page.getByRole("button", { name: "오늘 기록", exact: true });
     await expect(button).toBeVisible();
@@ -122,6 +125,10 @@ for (const size of ["360x800", "text200-sim"] as SizeTag[]) {
     await noHorizontalScroll(page, "기록 없음 이번 주");
     await page.getByRole("button", { name: "총 시간" }).click();
     await noHorizontalScroll(page, "기록 없음 총 시간");
+    // 고침7 ③: 빈 상태 원그래프 — 오른쪽 빈 고리 + 「0시간」도 가로로 넘치지 않는다
+    await page.getByRole("button", { name: "원그래프로 보기" }).click();
+    await expect(page.locator(".growth-pie-ring")).toHaveCount(1);
+    await noHorizontalScroll(page, "기록 없음 원그래프");
   });
 }
 
