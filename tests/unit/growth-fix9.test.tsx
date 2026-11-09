@@ -314,7 +314,9 @@ describe("보기 단추 자리 · 목록 「›」 · 줄 사이 선", () => {
     const toggle = screen.getByRole("button", { name: "원그래프로 보기" });
     expect(Array.from(head.children).map((el) => el.className.split(" ")[0])).toEqual(["growth-card-total", "growth-period-menu", "btn"]);
     expect(head.lastElementChild).toBe(toggle);
-    expect(rule(".btn.growth-switch")).toContain("min-height: var(--tap-min)");
+    // 누름 높이 44 = 공통 .text-tap(스킬 검토 O-2, J1 공통 부품)
+    expect(toggle.classList.contains("text-tap")).toBe(true);
+    expect(rule(".btn.text-tap, .text-tap")).toContain("min-height: 44px");
     expect(rule(".btn.growth-switch")).toContain("margin-inline-start: auto");
   });
 

@@ -125,7 +125,7 @@ async function streak(page: Page, weeks: number | null) {
   expect(Math.round(st.ring)).toBe(14);
 }
 
-/** 목표 비율 뷰 카드 머리 한 줄: 합계 · 칩(보이는 24, 누름 48) · 오른쪽 끝 보기 바꾸기(누름 48) */
+/** 목표 비율 뷰 카드 머리 한 줄: 합계 · 칩(보이는 24, 누름 48) · 오른쪽 끝 보기 바꾸기(누름 44 — O-2 .text-tap) */
 async function ratioHead(page: Page, total: string, periodText: string, switchText: string | null) {
   await expect(page.locator(".growth-card-total")).toHaveText(total);
   const chip = page.getByRole("button", { name: /^기간, / });
@@ -159,9 +159,9 @@ async function ratioHead(page: Page, total: string, periodText: string, switchTe
     return;
   }
   await expect(page.locator(".growth-switch")).toHaveText(switchText);
-  // 같은 머리 줄의 오른쪽 끝(카드 오른쪽 안 여백 16 안팎), 누름 48
+  // 같은 머리 줄의 오른쪽 끝(카드 오른쪽 안 여백 16 안팎), 누름 44(O-2)
   expect(Math.abs(m.sw!.y + m.sw!.height / 2 - (m.face.y + m.face.height / 2))).toBeLessThanOrEqual(3);
-  expect(m.sw!.height).toBeGreaterThanOrEqual(48);
+  expect(m.sw!.height).toBeGreaterThanOrEqual(44);
   expect(m.card.x + m.card.width - (m.sw!.x + m.sw!.width)).toBeLessThanOrEqual(16);
   expect(m.card.x + m.card.width - (m.sw!.x + m.sw!.width)).toBeGreaterThanOrEqual(0);
 }

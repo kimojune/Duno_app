@@ -479,7 +479,7 @@ function RatioPanel({
             onSelect={(p) => choose({ ...pref, period: p, periodWeek: data.weekStart })}
           />
           {canSwitch && (
-            <TextButton className="growth-switch" onClick={() => choose({ ...pref, view: nextView.id })}>
+            <TextButton className="growth-switch text-tap" onClick={() => choose({ ...pref, view: nextView.id })}>
               {GROWTH_TEXT[view.switchLabel]}
             </TextButton>
           )}
