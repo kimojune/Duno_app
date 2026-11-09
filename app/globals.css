@@ -468,7 +468,7 @@ button, input { font: inherit; color: inherit; }
 /* 칩·줄의 분야 색 점: 1px 윤곽(분야 색이 흰 바탕 3:1 미만) */
 .chip-dot { flex: none; display: inline-block; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }
 /* 나누기 줄: 색 점 · Stepper(이름 · − · 숫자 칸 · +). 고른 조각의 줄 = 연한 면 바탕 + 이름 Bold(PM 10) */
-.evening-row { flex-wrap: nowrap; justify-content: flex-start; padding-inline: var(--space-2); }
+.evening-row { flex-wrap: nowrap; justify-content: flex-start; padding-inline: var(--space-1); } /* 글자 200%·360px에서 −/숫자 칸/+ 가 넘치지 않게 좌우 4 */
 .evening-row .stepper { flex: 1; min-width: 0; }
 .evening-row .ratio-value { margin-inline-start: auto; }
 .evening-row.is-picked { background: var(--color-notice-bg); }

@@ -1,0 +1,168 @@
+{
+  "1-나누기-처음-기타100": {
+    "dialWidth": 240,
+    "dialLeft": 60,
+    "dialRight": 60,
+    "scrollW": 360,
+    "clientW": 360,
+    "slices": [
+      {
+        "label": "기타 2시간, 고름",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      }
+    ],
+    "glow": false,
+    "overflow": "visible",
+    "handles": [],
+    "hits": [],
+    "chips": [
+      {
+        "name": "어학, 다이얼에 넣기",
+        "pressed": "false",
+        "border": "1px"
+      },
+      {
+        "name": "포트폴리오, 다이얼에 넣기",
+        "pressed": "false",
+        "border": "1px"
+      },
+      {
+        "name": "CS 공부, 다이얼에 넣기",
+        "pressed": "false",
+        "border": "1px"
+      },
+      {
+        "name": "+ 분야",
+        "pressed": null,
+        "border": "1px"
+      }
+    ],
+    "chipRow": {
+      "wrap": "nowrap",
+      "overflowX": "auto",
+      "h": 48
+    },
+    "pickedRow": {
+      "key": "other",
+      "bg": "rgb(239, 237, 230)"
+    }
+  },
+  "2-나누기-칩둘-포트폴리오고름": {
+    "dialWidth": 240,
+    "dialLeft": 60,
+    "dialRight": 60,
+    "scrollW": 360,
+    "clientW": 360,
+    "slices": [
+      {
+        "label": "어학 30분",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      },
+      {
+        "label": "포트폴리오 30분, 고름",
+        "transform": "matrix(1, 0, 0, 1, 2.12, 2.12)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      },
+      {
+        "label": "기타 1시간",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      }
+    ],
+    "glow": true,
+    "overflow": "visible",
+    "handles": [
+      20,
+      20
+    ],
+    "hits": [
+      50,
+      50
+    ],
+    "chips": [
+      {
+        "name": "어학, 다이얼에 넣기",
+        "pressed": "true",
+        "border": "2px"
+      },
+      {
+        "name": "포트폴리오, 다이얼에 넣기",
+        "pressed": "true",
+        "border": "2px"
+      },
+      {
+        "name": "CS 공부, 다이얼에 넣기",
+        "pressed": "false",
+        "border": "1px"
+      },
+      {
+        "name": "+ 분야",
+        "pressed": null,
+        "border": "1px"
+      }
+    ],
+    "chipRow": {
+      "wrap": "nowrap",
+      "overflowX": "auto",
+      "h": 48
+    },
+    "pickedRow": {
+      "key": "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2",
+      "bg": "rgb(239, 237, 230)"
+    }
+  },
+  "3-처음설정-목표비율-다이얼": {
+    "dialWidth": 240,
+    "dialLeft": 60,
+    "dialRight": 60,
+    "scrollW": 360,
+    "clientW": 360,
+    "slices": [
+      {
+        "label": "어학 35%, 고름",
+        "transform": "matrix(1, 0, 0, 1, 2.67, -1.36)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      },
+      {
+        "label": "포트폴리오 35%",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      },
+      {
+        "label": "CS 공부 30%",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "stroke": "rgb(28, 28, 26)",
+        "strokeWidth": "1px"
+      }
+    ],
+    "glow": true,
+    "overflow": "visible",
+    "handles": [
+      20
+    ],
+    "hits": [
+      50
+    ],
+    "chips": [],
+    "chipRow": null,
+    "pickedRow": null
+  },
+  "reducedMotion": [
+    "0s",
+    "0s",
+    "0s"
+  ],
+  "normalMotion": [
+    "0.12s",
+    "0.12s",
+    "0.12s"
+  ]
+}
