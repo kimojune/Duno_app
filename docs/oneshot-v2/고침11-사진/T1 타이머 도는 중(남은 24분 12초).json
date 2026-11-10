@@ -72,6 +72,17 @@
       "labelFont": "12px system-ui, -apple-system, \"Noto Sans KR\", sans-serif"
     },
     "label": "토익 단어 50개",
+    "labelBox": {
+      "x": 125.5625,
+      "y": 91,
+      "width": 108.875,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "color": "rgb(28, 35, 64)",
+      "textAlign": "center",
+      "hasDot": false,
+      "boxY": 90
+    },
     "name": {
       "x": 153.890625,
       "y": 254,
@@ -102,6 +113,11 @@
       "ariaLabel": "30분 타이머가 돌고 있어요",
       "topFromCenterY": 12
     },
+    "belowCenter": {
+      "status": 168,
+      "button": 196,
+      "buttonX": 139
+    },
     "statusText": {
       "text": "30분 타이머가 돌고 있어요",
       "fontSize": "14px",
@@ -125,6 +141,7 @@
     "scrollWidth": 360,
     "clientWidth": 360
   },
+  "comparedItems": 50,
   "mismatches": [
     {
       "item": "「남은 시간」 상자 위쪽이 판 가운데에서 위로",
@@ -142,6 +159,66 @@
       "item": "끝내기 단추 너비",
       "spec": "320",
       "screen": "82",
+      "group": "나 23이 판단"
+    },
+    {
+      "item": "위 글(할 일 · 분야)",
+      "spec": "토익 단어 50개 · 어학",
+      "screen": "토익 단어 50개",
+      "group": "다 새로 찾음"
+    },
+    {
+      "item": "위 글 분야 점 10×10(x36)",
+      "spec": "있음",
+      "screen": "없음",
+      "group": "다 새로 찾음"
+    },
+    {
+      "item": "위 글 글자 크기",
+      "spec": "14px",
+      "screen": "16px",
+      "group": "다 새로 찾음"
+    },
+    {
+      "item": "위 글 색",
+      "spec": "rgb(94, 100, 120)",
+      "screen": "rgb(28, 35, 64)",
+      "group": "다 새로 찾음"
+    },
+    {
+      "item": "위 글 x(점 오른쪽, x52)",
+      "spec": "52",
+      "screen": "125.56",
+      "group": "다 새로 찾음"
+    },
+    {
+      "item": "시계 판 가운데 x",
+      "spec": "180.5",
+      "screen": "180",
+      "group": "나 23이 판단"
+    },
+    {
+      "item": "시계 판 가운데 y",
+      "spec": "290.5",
+      "screen": "282",
+      "group": "나 23이 판단"
+    },
+    {
+      "item": "상태 글 y(판 가운데에서 아래로)",
+      "spec": "171.5",
+      "screen": "168",
+      "group": "나 23이 판단"
+    },
+    {
+      "item": "끝내기 단추 y(판 가운데에서 아래로)",
+      "spec": "215.5",
+      "screen": "196",
+      "group": "나 23이 판단"
+    },
+    {
+      "item": "끝내기 단추 x",
+      "spec": "20",
+      "screen": "139",
       "group": "나 23이 판단"
     }
   ]

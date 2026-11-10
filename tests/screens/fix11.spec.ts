@@ -32,14 +32,18 @@ async function open(page: Page, s: string) {
 }
 
 async function save(page: Page, name: string, data: Record<string, unknown>, mismatches: Mismatch[]) {
+  const comparedItems = compared;
+  compared = 0;
   for (const x of mismatches) x.group = KNOWN_DIFFS[x.item]?.group ?? "목록 밖";
   fs.mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: false });
-  fs.writeFileSync(path.join(OUT, `${name}.json`), JSON.stringify({ viewport: "360x800 @2x", ...data, mismatches }, null, 2) + "\n", "utf8");
+  fs.writeFileSync(path.join(OUT, `${name}.json`), JSON.stringify({ viewport: "360x800 @2x", ...data, comparedItems, mismatches }, null, 2) + "\n", "utf8");
 }
 
 /** 한 값을 명세 값과 견주어, 다르면 mismatches에 「명세 X / 화면 Y」로 쌓는다 */
+let compared = 0; // 이 사진에서 명세(Figma) 값과 대 본 항목 수(save가 json에 적고 0으로 되돌린다)
 function check(mm: Mismatch[], item: string, spec: unknown, screen: unknown) {
+  compared += 1;
   if (String(spec) !== String(screen)) mm.push({ item, spec: String(spec), screen: String(screen) });
 }
 
@@ -66,6 +70,9 @@ async function measureCard(page: Page) {
         padding: s.padding,
         outline: `${s.outlineWidth} ${s.outlineStyle} ${s.outlineColor}`,
         outlineOffset: s.outlineOffset,
+        boxShadow: s.boxShadow,
+        letterSpacing: s.letterSpacing,
+        fontFamily: s.fontFamily.split(",")[0],
       };
     };
     // 단추: 누름 영역 = 상자 전체(위아래 투명 테두리 4 포함), 보이는 꼴 = 테두리를 뺀 안쪽
@@ -273,14 +280,19 @@ async function measureTimer(page: Page) {
  * 화면 값이 여기 적은 값과 다르면(목록 밖 차이이거나 값이 바뀌었으면) 시험이 실패한다. 명세와 같아진 항목은 여기서 빼서 명세 값 단언이 되게 한다.
  * 무리: 가 = 고침11 이전부터의 현행 꼴(카드 틀·단추 부품·추천 꼬리표·요일 데이터), 나 = 23이 판단할 것(타이머 글자 자리·끝내기 너비), 다 = 그 밖에 새로 찾은 것.
  */
-const KNOWN_DIFFS: Record<string, { group: "가 현행 꼴" | "나 23이 판단" | "다 새로 찾음"; screen: string[] }> = {
+const KNOWN_DIFFS: Record<string, { group: "가 현행 꼴" | "가 앱 여백(d-240)" | "가 앱 글꼴(d-237)" | "나 23이 판단" | "다 새로 찾음"; screen: string[] }> = {
+  "머리 날짜 글(요일)": { group: "가 현행 꼴", screen: ["11월 13일 금요일"] },
+  "카드 x": { group: "가 앱 여백(d-240)", screen: ["16"] },
+  "카드 너비": { group: "가 앱 여백(d-240)", screen: ["328"] },
+  "카드 높이": { group: "나 23이 판단", screen: ["164"] },
   "이번 주 목표 줄(320×56 @20,112)": { group: "가 현행 꼴", screen: ["328×48@16,130"] },
   "어제 못 끝낸 줄(320×40 @20,184)": { group: "가 현행 꼴", screen: ["328×40@16,254"] },
   "오늘 기록 줄(320×56 @20,232)": { group: "가 현행 꼴", screen: ["328×56@16,190"] },
   "할 일 목록 카드 위(@20,300 · 너비 320)": { group: "가 현행 꼴", screen: ["328@16,310"] },
+  "안내 상자 x": { group: "가 앱 여백(d-240)", screen: ["16"] },
+  "안내 상자 너비": { group: "가 앱 여백(d-240)", screen: ["328"] },
   "안내 상자 y": { group: "가 현행 꼴", screen: ["74"] },
   "목록 제목 「무엇을 할까요?」 글자 크기(24 Bold)": { group: "가 현행 꼴", screen: ["16px"] },
-  "목록 제목 굵기": { group: "가 현행 꼴", screen: ["700"] },
   "고른 줄 크기(312×48 · x24)": { group: "가 현행 꼴", screen: ["328×48@16"] },
   "고른 줄 모서리": { group: "가 현행 꼴", screen: ["8px"] },
   "고른 줄 글(14 Bold)": { group: "가 현행 꼴", screen: ["16px/400"] },
@@ -289,6 +301,21 @@ const KNOWN_DIFFS: Record<string, { group: "가 현행 꼴" | "나 23이 판단"
   "오늘 할 일 목록 흰 카드(320 · 모서리 16)": { group: "가 현행 꼴", screen: ["없음"] },
   "줄 오른쪽 분야 점·분야 글": { group: "가 현행 꼴", screen: ["없음"] },
   "「30분 시작」 단추 320×48(x20)": { group: "가 현행 꼴", screen: ["106.17×48@16"] },
+  "「추천」 꼬리표 글자 크기": { group: "가 현행 꼴", screen: ["14px"] },
+  "단추 x": { group: "가 앱 여백(d-240)", screen: ["32"] },
+  "단추 너비(글에 맞춤)": { group: "가 앱 글꼴(d-237)", screen: ["146.77", "108.92", "122.92", "132.77"] },
+  "알림 상자 x": { group: "가 앱 여백(d-240)", screen: ["32"] },
+  "알림 상자 너비": { group: "가 앱 여백(d-240)", screen: ["296"] },
+  "보조 길 글 x(글 왼쪽)": { group: "다 새로 찾음", screen: ["46"] },
+  "포커스 고리 바깥 크기(명세 117×36, 바깥 가장자리 기준)": { group: "다 새로 찾음", screen: ["134.36×40"] },
+  "꼬리표 크기": { group: "가 앱 글꼴(d-237)", screen: ["64.22×20"] },
+  "꼬리표 ← 분야 글 끝에서": { group: "다 새로 찾음", screen: ["14"] },
+  "강조 크기": { group: "가 현행 꼴", screen: ["312×68"] },
+  "포커스 줄 크기(행 312×54)": { group: "가 현행 꼴", screen: ["312×68"] },
+  "포커스 고리 바깥 크기(312×54, 선 INSIDE 기준)": { group: "다 새로 찾음", screen: ["316×72"] },
+  "「남은 시간」 상자 위쪽이 판 가운데에서 위로": { group: "나 23이 판단", screen: ["28"] },
+  "숫자 상자 위쪽이 판 가운데에서 위로": { group: "나 23이 판단", screen: ["12"] },
+  "끝내기 단추 너비": { group: "나 23이 판단", screen: ["82"] },
   "위 글(할 일 · 분야)": { group: "다 새로 찾음", screen: ["토익 단어 50개"] },
   "위 글 분야 점 10×10(x36)": { group: "다 새로 찾음", screen: ["없음"] },
   "위 글 글자 크기": { group: "다 새로 찾음", screen: ["16px"] },
@@ -299,36 +326,6 @@ const KNOWN_DIFFS: Record<string, { group: "가 현행 꼴" | "나 23이 판단"
   "상태 글 y(판 가운데에서 아래로)": { group: "나 23이 판단", screen: ["168"] },
   "끝내기 단추 y(판 가운데에서 아래로)": { group: "나 23이 판단", screen: ["196"] },
   "끝내기 단추 x": { group: "나 23이 판단", screen: ["139"] },
-  "머리 날짜 글(요일)": { group: "가 현행 꼴", screen: ["11월 13일 금요일"] },
-  "카드 x": { group: "가 현행 꼴", screen: ["16"] },
-  "카드 너비": { group: "가 현행 꼴", screen: ["328"] },
-  "카드 바탕(--color-surface)": { group: "가 현행 꼴", screen: ["rgb(243, 238, 230)"] },
-  "카드 높이": { group: "가 현행 꼴", screen: ["108", "156", "128"] },
-  "분야 점 10×10(제목 옆)": { group: "가 현행 꼴", screen: ["없음"] },
-  "제목 글자 크기": { group: "가 현행 꼴", screen: ["16px"] },
-  "제목 색": { group: "가 현행 꼴", screen: ["rgb(28, 35, 64)"] },
-  "건넨 할 일 굵기": { group: "가 현행 꼴", screen: ["400"] },
-  "넘기기 누름 영역 너비": { group: "가 현행 꼴", screen: ["68"] },
-  "넘기기 누름 영역 높이": { group: "가 현행 꼴", screen: ["48"] },
-  "단추 너비(명세 84는 윤곽 단추 기준)": { group: "가 현행 꼴", screen: ["162.88", "119.63"] },
-  "단추 높이": { group: "가 현행 꼴", screen: ["48"] },
-  "단추 바탕": { group: "가 현행 꼴", screen: ["rgb(28, 35, 64)"] },
-  "단추 윤곽": { group: "가 현행 꼴", screen: ["1px solid rgb(28, 35, 64)"] },
-  "단추 글자 크기": { group: "가 현행 꼴", screen: ["16px"] },
-  "단추 글 색": { group: "가 현행 꼴", screen: ["rgb(255, 255, 255)"] },
-  "K6 단추 윤곽": { group: "가 현행 꼴", screen: ["1px solid rgb(28, 35, 64)"] },
-  "K6 단추 높이": { group: "가 현행 꼴", screen: ["48"] },
-  "알림 상자 x": { group: "가 현행 꼴", screen: ["32"] },
-  "알림 상자 너비": { group: "가 현행 꼴", screen: ["296"] },
-  "안내 상자 x": { group: "가 현행 꼴", screen: ["16"] },
-  "안내 상자 너비": { group: "가 현행 꼴", screen: ["328"] },
-  "「추천」 꼬리표 글자 크기": { group: "가 현행 꼴", screen: ["14px"] },
-  "「남은 시간」 상자 위쪽이 판 가운데에서 위로": { group: "나 23이 판단", screen: ["28"] },
-  "숫자 상자 위쪽이 판 가운데에서 위로": { group: "나 23이 판단", screen: ["12"] },
-  "끝내기 단추 너비": { group: "나 23이 판단", screen: ["82"] },
-  "적은 날 줄 → 알림 상자 간격": { group: "다 새로 찾음", screen: ["4"] },
-  "알림 상자 → 단추 줄 간격": { group: "다 새로 찾음", screen: ["4"] },
-  "안내 상자 위 → 목록 제목 아래로 내려옴": { group: "다 새로 찾음", screen: ["68"] },
 };
 function expectOnlyKnown(mm: Mismatch[]) {
   const bad = mm.filter((x) => !KNOWN_DIFFS[x.item]?.screen.includes(x.screen));
@@ -368,7 +365,7 @@ function checkCard(m: CardM, mm: Mismatch[], k: CardKind) {
   check(mm, "카드 x", 20, r1(m.card.x));
   check(mm, "카드 너비", 320, r1(m.card.width));
   if (k.height !== null) check(mm, "카드 높이", k.height, r1(m.card.height));
-  check(mm, "카드 바탕(--color-surface)", "#FFFFFF", m.card.background);
+  check(mm, "카드 바탕(--color-surface)", WHITE, m.card.background);
   check(mm, "카드 모서리", "16px", m.card.borderRadius);
   check(mm, "분야 점 10×10(제목 옆)", "10×10", m.dot ? `${r1(m.dot.width)}×${r1(m.dot.height)}` : "없음");
   check(mm, "제목 글자 크기", "12px", m.title!.fontSize);
@@ -482,9 +479,11 @@ function checkCard(m: CardM, mm: Mismatch[], k: CardKind) {
   if (k.tag?.focus) {
     expect(m.focusedRow, "포커스는 그 줄").not.toBeNull();
     check(mm, "포커스 줄 tabindex", "-1", m.focusedRow!.tabindex);
-    check(mm, "포커스 고리", `2px solid ${INK}`, m.focusedRow!.outline);
+    // 고리는 box-shadow 0 0 0 2px(행 바깥으로 2px씩). Figma 166:809는 선 정렬 INSIDE라 바깥 가장자리가 행 312×54와 같다
+    check(mm, "포커스 고리(2px #1C2340)", "rgb(28, 35, 64) 0px 0px 0px 2px", m.focusedRow!.boxShadow);
     check(mm, "포커스 줄 모서리", "8px", m.focusedRow!.borderRadius);
-    check(mm, "포커스 줄 크기(고리 바깥 312×54)", "312×54", `${r1(m.focusedRow!.width)}×${r1(m.focusedRow!.height)}`);
+    check(mm, "포커스 줄 크기(행 312×54)", "312×54", `${r1(m.focusedRow!.width)}×${r1(m.focusedRow!.height)}`);
+    check(mm, "포커스 고리 바깥 크기(312×54, 선 INSIDE 기준)", "312×54", `${r1(m.focusedRow!.width + 4)}×${r1(m.focusedRow!.height + 4)}`);
   } else if (k.tag) {
     expect(m.focusedRow, "포커스 줄 없음").toBeNull();
   }
@@ -545,7 +544,7 @@ test("K7 타이머가 이미 돎 (157:698)", async ({ page }) => {
   check(mm, "카드 x", 20, r1(m.card.x));
   check(mm, "카드 너비", 320, r1(m.card.width));
   check(mm, "카드 높이", 144, r1(m.card.height));
-  check(mm, "카드 바탕(--color-surface)", "#FFFFFF", m.card.background);
+  check(mm, "카드 바탕(--color-surface)", WHITE, m.card.background);
   check(mm, "카드 모서리", "16px", m.card.borderRadius);
   check(mm, "분야 점 10×10(제목 옆)", "10×10", m.dot ? `${r1(m.dot.width)}×${r1(m.dot.height)}` : "없음");
   check(mm, "제목 글자 크기", "12px", m.title!.fontSize);

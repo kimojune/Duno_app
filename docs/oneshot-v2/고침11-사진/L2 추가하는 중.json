@@ -1,0 +1,202 @@
+{
+  "viewport": "360x800 @2x",
+  "node": "166:159",
+  "data": "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음 · 추가하는 중",
+  "measured": {
+    "headerDay": "11월 13일 금요일",
+    "card": {
+      "x": 16,
+      "y": 190,
+      "width": 328,
+      "height": 142,
+      "right": 344,
+      "bottom": 332,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgb(255, 255, 255)",
+      "borderTop": "0px none rgb(28, 35, 64)",
+      "borderRadius": "16px",
+      "padding": "8px 16px 12px",
+      "outline": "3px none rgb(28, 35, 64)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui"
+    },
+    "dot": {
+      "width": 10,
+      "height": 10
+    },
+    "title": {
+      "text": "오늘 먼저 할 일 · 어학",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "lineHeight": "16px",
+      "color": "rgb(94, 100, 120)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "0px none rgb(94, 100, 120)",
+      "borderRadius": "0px",
+      "padding": "0px",
+      "outline": "3px none rgb(94, 100, 120)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui"
+    },
+    "todoText": {
+      "text": "토익 단어 50개",
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "lineHeight": "24px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "0px none rgb(28, 35, 64)",
+      "borderRadius": "0px",
+      "padding": "0px",
+      "outline": "3px none rgb(28, 35, 64)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui",
+      "x": 32,
+      "y": 220,
+      "width": 296,
+      "height": 24,
+      "right": 328,
+      "bottom": 244
+    },
+    "written": {
+      "text": "어제 적은 할 일",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "20px",
+      "color": "rgb(94, 100, 120)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "0px none rgb(94, 100, 120)",
+      "borderRadius": "0px",
+      "padding": "0px",
+      "outline": "3px none rgb(94, 100, 120)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui",
+      "x": 32,
+      "y": 244,
+      "width": 296,
+      "height": 20,
+      "right": 328,
+      "bottom": 264,
+      "role": null
+    },
+    "status": null,
+    "notice": null,
+    "mainButton": {
+      "text": "추가하는 중",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "lineHeight": "20px",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(28, 35, 64)",
+      "borderTop": "4px solid rgba(0, 0, 0, 0)",
+      "borderRadius": "999px",
+      "padding": "0px 16px",
+      "outline": "3px none rgb(255, 255, 255)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui",
+      "x": 32,
+      "right": 140.921875,
+      "width": 108.921875,
+      "height": 40,
+      "hit": {
+        "x": 32,
+        "y": 276,
+        "width": 108.921875,
+        "height": 48
+      },
+      "disabled": true,
+      "ariaBusy": "true"
+    },
+    "skipButton": {
+      "text": "넘기기",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "lineHeight": "20px",
+      "color": "rgb(94, 100, 120)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "4px solid rgba(0, 0, 0, 0)",
+      "borderRadius": "999px",
+      "padding": "0px 12px",
+      "outline": "3px none rgb(94, 100, 120)",
+      "outlineOffset": "0px",
+      "boxShadow": "none",
+      "letterSpacing": "normal",
+      "fontFamily": "system-ui",
+      "x": 156.921875,
+      "right": 224.921875,
+      "width": 68,
+      "height": 40,
+      "hit": {
+        "x": 156.921875,
+        "y": 276,
+        "width": 68,
+        "height": 48
+      },
+      "disabled": true,
+      "ariaBusy": null
+    },
+    "secondary": null,
+    "buttonOrder": [
+      "추가하는 중",
+      "넘기기"
+    ],
+    "gaps": {
+      "writtenToNotice": null,
+      "writtenToActions": 16,
+      "noticeToActions": null,
+      "mainToSkip": 16
+    },
+    "listTag": null,
+    "flashRow": null,
+    "focusedRow": null,
+    "carry": "어제 못 끝낸 할 일 2개 보기",
+    "scrollWidth": 360,
+    "clientWidth": 360
+  },
+  "comparedItems": 37,
+  "mismatches": [
+    {
+      "item": "머리 날짜 글(요일)",
+      "spec": "11월 13일 목요일",
+      "screen": "11월 13일 금요일",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "카드 x",
+      "spec": "20",
+      "screen": "16",
+      "group": "가 앱 여백(d-240)"
+    },
+    {
+      "item": "카드 너비",
+      "spec": "320",
+      "screen": "328",
+      "group": "가 앱 여백(d-240)"
+    },
+    {
+      "item": "단추 x",
+      "spec": "36",
+      "screen": "32",
+      "group": "가 앱 여백(d-240)"
+    },
+    {
+      "item": "단추 너비(글에 맞춤)",
+      "spec": "100",
+      "screen": "108.92",
+      "group": "가 앱 글꼴(d-237)"
+    }
+  ]
+}

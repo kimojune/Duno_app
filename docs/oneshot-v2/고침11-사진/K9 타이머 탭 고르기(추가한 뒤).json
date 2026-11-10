@@ -18,7 +18,7 @@
       "color": "rgb(28, 35, 64)",
       "role": "status"
     },
-    "listHeadingY": 142,
+    "listHeadingY": 130,
     "radios": [
       {
         "label": "토익 단어 50개어학추천",
@@ -61,27 +61,112 @@
     ],
     "selectedRowBackground": "rgb(243, 238, 230)",
     "startButton": "30분 시작",
+    "headingCss": {
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "color": "rgb(28, 35, 64)"
+    },
+    "selectedRow": {
+      "x": 16,
+      "width": 328,
+      "height": 48,
+      "radius": "8px",
+      "textSize": "16px",
+      "textWeight": "400"
+    },
+    "otherRowText": {
+      "size": "16px",
+      "weight": "400"
+    },
+    "radio": {
+      "width": 24,
+      "height": 24
+    },
+    "hasListCard": false,
+    "fieldsetBg": "rgba(0, 0, 0, 0)",
+    "categoryDotInRow": false,
+    "startButtonBox": {
+      "x": 16,
+      "y": 358,
+      "width": 106.171875,
+      "height": 48
+    },
     "scrollWidth": 360,
     "clientWidth": 360
   },
+  "comparedItems": 26,
   "mismatches": [
     {
       "item": "안내 상자 x",
       "spec": "20",
       "screen": "16",
-      "group": "가 현행 꼴"
+      "group": "가 앱 여백(d-240)"
     },
     {
       "item": "안내 상자 너비",
       "spec": "320",
       "screen": "328",
+      "group": "가 앱 여백(d-240)"
+    },
+    {
+      "item": "안내 상자 y",
+      "spec": "110",
+      "screen": "74",
       "group": "가 현행 꼴"
     },
     {
-      "item": "안내 상자 위 → 목록 제목 아래로 내려옴",
-      "spec": "56",
-      "screen": "68",
-      "group": "다 새로 찾음"
+      "item": "목록 제목 「무엇을 할까요?」 글자 크기(24 Bold)",
+      "spec": "24px",
+      "screen": "16px",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "고른 줄 크기(312×48 · x24)",
+      "spec": "312×48@24",
+      "screen": "328×48@16",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "고른 줄 모서리",
+      "spec": "12px",
+      "screen": "8px",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "고른 줄 글(14 Bold)",
+      "spec": "14px/700",
+      "screen": "16px/400",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "다른 줄 글(14 Regular)",
+      "spec": "14px/400",
+      "screen": "16px/400",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "라디오 20×20",
+      "spec": "20×20",
+      "screen": "24×24",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "오늘 할 일 목록 흰 카드(320 · 모서리 16)",
+      "spec": "흰 바탕",
+      "screen": "없음",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "줄 오른쪽 분야 점·분야 글",
+      "spec": "있음",
+      "screen": "없음",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "「30분 시작」 단추 320×48(x20)",
+      "spec": "320×48@20",
+      "screen": "106.17×48@16",
+      "group": "가 현행 꼴"
     },
     {
       "item": "「추천」 꼬리표 글자 크기",
