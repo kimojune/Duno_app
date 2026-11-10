@@ -311,7 +311,7 @@ export function TimerScreen({
         {load === "ready" && !running && (
           <div className="timer-choose">
             {noticeOpen && added && effectiveChoice.kind === "todo" && effectiveChoice.id === added.todoId && (
-              <Notice role="status">{TIMER_TEXT.added(added.text ?? TIMER_TEXT.unreadable)}</Notice>
+              <Notice role="status" className="notice-compact">{TIMER_TEXT.added(added.text ?? TIMER_TEXT.unreadable)}</Notice>
             )}
             <h2 className="growth-sub-title">{TIMER_TEXT.chooseHeading}</h2>
             {todosFailed && <p className="todo-sub">{TIMER_TEXT.todosFailed}</p>}
@@ -323,7 +323,7 @@ export function TimerScreen({
                 </p>
               )}
               {todos.map((t) => (
-                <label key={t.id} className="timer-option">
+                <label key={t.id} className={noticeOpen && added?.todoId === t.id ? "timer-option timer-option-added" : "timer-option"}>
                   <input
                     type="radio"
                     name="timer-choice"

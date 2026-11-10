@@ -121,6 +121,8 @@ button, input { font: inherit; color: inherit; }
   overflow-wrap: anywhere;
 }
 .notice p + p { margin-top: 0; }
+/* 고침 11: 카드 안 알림(K3·K4, 157:375)과 K9 안내(157:963)만 14 Regular · 줄 20 · #1C2340 · 안쪽 12. 공용 .notice는 그대로 */
+.notice.notice-compact { padding: var(--space-3); font: 400 0.875rem/1.25rem var(--font-family); color: var(--color-text); }
 .notice-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 
 /* ---- Google 단추 (명세 2-4, Light) ---- */
@@ -1049,6 +1051,10 @@ select.input { appearance: auto; }
 .timer-option input { flex: none; appearance: none; -webkit-appearance: none; inline-size: 24px; block-size: 24px; margin: 0; border: 0; border-radius: 50%; background: var(--color-surface); box-shadow: inset 0 0 0 1.5px var(--color-border-input); cursor: pointer; }
 .timer-option input:checked { background: radial-gradient(circle, var(--color-surface) 0 4px, var(--color-text) 4.5px); box-shadow: none; }
 .timer-option-text { min-width: 0; }
+/* 고침 11 K9(157:904): 「오늘 할 일에 추가」 뒤 골라 둔 줄만 바탕 #F3EEE6 */
+.timer-option-added { background: var(--color-notice-bg); border-radius: var(--radius-control); }
+/* 고침 11 K2: 「추가하는 중」 동안 「넘기기」 글색 보조색(막힘은 그대로) */
+.offer-skip:disabled { color: var(--color-text-sub); }
 
 /* ---- 원샷 v2 ⑤: 오늘 먼저 할 일 카드 ---- */
 .offer-text { margin: 0; font: var(--font-body); overflow-wrap: anywhere; }

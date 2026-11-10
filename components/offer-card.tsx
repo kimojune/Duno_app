@@ -75,12 +75,12 @@ export function OfferCard({
         <p className="entry-title">{OFFER_TEXT.title(offer.categoryName)}</p>
         <p className="offer-text">{offer.todoText ?? `${offer.categoryName} ${minutes}분`}</p>
         <p className="todo-sub offer-written">{writtenDayLine(offer.todoDay, today)}</p>
-        {error && <Notice role="alert">{error === "offline" ? OFFER_TEXT.addOffline : OFFER_TEXT.addFailed}</Notice>}
+        {error && <Notice role="alert" className="notice-compact">{error === "offline" ? OFFER_TEXT.addOffline : OFFER_TEXT.addFailed}</Notice>}
         <div className="detail-actions">
           <PrimaryButton busy={busy} disabled={busy} onClick={onAdd}>
             {busy ? OFFER_TEXT.adding : OFFER_TEXT.add}
           </PrimaryButton>
-          <TextButton disabled={busy} onClick={onDismiss}>
+          <TextButton className="offer-skip" disabled={busy} onClick={onDismiss}>
             {OFFER_TEXT.skip}
           </TextButton>
         </div>
