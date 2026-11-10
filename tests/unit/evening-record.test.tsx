@@ -287,14 +287,14 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ totalMinutes: 150, saveMode: "prefilled" }));
   });
 
-  it("체험 데이터의 오늘 기록 줄(PM 13)이 「이미 남긴 기록」으로 들어와도 깨지지 않고 그 값으로 열린다", async () => {
+  it("체험 데이터의 기록 줄(어제 것을 오늘 자리에 넣어 봄 — 오늘 줄은 시연 2막에서 거둠)이 「이미 남긴 기록」으로 들어와도 깨지지 않고 그 값으로 열린다", async () => {
     const plan = buildDemoPlan("11111111-1111-4111-8111-111111111111", "2026-11-07");
-    const log = plan.eveningLogs.find((l) => l.targetDay === "2026-11-07")!;
+    const log = plan.eveningLogs.find((l) => l.targetDay === "2026-11-06")!;
     expect(log).toBeTruthy();
     const ids = [C1, C2];
     const existing = {
       id: log.id,
-      targetDay: log.targetDay,
+      targetDay: "2026-11-07",
       totalMinutes: log.totalMinutes,
       items: log.items.map((i) => ({ categoryId: i.categoryIndex === null ? null : ids[i.categoryIndex % 2], minutes: i.minutes })),
       saveMode: "edited" as const,

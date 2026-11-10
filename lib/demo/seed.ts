@@ -13,10 +13,10 @@ import { addDays, weekStartFor } from "../week";
  * - 그 사용자 자기 세션의 Supabase 클라이언트로 표에 직접 넣는다(RLS를 거친다). service role 키는 쓰지 않는다.
  *   앱 서버의 쓰기 길(할 일 72시간·저녁 기록 오늘/어제 제한)을 거치지 않는 까닭: 지난 2~3주치를 넣어야 해서. DB에는 지난 날짜를 막는 제약이 없다.
  * - 글(할 일·분야 이름·목표 한 줄)은 앱과 같은 함수·같은 키·같은 AAD로 암호화한다(lib/todos/crypto.ts).
- * - 다시 돌려도 중복되지 않는다: 분야·할 일·저녁 기록 id는 (사용자, 종류, 번호)에서 정해지는 결정적 uuid이고, 이미 있으면 건너뛴다
+ * - 다시 돌려도 중복되지 않는다: 분야·할 일·작업 기록·저녁 기록 id는 (사용자, 종류, 번호)에서 정해지는 결정적 uuid이고, 이미 있으면 건너뛴다
  *   (upsert ignoreDuplicates = ON CONFLICT DO NOTHING, insert 권한만 든다). 비율·이번 주 목표·설정은 키가 (사용자[, 분야/주])라 덮어쓴다.
  *   목표 비율 기록(category_ratio_history)은 앱 함수(recordRatioHistory)가 「직전과 같은 묶음이면 안 씀」을 지킨다.
- * - 넣는 순서: 분야(한 줄씩 — created_at이 만든 순서가 되게) → 할 일 → 저녁 기록 → 목표 비율 → 비율 기록 → 이번 주 목표 → 설정(목표 한 줄·처음 설정 끝 표시).
+ * - 넣는 순서: 분야(한 줄씩 — created_at이 만든 순서가 되게) → 할 일 → 작업 기록 글 → 저녁 기록 → 목표 비율 → 비율 기록 → 이번 주 목표 → 설정(목표 한 줄·처음 설정 끝 표시).
  *   처음 설정 끝 표시가 맨 끝이라, 중간에 실패하면 끝 표시가 남지 않고 다시 돌리면 빠진 것만 채운다.
  * - 실패하면 DemoSeedError(단계 이름과 DB 오류 코드만, 값·사용자 글 없음)를 던진다.
  * - 예시 글은 사용자 입력이 아니라 아래 고정 목록이다.
@@ -40,8 +40,13 @@ const TODO_TEXTS: readonly (readonly string[])[] = [
 export const DEMO_RATIOS = [30, 30, 20, 10] as const;
 export const DEMO_RATIO_OTHER = 10;
 
-/** 이번 주 목표(분, 1시간 단위) — 분야 순서대로 */
-export const DEMO_WEEKLY_MINUTES = [6 * 60, 5 * 60, 4 * 60, 3 * 60] as const;
+/**
+ * 시연 2막용 「모자란 분야」(창구 요청 11-10): 이번 주 목표에서 이 분야만 DEMO_SHORT_MINUTES만큼 모자라고, 나머지 분야는 목표를 채워 둔다.
+ * 그래서 카드(lib/offers/logic.ts pickOfferCategory)가 이 분야를 건네고, 오늘 저녁 기록 한 번(DEMO_SHORT_MINUTES)이면 목표가 꽉 찬다.
+ * 이번 주 목표는 「이번 주 지난 날」 기록 합에서 계산한다(buildDemoWeeklyGoals) — 날짜가 바뀌어도 어긋나지 않게.
+ */
+export const DEMO_SHORT_CATEGORY_INDEX = 0; // 어학
+export const DEMO_SHORT_MINUTES = 60;
 
 export const DEMO_GOAL_TEXT = "내년 상반기 안에 원하는 회사에 취업하기";
 
@@ -63,6 +68,8 @@ export type DemoSeedCounts = {
   ratioHistory: number;
   weeklyGoals: number;
   settings: number;
+  /** 작업 기록 글 수(시연 2막). 옛 호출 꼴이 안 깨지게 있어도 없어도 된다 */
+  todoNotes?: number;
 };
 
 export class DemoSeedError extends Error {
@@ -101,17 +108,32 @@ export type DemoEveningLog = {
   totalMinutes: number;
   items: { categoryIndex: number | null; minutes: number }[];
 };
+export type DemoNote = { id: string; todoId: string; day: string; text: string };
+export type DemoWeeklyGoal = { categoryIndex: number; minutes: number };
 export type DemoPlan = {
   categoryIds: string[];
   todos: DemoTodo[];
+  notes: DemoNote[];
   eveningLogs: DemoEveningLog[];
   weekStart: string;
+  /** 이번 주 목표(분야 번호·분, 1시간 단위) */
+  weeklyGoals: DemoWeeklyGoal[];
 };
+
+/** 시연 2막: 모자란 분야의 「끝낸 할 일」(날 → 번호 0)과 거기 남기는 작업 기록 글(고정) */
+const SHORT_DONE_NOTES: readonly { back: number; text: string; note: string }[] = [
+  { back: 2, text: "영어 단어 50개 외우기", note: "단어 50개 중 8개가 계속 헷갈렸다. 예문과 같이 다시 적어 두었다." },
+  { back: 3, text: "섀도잉 20분", note: "빠른 구간에서 말이 뭉개졌다. 속도를 0.8배로 낮춰 한 번 더 따라 했다." },
+];
+/** 시연 2막: 어제의 끝내지 않은 모자란 분야 할 일(카드가 「오늘 할 일에 추가」로 건네는 것) */
+const SHORT_UNDONE_TEXT = "오픽 답변 스크립트 다듬기";
 
 export function buildDemoPlan(userId: string, today: string): DemoPlan {
   const categoryIds = DEMO_CATEGORIES.map((_, i) => demoUuid(userId, "category", i));
   const todos: DemoTodo[] = [];
+  const notes: DemoNote[] = [];
   const eveningLogs: DemoEveningLog[] = [];
+  const weekStart = weekStartFor(today);
 
   for (let back = DEMO_SPAN_DAYS; back >= 0; back -= 1) {
     const day = addDays(today, -back);
@@ -120,12 +142,33 @@ export function buildDemoPlan(userId: string, today: string): DemoPlan {
     // 할 일: 하루 2~4개. 분야는 날마다 돌려 가며, 가끔 기타
     const count = 2 + pick(`count|${day}`, 3);
     const start = pick(`start|${day}`, TODO_TEXTS.length);
+    const groups = Array.from({ length: count }, (_, n) => (start + n) % TODO_TEXTS.length);
+    // 시연 2막: 오늘 목록에는 모자란 분야 할 일이 없다(있으면 카드가 오늘 것을 먼저 건네 「오늘 할 일에 추가」가 안 나온다) — 그 자리는 안 쓰인 다른 묶음으로
+    if (isToday) {
+      groups.forEach((g, n) => {
+        if (g !== DEMO_SHORT_CATEGORY_INDEX) return;
+        groups[n] = [1, 2, 3, 4].find((c) => !groups.includes(c)) ?? 4;
+      });
+    }
+    // 시연 2막: 어제는 모자란 분야 할 일이 「끝내지 않은 것 하나」뿐(나머지는 끝냄), 2·3일 전 첫 할 일은 모자란 분야의 끝낸 것
+    const fixedShort = back === 1 || SHORT_DONE_NOTES.some((x) => x.back === back);
+    if (fixedShort) groups[0] = DEMO_SHORT_CATEGORY_INDEX;
     for (let n = 0; n < count; n += 1) {
-      const group = (start + n) % TODO_TEXTS.length;
+      const group = groups[n];
       const texts = TODO_TEXTS[group];
-      const text = texts[pick(`text|${day}|${n}`, texts.length)];
+      let text = texts[pick(`text|${day}|${n}`, texts.length)];
       // 지난날은 대부분 끝냄(약 3/4), 오늘은 첫 하나만 끝냄
-      const done = isToday ? n === 0 : pick(`done|${day}|${n}`, 4) !== 0;
+      let done = isToday ? n === 0 : pick(`done|${day}|${n}`, 4) !== 0;
+      if (back === 1 && group === DEMO_SHORT_CATEGORY_INDEX) {
+        done = n !== 0;
+        if (n === 0) text = SHORT_UNDONE_TEXT;
+      }
+      const fixedDone = SHORT_DONE_NOTES.find((x) => x.back === back);
+      if (fixedDone && n === 0) {
+        done = true;
+        text = fixedDone.text;
+        notes.push({ id: demoUuid(userId, `note|${day}`, 0), todoId: demoUuid(userId, `todo|${day}`, 0), day, text: fixedDone.note });
+      }
       todos.push({
         id: demoUuid(userId, `todo|${day}`, n),
         day,
@@ -135,8 +178,10 @@ export function buildDemoPlan(userId: string, today: string): DemoPlan {
       });
     }
 
-    // 오늘 기록: 날마다 하나(오늘 포함, PM 13 — 시연 화면이 「이미 남긴 기록」 상태로도 열리게). 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
-    {
+    // 오늘 기록: 날마다 하나. 30분 단위, 분야 2~3개(가끔 기타 포함), 합 = total
+    // 오늘 줄은 넣지 않는다(시연 2막이 새 기록 흐름을 보여야 해서 — 창구 요청 11-10, 전에는 PM 13으로 오늘도 넣었다).
+    // 이번 주 지난 날은 아래에서 정해진 모양으로 다시 만든다(이번 주 목표와 맞추려고).
+    if (!isToday) {
       const parts = 2 + pick(`parts|${day}`, 2);
       const first = pick(`first|${day}`, DEMO_CATEGORIES.length);
       const items: { categoryIndex: number | null; minutes: number }[] = [];
@@ -155,7 +200,38 @@ export function buildDemoPlan(userId: string, today: string): DemoPlan {
     }
   }
 
-  return { categoryIds, todos, eveningLogs, weekStart: weekStartFor(today) };
+  const weeklyGoals = rebuildThisWeekLogs(eveningLogs, today, weekStart);
+  return { categoryIds, todos, notes, eveningLogs, weekStart, weeklyGoals };
+}
+
+/**
+ * 이번 주 지난 날(주 월요일 ~ 어제) 기록을 분야 4개 모두 30~60분인 모양으로 다시 만들고, 그 합에서 이번 주 목표를 돌려준다.
+ * - 분야마다 합을 1시간 단위로 올려(마지막 날에 30분) 목표를 정확히 채운다. 모자란 분야만 목표를 DEMO_SHORT_MINUTES 더 크게 잡는다.
+ * - 주 첫날(월요일)에는 이번 주 지난 날이 없어 합이 0이다: 목표는 모자란 분야 DEMO_SHORT_MINUTES 하나만(0/1시간). 다른 분야는 목표에 넣지 않는다.
+ */
+function rebuildThisWeekLogs(logs: DemoEveningLog[], today: string, weekStart: string): DemoWeeklyGoal[] {
+  const days = logs.filter((l) => l.targetDay >= weekStart && l.targetDay < today);
+  const totals = DEMO_CATEGORIES.map(() => 0);
+  for (const log of days) {
+    log.items = DEMO_CATEGORIES.map((_, c) => ({ categoryIndex: c, minutes: 30 * (1 + pick(`wmin|${log.targetDay}|${c}`, 2)) }));
+    for (const item of log.items) totals[item.categoryIndex as number] += item.minutes;
+  }
+  const last = days[days.length - 1];
+  if (last) {
+    for (let c = 0; c < totals.length; c += 1) {
+      if (totals[c] % 60 === 0) continue;
+      const item = last.items.find((i) => i.categoryIndex === c)!;
+      item.minutes += 30;
+      totals[c] += 30;
+    }
+  }
+  for (const log of days) log.totalMinutes = log.items.reduce((sum, i) => sum + i.minutes, 0);
+  const goals: DemoWeeklyGoal[] = [];
+  totals.forEach((minutes, categoryIndex) => {
+    const goal = minutes + (categoryIndex === DEMO_SHORT_CATEGORY_INDEX ? DEMO_SHORT_MINUTES : 0);
+    if (goal > 0) goals.push({ categoryIndex, minutes: goal });
+  });
+  return goals;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +280,18 @@ export async function seedDemoData(input: DemoSeedInput): Promise<DemoSeedCounts
   if (todos.error) throw new DemoSeedError("todos", dbCode(todos.error));
   counts.todos = rowsOf(todos.data);
 
+  // 2-1. 작업 기록 글(시연 2막: 모자란 분야의 끝낸 할 일에). 할 일 글과 같은 키, 용도만 todo_note
+  const noteRows = plan.notes.map((n) => ({
+    id: n.id,
+    user_id: userId,
+    todo_id: n.todoId,
+    day: n.day,
+    note_encrypted: encryptTodoText(n.text, userId, key, "todo_note"),
+  }));
+  const notes = await supabase.from("todo_notes").upsert(noteRows, { onConflict: "id", ignoreDuplicates: true }).select("id");
+  if (notes.error) throw new DemoSeedError("todo_notes", dbCode(notes.error));
+  counts.todoNotes = rowsOf(notes.data);
+
   // 3. 오늘 기록(대상 날 저녁 10시 서울 = 기기 시계 자리. 서버 시계 saved_at은 DB 기본값)
   const logRows = plan.eveningLogs.map((l) => ({
     id: l.id,
@@ -232,8 +320,8 @@ export async function seedDemoData(input: DemoSeedInput): Promise<DemoSeedCounts
   if (history === "read_failed" || history === "write_failed") throw new DemoSeedError("category_ratio_history", null);
   counts.ratioHistory = history === "written" ? 1 : 0;
 
-  // 6. 이번 주 목표(1시간 단위)
-  const goalItems = plan.categoryIds.map((id, i) => ({ categoryId: id, minutes: DEMO_WEEKLY_MINUTES[i] }));
+  // 6. 이번 주 목표(1시간 단위) — 이번 주 지난 날 기록 합에서 정한다(buildDemoPlan)
+  const goalItems = plan.weeklyGoals.map((g) => ({ categoryId: plan.categoryIds[g.categoryIndex], minutes: g.minutes }));
   const weekly = await supabase
     .from("weekly_goals")
     .upsert({ user_id: userId, week_start: plan.weekStart, items: goalItems }, { onConflict: "user_id,week_start" })

@@ -6,13 +6,18 @@ import {
   DEMO_GOAL_TEXT,
   DEMO_RATIO_OTHER,
   DEMO_RATIOS,
+  DEMO_SHORT_CATEGORY_INDEX,
+  DEMO_SHORT_MINUTES,
   DEMO_SPAN_DAYS,
   DemoSeedError,
   demoUuid,
   seedDemoData,
 } from "../../lib/demo/seed";
 import { decryptCategoryName, decryptTodoText, parseTodoKey, type TodoKey } from "../../lib/todos/crypto";
-import { addDays } from "../../lib/week";
+import { shortfallByGoal, sumRange } from "../../lib/growth/logic";
+import { pickOfferCategory, pickOfferTodo } from "../../lib/offers/logic";
+import { todoDayFor } from "../../lib/todos/day";
+import { addDays, weekStartFor } from "../../lib/week";
 import { FakeStore, fakeTablesClient, v2Rules, type Row } from "./fake-tables";
 
 const USER = "11111111-1111-4111-8111-111111111111";
@@ -43,7 +48,7 @@ async function seed(s = store, user = USER) {
 }
 
 describe("예시 데이터 모양", () => {
-  it("지난 3주(오늘 포함 21일) — 날짜마다 할 일 2~4개, 오늘 포함 날마다 오늘 기록 하나", async () => {
+  it("지난 3주(오늘 포함 21일) — 날짜마다 할 일 2~4개, 오늘 빼고 날마다 오늘 기록 하나", async () => {
     const counts = await seed();
     const todos = store.table("todos");
     expect(todos.length).toBeGreaterThan(0);
@@ -65,7 +70,7 @@ describe("예시 데이터 모양", () => {
     expect(todos.some((t) => t.day === TODAY && t.done === false)).toBe(true);
 
     const logs = store.table("evening_logs");
-    expect(logs.map((l) => l.target_day).sort()).toEqual(days); // 오늘 줄 포함(PM 13)
+    expect(logs.map((l) => l.target_day).sort()).toEqual(days.filter((d) => d !== TODAY)); // 오늘 줄은 없다(시연 2막, 창구 11-10)
     expect(counts).toMatchObject({ categories: 4, todos: todos.length, eveningLogs: logs.length, ratios: 4, ratioHistory: 1, weeklyGoals: 1, settings: 1 });
   });
 
@@ -92,16 +97,12 @@ describe("예시 데이터 모양", () => {
     expect(sawOther).toBe(true);
   });
 
-  it("PM 13: 오늘 날짜 기록이 한 줄 든다 — 두 번 돌려도 1개, 다른 사용자 것과 섞이지 않는다", async () => {
+  it("오늘 기록 없음(시연 2막, 창구 11-10): 오늘 날짜 기록이 없다 — 두 번 돌려도, 다른 사용자도 그렇다. 어제 줄은 있다", async () => {
     await seed();
     await seed();
-    const mine = store.table("evening_logs").filter((l) => l.target_day === TODAY && l.user_id === USER);
-    expect(mine.length).toBe(1);
-    expect(mine[0].id).toBe(demoUuid(USER, "evening", TODAY));
-    expect(mine[0].save_mode).toBe("edited");
     await seed(store, OTHER);
-    expect(store.table("evening_logs").filter((l) => l.target_day === TODAY).length).toBe(2);
-    expect(store.table("evening_logs").filter((l) => l.target_day === TODAY && l.user_id === USER).length).toBe(1);
+    expect(store.table("evening_logs").filter((l) => l.target_day === TODAY).length).toBe(0);
+    expect(store.table("evening_logs").filter((l) => l.target_day === addDays(TODAY, -1) && l.user_id === USER).length).toBe(1);
   });
 
   it("목표 비율: 분야 몫 + 기타 몫 = 100, 비율 기록 한 줄도 합 100(기타 포함)", async () => {
@@ -119,13 +120,13 @@ describe("예시 데이터 모양", () => {
     expect(DEMO_RATIOS.every((p) => p % 5 === 0)).toBe(true);
   });
 
-  it("이번 주 목표: 이번 주 월요일, 분야마다 1시간 단위", async () => {
+  it("이번 주 목표: 이번 주 월요일, 분야마다 1시간 단위(TODAY가 월요일이라 모자란 분야 하나뿐)", async () => {
     await seed();
     const goals = store.table("weekly_goals");
     expect(goals.length).toBe(1);
     expect(goals[0].week_start).toBe("2026-11-09");
     const items = goals[0].items as { categoryId: string; minutes: number }[];
-    expect(items.length).toBeGreaterThan(0);
+    expect(items.length).toBe(1);
     for (const i of items) {
       expect(i.minutes % 60).toBe(0);
       expect(i.minutes).toBeGreaterThanOrEqual(60);
@@ -140,7 +141,7 @@ describe("예시 데이터 모양", () => {
 
   it("모든 행의 user_id = 그 사용자, 글은 암호문이고 같은 키·같은 AAD로 풀린다(다른 사용자 id로는 안 풀림)", async () => {
     await seed();
-    const tables = ["categories", "todos", "evening_logs", "category_ratios", "category_ratio_history", "weekly_goals", "user_settings"];
+    const tables = ["categories", "todos", "todo_notes", "evening_logs", "category_ratios", "category_ratio_history", "weekly_goals", "user_settings"];
     let total = 0;
     for (const t of tables) {
       const rows = store.table(t);
@@ -211,7 +212,7 @@ describe("다시 넣어도 중복 없음", () => {
     const retry = await seed();
     expect(retry.todos).toBe(0); // 이미 들어간 할 일은 건너뜀
     expect(store.table("todos").length).toBe(todosAfterFail);
-    expect(retry.eveningLogs).toBe(DEMO_SPAN_DAYS + 1); // 오늘 줄 포함(PM 13)
+    expect(retry.eveningLogs).toBe(DEMO_SPAN_DAYS); // 오늘 줄 없음(시연 2막)
     expect(store.table("user_settings")[0].onboarding_done_at).toBe(fixedNow().toISOString());
   });
 
@@ -221,6 +222,105 @@ describe("다시 넣어도 중복 없음", () => {
     expect(sent.length).toBeGreaterThan(0);
     for (const row of sent) {
       for (const col of ["created_at", "saved_at", "recorded_at"]) expect(Object.keys(row)).not.toContain(col);
+    }
+  });
+});
+
+describe("시연 2막(창구 11-10): 어느 날이든 모자란 분야 하나 · 카드 「오늘 할 일에 추가」", () => {
+  // 월요일(주 경계) · 화~토(주 중간) · 일요일(주 끝) · 다음 월요일
+  const DAYS = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09", "2026-11-15"];
+
+  for (const today of DAYS) {
+    it(`${today}: 목표 · 모자란 분야 하나 · 지난 날 할 일 · 오늘 그 분야 할 일 없음 · 저녁 기록 한 번이면 꽉`, async () => {
+      const s = newStore();
+      await seedDemoData({ supabase: fakeTablesClient(s, { sub: USER }), userId: USER, key, today, now: fixedNow });
+      const shortId = demoUuid(USER, "category", DEMO_SHORT_CATEGORY_INDEX);
+      expect(s.table("categories").some((c) => c.id === shortId)).toBe(true);
+
+      // 1. 이번 주 목표가 그 주로 들어 있다
+      const weekStart = weekStartFor(today);
+      const goalRow = s.table("weekly_goals").find((g) => g.week_start === weekStart)!;
+      expect(goalRow).toBeTruthy();
+      const goalItems = (goalRow.items as { categoryId: string; minutes: number }[]).map((g) => ({ categoryId: g.categoryId, minutes: g.minutes }));
+      for (const g of goalItems) expect(g.minutes % 60).toBe(0);
+
+      // 2. 이번 주 지난 날 기록 합 → 모자란 분야 하나만, 몫 = DEMO_SHORT_MINUTES
+      const logs = s.table("evening_logs").map((l) => ({
+        id: l.id as string,
+        targetDay: l.target_day as string,
+        totalMinutes: l.total_minutes as number,
+        items: l.items as { categoryId: string | null; minutes: number }[],
+        saveMode: "edited" as const,
+        savedAt: "x",
+      }));
+      expect(logs.some((l) => l.targetDay >= today)).toBe(false); // 오늘 이후 기록 없음
+      const totals = sumRange(logs, weekStart, addDays(weekStart, 6));
+      expect(shortfallByGoal(goalItems, totals)).toEqual([{ categoryId: shortId, minutes: DEMO_SHORT_MINUTES }]);
+      expect(DEMO_SHORT_MINUTES).toBeGreaterThanOrEqual(60);
+      expect(DEMO_SHORT_MINUTES).toBeLessThanOrEqual(120);
+      // 카드가 건넬 분야 = 모자란 분야
+      const ratios = s.table("category_ratios").map((r) => ({ categoryId: r.category_id as string | null, percent: r.percent as number }));
+      expect(pickOfferCategory({ ratios, goalItems, totals })).toBe(shortId);
+      // 오늘 저녁 기록 한 번(모자란 분야 몫)이면 목표가 꽉 찬다
+      const tonight = { id: "n", targetDay: today, totalMinutes: DEMO_SHORT_MINUTES, items: [{ categoryId: shortId, minutes: DEMO_SHORT_MINUTES }], saveMode: "edited" as const, savedAt: "x" };
+      expect(shortfallByGoal(goalItems, sumRange([...logs, tonight], weekStart, addDays(weekStart, 6)))).toEqual([]);
+
+      // 3. 그 분야의 지난 날(7일 안) 끝내지 않은 할 일이 있고 오늘 그 분야 할 일은 없다 → 카드는 어제 것을 건넨다
+      const mine = s.table("todos").filter((t) => t.category_id === shortId);
+      expect(mine.some((t) => t.day === today)).toBe(false);
+      const cand = mine
+        .filter((t) => t.done === false && (t.day as string) < today && (t.day as string) >= addDays(today, -7))
+        .map((t) => ({ id: t.id as string, day: t.day as string, createdAt: String(t.created_at ?? "") }));
+      expect(cand.length).toBeGreaterThan(0);
+      const picked = mine.find((t) => t.id === pickOfferTodo(cand, today))!;
+      expect(picked.day).toBe(addDays(today, -1));
+      expect(decryptTodoText(picked.text_encrypted, USER, key)).toEqual({ ok: true, text: "오픽 답변 스크립트 다듬기" });
+
+      // 5. 그 분야의 끝낸 할 일에 작업 기록 글 두 개(풀린다, 다른 용도로는 안 풀린다)
+      const notes = s.table("todo_notes");
+      expect(notes.length).toBe(2);
+      for (const n of notes) {
+        expect(mine.find((t) => t.id === n.todo_id)!.done).toBe(true);
+        expect(decryptTodoText(n.note_encrypted, USER, key, "todo_note").ok).toBe(true);
+        expect(decryptTodoText(n.note_encrypted, USER, key).ok).toBe(false);
+      }
+    });
+  }
+
+  it("월요일은 이번 주 지난 날이 없어 목표가 모자란 분야 1시간 하나뿐(0/1시간)", async () => {
+    const s = newStore();
+    await seedDemoData({ supabase: fakeTablesClient(s, { sub: USER }), userId: USER, key, today: "2026-11-09", now: fixedNow });
+    const items = s.table("weekly_goals")[0].items as { categoryId: string; minutes: number }[];
+    expect(items).toEqual([{ categoryId: demoUuid(USER, "category", DEMO_SHORT_CATEGORY_INDEX), minutes: DEMO_SHORT_MINUTES }]);
+  });
+
+  it("새벽 4시 경계: 서울 월요일 03:59는 일요일 하루, 04:00부터 월요일 — 그 하루로 계획을 세워도 같은 규칙이 선다", () => {
+    const sundayLate = todoDayFor(new Date("2026-11-08T18:59:00.000Z")); // 서울 11-09 03:59
+    const mondayStart = todoDayFor(new Date("2026-11-08T19:00:00.000Z")); // 서울 11-09 04:00
+    expect([sundayLate, mondayStart]).toEqual(["2026-11-08", "2026-11-09"]);
+    for (const today of [sundayLate, mondayStart]) {
+      const plan = buildDemoPlan(USER, today);
+      expect(plan.weekStart).toBe(weekStartFor(today));
+      expect(plan.eveningLogs.some((l) => l.targetDay >= today)).toBe(false);
+      expect(plan.todos.some((t) => t.day === today && t.categoryIndex === DEMO_SHORT_CATEGORY_INDEX)).toBe(false);
+    }
+    expect(buildDemoPlan(USER, sundayLate).weeklyGoals.length).toBe(4);
+    expect(buildDemoPlan(USER, mondayStart).weeklyGoals.length).toBe(1);
+  });
+
+  it("오늘이 어느 날이든(60일 훑기) 모자란 몫은 늘 하나, 오늘 그 분야 할 일은 없고 어제는 끝내지 않은 것이 있다", () => {
+    for (let i = 0; i < 60; i += 1) {
+      const today = addDays("2026-09-01", i);
+      const plan = buildDemoPlan(USER, today);
+      const totals = DEMO_CATEGORIES.map((_, c) =>
+        plan.eveningLogs.filter((l) => l.targetDay >= plan.weekStart).reduce((sum, l) => sum + (l.items.find((it) => it.categoryIndex === c)?.minutes ?? 0), 0),
+      );
+      for (const g of plan.weeklyGoals) {
+        const expected = g.categoryIndex === DEMO_SHORT_CATEGORY_INDEX ? DEMO_SHORT_MINUTES : 0;
+        expect(g.minutes - totals[g.categoryIndex], today).toBe(expected);
+      }
+      expect(plan.todos.some((t) => t.day === today && t.categoryIndex === DEMO_SHORT_CATEGORY_INDEX), today).toBe(false);
+      expect(plan.todos.some((t) => t.day === addDays(today, -1) && t.categoryIndex === DEMO_SHORT_CATEGORY_INDEX && !t.done), today).toBe(true);
     }
   });
 });
