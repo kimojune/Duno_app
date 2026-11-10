@@ -55,7 +55,7 @@ async function runContext(
     const clickedAt = Date.now();
     await page.locator("button.demo-start").click({ timeout: 30_000 });
     const todoTab = page.getByRole("button", { name: "할 일 적기" });
-    // 체험 화면의 오류 글 자리(components/login-button.tsx: p.demo-error, role=alert). 글이 있는 것만(Next 경로 안내기의 빈 알림은 잡지 않는다)
+    // 체험 화면의 오류 글 자리(components/login-button.tsx: p.demo-error, role=alert). Next 경로 안내기의 빈 알림은 이 선택자(p.demo-error)가 거른다. hasText는 글이 있는 것만 남기는 덧붙임
     const alert = page.locator("p.demo-error[role=alert]").filter({ hasText: /\S/ });
     const which = await Promise.race([
       todoTab.waitFor({ timeout: 60_000 }).then(() => "ok" as const),
