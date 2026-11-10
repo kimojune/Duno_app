@@ -93,10 +93,10 @@ for (const [state, width, height] of [
 
 /** 고침11-2 검토 고침 1·2·7: 보이는 간격 · 카드 높이 · 포커스 고리 상자 · 누름 영역을 지난 날(L1) · 알림 붙음(L3) · 이미 목록(L6) · 분야만(L8) 카드로 잰다 */
 const STATES = [
-  { id: "fix11-k1", label: "L1" },
-  { id: "fix11-k3", label: "L3(알림 상자 붙음)" },
-  { id: "fix11-today", label: "L6" },
-  { id: "fix11-k6", label: "L8" },
+  { id: "fix11-l1", label: "L1" },
+  { id: "fix11-l3", label: "L3(알림 상자 붙음)" },
+  { id: "fix11-l6", label: "L6" },
+  { id: "fix11-l8", label: "L8" },
 ] as const;
 
 async function openGallery(page: Page, id: string) {
@@ -142,16 +142,18 @@ for (const s of STATES) {
   });
 }
 
-test("카드 L3은 L1보다 알림 상자(44) + 위 여백 12 = 56 높다(명세 198 − 142). 카드 전체 높이 142 · 198은 카드 틀(안쪽 여백 · 제목/글 줄 쌓기) 차이로 맞지 않는다 — 23 QA 몫(현재 L1 112)", async ({ page }) => {
-  await openGallery(page, "fix11-k1");
+test("카드 L3은 L1보다 알림 상자(44) + 위 여백 12 = 56 높다. 카드 전체 높이는 Figma 노드 값 L1 142 · L3 198(틀을 맞춘 뒤, 고침11-2 틀)", async ({ page }) => {
+  await openGallery(page, "fix11-l1");
   const l1 = (await boxes(page)).card.h;
-  await openGallery(page, "fix11-k3");
+  await openGallery(page, "fix11-l3");
   const l3 = (await boxes(page)).card.h;
   expect(Math.round(l3 - l1), "L3 − L1").toBe(56);
+  expect(l1, "L1 카드 높이(166:150)").toBe(142);
+  expect(l3, "L3 카드 높이(166:348)").toBe(198);
 });
 
 test("카드 단추 포커스 고리: 보이는 40 채움 둘레(상자 안쪽 -2) · 2px", async ({ page }) => {
-  await openGallery(page, "fix11-k1");
+  await openGallery(page, "fix11-l1");
   const btn = page.locator('.entry-card[aria-label="오늘 먼저 할 일"] button').first();
   await page.keyboard.press("Tab");
   await btn.focus();

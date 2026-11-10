@@ -4,6 +4,7 @@ import { APP_CONFIG } from "../lib/app-config";
 import { needsAddToToday, writtenDayLine } from "../lib/offers/logic";
 import type { Offer } from "../lib/offers/types";
 import { todoDayFor } from "../lib/todos/day";
+import { categoryColorValue } from "../lib/category-color";
 import { Notice, PrimaryButton, TextButton } from "./ui";
 
 /**
@@ -51,6 +52,7 @@ export function OfferCard({
   running = false,
   onOpenTimer,
   today = todoDayFor(new Date()),
+  categoryColor = categoryColorValue(null),
 }: {
   offer: Offer;
   busy: boolean;
@@ -75,18 +77,21 @@ export function OfferCard({
   onOpenTimer?: () => void;
   /** 오늘(두노 하루). 건넨 할 일이 이보다 앞선 날 것이면 추가 꼴로 보인다 */
   today?: string;
+  /** 분야 점 색(분야 색 값). 분야 순서를 아는 호출처가 넘기고, 모르면 기타 색 */
+  categoryColor?: string;
 }) {
   const minutes = APP_CONFIG.timerMinutes;
   const text = offer.todoText ?? `${offer.categoryName} ${minutes}분`;
   const head = (
     <>
+      <span className="offer-dot" style={{ background: categoryColor }} aria-hidden="true" />
       <p className="entry-title">{OFFER_TEXT.title(offer.categoryName)}</p>
       <p className="offer-text">{text}</p>
     </>
   );
   if (running) {
     return (
-      <section className="entry-card" aria-label="오늘 먼저 할 일">
+      <section className="entry-card offer-card" aria-label="오늘 먼저 할 일">
         {head}
         <p className="todo-sub" role="status">
           {OFFER_TEXT.running}
@@ -100,7 +105,7 @@ export function OfferCard({
   if (added) {
     // L5: 주 단추·「넘기기」 없음. 포커스는 보조 길로(추가 단추가 사라지므로)
     return (
-      <section className="entry-card entry-card-stack" aria-label="오늘 먼저 할 일">
+      <section className="entry-card offer-card entry-card-stack" aria-label="오늘 먼저 할 일">
         {head}
         <p className="todo-sub offer-written offer-added" role="status">
           {OFFER_TEXT.added}
@@ -116,7 +121,7 @@ export function OfferCard({
   if (needsAddToToday(offer, today)) {
     // L1~L4: 지난 날 할 일. 「넘기기」는 추가하는 동안 막힌다
     return (
-      <section className="entry-card entry-card-stack" aria-label="오늘 먼저 할 일">
+      <section className="entry-card offer-card entry-card-stack" aria-label="오늘 먼저 할 일">
         {head}
         <p className="todo-sub offer-written">{writtenDayLine(offer.todoDay, today)}</p>
         {error && (
@@ -138,7 +143,7 @@ export function OfferCard({
   if (startEnabled) {
     // 예전(고침 11) 꼴: 이미 목록에 있는 할 일 · 분야만 → 「30분 시작」 + 「넘기기」. 시작하는 동안 「넘기기」 막힘
     return (
-      <section className="entry-card" aria-label="오늘 먼저 할 일">
+      <section className="entry-card offer-card" aria-label="오늘 먼저 할 일">
         {head}
         {error && (
           <Notice role="alert" className="notice-compact">
@@ -159,7 +164,7 @@ export function OfferCard({
   if (offer.todoId !== null) {
     // L6: 이미 오늘 목록에 있는 할 일
     return (
-      <section className="entry-card entry-card-stack" aria-label="오늘 먼저 할 일">
+      <section className="entry-card offer-card entry-card-stack" aria-label="오늘 먼저 할 일">
         {head}
         <p className="todo-sub offer-written">{OFFER_TEXT.inList}</p>
         <div className="detail-actions">
@@ -173,7 +178,7 @@ export function OfferCard({
   }
   // L8: 분야만 건넬 때(건넬 할 일이 없다)
   return (
-    <section className="entry-card" aria-label="오늘 먼저 할 일">
+    <section className="entry-card offer-card" aria-label="오늘 먼저 할 일">
       {head}
       <div className="detail-actions">
         <PrimaryButton onClick={onCompose}>{OFFER_TEXT.composeFor(offer.categoryName)}</PrimaryButton>

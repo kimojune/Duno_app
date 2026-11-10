@@ -829,6 +829,19 @@ select.input { appearance: auto; }
 .entry-card .offer-secondary { padding-inline: 14px; border-radius: 8px; }
 .entry-card .offer-secondary:focus-visible { outline-offset: -6px; }
 .entry-card > .btn { margin-left: auto; }
+/* 고침11-2 틀(PM d-241, Figma 166:150): 먼저 할 일 카드만(.offer-card). 「오늘 기록」 입구(.entry-card-button)는 그대로.
+   흰 바탕 · 위 8 · 좌우 16 · 아래 12. 분야 점 10(윤곽 1) 카드 위에서 15, 제목 12 Regular 줄 16(점 오른쪽 6), 건넨 할 일 16 Bold 줄 24(제목 아래 6),
+   줄 20(적은 날 · 상태), 단추 줄은 위 글에서 16(분야만 L8은 14, 상태 글이 있는 K7은 글 위 2). 세로로 쌓고 왼쪽에 맞춘다 */
+.entry-card.offer-card { position: relative; flex-direction: column; flex-wrap: nowrap; align-items: stretch; row-gap: 0; padding: var(--space-2) var(--space-4) var(--space-3); background: var(--color-surface); }
+.entry-card.offer-card > .offer-dot { position: absolute; top: 15px; left: var(--space-4); box-sizing: border-box; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }
+.entry-card.offer-card > .entry-title { flex: none; margin: 0 0 0 16px; font: 400 0.75rem/1rem var(--font-family); font-weight: 400; color: var(--color-text-sub); }
+.entry-card.offer-card > .offer-text { flex: none; margin: 6px 0 0; font: 700 1rem/1.5rem var(--font-family); color: var(--color-text); }
+.entry-card.offer-card > .todo-sub { flex: none; margin: 0; }
+.entry-card.offer-card > .offer-text + .todo-sub { margin-top: 2px; } /* K7 상태 글(157:799)은 건넨 할 일 아래 2 */
+.entry-card.offer-card > .offer-text + .offer-written { margin-top: 0; } /* 적은 날 · 넣은 결과 · 목록에 있음 줄은 바로 아래(간격 0) */
+.entry-card.offer-card > .notice { flex: none; margin: var(--space-3) 0 0; }
+.entry-card.offer-card > .detail-actions, .entry-card.offer-card.entry-card-stack > .detail-actions, .entry-card.offer-card.entry-card-stack > .notice + .detail-actions { flex: none; align-self: flex-start; margin: var(--space-4) 0 0; }
+.entry-card.offer-card > .offer-text + .detail-actions { margin-top: 14px; } /* L8: 건넨 할 일 아래 14(166:904) */
 
 /* ---- 원샷 v2 ③: 아래 탭·상태보기·분야 페이지. 새 색 없음 ---- */
 .app-shell { min-height: 100dvh; }

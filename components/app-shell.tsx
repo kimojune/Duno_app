@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { APP_CONFIG } from "../lib/app-config";
+import { categoryColorValue } from "../lib/category-color";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
 import { defaultGoalsApi } from "../lib/goals-api";
@@ -642,6 +643,7 @@ function MainShell({
               {cardOffer && (
                 <OfferCard
                   offer={cardOffer}
+                  categoryColor={categoryColorValue(cardOffer.categoryId === null ? null : (() => { const at = meCategoriesNow.findIndex((c) => c.id === cardOffer.categoryId); return at >= 0 ? at : null; })())}
                   busy={cardBusy}
                   error={cardError}
                   running={timerRunning}
