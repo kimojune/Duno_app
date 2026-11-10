@@ -815,8 +815,7 @@ select.input { appearance: auto; }
 /* 고침 11 K1: 적은 날 줄(14 보조)은 건넨 할 일 바로 아래 한 줄을 다 쓴다 */
 .entry-card > .offer-written { flex: 1 1 100%; margin: 0; }
 .entry-card > .offer-added { color: var(--color-text); } /* L5 「오늘 할 일에 넣었어요」 14 Regular #1C2340(166:554) */
-/* 고침 11-2: 카드 안 단추는 40 · 14 Medium(채움 PrimaryButton, 카드 안에서만), 「넘기기」는 주 단추 끝에서 16, 줄 사이는 12·16(적은 날 줄 → 알림 12, 알림 → 단추 줄 16) */
-.entry-card .btn-primary { min-height: 40px; padding-block: 0; font: 500 0.875rem/1.25rem var(--font-family); }
+/* 고침 11-2: 카드 단추는 앱 현행 PrimaryButton 그대로(누를 곳 48 규칙, 22 결정: 명세 40·14는 23 QA에 넘김). 「넘기기」는 주 단추 끝에서 16, 줄 사이는 12·16(적은 날 줄 → 알림 12, 알림 → 단추 줄 16) */
 .entry-card .detail-actions { gap: var(--space-4); }
 .entry-card-stack > .notice { margin: var(--space-2) 0 var(--space-3); }
 .entry-card-stack > .detail-actions { margin-top: var(--space-3); }
