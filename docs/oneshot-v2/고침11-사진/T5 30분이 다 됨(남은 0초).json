@@ -42,6 +42,15 @@
       "minorWidth": "1px",
       "majorStroke": "rgb(28, 35, 64)",
       "majorWidth": "2px",
+      "minorRadii": [
+        126,
+        132
+      ],
+      "majorRadii": [
+        120,
+        132
+      ],
+      "labelRadius": 146.00025205457695,
       "labels": [
         "0",
         "5",
@@ -110,17 +119,20 @@
     {
       "item": "「남은 시간」 상자 위쪽이 판 가운데에서 위로",
       "spec": "29",
-      "screen": "28"
+      "screen": "28",
+      "group": "나 23이 판단"
     },
     {
       "item": "숫자 상자 위쪽이 판 가운데에서 위로",
       "spec": "11",
-      "screen": "12"
+      "screen": "12",
+      "group": "나 23이 판단"
     },
     {
       "item": "끝내기 단추 너비",
       "spec": "320",
-      "screen": "82"
+      "screen": "82",
+      "group": "나 23이 판단"
     }
   ]
 }

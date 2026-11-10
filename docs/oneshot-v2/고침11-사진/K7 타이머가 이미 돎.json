@@ -3,6 +3,11 @@
   "node": "157:698",
   "data": "11-13 12:00 · 「토익 단어 50개」 · 어학 · 오늘 목록에 있음 · 타이머 도는 중",
   "measured": {
+    "gaps": {
+      "writtenToNotice": null,
+      "noticeToActions": null
+    },
+    "dot": null,
     "headerDay": "11월 13일 금요일",
     "card": {
       "x": 16,
@@ -82,22 +87,32 @@
     {
       "item": "카드 x",
       "spec": "20",
-      "screen": "16"
+      "screen": "16",
+      "group": "가 현행 꼴"
     },
     {
       "item": "카드 너비",
       "spec": "320",
-      "screen": "328"
+      "screen": "328",
+      "group": "가 현행 꼴"
     },
     {
       "item": "카드 바탕(--color-surface)",
       "spec": "#FFFFFF",
-      "screen": "rgb(243, 238, 230)"
+      "screen": "rgb(243, 238, 230)",
+      "group": "가 현행 꼴"
     },
     {
       "item": "머리 날짜 글(요일)",
       "spec": "11월 13일 목요일",
-      "screen": "11월 13일 금요일"
+      "screen": "11월 13일 금요일",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "카드 높이",
+      "spec": "144",
+      "screen": "128",
+      "group": "가 현행 꼴"
     }
   ]
 }

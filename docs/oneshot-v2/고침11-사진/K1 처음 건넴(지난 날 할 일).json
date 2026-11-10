@@ -3,6 +3,11 @@
   "node": "157:60",
   "data": "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음",
   "measured": {
+    "gaps": {
+      "writtenToNotice": null,
+      "noticeToActions": null
+    },
+    "dot": null,
     "headerDay": "11월 13일 금요일",
     "card": {
       "x": 16,
@@ -98,72 +103,104 @@
     {
       "item": "머리 날짜 글(요일)",
       "spec": "11월 13일 목요일",
-      "screen": "11월 13일 금요일"
+      "screen": "11월 13일 금요일",
+      "group": "가 현행 꼴"
     },
     {
       "item": "카드 x",
       "spec": "20",
-      "screen": "16"
+      "screen": "16",
+      "group": "가 현행 꼴"
     },
     {
       "item": "카드 너비",
       "spec": "320",
-      "screen": "328"
+      "screen": "328",
+      "group": "가 현행 꼴"
     },
     {
       "item": "카드 바탕(--color-surface)",
       "spec": "#FFFFFF",
-      "screen": "rgb(243, 238, 230)"
+      "screen": "rgb(243, 238, 230)",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "분야 점 10×10(제목 옆)",
+      "spec": "10×10",
+      "screen": "없음",
+      "group": "가 현행 꼴"
     },
     {
       "item": "제목 글자 크기",
       "spec": "12px",
-      "screen": "16px"
+      "screen": "16px",
+      "group": "가 현행 꼴"
     },
     {
       "item": "제목 색",
       "spec": "rgb(94, 100, 120)",
-      "screen": "rgb(28, 35, 64)"
+      "screen": "rgb(28, 35, 64)",
+      "group": "가 현행 꼴"
     },
     {
       "item": "건넨 할 일 굵기",
       "spec": "700",
-      "screen": "400"
+      "screen": "400",
+      "group": "가 현행 꼴"
     },
     {
       "item": "넘기기 누름 영역 너비",
       "spec": "63",
-      "screen": "68"
+      "screen": "68",
+      "group": "가 현행 꼴"
     },
     {
       "item": "넘기기 누름 영역 높이",
       "spec": "40",
-      "screen": "48"
+      "screen": "48",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "단추 너비(명세 84는 윤곽 단추 기준)",
+      "spec": "84",
+      "screen": "162.88",
+      "group": "가 현행 꼴"
     },
     {
       "item": "단추 높이",
       "spec": "40",
-      "screen": "48"
+      "screen": "48",
+      "group": "가 현행 꼴"
     },
     {
       "item": "단추 바탕",
       "spec": "rgb(255, 255, 255)",
-      "screen": "rgb(28, 35, 64)"
+      "screen": "rgb(28, 35, 64)",
+      "group": "가 현행 꼴"
     },
     {
       "item": "단추 윤곽",
       "spec": "1.5px solid rgb(28, 35, 64)",
-      "screen": "1px solid rgb(28, 35, 64)"
+      "screen": "1px solid rgb(28, 35, 64)",
+      "group": "가 현행 꼴"
     },
     {
       "item": "단추 글자 크기",
       "spec": "14px",
-      "screen": "16px"
+      "screen": "16px",
+      "group": "가 현행 꼴"
     },
     {
       "item": "단추 글 색",
       "spec": "rgb(28, 35, 64)",
-      "screen": "rgb(255, 255, 255)"
+      "screen": "rgb(255, 255, 255)",
+      "group": "가 현행 꼴"
+    },
+    {
+      "item": "카드 높이",
+      "spec": "142",
+      "screen": "108",
+      "group": "가 현행 꼴"
     }
   ]
 }
