@@ -19,8 +19,9 @@ export type Offer = {
   state: "new" | "dismissed" | "started";
 };
 
-/** offer가 null이면 건네지 않은 것: no_target = 건넬 분야가 없음(비율·목표 없음) */
-export type OfferRequestResult = { offer: Offer | null; reason?: "no_target" };
+/** offer가 null이면 건네지 않은 것 */
+/** reason: no_target = 건넬 분야 없음, done = 그날 건넨 카드가 가리키는 할 일을 끝냈거나 지워서 카드를 접었다(새 제시 없음) */
+export type OfferRequestResult = { offer: Offer | null; reason?: "no_target" | "done" };
 export type DismissedOffer = { id: string };
 
 /**

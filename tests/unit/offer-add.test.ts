@@ -169,14 +169,16 @@ describe("addOfferTodoForUser — 정상", () => {
     expect(store.table("todo_offers")).toHaveLength(1);
   });
 
-  it("사본을 오늘 끝내면 카드는 다시 정하는 대로 돌아간다(사본이 끝난 제시는 재사용하지 않는다)", async () => {
+  it("사본을 오늘 끝내면 그날 카드는 접힌다(offer null · 이유 done), 새 제시 줄은 없다 — 고침 11-2: 끝냄을 먼저 할 일을 했다로 본다", async () => {
     const { store, todo } = setup();
     todo(T1, "어제 단어", C1, "2026-11-06");
     const offer = await cardOffer(store);
     await addOfferTodoForUser(deps(store), { offerId: offer.id });
     store.table("todos").find((t) => t.id === offerCopyId(offer.id))!.done = true;
     const again = await requestOfferForUser(deps(store), { surface: "card" });
-    expect(again.ok && again.data.offer?.todoId).toBe(T1);
+    expect(again).toEqual({ ok: true, data: { offer: null, reason: "done" } });
+    await requestOfferForUser(deps(store), { surface: "card" });
+    expect(store.table("todo_offers")).toHaveLength(1);
   });
 
   it("타이머 탭 추천은 카드 제시와 따로 센다(사본 재사용은 카드에만)", async () => {

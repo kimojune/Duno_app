@@ -62,6 +62,16 @@ export async function startFocusForUser(deps: FocusDeps, input: unknown): Promis
     const day = resolveWriteDay(now, v.clientStartedAt);
     const categoryId = v.categoryId ?? null;
 
+    // 제시 번호는 자기 제시이고 오늘 것이며 켠 자리(surface)와 같은 자리의 제시여야 한다(분자 부풀리기 막기, 고침 11-2).
+    // 남의 제시·없는 제시는 not_found, 자리가 다르거나 지난 날 제시는 invalid_input. 같은 id의 재시도는 아래에서 그 행으로 성공한다.
+    if (v.offerId) {
+      const offerRow = await deps.supabase.from("todo_offers").select("id, day, surface").eq("id", v.offerId).eq("user_id", user.data).limit(1);
+      if (offerRow.error) return recordFail(mapRecordDbError(offerRow.error));
+      const found = ((offerRow.data ?? []) as { id: string; day: string; surface: string }[])[0];
+      if (!found) return recordFail("not_found");
+      if (found.surface !== v.surface || found.day !== day) return recordFail("invalid_input");
+    }
+
     // 시작하는 순간의 이번 주 기록으로 반대편 여부를 정한다
     const weekStart = weekStartFor(day);
     const [logs, settings, goal] = await Promise.all([

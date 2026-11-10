@@ -17,6 +17,7 @@ import type { AddedTodo, TodayTodos, TodoDay, TodoItem, TodoResult } from "../li
 import { checkTodoText, countTodoChars } from "../lib/todos/validation";
 import { useAnnouncer } from "../lib/use-announcer";
 import { useOnline } from "../lib/use-online";
+import { useReducedMotion } from "../lib/use-reduced-motion";
 import { cancelConfirmOnBack } from "../lib/use-overlay-window";
 import {
   categoryAddedText,
@@ -127,6 +128,23 @@ async function safely<T>(call: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * 먼저 할 일 카드와 목록이 주고받는 것(고침 11-2). 모두 선택이다.
+ * - tagId: 꼬리표 「오늘 먼저」를 붙일 줄(카드가 가리키는 오늘 할 일).
+ * - reveal: seq가 바뀔 때마다 그 줄로 스크롤하고 잠깐 강조한다(2초 뒤 0.4초 페이드, 움직임 줄이기면 스크롤 즉시·페이드 없음). focus면 포커스도 그 줄로.
+ * - compose: seq가 바뀔 때마다 적는 창을 그 분야를 골라 둔 채 연다. todoId는 거기서 만드는 할 일의 id(제시 id에서 정한 식).
+ * - onRows: 목록을 읽은 뒤·바뀔 때마다 줄을 알린다(카드가 가리키는 할 일의 끝냄·지움·새로 적음을 알아보게).
+ */
+export type CardBridge = {
+  tagId: string | null;
+  reveal: { id: string; seq: number; focus: boolean } | null;
+  compose: { seq: number; categoryId: string | null; todoId: string } | null;
+  onRows: (rows: { id: string; text: string | null; done: boolean; categoryId: string | null }[]) => void;
+};
+
+const FLASH_ON_MS = 2000;
+const FLASH_FADE_MS = 400;
+
 type ListState = "loading" | "ready" | "error" | "locked";
 
 /** 서버가 넘긴 처음 결과로 목록 상태를 정한다(load가 결과를 받았을 때와 같은 규칙). 없으면 불러오는 중. */
@@ -164,7 +182,10 @@ export function TodoScreen({
   onLogoutConfirmChange,
   local,
   refreshKey = 0,
+  card,
 }: {
+  /** 먼저 할 일 카드와 주고받는 것(꼬리표 · 강조 · 분야만 적기 · 줄 알림) */
+  card?: CardBridge;
   /** 고침 5바퀴(선택, 예전 방식): 값이 바뀔 때마다 목록을 조용히 다시 읽는다(오늘 기록의 「오늘 할 일」 시트에서 적거나 체크한 뒤) */
   refreshKey?: number;
   /** 기기 먼저 저장(고침 3바퀴, 선택): 있으면 쓰기는 기기에 먼저 반영하고 읽기는 기기 거울에서 한다. 없으면 예전 방식 그대로 */
@@ -472,9 +493,12 @@ export function TodoScreen({
 
   // ---- 창 열고 닫기(C-D2, C-D8) ----
 
+  /** 카드의 「{분야} 할 일 적기」로 연 창이 만들 첫 할 일의 id(제시 id에서 정한 식). 창을 닫으면 버린다 */
+  const composeIdRef = useRef<string | null>(null);
   const closeSheet = useCallback((via: "button" | "esc" | "popstate") => {
     if (!sheetOpenRef.current) return;
     sheetOpenRef.current = false;
+    composeIdRef.current = null;
     // 닫을 때 포커스가 목록(체크 칸 등)에 있었으면 그대로 둔다. 아니면 단추로.
     const active = document.activeElement;
     const keepFocus = active instanceof HTMLElement && active.closest(".todo-main") !== null;
@@ -516,6 +540,59 @@ export function TodoScreen({
     flushSync(() => setSheetOpen(true));
     (newCategoryOpen ? newCategoryInputRef : inputRef).current?.focus();
   }
+
+  // ---- 먼저 할 일 카드(고침 11-2): 「{분야} 할 일 적기」 · 「목록에서 보기」 · 줄 알림 ----
+  const reducedMotion = useReducedMotion();
+  const composeSeq = card?.compose?.seq ?? 0;
+  const handledComposeRef = useRef(0);
+  useEffect(() => {
+    const c = card?.compose;
+    if (!c || handledComposeRef.current === c.seq) return;
+    handledComposeRef.current = c.seq;
+    composeIdRef.current = c.todoId;
+    setSelectedCategoryId(c.categoryId);
+    selectedCategoryRef.current = c.categoryId;
+    openSheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeSeq]);
+
+  const handledRevealRef = useRef(0);
+  const flashTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const reveal = card?.reveal ?? null;
+  useEffect(() => {
+    if (!reveal || handledRevealRef.current === reveal.seq) return;
+    const el = document.getElementById(`row-${reveal.id}`);
+    if (!el) return; // 줄이 아직 목록에 없다: 줄이 들어오면(rows) 다시 본다
+    handledRevealRef.current = reveal.seq;
+    el.scrollIntoView?.({ block: "center", behavior: reducedMotion ? "auto" : "smooth" });
+    if (reveal.focus) {
+      el.focus({ preventScroll: true });
+      el.classList.add("todo-row-ring"); // 포커스 고리 2px(마우스로 눌러 연 뒤에도 보이게 클래스로)
+      el.addEventListener("blur", () => el.classList.remove("todo-row-ring"), { once: true });
+    }
+    el.classList.remove("todo-row-fade");
+    el.classList.add("todo-row-flash");
+    const timers = flashTimersRef.current;
+    if (reducedMotion) {
+      timers.push(setTimeout(() => el.classList.remove("todo-row-flash"), FLASH_ON_MS));
+    } else {
+      timers.push(setTimeout(() => el.classList.add("todo-row-fade"), FLASH_ON_MS));
+      timers.push(setTimeout(() => el.classList.remove("todo-row-flash", "todo-row-fade"), FLASH_ON_MS + FLASH_FADE_MS));
+    }
+  }, [reveal, rows, reducedMotion]);
+  useEffect(() => {
+    const timers = flashTimersRef.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  const onRowsRef = useRef(card?.onRows);
+  useLayoutEffect(() => {
+    onRowsRef.current = card?.onRows;
+  });
+  useEffect(() => {
+    if (list !== "ready") return;
+    onRowsRef.current?.(rows.map((r) => ({ id: r.id, text: r.text, done: r.done, categoryId: r.categoryId ?? null })));
+  }, [rows, list]);
 
   /** 적는 창을 바꿨나: 할 일 칸·새 분야 칸에 글이 있거나(띄어쓰기만이면 없음) 분야를 기타가 아닌 것으로 골랐다(PM d-150 가, 23 133:2) */
   function sheetHasDraft(): boolean {
@@ -855,7 +932,8 @@ export function TodoScreen({
       // 기기 먼저 저장: 서버 왕복을 기다리지 않는다. 기기 거울에 먼저 적히고(목록이 바로 바뀐다) 서버에는 보낼 줄이 뒤에서 보낸다
       const categoryId =
         selectedCategoryId && readableChips().some((c) => c.id === selectedCategoryId) ? selectedCategoryId : null;
-      const id = crypto.randomUUID(); // 새로 적는 글마다 새 id (D4)
+      const id = composeIdRef.current ?? crypto.randomUUID(); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 첫 글은 제시 id에서 정한 id
+      composeIdRef.current = null;
       scrollToRef.current = id;
       local.addTodo({ id, text: checked.text, categoryId });
       setDraft(""); // 첫 누름에 칸을 비운다: 연타하면 둘째부터 빈 칸
@@ -877,7 +955,8 @@ export function TodoScreen({
     // C-D6: 그때 고른 분야 번호(없거나 분야를 못 불러왔으면 기타). 칩에 보이는 분야만 보낸다
     const categoryId =
       selectedCategoryId && readableChips().some((c) => c.id === selectedCategoryId) ? selectedCategoryId : null;
-    const id = crypto.randomUUID(); // 새로 적는 글마다 새 id (D4)
+    const id = composeIdRef.current ?? crypto.randomUUID(); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 첫 글은 제시 id에서 정한 id
+    composeIdRef.current = null;
     pendingTextRef.current.set(id, checked.text);
     pendingCategoryRef.current.set(id, categoryId);
     scrollToRef.current = id;
@@ -1241,6 +1320,7 @@ export function TodoScreen({
     category: categoryText(r.categoryId),
     categoryColor: categoryColorOf(r.categoryId),
     hasNotes: r.status === "saved" && r.hasNotes === true,
+    firstTag: card?.tagId != null && r.id === card.tagId,
   }));
   const chips: ChipView[] = categories.filter((c): c is ChipView => c.name !== null);
   const unsavedRows = rows.some((r) => r.status !== "saved");
@@ -1340,7 +1420,7 @@ export function TodoScreen({
               </Notice>
             )}
             {topSlot}
-            {manage && list === "ready" && <CarryOver api={manage} online={online || manage.localFirst === true} onCarried={onCarried} />}
+            {manage && list === "ready" && <CarryOver api={manage} online={online || manage.localFirst === true} onCarried={onCarried} refreshKey={card?.reveal?.seq ?? 0} />}
           </>
         ) : undefined
       }

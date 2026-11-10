@@ -179,7 +179,12 @@ export type RowView = {
   hasNotes?: boolean;
   /** 분야 색(분야 점, Figma 50:52). 없으면 점 없이 이름만 */
   categoryColor?: string;
+  /** 오늘 먼저 할 일 카드가 가리키는 줄: 꼬리표 「오늘 먼저」(고침 11-2). 카드를 넘기면 뗀다 */
+  firstTag?: boolean;
 };
+
+/** 카드가 가리키는 줄의 꼬리표 글 */
+export const FIRST_TAG_TEXT = "오늘 먼저";
 
 /** 칩 하나(풀 수 있는 이름만. 풀 수 없는 분야는 칩에 보이지 않는다, 12-7) */
 export type ChipView = { id: string; name: string };
@@ -363,7 +368,7 @@ export function SavePending({ id }: { id?: string }) {
 }
 
 /** 목록 줄의 분야 표시. 기타(분야 없음)는 붙이지 않는다. 화면 읽기용으로 앞에 「분야 」 */
-export function CategoryTag({ id, name, color }: { id: string; name: string; color?: string }) {
+export function CategoryTag({ id, name, color, children }: { id: string; name: string; color?: string; children?: ReactNode }) {
   return (
     <div className="category-tag-line">
       {/* 고침9 Figma 50:52: 분야 점(10, 1px 윤곽) + 이름 12 보조. 색만으로 가르지 않는다(이름이 늘 함께) */}
@@ -372,6 +377,7 @@ export function CategoryTag({ id, name, color }: { id: string; name: string; col
         <span className="sr-only">{TODO_TEXT.categoryPrefix}</span>
         {name}
       </span>
+      {children}
     </div>
   );
 }
@@ -387,11 +393,17 @@ function Row({
   const statusId = `todo-status-${row.id}`;
   const tagId = `todo-tag-${row.id}`;
   const noteId = `todo-note-${row.id}`;
+  const firstId = `todo-first-${row.id}`;
   // 저장 중·저장 못 한 줄은 서버에 아직 없다: 체크 칸은 보이되 눌러도 바뀌지 않고, 그 줄의 안내에 잇는다
   const notSaved = row.saving || row.failed || row.queued === true || row.pending === true;
-  const describedBy = [row.category ? tagId : null, row.hasNotes ? noteId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
+  const describedBy = [row.category ? tagId : null, row.firstTag ? firstId : null, row.hasNotes ? noteId : null, notSaved ? statusId : null].filter(Boolean).join(" ");
+  const firstTag = row.firstTag ? (
+    <span id={firstId} className="first-tag">
+      {FIRST_TAG_TEXT}
+    </span>
+  ) : null;
   return (
-    <li className="todo-row" id={`row-${row.id}`}>
+    <li className="todo-row" id={`row-${row.id}`} tabIndex={-1}>
       <label className="check-hit">
         <input
           type="checkbox"
@@ -410,7 +422,13 @@ function Row({
           {row.hasNotes && <NoteIcon id={noteId} />}
         </p>
         {/* C-D6: 저장 중 줄에도 분야 표시를 바로 그린다 */}
-        {row.category && <CategoryTag id={tagId} name={row.category} color={row.categoryColor} />}
+        {row.category ? (
+          <CategoryTag id={tagId} name={row.category} color={row.categoryColor}>
+            {firstTag}
+          </CategoryTag>
+        ) : (
+          firstTag && <div className="category-tag-line">{firstTag}</div>
+        )}
         {/* 늘 그린다(체크 칸 aria-describedby가 가리킨다). 처음 SAVING_HINT_DELAY_MS 동안은 화면 읽기용으로만 있다 */}
         {row.saving && (
           <p id={statusId} className={row.savingSlow ? "todo-sub" : "todo-sub sr-only"}>

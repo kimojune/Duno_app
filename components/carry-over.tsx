@@ -31,10 +31,13 @@ export function CarryOver({
   api,
   online,
   onCarried,
+  refreshKey = 0,
 }: {
   api: ManageApi;
   online: boolean;
   onCarried: (todos: TodoItem[]) => void;
+  /** 바뀔 때마다 어제 못 끝낸 목록을 다시 읽는다(카드의 「오늘 할 일에 추가」가 어제 것을 오늘로 넣은 뒤 n이 줄게, 고침 11-2) */
+  refreshKey?: number;
 }) {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -58,7 +61,7 @@ export function CarryOver({
     return () => {
       alive = false;
     };
-  }, [api]);
+  }, [api, refreshKey]);
 
   if (items.length === 0) return loaded ? null : <div className="slot-carry" aria-hidden="true" />;
 

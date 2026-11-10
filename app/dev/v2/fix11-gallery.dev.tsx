@@ -124,7 +124,7 @@ function TodoTab({ todos, card }: { todos: TodoItem[]; card: ReactNode }) {
 
 const card = (over: Partial<Parameters<typeof OfferCard>[0]> & { o?: Partial<Offer> } = {}) => {
   const { o, ...rest } = over;
-  return <OfferCard offer={offer(o)} busy={false} error={null} today={TODAY} onStart={noop} onAdd={noop} onDismiss={noop} {...rest} />;
+  return <OfferCard offer={offer(o)} busy={false} error={null} today={TODAY} onAdd={noop} onDismiss={noop} {...rest} />;
 };
 
 function session(over: Partial<FocusSession>): FocusSession {

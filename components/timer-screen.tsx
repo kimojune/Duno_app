@@ -89,7 +89,7 @@ export function TimerScreen({
    * 「오늘 할 일에 추가」 뒤(고침 11, K9): 그 할 일을 골라 두고 안내 상자를 위에 보인다. 타이머는 켜지 않는다(시작은 사용자가, D-092).
    * 새 객체가 오면 그때마다 골라 두고 포커스를 이 탭 제목으로 옮긴다. 사용자가 다른 줄을 고르면 안내는 사라진다.
    */
-  added?: { todoId: string; text: string | null } | null;
+  added?: { todoId: string; text: string | null; /** 카드 제시 번호: 이 할 일로 켜면 분자는 이 번호 · surface card로 센다(고침 11-2) */ offerId?: string } | null;
 }) {
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 시작·끝내기를 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
   const online = useOnline() || api.localFirst === true;
@@ -198,8 +198,10 @@ export function TimerScreen({
     const fromRecommendation =
       !!recommended &&
       (todo !== undefined ? recommended.todoId === todo.id : recommended.todoId === null && categoryId === recommended.categoryId);
-    const surface: FocusSurface = fromRecommendation ? "timer_tab" : "manual";
-    const offerId = fromRecommendation ? (recommended?.offerId ?? null) : null;
+    // 카드의 「타이머에서 시작 ›」로 들어와 골라 둔 그 할 일로 켠 것은 카드 제시로 센다(surface card · 카드 제시 번호)
+    const fromCard = !!added?.offerId && todo !== undefined && todo.id === added.todoId;
+    const surface: FocusSurface = fromCard ? "card" : fromRecommendation ? "timer_tab" : "manual";
+    const offerId = fromCard ? (added?.offerId ?? null) : fromRecommendation ? (recommended?.offerId ?? null) : null;
     // 같은 고름으로 다시 누르면 같은 id(서버가 한 번만 만든다)
     const key = JSON.stringify([todo?.id ?? null, categoryId, surface, offerId]);
     const id = startKeyRef.current?.key === key ? startKeyRef.current.id : crypto.randomUUID();

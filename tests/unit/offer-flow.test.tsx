@@ -85,7 +85,7 @@ afterEach(() => {
 });
 
 describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
-  it("앱을 열면 카드 제시를 한 번 받고, 「오늘 먼저 할 일 · 분야」와 할 일·단추가 보인다", async () => {
+  it("앱을 열면 카드 제시를 한 번 받고, 「오늘 먼저 할 일 · 분야」와 할 일·단추가 보인다(오늘 목록에 있는 할 일: 「목록에서 보기」 · 「넘기기」, 카드에 「30분 시작」은 없다 — 고침 11-2)", async () => {
     const offers = offersApi();
     await mount({ offers, focus: focusApi() });
     expect(offers.request).toHaveBeenCalledTimes(1);
@@ -93,13 +93,16 @@ describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
     const card = screen.getByRole("region", { name: "오늘 먼저 할 일" });
     expect(card.textContent).toContain("오늘 먼저 할 일 · 어학");
     expect(card.textContent).toContain("단어 외우기");
-    expect(screen.getByRole("button", { name: "30분 시작" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "넘기기" })).toBeTruthy();
+    expect(card.textContent).toContain("오늘 할 일 목록에 있어요");
+    expect(within(card).getAllByRole("button").map((b) => b.textContent)).toEqual(["목록에서 보기", "넘기기"]);
+    expect(screen.queryByRole("button", { name: "30분 시작" })).toBeNull();
   });
 
-  it("할 일이 없으면 분야와 길이만 건넨다", async () => {
-    await mount({ offers: offersApi(offer({ todoId: null, todoText: null })), focus: focusApi() });
-    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" }).textContent).toContain("어학 30분");
+  it("할 일이 없으면 분야와 길이만 건네고, 주 단추는 「{분야} 할 일 적기」(L8)다. 「30분 시작」은 없다", async () => {
+    await mount({ offers: offersApi(offer({ todoId: null, todoText: null, todoDay: null })), focus: focusApi() });
+    const card = screen.getByRole("region", { name: "오늘 먼저 할 일" });
+    expect(card.textContent).toContain("어학 30분");
+    expect(within(card).getAllByRole("button").map((b) => b.textContent)).toEqual(["어학 할 일 적기", "넘기기"]);
   });
 
   it("건네지 않는 경우(건넬 분야 없음·이미 넘김·이미 켬)에는 카드가 없다", async () => {
@@ -108,44 +111,6 @@ describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
       await mount({ offers: offersApi(card), focus: focusApi() });
       expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
     }
-  });
-
-  it("「30분 시작」: 건넨 것으로 타이머를 켜고(card, 제시 번호) 타이머 탭으로 가며 카드는 거둔다", async () => {
-    const focus = focusApi();
-    await mount({ offers: offersApi(), focus });
-    await press("30분 시작");
-    expect(focus.start).toHaveBeenCalledWith({
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      todoId: T1,
-      categoryId: C1,
-      offerId: OFFER_ID,
-      surface: "card",
-      clientStartedAt: expect.any(String),
-    });
-    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
-    expect(screen.getByRole("button", { name: "타이머" }).getAttribute("aria-current")).toBe("page");
-  });
-
-  it("시작이 실패하면 안내를 보이고 카드는 남으며, 다시 누르면 같은 id", async () => {
-    const start = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, error: "unavailable" })
-      .mockImplementation(async (input: FocusStartInput) => ({ ok: true, data: { session: session({ id: input.id }), serverNow: new Date().toISOString() } }));
-    await mount({ offers: offersApi(), focus: focusApi({ start }) });
-    await press("30분 시작");
-    expect(screen.getByText("시작하지 못했어요. 다시 눌러 주세요.")).toBeTruthy();
-    expect(screen.getByRole("region", { name: "오늘 먼저 할 일" })).toBeTruthy();
-    await press("30분 시작");
-    expect(start.mock.calls[0][0].id).toBe(start.mock.calls[1][0].id);
-  });
-
-  it("오프라인이면 켜지 않고 안내한다", async () => {
-    const focus = focusApi();
-    await mount({ offers: offersApi(), focus });
-    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
-    await press("30분 시작");
-    expect(focus.start).not.toHaveBeenCalled();
-    expect(within(screen.getByRole("region", { name: "오늘 먼저 할 일" })).getByText("인터넷에 연결되면 시작할 수 있어요.")).toBeTruthy();
   });
 
   it("「넘기기」: 카드를 거두고 넘김을 기록한다(타이머는 켜지 않는다)", async () => {
@@ -201,19 +166,7 @@ describe("카드 다시 받기·타이머가 돌 때 (A13·B3)", () => {
     expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
   });
 
-  it("서버가 이미 진행 중이라고 답하면 「시작하지 못했어요」 대신 타이머 탭 안내가 보이고 시작 단추가 없다", async () => {
-    const start = vi.fn(async () => ({ ok: false as const, error: "already_running" as const }));
-    await mount({ offers: offersApi(), focus: focusApi({ start }) });
-    await press("30분 시작");
-    const card = screen.getByRole("region", { name: "오늘 먼저 할 일" });
-    expect(within(card).getByText("타이머가 돌고 있어요. 타이머 탭에서 볼 수 있어요.")).toBeTruthy();
-    expect(screen.queryByText("시작하지 못했어요. 다시 눌러 주세요.")).toBeNull();
-    expect(screen.queryByRole("button", { name: "30분 시작" })).toBeNull();
-    await press("타이머 탭 열기");
-    expect(screen.getByRole("button", { name: "타이머" }).getAttribute("aria-current")).toBe("page");
-  });
-
-  it("타이머 탭이 도는 타이머를 알려 주면 카드는 안내로 바뀌고, 끝내면 시작 단추가 돌아온다", async () => {
+  it("타이머 탭이 도는 타이머를 알려 주면 카드는 안내(K7)로 바뀌고, 끝내면 주 단추 「목록에서 보기」가 돌아온다", async () => {
     const running = session({ startedAt: new Date().toISOString() });
     let active: FocusSession | null = running;
     const focus = focusApi({
@@ -231,7 +184,7 @@ describe("카드 다시 받기·타이머가 돌 때 (A13·B3)", () => {
     await press("타이머");
     await press("끝내기");
     await press("할 일");
-    expect(screen.getByRole("button", { name: "30분 시작" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "목록에서 보기" })).toBeTruthy();
   });
 });
 

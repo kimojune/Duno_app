@@ -67,9 +67,11 @@ export async function requestOfferForUser(deps: OfferDeps, input: unknown): Prom
 
     // 「오늘 할 일에 추가」로 오늘 사본을 만든 카드 제시가 있으면 새 제시 줄을 만들지 않고 그 원래 제시를 사본과 함께 돌려준다(분모는 한 번, 고침 11)
     if (surface === "card") {
-      const reused = await readCopiedCardOffer(deps, user.data, key, day, categories.data.categories);
-      if (!reused.ok) return recordFail(reused.error);
-      if (reused.offer) return { ok: true, data: { offer: reused.offer } };
+      const linked = await readCardLink(deps, user.data, key, day, categories.data.categories);
+      if (!linked.ok) return recordFail(linked.error);
+      if (linked.link.kind === "reuse") return { ok: true, data: { offer: linked.link.offer } };
+      // 가리키는 할 일이 끝났거나 없다: 그날 카드를 접는다(새 제시 줄 없음)
+      if (linked.link.kind === "fold") return { ok: true, data: { offer: null, reason: "done" } };
     }
 
     const target = pickOfferCategory({
@@ -157,69 +159,85 @@ export async function dismissOfferForUser(deps: Pick<OfferDeps, "supabase" | "no
 
 type CategoryList = CategoryItem[];
 
+type CardLink = { kind: "none" } | { kind: "reuse"; offer: Offer } | { kind: "fold" };
+
 /**
- * 오늘의 카드 제시(넘기지 않음) 가운데 「오늘 할 일에 추가」로 만든 오늘 사본이 있는 것을 찾는다.
- * 사본 id는 제시 id에서 정해지므로(offerCopyId) 제시 줄은 고치지 않고도 사본을 알아본다. 사본이 오늘 것이고 끝나지 않았을 때만 쓴다.
+ * 오늘의 카드 제시(넘기지 않음)가 가리키는 오늘 할 일을 본다(고침 11-2, d-232).
+ * 사본 id는 제시 id에서 정해지므로(offerCopyId) 제시 줄은 고치지 않고도 연결을 알아본다:
+ * - 그 id의 오늘 할 일(같은 분야)이 있고 끝나지 않았으면 reuse: 제시를 그 할 일과 함께 돌려준다(지난 날 할 일의 「추가」 사본, 분야만 제시에서 적은 새 할 일 둘 다).
+ * - 그 사본이 끝났거나, 제시가 가리킨 할 일이 끝났거나 지워졌으면 fold: 그날 카드를 접는다(새 제시 줄을 만들지 않는다. 끝냄을 「먼저 할 일을 했다」로 본다).
+ * - 그 밖(지난 날 할 일을 아직 안 넣음 · 분야만 제시에 할 일이 아직 없음)은 none: 평소대로 정한다.
+ * 가장 최근에 건넨 제시부터 보고 처음 정해진 것을 따른다.
  */
-async function readCopiedCardOffer(
+async function readCardLink(
   deps: Pick<OfferDeps, "supabase">,
   userId: string,
   key: TodoKey,
   day: string,
   categories: CategoryList,
-): Promise<{ ok: true; offer: Offer | null } | { ok: false; error: DbCode }> {
+): Promise<{ ok: true; link: CardLink } | { ok: false; error: DbCode }> {
   const offersRes = await deps.supabase
     .from("todo_offers")
-    .select(OFFER_COLUMNS)
+    .select(`${OFFER_COLUMNS}, offered_at`)
     .eq("user_id", userId)
     .eq("day", day)
     .eq("surface", "card")
     .is("dismissed_at", null)
     .limit(50);
   if (offersRes.error) return { ok: false, error: mapRecordDbError(offersRes.error) };
-  const rows = ((offersRes.data ?? []) as OfferRow[]).filter((r) => r.todo_id !== null);
-  const rowOfCopy = new Map<string, OfferRow>();
+  const rows = ((offersRes.data ?? []) as (OfferRow & { offered_at?: string })[]).sort((a, b) => {
+    const x = a.offered_at ?? "";
+    const y = b.offered_at ?? "";
+    return x === y ? (a.id < b.id ? -1 : 1) : x < y ? 1 : -1;
+  });
+  if (rows.length === 0) return { ok: true, link: { kind: "none" } };
+  const wanted = new Set<string>();
   for (const r of rows) {
-    const id = offerCopyId(r.id);
-    if (id) rowOfCopy.set(id, r);
+    const copy = offerCopyId(r.id);
+    if (copy) wanted.add(copy);
+    if (r.todo_id) wanted.add(r.todo_id);
   }
-  if (rowOfCopy.size === 0) return { ok: true, offer: null };
   const todosRes = await deps.supabase
     .from("todos")
-    .select("id, day, text_encrypted")
+    .select("id, day, done, category_id, text_encrypted")
     .eq("user_id", userId)
-    .in("id", [...rowOfCopy.keys()])
-    .eq("day", day)
-    .eq("done", false)
-    .limit(50);
+    .in("id", [...wanted])
+    .limit(100);
   if (todosRes.error) return { ok: false, error: mapRecordDbError(todosRes.error) };
-  // 사본이 여럿이면(분야가 다른 제시 둘 등) 제시 번호가 작은 쪽을 먼저 쓴다(늘 같은 답)
-  const copies = ((todosRes.data ?? []) as { id: string; day: string; text_encrypted: string }[]).sort((a, b) =>
-    rowOfCopy.get(a.id)!.id < rowOfCopy.get(b.id)!.id ? -1 : 1,
-  );
-  for (const copy of copies) {
-    const row = rowOfCopy.get(copy.id)!;
-    const category = row.category_id === null ? { readable: true, name: "기타" } : categories.find((c) => c.id === row.category_id);
-    if (!category || !category.readable) continue;
-    const opened = decryptTodoText(copy.text_encrypted, userId, key);
-    const state = await offerState(deps, userId, row);
-    if (!state.ok) return state;
-    return {
-      ok: true,
-      offer: {
-        id: row.id,
-        surface: "card",
-        day: row.day,
-        categoryId: row.category_id,
-        categoryName: category.name,
-        todoId: copy.id,
-        todoText: opened.ok ? opened.text : null,
-        todoDay: copy.day,
-        state: state.state,
-      },
-    };
+  const byId = new Map(((todosRes.data ?? []) as { id: string; day: string; done: boolean; category_id: string | null; text_encrypted: string }[]).map((t) => [t.id, t]));
+  for (const row of rows) {
+    const copy = byId.get(offerCopyId(row.id) ?? "");
+    if (copy && copy.day === day && (copy.category_id ?? null) === (row.category_id ?? null)) {
+      if (copy.done) return { ok: true, link: { kind: "fold" } };
+      const category = row.category_id === null ? { readable: true as const, name: "기타" } : categories.find((c) => c.id === row.category_id);
+      if (!category || !category.readable) continue;
+      const opened = decryptTodoText(copy.text_encrypted, userId, key);
+      const state = await offerState(deps, userId, row);
+      if (!state.ok) return state;
+      return {
+        ok: true,
+        link: {
+          kind: "reuse",
+          offer: {
+            id: row.id,
+            surface: "card",
+            day: row.day,
+            categoryId: row.category_id,
+            categoryName: category.name,
+            todoId: copy.id,
+            todoText: opened.ok ? opened.text : null,
+            todoDay: copy.day,
+            state: state.state,
+          },
+        },
+      };
+    }
+    if (row.todo_id) {
+      const origin = byId.get(row.todo_id);
+      if (!origin || origin.done) return { ok: true, link: { kind: "fold" } };
+    }
   }
-  return { ok: true, offer: null };
+  return { ok: true, link: { kind: "none" } };
 }
 
 const addSchema = z.object({ offerId: z.uuid() }).strict();

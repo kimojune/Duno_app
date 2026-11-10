@@ -73,7 +73,6 @@ function OfferOnly({ text }: { text: string | null }) {
       offer={{ id: "o2", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: text ? "t-long" : null, todoText: text, todoDay: null, state: "new" }}
       busy={false}
       error={null}
-      onStart={noop}
       onDismiss={noop}
     />
   );
@@ -90,7 +89,6 @@ function TopCards() {
         offer={{ id: "o1", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: null, todoText: null, todoDay: null, state: "new" }}
         busy={false}
         error={null}
-        onStart={noop}
         onDismiss={noop}
       />
       <EveningEntry onOpen={noop} />

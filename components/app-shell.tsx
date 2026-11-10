@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
@@ -15,6 +15,8 @@ import { createLocalTodos, type LocalTodos } from "../lib/local/todos";
 import type { Runtime } from "../lib/local/runtime";
 import type { ArchivedWrite } from "../lib/local/types";
 import { clearOtherOutboxes, createOutbox, safeLocalStorage, type Outbox } from "../lib/outbox";
+import { offerCopyId } from "../lib/offers/copy-id";
+import { needsAddToToday } from "../lib/offers/logic";
 import type { Offer } from "../lib/offers/types";
 import { defaultSettingsApi } from "../lib/onboarding-api";
 import { msUntilNextDayStart, todoDayFor } from "../lib/todos/day";
@@ -36,7 +38,7 @@ import { OfferCard } from "./offer-card";
 import { Onboarding, pushOutcomeText, type OnboardingResult } from "./onboarding";
 import { TabBar, type TabId } from "./tab-bar";
 import { TimerScreen } from "./timer-screen";
-import { TodoScreen } from "./todo-screen";
+import { TodoScreen, type CardBridge } from "./todo-screen";
 import { TODO_TEXT } from "./todo-view";
 import { Notice, TextButton } from "./ui";
 
@@ -303,9 +305,19 @@ function MainShell({
   const [goalVersion, setGoalVersion] = useState(0);
   const [goalEditor, setGoalEditor] = useState<GoalSummary | null>(null);
   // 「오늘 할 일에 추가」 뒤 타이머 탭이 골라 둘 할 일과 안내(K9). 타이머 탭을 떠나면 비운다
-  const [addedTodo, setAddedTodo] = useState<{ todoId: string; text: string | null } | null>(null);
-  const cardStartRef = useRef<string | null>(null);
+  const [addedTodo, setAddedTodo] = useState<{ todoId: string; text: string | null; offerId?: string } | null>(null);
+  // 방금 「오늘 할 일에 추가」를 눌렀다(L5 카드): 할 일 탭에 머물고, 탭을 떠나거나 앱을 다시 열 때까지 남는다
+  const [cardAdded, setCardAdded] = useState(false);
+  // 목록에 요청: 줄로 스크롤·강조(·포커스) / 적는 창을 분야를 골라 둔 채 열기. seq가 바뀔 때마다 한 번
+  const [revealReq, setRevealReq] = useState<CardBridge["reveal"]>(null);
+  const [composeReq, setComposeReq] = useState<CardBridge["compose"]>(null);
+  const requestSeqRef = useRef(0);
   const cardAddingRef = useRef(false);
+  const cardRef = useRef<Offer | null>(null);
+  useLayoutEffect(() => {
+    cardRef.current = cardOffer;
+  });
+  const seenRowsRef = useRef(new Set<string>());
   // 탭 줄의 실제 높이(B9): 글자가 커져 두 줄이 되면 본문 아래 여백도 따라 늘린다
   const { shellRef, shellStyle } = useTabbarHeight();
 
@@ -388,8 +400,9 @@ function MainShell({
 
   /** 탭을 연다. 상태보기는 열 때마다 다시 읽고 본 것을 한 번 남긴다(입구와 함께) */
   function openTab(next: TabId, entry: ViewEntry = "self") {
-    // 타이머 탭을 떠나면 「오늘 할 일에 넣었어요」 안내는 사라진다(임시)
+    // 타이머 탭을 떠나면 「오늘 할 일에 넣었어요」 안내는 사라진다(임시). 할 일 탭을 떠나면 카드의 L5 꼴도 끝난다(그 뒤는 L6)
     if (next !== "timer") setAddedTodo(null);
+    if (next !== "todo") setCardAdded(false);
     if (next === "growth") {
       setGrowthEntry(entry);
       setGrowthActivation((n) => n + 1);
@@ -416,42 +429,7 @@ function MainShell({
     };
   }, [meActivation, local]);
 
-  async function startFromCard() {
-    const offer = cardOffer;
-    if (!offer || cardBusy) return;
-    if (typeof navigator !== "undefined" && !navigator.onLine && !local) {
-      setCardError("offline");
-      return;
-    }
-    // 같은 제시로 다시 누르면 같은 id(서버가 한 번만 만든다)
-    const id = cardStartRef.current ?? crypto.randomUUID();
-    cardStartRef.current = id;
-    setCardBusy(true);
-    setCardError(null);
-    const res = await apis.focus.start({
-      id,
-      todoId: offer.todoId,
-      categoryId: offer.categoryId,
-      offerId: offer.id,
-      surface: "card",
-      clientStartedAt: new Date().toISOString(),
-    });
-    setCardBusy(false);
-    if (res.ok) {
-      cardStartRef.current = null;
-      setCardOffer(null);
-      setTimerRunning(true);
-      openTab("timer");
-    } else if (res.error === "already_running") {
-      // 이미 돌고 있는 타이머가 있다: 「시작하지 못했어요」를 반복하지 않고 타이머 탭을 안내한다
-      cardStartRef.current = null;
-      setTimerRunning(true);
-    } else {
-      setCardError("failed");
-    }
-  }
-
-  /** 「오늘 할 일에 추가」: 지난 날 할 일을 오늘 할 일로 복사하고 타이머 탭에서 골라 둔다. 타이머는 켜지 않는다(시작은 사용자가, D-092) */
+  /** 「오늘 할 일에 추가」: 지난 날 할 일을 오늘 할 일로 복사한다. 할 일 탭에 머문다. 타이머는 켜지 않는다(시작은 사용자가, D-092) */
   const refreshCardNow = useCallback(async () => {
     const res = await apis.offers.request("card");
     if (!res.ok) return;
@@ -473,10 +451,12 @@ function MainShell({
       const res = await apis.offers.addTodo(offer.id);
       if (res.ok && res.data.added) {
         const { todoId, todoText, day } = res.data;
-        // 카드는 그 사본으로 현행 「30분 시작」 꼴이 된다(같은 제시)
+        // 카드는 그 사본을 가리키고(같은 제시) L5 꼴(「오늘 할 일에 넣었어요」 · 「타이머에서 시작 ›」)이 된다. 할 일 탭에 머문다
         setCardOffer((prev) => (prev && prev.id === offer.id ? { ...prev, todoId, todoText: todoText ?? prev.todoText, todoDay: day } : prev));
-        setAddedTodo({ todoId, text: todoText ?? offer.todoText });
-        openTab("timer");
+        setCardAdded(true);
+        setTodoRefresh((n) => n + 1); // 새 줄이 목록에 들어오고, 「어제 못 끝낸 할 일」 n이 하나 준다
+        requestSeqRef.current += 1;
+        setRevealReq({ id: todoId, seq: requestSeqRef.current, focus: false });
       } else if (res.ok || res.error === "not_found") {
         // 원본이 그새 끝났거나 지워졌다(다른 탭·기기): 사본을 만들지 않고 카드를 다시 받는다
         await refreshCardNow();
@@ -497,6 +477,59 @@ function MainShell({
     todoTitleFocus();
     await apis.offers.dismiss(offer.id);
   }
+
+  /** 「타이머에서 시작 ›」: 타이머 탭으로 가서 그 할 일을 골라 둔다(시작은 사용자가). 켜면 카드 제시로 센다 */
+  function startInTimerFromCard() {
+    const offer = cardOffer;
+    if (!offer || offer.todoId === null) return;
+    setAddedTodo({ todoId: offer.todoId, text: offer.todoText, offerId: offer.id });
+    openTab("timer");
+  }
+
+  /** 「목록에서 보기」: 그 줄로 스크롤 · 강조 · 포커스 */
+  function showCardTodoInList() {
+    const offer = cardOffer;
+    if (!offer || offer.todoId === null) return;
+    requestSeqRef.current += 1;
+    setRevealReq({ id: offer.todoId, seq: requestSeqRef.current, focus: true });
+  }
+
+  /** 「{분야} 할 일 적기」: 적는 창을 그 분야를 골라 둔 채 연다. 만드는 할 일의 id는 제시 id에서 정한 식(서버가 그 id로 제시와 잇는다) */
+  function composeFromCard() {
+    const offer = cardOffer;
+    const todoId = offer ? offerCopyId(offer.id) : null;
+    if (!offer || todoId === null) return;
+    requestSeqRef.current += 1;
+    setComposeReq({ seq: requestSeqRef.current, categoryId: offer.categoryId, todoId });
+  }
+
+  /** 목록 줄을 받아 카드가 가리키는 할 일을 맞춘다: 분야만 카드가 가리킬 새 할 일이 생기면 잇고(L8 → L6), 끝내거나 지우면 그날 카드를 접는다(K8) */
+  const onTodoRows = useCallback<CardBridge["onRows"]>(
+    (rows) => {
+      for (const r of rows) seenRowsRef.current.add(r.id);
+      const card = cardRef.current;
+      if (!card) return;
+      const patchMirrorCard = (next: Offer | null) => {
+        local?.runtime.patchBase((m) => (m.offers.card?.id === card.id ? { ...m, offers: { ...m.offers, card: next } } : m));
+      };
+      if (card.todoId === null) {
+        const copyId = offerCopyId(card.id);
+        const row = copyId ? rows.find((r) => r.id === copyId && !r.done && r.categoryId === card.categoryId) : undefined;
+        if (row) {
+          const linked: Offer = { ...card, todoId: row.id, todoText: row.text, todoDay: todoDayFor(new Date()) };
+          setCardOffer(linked);
+          patchMirrorCard(linked);
+        }
+        return;
+      }
+      const row = rows.find((r) => r.id === card.todoId);
+      if ((row && row.done) || (!row && seenRowsRef.current.has(card.todoId))) {
+        setCardOffer(null); // 끝냈거나 지웠다: 그날 카드를 접는다(서버도 새 제시 없이 접는다)
+        patchMirrorCard(null);
+      }
+    },
+    [local],
+  );
 
   const meCategoriesNow = local ? readableMirrorCategories(local.runtime.getMirror()) : (meCategories ?? readableCategories(initial));
   const recommended = timerOffer
@@ -533,6 +566,12 @@ function MainShell({
           logoutRequest={logoutRequest}
           onLogoutConfirmChange={setLogoutConfirmOpen}
           refreshKey={todoRefresh}
+          card={{
+            tagId: cardOffer && cardOffer.todoId !== null && !needsAddToToday(cardOffer, todoDayFor(new Date())) ? cardOffer.todoId : null,
+            reveal: revealReq,
+            compose: composeReq,
+            onRows: onTodoRows,
+          }}
           topSlot={
             <>
               {rejectedCount > 0 && (
@@ -570,8 +609,11 @@ function MainShell({
                   error={cardError}
                   running={timerRunning}
                   onOpenTimer={() => openTab("timer")}
-                  onStart={() => void startFromCard()}
+                  added={cardAdded}
                   onAdd={() => void addFromCard()}
+                  onStartInTimer={startInTimerFromCard}
+                  onShowInList={showCardTodoInList}
+                  onCompose={composeFromCard}
                   onDismiss={() => void dismissCard()}
                 />
               )}
