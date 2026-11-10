@@ -139,6 +139,12 @@ export function withCategories(initial: TodayRead, added: Entry[]): TodayRead {
 }
 
 /** 읽을 수 있는 분야(보관 안 한 것) */
+/** 먼저 할 일 카드 분야 점 색: 읽을 수 있는 분야 목록에서의 자리(없으면 기타 색) */
+function cardCategoryColor(categoryId: string | null, list: Entry[]): string {
+  const at = categoryId === null ? -1 : list.findIndex((c) => c.id === categoryId);
+  return categoryColorValue(at >= 0 ? at : null);
+}
+
 function readableCategories(initial: TodayRead): Entry[] {
   return initial.categories.ok ? initial.categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])) : [];
 }
@@ -643,7 +649,7 @@ function MainShell({
               {cardOffer && (
                 <OfferCard
                   offer={cardOffer}
-                  categoryColor={categoryColorValue(cardOffer.categoryId === null ? null : (() => { const at = meCategoriesNow.findIndex((c) => c.id === cardOffer.categoryId); return at >= 0 ? at : null; })())}
+                  categoryColor={cardCategoryColor(cardOffer.categoryId, meCategoriesNow)}
                   busy={cardBusy}
                   error={cardError}
                   running={timerRunning}

@@ -84,13 +84,15 @@ for (const [id, label, height] of STATES) {
   test(`카드 틀 ${label}: 높이 ${height} · 흰 바탕 · 모서리 16 · 안쪽 위 8 왼쪽 16 · 점 10 · 제목 12/16 · 건넨 할 일 16 Bold/24`, async ({ page }) => {
     await open(page, `/dev/v2?s=${id}`);
     const f = await frame(page);
-    // K7 상태 글(157:799)은 Figma 노드가 288 안 한 줄(20)로 그려졌지만 앱 글(14px, 안쪽 296)은 두 줄로 감겨 한 줄(20)만큼 더 높다.
-    // 글이 길어 줄이 느는 것이라 높이도 느는 것이 정상이다(보고에 적음). 한 줄로 들어가면 노드 값 144와 같아야 한다.
-    const extra = await page.evaluate((sel) => {
-      const el = document.querySelector(`${sel} > .todo-sub`);
-      return el ? Math.round(el.getBoundingClientRect().height) - 20 : 0;
-    }, CARD);
-    expect(f.box.h, `${label} 카드 높이`).toBe(height + extra);
+    // K7: Figma 157:799는 상태 글을 288 안 한 줄(20)로 그렸지만 앱 글(14px, 약 330px)은 안쪽 296을 넘어 정확히 두 줄(40)로 감긴다
+    // → 카드는 노드 144보다 20 높은 164다(글이 너비를 넘은 것 · 23 QA 몫). 줄 수와 상관없이 통과하지 않게 값을 그대로 단언한다.
+    if (id === "fix11-k7") {
+      const status = await page.evaluate((sel) => document.querySelector(`${sel} > .todo-sub`)!.getBoundingClientRect().height, CARD);
+      expect(status, "K7 상태 글 높이(두 줄)").toBe(40);
+      expect(f.box.h, `${label} 카드 높이(두 줄)`).toBe(164);
+    } else {
+      expect(f.box.h, `${label} 카드 높이`).toBe(height);
+    }
     expect(f.bg).toBe("rgb(255, 255, 255)");
     expect(f.radius).toBe("16px");
     expect(f.padTop).toBe(8);

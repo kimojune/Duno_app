@@ -834,7 +834,7 @@ select.input { appearance: auto; }
    줄 20(적은 날 · 상태), 단추 줄은 위 글에서 16(분야만 L8은 14, 상태 글이 있는 K7은 글 위 2). 세로로 쌓고 왼쪽에 맞춘다 */
 .entry-card.offer-card { position: relative; flex-direction: column; flex-wrap: nowrap; align-items: stretch; row-gap: 0; padding: var(--space-2) var(--space-4) var(--space-3); background: var(--color-surface); }
 .entry-card.offer-card > .offer-dot { position: absolute; top: 15px; left: var(--space-4); box-sizing: border-box; inline-size: 10px; block-size: 10px; border-radius: 50%; border: 1px solid var(--color-chart-outline, var(--color-text)); }
-.entry-card.offer-card > .entry-title { flex: none; margin: 0 0 0 16px; font: 400 0.75rem/1rem var(--font-family); font-weight: 400; color: var(--color-text-sub); }
+.entry-card.offer-card > .entry-title { flex: none; margin: 0 0 0 16px; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
 .entry-card.offer-card > .offer-text { flex: none; margin: 6px 0 0; font: 700 1rem/1.5rem var(--font-family); color: var(--color-text); }
 .entry-card.offer-card > .todo-sub { flex: none; margin: 0; }
 .entry-card.offer-card > .offer-text + .todo-sub { margin-top: 2px; } /* K7 상태 글(157:799)은 건넨 할 일 아래 2 */
