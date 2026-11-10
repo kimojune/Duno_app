@@ -167,7 +167,7 @@ type CardLink = { kind: "none" } | { kind: "reuse"; offer: Offer } | { kind: "fo
  * - 그 id의 오늘 할 일(같은 분야)이 있고 끝나지 않았으면 reuse: 제시를 그 할 일과 함께 돌려준다(지난 날 할 일의 「추가」 사본, 분야만 제시에서 적은 새 할 일 둘 다).
  * - 그 사본이 끝났거나, 제시가 가리킨 할 일이 끝났거나 지워졌으면 fold: 그날 카드를 접는다(새 제시 줄을 만들지 않는다. 끝냄을 「먼저 할 일을 했다」로 본다).
  * - 그 밖(지난 날 할 일을 아직 안 넣음 · 분야만 제시에 할 일이 아직 없음)은 none: 평소대로 정한다.
- * 가장 최근에 건넨 제시부터 보고 처음 정해진 것을 따른다.
+ * 가장 최근에 건넨 제시부터 보고 처음 정해진 것을 따른다(접는 것은 가장 최근 제시에만 건다).
  */
 async function readCardLink(
   deps: Pick<OfferDeps, "supabase">,
@@ -205,10 +205,15 @@ async function readCardLink(
     .limit(100);
   if (todosRes.error) return { ok: false, error: mapRecordDbError(todosRes.error) };
   const byId = new Map(((todosRes.data ?? []) as { id: string; day: string; done: boolean; category_id: string | null; text_encrypted: string }[]).map((t) => [t.id, t]));
-  for (const row of rows) {
+  // 접는 것은 가장 최근에 건넨 카드 제시만 본다(오래된 제시가 가리키던 할 일이 지워졌다고 새로 정할 카드까지 접지 않는다). 살아 있는 사본은 어느 제시 것이든 잇는다.
+  for (const [index, row] of rows.entries()) {
+    const latest = index === 0;
     const copy = byId.get(offerCopyId(row.id) ?? "");
     if (copy && copy.day === day && (copy.category_id ?? null) === (row.category_id ?? null)) {
-      if (copy.done) return { ok: true, link: { kind: "fold" } };
+      if (copy.done) {
+        if (latest) return { ok: true, link: { kind: "fold" } };
+        continue;
+      }
       const category = row.category_id === null ? { readable: true as const, name: "기타" } : categories.find((c) => c.id === row.category_id);
       if (!category || !category.readable) continue;
       const opened = decryptTodoText(copy.text_encrypted, userId, key);
@@ -234,7 +239,7 @@ async function readCardLink(
     }
     if (row.todo_id) {
       const origin = byId.get(row.todo_id);
-      if (!origin || origin.done) return { ok: true, link: { kind: "fold" } };
+      if (latest && (!origin || origin.done)) return { ok: true, link: { kind: "fold" } };
     }
   }
   return { ok: true, link: { kind: "none" } };

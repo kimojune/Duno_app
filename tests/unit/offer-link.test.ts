@@ -178,3 +178,17 @@ describe("분자: 타이머는 카드 제시 id · surface card로 센다(서버
     expect(ok.ok).toBe(true);
   });
 });
+
+describe("접는 것은 가장 최근 제시만 본다", () => {
+  it("오래된 제시가 가리키던 오늘 할 일이 지워졌어도 더 최근 제시가 살아 있으면 접지 않는다", async () => {
+    const { store, todo } = setup();
+    todo(T1, "오늘 단어", C1, "2026-11-07");
+    const older = (await card(store)).offer!;
+    expect(older.todoId).toBe(T1);
+    // 더 최근 제시(다른 분야, 아직 할 일 없음)를 직접 심는다
+    store.seed("todo_offers", { id: "0a0a0a0a-0a0a-40a0-80a0-0a0a0a0a0a0a", user_id: ME, day: "2026-11-07", surface: "card", category_id: C2, todo_id: null, offer_key: "card|c2|-", offered_at: "2099-01-01T00:00:00.000Z", dismissed_at: null });
+    store.tables["todos"] = []; // 오래된 제시의 할 일이 지워졌다
+    const res = await requestOfferForUser(deps(store), { surface: "card" });
+    expect(res.ok && res.data.reason).not.toBe("done");
+  });
+});

@@ -9,8 +9,8 @@ import { accountA, contextFor, markOnboardingDone, nodeClient, pollUntil, sessio
 
 /**
  * 고침 11: 먼저 할 일 카드 「오늘 할 일에 추가」의 실제 흐름(운영 빌드 + duno_dev 시험 계정 A).
- *  - 어제 적은 할 일이 카드로 건너오고(「어제 적은 할 일」), 누르면(연타해도) 오늘 할 일이 하나만 생기고 타이머 탭에서 골라져 있다. 타이머는 켜지지 않는다(focus_sessions 그대로).
- *  - 할 일 탭으로 돌아오면 카드는 그 사본의 「30분 시작」 꼴이고 카드 제시 줄은 늘지 않는다. /?open=offer로 열면 할 일 탭 맨 위에 카드가 있다.
+ *  - (고침 11-2) 어제 적은 할 일이 카드로 건너오고, 누르면(연타해도) 오늘 할 일이 하나만 생기며 할 일 탭에 머문다(새 줄 꼬리표 · 「타이머에서 시작 ›」). 보조 길을 누르면 타이머 탭에서 골라져 있다. 타이머는 켜지지 않는다(focus_sessions 그대로).
+ *  - 돌아오면 카드는 「목록에서 보기」 꼴이고 카드 제시 줄은 늘지 않는다. /?open=offer로 열면 할 일 탭 맨 위에 카드가 있다.
  * 시험이 만드는 것: 어제 날짜의 할 일 하나(오늘 쓴 시험 글의 암호문을 복사), 이번 주 목표 한 줄(분야 하나) — 끝나면 지우고 되돌린다.
  * 제시 줄·타이머 기록은 쌓기만 하는 표라 지울 수 없다(제시는 넘김으로 닫는다). 이 시험은 타이머를 켜지 않는다.
  */
@@ -25,7 +25,7 @@ async function count(client: SupabaseClient, table: "focus_sessions"): Promise<n
   return (res.data ?? []).length;
 }
 
-test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 · 타이머 안 켜짐 · 돌아오면 「30분 시작」 · /?open=offer", async ({ browser }) => {
+test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 · 할 일 탭에 머묾 · 보조 길 → 타이머 탭 · 돌아오면 「목록에서 보기」 · /?open=offer", async ({ browser }) => {
   test.setTimeout(240_000);
   const env = loadIntegrationEnv();
   const A = accountA(env);
@@ -35,6 +35,9 @@ test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 
   const yesterday = addDays(today, -1);
   const weekStart = weekStartFor(today);
   const beforeTodos = await ids(nodeA, "todos");
+
+  // 앞선 시험·사용이 남긴 오늘의 열린 카드 제시는 닫아 둔다(가장 최근 제시가 가리키던 할 일이 지워졌으면 그날 카드가 접히므로)
+  await nodeA.from("todo_offers").update({ dismissed_at: new Date().toISOString() }).eq("surface", "card").eq("day", today).is("dismissed_at", null);
 
   const goalBefore = await nodeA.from("weekly_goals").select("items").eq("week_start", weekStart);
   const hadGoal = ((goalBefore.data ?? []) as { items: unknown }[])[0]?.items ?? null;
@@ -101,13 +104,25 @@ test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 
     const s = await skip.boundingBox();
     expect(a && s && Math.abs(a.y - s.y) < 8, "두 단추가 한 줄").toBe(true);
 
-    // 4) 연타 → 타이머 탭, 골라져 있고 안내가 있다. 타이머는 안 켜진다
-    // 연타: 같은 순간에 세 번 누른다(마우스를 세 번 옮겨 누르면 탭이 바뀐 뒤의 클릭이 다른 곳을 눌러 포커스를 흐리므로 DOM 클릭으로)
+    // 4) 연타 → 할 일 탭에 머문다: 카드는 「오늘 할 일에 넣었어요」 · 「타이머에서 시작 ›」 하나, 새 줄에 꼬리표, 타이머는 안 켜진다
+    // 연타: 같은 순간에 세 번 누른다(마우스를 세 번 옮겨 누르면 카드가 바뀐 뒤의 클릭이 다른 곳을 눌러 포커스를 흐리므로 DOM 클릭으로)
     await add.evaluate((el) => {
       (el as HTMLButtonElement).click();
       (el as HTMLButtonElement).click();
       (el as HTMLButtonElement).click();
     });
+    await expect(page.getByRole("button", { name: "할 일", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(card.getByText("오늘 할 일에 넣었어요")).toBeVisible({ timeout: 10_000 });
+    const toTimer = card.getByRole("button", { name: "타이머에서 시작 ›" });
+    await expect(toTimer).toBeFocused();
+    await expect(card.getByRole("button")).toHaveCount(1);
+    await expect(card.getByRole("button", { name: "30분 시작" })).toHaveCount(0);
+    const newRow = page.locator("li.todo-row", { hasText: marker });
+    await expect(newRow).toHaveCount(1, { timeout: 10_000 });
+    await expect(newRow.getByText("오늘 먼저")).toBeVisible();
+
+    // 4-2) 보조 길 → 타이머 탭, 그 할 일이 골라져 있고 안내가 있다(켜지는 않는다)
+    await toTimer.click();
     await expect(page.getByRole("button", { name: "타이머" })).toHaveAttribute("aria-current", "page", { timeout: 10_000 });
     await expect(page.getByRole("radio", { name: new RegExp(marker) })).toBeChecked();
     await expect(page.getByRole("status").filter({ hasText: `「${marker}」를 오늘 할 일에 넣었어요.` })).toBeVisible();
@@ -133,12 +148,15 @@ test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 
     expect(cardOffersAfter - cardOffersBefore, "카드 제시 줄은 한 줄만 늘었다(추가가 새 제시를 만들지 않는다)").toBe(1);
     expect(await count(nodeA, "focus_sessions"), "추가만으로는 먼저 한 기록이 남지 않는다").toBe(focusBefore);
 
-    // 6) 할 일 탭으로 돌아오면 카드는 그 사본의 현행 「30분 시작」 꼴
+    // 6) 할 일 탭으로 돌아오면 카드는 L6 꼴(목록에 있어요 · 목록에서 보기), 꼬리표는 남는다
     await page.getByRole("button", { name: "할 일", exact: true }).click();
-    await expect(card.getByRole("button", { name: "30분 시작" })).toBeVisible();
-    await expect(card.getByText("어제 적은 할 일")).toHaveCount(0);
+    await expect(card.getByText("오늘 할 일 목록에 있어요")).toBeVisible();
+    await expect(card.getByRole("button", { name: "목록에서 보기" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "30분 시작" })).toHaveCount(0);
     await expect(card.getByRole("button", { name: "오늘 할 일에 추가" })).toHaveCount(0);
-    await expect(card.getByText(marker, { exact: true })).toBeVisible();
+    await expect(newRow.getByText("오늘 먼저")).toBeVisible();
+    await card.getByRole("button", { name: "목록에서 보기" }).click();
+    await expect(newRow).toBeFocused();
 
     // 7) 새로 열어도(다른 기기처럼) 같은 제시가 그 사본으로 오고, 제시 줄은 늘지 않는다. /?open=offer는 할 일 탭 맨 위
     const ctx2 = await contextFor(browser, await sessionCookies(env, A));
@@ -147,7 +165,7 @@ test("카드 「오늘 할 일에 추가」: 연타해도 오늘 할 일 하나 
     await second.goto("/?open=offer");
     await expect(second.getByRole("button", { name: "할 일", exact: true })).toHaveAttribute("aria-current", "page", { timeout: 30_000 });
     const card2 = second.getByRole("region", { name: "오늘 먼저 할 일" });
-    await expect(card2.getByRole("button", { name: "30분 시작" })).toBeVisible({ timeout: 30_000 });
+    await expect(card2.getByRole("button", { name: "목록에서 보기" })).toBeVisible({ timeout: 30_000 });
     expect(await second.evaluate(() => window.scrollY)).toBe(0);
     const offersEnd = await nodeA.from("todo_offers").select("id").eq("surface", "card").eq("day", today);
     expect((offersEnd.data ?? []).length).toBe(cardOffersAfter);
