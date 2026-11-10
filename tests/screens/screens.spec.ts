@@ -505,10 +505,12 @@ test("C5·T5 적는 중: 할 일 칸 포커스 (키보드 없음 — 키보드�
 // 줄이는 방법(카드를 한 줄로 줄일지)은 결정 대기: docs/oneshot-v2/임시값.md 「고침 4바퀴」 절.
 const SLOT_VS_CARD_BOUNDS: Record<SizeTag, { slot: number; card: number; longCard: number }> = {
   // 측정(고침1 시점): 자리 56 · 카드 84 · 글 200자 카드 280(360 폭) / 304(320 폭). 글자 200%는 56 · 210 · 882
-  "360x640": { slot: 56, card: 84, longCard: 280 },
-  "360x800": { slot: 56, card: 84, longCard: 280 },
-  "320x640": { slot: 56, card: 84, longCard: 304 },
-  "text200-sim": { slot: 56, card: 210, longCard: 882 },
+  // 고침11-2(PM d-232) 뒤: 글 200자 카드(C31)는 이미 목록에 있는 할 일이라 L6 꼴(「오늘 할 일 목록에 있어요」 줄 20 + 글 → 줄 → 단추 줄 간격)이 되어 +28:
+  // 308(360 폭) / 332(320 폭) / 글자 200% 968. 분야만 카드(C29)는 L8 꼴로 76이라 상한 84를 그대로 둔다. 카드가 늘어나는 것을 막는 상한이라는 뜻은 그대로다
+  "360x640": { slot: 56, card: 84, longCard: 308 },
+  "360x800": { slot: 56, card: 84, longCard: 308 },
+  "320x640": { slot: 56, card: 84, longCard: 332 },
+  "text200-sim": { slot: 56, card: 210, longCard: 968 },
 };
 for (const size of ["360x640", "360x800", "320x640", "text200-sim"] as SizeTag[]) {
   test(`카드 자리와 카드 높이 ${size}: 자리(.slot-card)·먼저 할 일 카드·먼저 할 일 글 200자 카드를 같은 크기에서 잰다`, async ({ page }) => {

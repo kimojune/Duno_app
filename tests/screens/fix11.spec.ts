@@ -49,7 +49,7 @@ async function measureCard(page: Page) {
     const box = (el: Element | null) => {
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
+      return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
     };
     const css = (el: Element | null) => {
       if (!el) return null;
@@ -64,33 +64,92 @@ async function measureCard(page: Page) {
         borderTop: `${s.borderTopWidth} ${s.borderTopStyle} ${s.borderTopColor}`,
         borderRadius: s.borderTopLeftRadius,
         padding: s.padding,
+        outline: `${s.outlineWidth} ${s.outlineStyle} ${s.outlineColor}`,
+        outlineOffset: s.outlineOffset,
+      };
+    };
+    // 단추: 누름 영역 = 상자 전체(위아래 투명 테두리 4 포함), 보이는 꼴 = 테두리를 뺀 안쪽
+    const btn = (el: Element | null) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const s = getComputedStyle(el);
+      const bt = parseFloat(s.borderTopWidth);
+      const bb = parseFloat(s.borderBottomWidth);
+      return {
+        ...css(el)!,
+        x: r.x,
+        right: r.right,
+        width: r.width,
+        height: r.height - bt - bb,
+        hit: { x: r.x, y: r.y, width: r.width, height: r.height },
+        disabled: (el as HTMLButtonElement).disabled,
+        ariaBusy: el.getAttribute("aria-busy"),
       };
     };
     const headerEl = Array.from(document.querySelectorAll("p, span, h2")).find((e) => e.children.length === 0 && /^11월 13일/.test(e.textContent ?? ""));
-    const gapEls = { written: card.querySelector(".offer-written"), notice: card.querySelector(".notice"), actions: card.querySelector(".detail-actions") };
-    const dotEl = card.querySelector('[class*="dot"], [class*="Dot"]');
     const buttons = Array.from(card.querySelectorAll("button"));
-    const primary = card.querySelector(".btn-primary, .btn-secondary:not(.btn-text)");
     const skip = buttons.find((b) => (b.textContent ?? "").trim() === "넘기기") ?? null;
-    const main = buttons.find((b) => b !== skip) ?? null;
+    const secondary = card.querySelector(".offer-secondary");
+    const main = buttons.find((b) => b !== skip && b !== secondary) ?? null;
+    const written = card.querySelector(".offer-written");
     const notice = card.querySelector(".notice");
+    const actions = card.querySelector(".detail-actions");
+    const dotEl = card.querySelector('[class*="dot"], [class*="Dot"]');
+    const tag = document.querySelector(".first-tag");
+    const tagRow = tag?.closest(".todo-row, li") ?? null;
+    const catTag = tagRow?.querySelector(".category-tag") ?? null;
+    const flashRow = document.querySelector(".todo-row-flash");
+    const active = document.activeElement as HTMLElement | null;
+    // 보조 길 포커스 고리: 단추 상자(누름 48)를 outline-offset 만큼 줄인 안쪽 가장자리, 바깥 가장자리는 거기서 고리 두께만큼 더 나간 곳
+    let ring: Record<string, number | string> | null = null;
+    if (secondary) {
+      const r = secondary.getBoundingClientRect();
+      const s = getComputedStyle(secondary);
+      const off = parseFloat(s.outlineOffset);
+      const w = parseFloat(s.outlineWidth);
+      ring = {
+        style: s.outlineStyle,
+        width: w,
+        color: s.outlineColor,
+        offset: off,
+        radius: s.borderTopLeftRadius,
+        innerW: r.width + 2 * off,
+        innerH: r.height + 2 * off,
+        outerW: r.width + 2 * off + 2 * w,
+        outerH: r.height + 2 * off + 2 * w,
+      };
+    }
+    const carryEl = Array.from(document.querySelectorAll("button, a, div, span")).find((e) => e.children.length === 0 && /^어제 못 끝낸 할 일 \d+개 보기/.test((e.textContent ?? "").trim()));
     return {
-      gaps: {
-        writtenToNotice: gapEls.written && gapEls.notice ? gapEls.notice.getBoundingClientRect().top - gapEls.written.getBoundingClientRect().bottom : null,
-        noticeToActions: gapEls.notice && gapEls.actions ? gapEls.actions.getBoundingClientRect().top - gapEls.notice.getBoundingClientRect().bottom : null,
-      },
-      dot: dotEl ? { width: dotEl.getBoundingClientRect().width, height: dotEl.getBoundingClientRect().height } : null,
       headerDay: (headerEl?.textContent ?? "").split(" · ")[0],
-      card: { ...box(card), ...css(card), text: undefined },
+      card: { ...box(card)!, ...css(card)!, text: undefined },
+      dot: dotEl ? { width: dotEl.getBoundingClientRect().width, height: dotEl.getBoundingClientRect().height } : null,
       title: css(card.querySelector(".entry-title")),
-      todoText: css(card.querySelector(".offer-text")),
-      writtenLine: css(card.querySelector(".offer-written")),
+      todoText: { ...css(card.querySelector(".offer-text"))!, ...box(card.querySelector(".offer-text"))! },
+      written: written ? { ...css(written)!, ...box(written)!, role: written.getAttribute("role") } : null,
       status: css(card.querySelector("p[role=status]")),
-      notice: notice ? { ...box(notice), ...css(notice) } : null,
-      mainButton: main ? { ...box(main), ...css(main), disabled: (main as HTMLButtonElement).disabled, ariaBusy: main.getAttribute("aria-busy") } : null,
-      skipButton: skip ? { ...box(skip), ...css(skip), disabled: (skip as HTMLButtonElement).disabled } : null,
-      primaryClass: primary?.className ?? null,
+      notice: notice ? { ...box(notice)!, ...css(notice)! } : null,
+      mainButton: btn(main),
+      skipButton: btn(skip),
+      secondary: secondary ? { ...btn(secondary)!, ring, activeIsIt: document.activeElement === secondary, focusVisible: secondary.matches(":focus-visible") } : null,
       buttonOrder: buttons.map((b) => (b.textContent ?? "").trim()),
+      gaps: {
+        writtenToNotice: written && notice ? notice.getBoundingClientRect().top - written.getBoundingClientRect().bottom : null,
+        writtenToActions: written && !notice && actions ? actions.getBoundingClientRect().top - written.getBoundingClientRect().bottom : null,
+        noticeToActions: notice && actions ? actions.getBoundingClientRect().top - notice.getBoundingClientRect().bottom : null,
+        mainToSkip: main && skip ? skip.getBoundingClientRect().left - main.getBoundingClientRect().right : null,
+      },
+      listTag: tag
+        ? {
+            ...css(tag)!,
+            ...box(tag)!,
+            gapFromCategory: catTag ? tag.getBoundingClientRect().left - catTag.getBoundingClientRect().right : null,
+            rowText: (tagRow?.textContent ?? "").trim(),
+          }
+        : null,
+      flashRow: flashRow ? { id: flashRow.id, ...box(flashRow)!, ...css(flashRow)!, tagBackground: tag ? getComputedStyle(tag).backgroundColor : null } : null,
+      focusedRow: active && active.id.startsWith("row-") ? { id: active.id, ...css(active)!, ...box(active)!, tabindex: active.getAttribute("tabindex") } : null,
+      carry: carryEl?.textContent?.trim() ?? null,
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
     };
@@ -173,6 +232,18 @@ async function measureTimer(page: Page) {
         labelFont: document.querySelector(".clock-num") ? getComputedStyle(document.querySelector(".clock-num")!).font : null,
       },
       label: document.querySelector(".timer-label")?.textContent ?? null,
+      labelBox: (() => {
+        const el = document.querySelector(".timer-label");
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        const dot = el.parentElement?.querySelector('[class*="dot"]');
+        // 글 왼쪽 끝(가운데 정렬이면 글 상자 안쪽의 실제 글 위치)
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const tr = range.getBoundingClientRect();
+        return { x: tr.x, y: tr.y, width: tr.width, fontSize: cs.fontSize, fontWeight: cs.fontWeight, color: cs.color, textAlign: cs.textAlign, hasDot: !!dot, boxY: r.y };
+      })(),
       name: name ? { ...nameBox, text: name.textContent, fontSize: getComputedStyle(name).fontSize, color: getComputedStyle(name).color, offsetFromCenterY: center.y - nameBox!.cy, topFromCenterY: center.y - nameBox!.y } : null,
       number: clock
         ? {
@@ -188,6 +259,7 @@ async function measureTimer(page: Page) {
             topFromCenterY: center.y - clockBox!.y,
           }
         : null,
+      belowCenter: { status: box(status) ? box(status)!.y - center.y : null, button: end ? box(end)!.y - center.y : null, buttonX: end ? box(end)!.x : null },
       statusText: status ? { text: status.textContent, fontSize: getComputedStyle(status).fontSize, color: getComputedStyle(status).color, y: box(status)!.y } : null,
       endButton: end ? { ...box(end), text: (end.textContent ?? "").trim(), background: getComputedStyle(end).backgroundColor, color: getComputedStyle(end).color, radius: getComputedStyle(end).borderTopLeftRadius, fontSize: getComputedStyle(end).fontSize, fontWeight: getComputedStyle(end).fontWeight } : null,
       scrollWidth: document.documentElement.scrollWidth,
@@ -202,6 +274,31 @@ async function measureTimer(page: Page) {
  * 무리: 가 = 고침11 이전부터의 현행 꼴(카드 틀·단추 부품·추천 꼬리표·요일 데이터), 나 = 23이 판단할 것(타이머 글자 자리·끝내기 너비), 다 = 그 밖에 새로 찾은 것.
  */
 const KNOWN_DIFFS: Record<string, { group: "가 현행 꼴" | "나 23이 판단" | "다 새로 찾음"; screen: string[] }> = {
+  "이번 주 목표 줄(320×56 @20,112)": { group: "가 현행 꼴", screen: ["328×48@16,130"] },
+  "어제 못 끝낸 줄(320×40 @20,184)": { group: "가 현행 꼴", screen: ["328×40@16,254"] },
+  "오늘 기록 줄(320×56 @20,232)": { group: "가 현행 꼴", screen: ["328×56@16,190"] },
+  "할 일 목록 카드 위(@20,300 · 너비 320)": { group: "가 현행 꼴", screen: ["328@16,310"] },
+  "안내 상자 y": { group: "가 현행 꼴", screen: ["74"] },
+  "목록 제목 「무엇을 할까요?」 글자 크기(24 Bold)": { group: "가 현행 꼴", screen: ["16px"] },
+  "목록 제목 굵기": { group: "가 현행 꼴", screen: ["700"] },
+  "고른 줄 크기(312×48 · x24)": { group: "가 현행 꼴", screen: ["328×48@16"] },
+  "고른 줄 모서리": { group: "가 현행 꼴", screen: ["8px"] },
+  "고른 줄 글(14 Bold)": { group: "가 현행 꼴", screen: ["16px/400"] },
+  "다른 줄 글(14 Regular)": { group: "가 현행 꼴", screen: ["16px/400"] },
+  "라디오 20×20": { group: "가 현행 꼴", screen: ["24×24"] },
+  "오늘 할 일 목록 흰 카드(320 · 모서리 16)": { group: "가 현행 꼴", screen: ["없음"] },
+  "줄 오른쪽 분야 점·분야 글": { group: "가 현행 꼴", screen: ["없음"] },
+  "「30분 시작」 단추 320×48(x20)": { group: "가 현행 꼴", screen: ["106.17×48@16"] },
+  "위 글(할 일 · 분야)": { group: "다 새로 찾음", screen: ["토익 단어 50개"] },
+  "위 글 분야 점 10×10(x36)": { group: "다 새로 찾음", screen: ["없음"] },
+  "위 글 글자 크기": { group: "다 새로 찾음", screen: ["16px"] },
+  "위 글 색": { group: "다 새로 찾음", screen: ["rgb(28, 35, 64)"] },
+  "위 글 x(점 오른쪽, x52)": { group: "다 새로 찾음", screen: ["125.56", "164"] },
+  "시계 판 가운데 x": { group: "나 23이 판단", screen: ["180"] },
+  "시계 판 가운데 y": { group: "나 23이 판단", screen: ["282"] },
+  "상태 글 y(판 가운데에서 아래로)": { group: "나 23이 판단", screen: ["168"] },
+  "끝내기 단추 y(판 가운데에서 아래로)": { group: "나 23이 판단", screen: ["196"] },
+  "끝내기 단추 x": { group: "나 23이 판단", screen: ["139"] },
   "머리 날짜 글(요일)": { group: "가 현행 꼴", screen: ["11월 13일 금요일"] },
   "카드 x": { group: "가 현행 꼴", screen: ["16"] },
   "카드 너비": { group: "가 현행 꼴", screen: ["328"] },
@@ -240,100 +337,202 @@ function expectOnlyKnown(mm: Mismatch[]) {
 
 type CardM = Awaited<ReturnType<typeof measureCard>>;
 type TimerM = Awaited<ReturnType<typeof measureTimer>>;
+type BtnM = NonNullable<CardM["mainButton"]>;
 
-/** 카드 공통 명세 값(4절 「카드 공통」) */
-function checkCardCommon(m: CardM, mm: Mismatch[], skipColor: string = INK) {
+const visTop = (b: BtnM) => b.hit.y + (b.hit.height - b.height) / 2;
+
+type CardKind = {
+  id: string;
+  file: string;
+  node: string;
+  data: string;
+  /** 건넨 할 일 자리 글 */
+  todo: string;
+  /** 적은 날 · 결과 · 목록에 있음 줄(없으면 null)과 그 글 색 */
+  written: { text: string; color: string; role?: string } | null;
+  /** 주 단추(글 · 너비). 보조 길만 있는 L5는 null */
+  main: { text: string; width: number | null } | null;
+  secondary?: string;
+  skip: boolean;
+  skipColor?: string;
+  error?: string;
+  height: number | null;
+  carry: string;
+  /** 목록 줄 꼬리표 「오늘 먼저」가 있어야 하나 / 줄 강조(flash)와 포커스 */
+  tag?: { flash: boolean; focus: boolean };
+};
+
+/** 카드 값(23 명세 덧붙임 C절 + Figma 166:* 노드에서 읽은 값). 카드 틀 x20 · 너비 320 · 바탕 #FFFFFF · 모서리 16 · 분야 점 10×10 · 제목 12 · 건넨 할 일 16 Bold */
+function checkCard(m: CardM, mm: Mismatch[], k: CardKind) {
   check(mm, "머리 날짜 글(요일)", "11월 13일 목요일", m.headerDay);
-  check(mm, "카드 x", 20, r1(m.card.x!));
-  check(mm, "카드 너비", 320, r1(m.card.width!));
+  check(mm, "카드 x", 20, r1(m.card.x));
+  check(mm, "카드 너비", 320, r1(m.card.width));
+  if (k.height !== null) check(mm, "카드 높이", k.height, r1(m.card.height));
   check(mm, "카드 바탕(--color-surface)", "#FFFFFF", m.card.background);
   check(mm, "카드 모서리", "16px", m.card.borderRadius);
   check(mm, "분야 점 10×10(제목 옆)", "10×10", m.dot ? `${r1(m.dot.width)}×${r1(m.dot.height)}` : "없음");
   check(mm, "제목 글자 크기", "12px", m.title!.fontSize);
+  check(mm, "제목 굵기", "400", m.title!.fontWeight);
   check(mm, "제목 색", GRAY, m.title!.color);
+  check(mm, "건넨 할 일 글", k.todo, m.todoText!.text);
   check(mm, "건넨 할 일 글자 크기", "16px", m.todoText!.fontSize);
   check(mm, "건넨 할 일 굵기", "700", m.todoText!.fontWeight);
   check(mm, "건넨 할 일 색", INK, m.todoText!.color);
-  check(mm, "넘기기 누름 영역 너비", 63, r1(m.skipButton!.width!));
-  check(mm, "넘기기 누름 영역 높이", 40, r1(m.skipButton!.height!));
-  check(mm, "넘기기 글자 크기", "14px", m.skipButton!.fontSize);
-  check(mm, "넘기기 색", skipColor, m.skipButton!.color);
+  if (k.written) {
+    check(mm, "줄 글(적은 날 · 결과 · 목록에 있음)", k.written.text, m.written?.text);
+    check(mm, "줄 글 글자 크기", "14px", m.written?.fontSize);
+    check(mm, "줄 글 굵기", "400", m.written?.fontWeight);
+    check(mm, "줄 글 줄 높이", "20px", m.written?.lineHeight);
+    check(mm, "줄 글 색", k.written.color, m.written?.color);
+    check(mm, "줄 글 role", k.written.role ?? "null", m.written?.role ?? "null");
+  } else {
+    check(mm, "줄 글 없음", "없음", m.written ? m.written.text : "없음");
+  }
+  const above = m.notice ?? m.written ?? m.todoText!;
+  if (m.notice) {
+    check(mm, "알림 상자 글", k.error, m.notice.text);
+    check(mm, "알림 상자 x", 36, r1(m.notice.x));
+    check(mm, "알림 상자 너비", 288, r1(m.notice.width));
+    check(mm, "알림 상자 바탕", NOTICE, m.notice.background);
+    check(mm, "알림 상자 모서리", "8px", m.notice.borderRadius);
+    check(mm, "알림 상자 안쪽", "12px", m.notice.padding);
+    check(mm, "알림 상자 글자 크기", "14px", m.notice.fontSize);
+    check(mm, "알림 상자 굵기", "400", m.notice.fontWeight);
+    check(mm, "알림 상자 줄 높이", "20px", m.notice.lineHeight);
+    check(mm, "알림 상자 글 색", INK, m.notice.color);
+    check(mm, "알림 상자 높이", 44, r1(m.notice.height));
+    check(mm, "적은 날 줄 → 알림 상자 간격", 12, r1(m.notice.y - m.written!.bottom));
+  } else {
+    expect(k.error, "알림 상자가 있어야 하는 상태").toBeUndefined();
+  }
+  const main = m.mainButton ?? m.secondary;
+  if (main) {
+    check(mm, "단추 줄 위 간격(위 글/알림 → 단추 보이는 위)", m.written || m.notice ? 16 : 14, r1(visTop(main) - above.bottom));
+    check(mm, "단추 보이는 높이", 40, r1(main.height));
+    expect(main.hit.height, "단추 누름 높이 48 이상(창구 가)").toBeGreaterThanOrEqual(47.5);
+    expect(main.hit.width, "단추 누름 폭 48 이상").toBeGreaterThanOrEqual(47.5);
+    check(mm, "단추 글자 크기", "14px", main.fontSize);
+    check(mm, "단추 굵기", "500", main.fontWeight);
+  }
+  if (k.main) {
+    expect(m.mainButton, "주 단추 있음").not.toBeNull();
+    const b = m.mainButton!;
+    check(mm, "단추 글", k.main.text, b.text);
+    check(mm, "단추 x", 36, r1(b.x));
+    if (k.main.width !== null) check(mm, "단추 너비(글에 맞춤)", k.main.width, r1(b.width));
+    check(mm, "단추 바탕", INK, b.background);
+    check(mm, "단추 글 색", WHITE, b.color);
+    check(mm, "단추 모서리", "999px", b.borderRadius);
+  }
+  if (k.skip) {
+    expect(m.skipButton, "「넘기기」 있음").not.toBeNull();
+    const s = m.skipButton!;
+    check(mm, "넘기기 글자 크기", "14px", s.fontSize);
+    check(mm, "넘기기 굵기", "500", s.fontWeight);
+    check(mm, "넘기기 색", k.skipColor ?? INK, s.color);
+    check(mm, "넘기기 보이는 높이", 40, r1(s.height));
+    expect(s.hit.height, "넘기기 누름 높이 48 이상").toBeGreaterThanOrEqual(47.5);
+    check(mm, "주 단추 → 넘기기 간격", 16, r1(m.gaps.mainToSkip!));
+    check(mm, "단추 순서", `${k.main!.text},넘기기`, m.buttonOrder.join(","));
+  } else {
+    expect(m.skipButton, "「넘기기」 없음").toBeNull();
+  }
+  if (k.secondary) {
+    const sec = m.secondary!;
+    check(mm, "보조 길 글", k.secondary, sec.text);
+    check(mm, "보조 길 글 색", INK, sec.color);
+    check(mm, "보조 길 글 x(글 왼쪽)", 36, r1(sec.x + parseFloat(sec.padding.split(" ")[1] ?? sec.padding)));
+    expect(m.mainButton, "보조 길만 있다(주 단추 없음)").toBeNull();
+    expect(m.buttonOrder, "카드 단추는 보조 길 하나").toEqual([k.secondary]);
+    expect(sec.activeIsIt, "추가한 뒤 포커스는 보조 길").toBe(true);
+    const ring = sec.ring!;
+    expect(ring.style, "포커스 고리 보임(solid)").toBe("solid");
+    check(mm, "포커스 고리 두께", 2, ring.width);
+    check(mm, "포커스 고리 색", INK, ring.color);
+    check(mm, "포커스 고리 모서리", "8px", ring.radius);
+    // Figma 167:60: 고리 2px · 선 정렬 INSIDE · 117×36 = 고리 바깥 가장자리 기준. 화면은 안쪽·바깥 가장자리를 둘 다 json에 둔다
+    check(mm, "포커스 고리 바깥 크기(명세 117×36, 바깥 가장자리 기준)", "117×36", `${r1(ring.outerW as number)}×${r1(ring.outerH as number)}`);
+  }
+  if (k.tag) {
+    expect(m.listTag, "목록 줄 꼬리표 있음").not.toBeNull();
+    const t = m.listTag!;
+    check(mm, "목록 줄 꼬리표 글", "오늘 먼저", t.text);
+    check(mm, "꼬리표 글자 크기", "12px", t.fontSize);
+    check(mm, "꼬리표 굵기", "500", t.fontWeight);
+    check(mm, "꼬리표 줄 높이", "16px", t.lineHeight);
+    check(mm, "꼬리표 색", GRAY, t.color);
+    check(mm, "꼬리표 바탕(강조 위 #FFFFFF · 평소 #F3EEE6)", k.tag.flash ? WHITE : NOTICE, t.background);
+    check(mm, "꼬리표 모서리", "999px", t.borderRadius);
+    check(mm, "꼬리표 안쪽(위아래 2 · 좌우 6)", "2px 6px", t.padding);
+    check(mm, "꼬리표 크기", "59×20", `${r1(t.width)}×${r1(t.height)}`);
+    check(mm, "꼬리표 ← 분야 글 끝에서", 8, r1(t.gapFromCategory!));
+    expect(t.rowText, "꼬리표가 붙은 줄").toContain("토익 단어 50개");
+  } else {
+    expect(m.listTag, "꼬리표 없음").toBeNull();
+  }
+  if (k.tag?.flash) {
+    expect(m.flashRow, "줄 강조 보임").not.toBeNull();
+    check(mm, "강조 바탕", NOTICE, m.flashRow!.background);
+    check(mm, "강조 크기", "312×54", `${r1(m.flashRow!.width)}×${r1(m.flashRow!.height)}`);
+    check(mm, "강조 모서리", "8px", m.flashRow!.borderRadius);
+    check(mm, "강조 x", 24, r1(m.flashRow!.x));
+  } else if (k.tag) {
+    expect(m.flashRow, "강조 없음").toBeNull();
+  }
+  if (k.tag?.focus) {
+    expect(m.focusedRow, "포커스는 그 줄").not.toBeNull();
+    check(mm, "포커스 줄 tabindex", "-1", m.focusedRow!.tabindex);
+    check(mm, "포커스 고리", `2px solid ${INK}`, m.focusedRow!.outline);
+    check(mm, "포커스 줄 모서리", "8px", m.focusedRow!.borderRadius);
+    check(mm, "포커스 줄 크기(고리 바깥 312×54)", "312×54", `${r1(m.focusedRow!.width)}×${r1(m.focusedRow!.height)}`);
+  } else if (k.tag) {
+    expect(m.focusedRow, "포커스 줄 없음").toBeNull();
+  }
+  check(mm, "「어제 못 끝낸 할 일 n개 보기」", k.carry, m.carry);
+  expect(m.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(m.clientWidth);
 }
 
-/** 추가 꼴(K1~K4) 값(4절): 적은 날 줄 · 「추가」 단추 */
-function checkAddCard(m: CardM, mm: Mismatch[], opts: { written: string; button: string }) {
-  check(mm, "적은 날 줄 글", opts.written, m.writtenLine!.text);
-  check(mm, "적은 날 줄 글자 크기", "14px", m.writtenLine!.fontSize);
-  check(mm, "적은 날 줄 줄 높이", "20px", m.writtenLine!.lineHeight);
-  check(mm, "적은 날 줄 색", GRAY, m.writtenLine!.color);
-  check(mm, "단추 글(PM 결정)", opts.button, m.mainButton!.text);
-  check(mm, "단추 너비(명세 84는 윤곽 단추 기준)", 84, r1(m.mainButton!.width!));
-  check(mm, "단추 높이", 40, r1(m.mainButton!.height!));
-  check(mm, "단추 바탕", WHITE, m.mainButton!.background);
-  check(mm, "단추 윤곽", `1.5px solid ${INK}`, m.mainButton!.borderTop);
-  check(mm, "단추 모서리", "999px", m.mainButton!.borderRadius);
-  check(mm, "단추 글자 크기", "14px", m.mainButton!.fontSize);
-  check(mm, "단추 글 색", INK, m.mainButton!.color);
-  check(mm, "단추 순서", `${opts.button},넘기기`, m.buttonOrder.join(","));
-}
-
-const CARD_STATES: { id: string; file: string; node: string; data: string; written: string | null; button: string; error?: string }[] = [
-  { id: "fix11-k1", file: "K1 처음 건넴(지난 날 할 일)", node: "157:60", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음", written: "어제 적은 할 일", button: "오늘 할 일에 추가" },
-  { id: "fix11-k2", file: "K2 추가하는 중", node: "157:166", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음 · 추가하는 중", written: "어제 적은 할 일", button: "추가하는 중" },
-  { id: "fix11-k3", file: "K3 오프라인", node: "157:272", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음 · 오프라인", written: "어제 적은 할 일", button: "오늘 할 일에 추가", error: "인터넷에 연결되면 추가할 수 있어요." },
-  { id: "fix11-k4", file: "K4 실패", node: "157:380", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음 · 추가 실패", written: "어제 적은 할 일", button: "오늘 할 일에 추가", error: "추가하지 못했어요. 다시 눌러 주세요." },
+const Y = "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12(어제) 적음";
+const W_Y = { text: "어제 적은 할 일", color: GRAY };
+const W_IN = { text: "오늘 할 일 목록에 있어요", color: GRAY };
+const CARD_STATES: CardKind[] = [
+  { id: "fix11-l1", file: "L1 지난 날 할 일(오늘 할 일에 추가)", node: "166:60", data: Y, todo: "토익 단어 50개", written: W_Y, main: { text: "오늘 할 일에 추가", width: 132 }, skip: true, height: 142, carry: "어제 못 끝낸 할 일 2개 보기" },
+  { id: "fix11-l2", file: "L2 추가하는 중", node: "166:159", data: `${Y} · 추가하는 중`, todo: "토익 단어 50개", written: W_Y, main: { text: "추가하는 중", width: 100 }, skip: true, skipColor: GRAY, height: 142, carry: "어제 못 끝낸 할 일 2개 보기" },
+  { id: "fix11-l3", file: "L3 오프라인", node: "166:258", data: `${Y} · 오프라인`, todo: "토익 단어 50개", written: W_Y, main: { text: "오늘 할 일에 추가", width: 132 }, skip: true, error: "인터넷에 연결되면 추가할 수 있어요.", height: 198, carry: "어제 못 끝낸 할 일 2개 보기" },
+  { id: "fix11-l4", file: "L4 실패", node: "166:359", data: `${Y} · 추가 실패`, todo: "토익 단어 50개", written: W_Y, main: { text: "오늘 할 일에 추가", width: 132 }, skip: true, error: "추가하지 못했어요. 다시 눌러 주세요.", height: 198, carry: "어제 못 끝낸 할 일 2개 보기" },
+  { id: "fix11-l5", file: "L5 추가한 뒤(타이머에서 시작 보조 길)", node: "166:460", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-12 적은 것을 방금 추가 · 새 줄 맨 위 강조(움직임 줄이기, 강조 보이는 동안) · 어제 못 끝낸 1개", todo: "토익 단어 50개", written: { text: "오늘 할 일에 넣었어요", color: INK, role: "status" }, main: null, secondary: "타이머에서 시작 ›", skip: false, height: 142, carry: "어제 못 끝낸 할 일 1개 보기", tag: { flash: true, focus: false } },
+  { id: "fix11-l6", file: "L6 이미 오늘 목록에 있음(목록에서 보기)", node: "166:578", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 오늘 목록에 있음(끝내지 않음) · 목록 줄 꼬리표", todo: "토익 단어 50개", written: W_IN, main: { text: "목록에서 보기", width: 113 }, skip: true, height: 142, carry: "어제 못 끝낸 할 일 2개 보기", tag: { flash: false, focus: false } },
+  { id: "fix11-l7", file: "L7 목록에서 보기 뒤(그 줄 강조 · 포커스)", node: "166:693", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 「목록에서 보기」를 누른 직후(움직임 줄이기, 강조 보이는 동안)", todo: "토익 단어 50개", written: W_IN, main: { text: "목록에서 보기", width: 113 }, skip: true, height: 142, carry: "어제 못 끝낸 할 일 2개 보기", tag: { flash: true, focus: true } },
+  { id: "fix11-l8", file: "L8 분야만(어학 할 일 적기)", node: "166:810", data: "11-13 12:00 · 「어학 30분」(할 일 없음) · 어학", todo: "어학 30분", written: null, main: { text: "어학 할 일 적기", width: 119 }, skip: true, height: 120, carry: "어제 못 끝낸 할 일 2개 보기" },
 ];
 
-for (const s of CARD_STATES) {
-  test(`${s.file} (${s.node})`, async ({ page }) => {
-    await open(page, s.id);
+/** L5 · L7은 강조(2초)가 보이는 순간을 찍는다: 움직임 줄이기를 켜 페이드 없이 고정하고 로드 직후에 잰다 */
+async function openCard(page: Page, k: CardKind) {
+  if (k.tag?.flash) {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/dev/v2?s=${k.id}`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".todo-row-flash", { timeout: 15_000 });
+  } else {
+    await open(page, k.id);
+  }
+}
+
+for (const k of CARD_STATES) {
+  test(`${k.file} (${k.node})`, async ({ page }) => {
+    await openCard(page, k);
     await expect(page.getByRole("region", { name: "오늘 먼저 할 일" })).toBeVisible();
     const m = await measureCard(page);
     const mm: Mismatch[] = [];
-    checkCardCommon(m, mm, s.id === "fix11-k2" ? GRAY : INK); // K2: 추가하는 중에는 「넘기기」가 보조색(명세 4절)
-    checkAddCard(m, mm, { written: s.written!, button: s.button });
-    expect(m.todoText!.text, "건넨 할 일 글").toBe("토익 단어 50개");
-    expect(m.title!.text).toBe("오늘 먼저 할 일 · 어학");
-    // 카드 높이(4절: K1 142 · K3 198). K2·K4는 K1·K3과 같은 틀
-    check(mm, "카드 높이", s.error ? 198 : 142, r1(m.card.height!));
-    if (s.id === "fix11-k2") {
+    if (k.id === "fix11-l2") {
       expect(m.mainButton!.ariaBusy, "추가하는 중 aria-busy").toBe("true");
       expect(m.skipButton!.disabled, "추가하는 중 넘기기 막힘").toBe(true);
     }
-    if (s.error) {
-      expect(m.notice!.text, "알림 상자 글").toBe(s.error);
-      check(mm, "알림 상자 x", 36, r1(m.notice!.x!));
-      check(mm, "알림 상자 너비", 288, r1(m.notice!.width!));
-      check(mm, "알림 상자 바탕", NOTICE, m.notice!.background);
-      check(mm, "알림 상자 모서리", "8px", m.notice!.borderRadius);
-      check(mm, "알림 상자 안쪽", "12px", m.notice!.padding);
-      check(mm, "알림 상자 글자 크기", "14px", m.notice!.fontSize);
-      check(mm, "알림 상자 굵기", "400", m.notice!.fontWeight);
-      check(mm, "알림 상자 줄 높이", "20px", m.notice!.lineHeight);
-      check(mm, "알림 상자 글 색", INK, m.notice!.color);
-      check(mm, "적은 날 줄 → 알림 상자 간격", 12, r1(m.gaps.writtenToNotice!));
-      check(mm, "알림 상자 → 단추 줄 간격", 16, r1(m.gaps.noticeToActions!));
-    }
-    expect(m.scrollWidth, "가로 스크롤 없음").toBeLessThanOrEqual(m.clientWidth);
-    await save(page, s.file, { node: s.node, data: s.data, measured: m }, mm);
+    checkCard(m, mm, k);
+    await save(page, k.file, { node: k.node, data: k.data, measured: m }, mm);
     expectOnlyKnown(mm);
   });
 }
-
-test("K6 분야만 건넴 · 안 B 현행 「30분 시작」 (157:593)", async ({ page }) => {
-  await open(page, "fix11-k6");
-  const m = await measureCard(page);
-  const mm: Mismatch[] = [];
-  expect(m.todoText!.text, "분야만 건넬 때 글").toBe("어학 30분");
-  expect(m.writtenLine, "적은 날 줄 없음").toBeNull();
-  expect(m.mainButton!.text).toBe("30분 시작");
-  expect(m.buttonOrder).toEqual(["30분 시작", "넘기기"]);
-  checkCardCommon(m, mm);
-  check(mm, "K6 단추 윤곽", `1.5px solid ${INK}`, m.mainButton!.borderTop);
-  check(mm, "K6 단추 높이", 40, r1(m.mainButton!.height!));
-  await save(page, "K6 분야만 건넴(안 B 30분 시작)", { node: "157:593", data: "11-13 12:00 · 「어학 30분」(할 일 없음) · 어학 · 적은 날 없음", measured: m }, mm);
-  expectOnlyKnown(mm);
-});
 
 test("K7 타이머가 이미 돎 (157:698)", async ({ page }) => {
   await open(page, "fix11-k7");
@@ -342,17 +541,23 @@ test("K7 타이머가 이미 돎 (157:698)", async ({ page }) => {
   expect(m.status!.text).toBe("타이머가 돌고 있어요. 타이머 탭에서 볼 수 있어요.");
   expect(m.mainButton!.text).toBe("타이머 탭 열기");
   expect(m.skipButton).toBeNull();
-  check(mm, "카드 x", 20, r1(m.card.x!));
-  check(mm, "카드 너비", 320, r1(m.card.width!));
+  check(mm, "머리 날짜 글(요일)", "11월 13일 목요일", m.headerDay);
+  check(mm, "카드 x", 20, r1(m.card.x));
+  check(mm, "카드 너비", 320, r1(m.card.width));
+  check(mm, "카드 높이", 144, r1(m.card.height));
   check(mm, "카드 바탕(--color-surface)", "#FFFFFF", m.card.background);
   check(mm, "카드 모서리", "16px", m.card.borderRadius);
-  check(mm, "머리 날짜 글(요일)", "11월 13일 목요일", m.headerDay);
-  check(mm, "카드 높이", 144, r1(m.card.height!));
+  check(mm, "분야 점 10×10(제목 옆)", "10×10", m.dot ? `${r1(m.dot.width)}×${r1(m.dot.height)}` : "없음");
+  check(mm, "제목 글자 크기", "12px", m.title!.fontSize);
+  check(mm, "제목 색", GRAY, m.title!.color);
+  check(mm, "건넨 할 일 굵기", "700", m.todoText!.fontWeight);
   check(mm, "상태 글 글자 크기", "14px", m.status!.fontSize);
   check(mm, "상태 글 색", GRAY, m.status!.color);
   check(mm, "주 단추 바탕", INK, m.mainButton!.background);
   check(mm, "주 단추 글 색", WHITE, m.mainButton!.color);
-  await save(page, "K7 타이머가 이미 돎", { node: "157:698", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 오늘 목록에 있음 · 타이머 도는 중", measured: m }, mm);
+  expect(m.mainButton!.hit.height, "단추 누름 높이 48 이상").toBeGreaterThanOrEqual(47.5);
+  expect(m.listTag, "카드가 가리키는 오늘 줄에 꼬리표 「오늘 먼저」").not.toBeNull();
+  await save(page, "K7 타이머가 이미 돎", { node: "157:698", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 오늘 목록에 있음(끝내지 않음) · 타이머 도는 중", measured: m }, mm);
   expectOnlyKnown(mm);
 });
 
@@ -361,25 +566,38 @@ test("K8 넘긴 뒤 · 카드 없음 (157:802)", async ({ page }) => {
   await expect(page.getByRole("region", { name: "오늘 먼저 할 일" })).toHaveCount(0);
   await expect(page.getByText("토익 단어 50개")).toBeVisible();
   await expect(page.getByRole("button", { name: "넘기기" })).toHaveCount(0);
+  await expect(page.locator(".first-tag"), "카드가 없으면 꼬리표도 없다").toHaveCount(0);
   const first = (await page.locator(".todo-row").first().boundingBox())!;
   const rows = await page.locator(".todo-row").count();
   expect(rows, "오늘 목록 3줄").toBe(3);
-  expect(r1(first.y), "할 일 목록 맨 위 y(카드 없음: 이번 주 목표 · 오늘 기록 · 어제 못 끝낸 줄 아래, 360x800)").toBe(FIRST_ROW_Y_K8);
-  await save(page, "K8 넘긴 뒤(카드 없음)", { node: "157:802", data: "11-13 12:00 · 카드 없음 · 오늘 목록 3개(토익 단어 50개 · 어학, 글 한 편 초고 쓰기 · 글쓰기, 정보처리기사 기출 1회 · 자격증)", measured: { cardCount: 0, firstRowY: first.y, scrollWidth: await page.evaluate(() => document.documentElement.scrollWidth) } }, []);
+  expect(r1(first.y), "할 일 목록 맨 위 y(카드 없음, 360x800)").toBe(FIRST_ROW_Y_K8);
+  const frame = await page.evaluate(() => {
+    const r = (sel: string) => {
+      const e = document.querySelector(sel);
+      if (!e) return null;
+      const b = e.getBoundingClientRect();
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    };
+    const goal = r(".goal-line");
+    const evening = Array.from(document.querySelectorAll("button")).find((b) => /오늘 기록/.test(b.textContent ?? ""))?.getBoundingClientRect();
+    const carry = Array.from(document.querySelectorAll("button")).find((b) => /^어제 못 끝낸 할 일/.test((b.textContent ?? "").trim()))?.getBoundingClientRect();
+    const list = document.querySelector(".todo-row")?.closest("ul, ol, section, div")?.getBoundingClientRect();
+    return {
+      goal,
+      carry: carry ? { x: carry.x, y: carry.y, width: carry.width, height: carry.height } : null,
+      evening: evening ? { x: evening.x, y: evening.y, width: evening.width, height: evening.height } : null,
+      list: list ? { x: list.x, y: list.y, width: list.width, height: list.height } : null,
+    };
+  });
+  const mm8: Mismatch[] = [];
+  const box4 = (b: { x: number; y: number; width: number; height: number } | null) => (b ? `${r1(b.width)}×${r1(b.height)}@${r1(b.x)},${r1(b.y)}` : "없음");
+  check(mm8, "이번 주 목표 줄(320×56 @20,112)", "320×56@20,112", box4(frame.goal));
+  check(mm8, "어제 못 끝낸 줄(320×40 @20,184)", "320×40@20,184", box4(frame.carry));
+  check(mm8, "오늘 기록 줄(320×56 @20,232)", "320×56@20,232", box4(frame.evening));
+  check(mm8, "할 일 목록 카드 위(@20,300 · 너비 320)", "320@20,300", frame.list ? `${r1(frame.list.width)}@${r1(frame.list.x)},${r1(frame.list.y)}` : "없음");
+  await save(page, "K8 넘긴 뒤(카드 없음)", { node: "157:802", data: "11-13 12:00 · 카드 없음 · 오늘 목록 3개(토익 단어 50개 · 어학, 글 한 편 초고 쓰기 · 글쓰기, 정보처리기사 기출 1회 · 자격증)", measured: { cardCount: 0, firstRowY: first.y, frame, scrollWidth: await page.evaluate(() => document.documentElement.scrollWidth) } }, mm8);
+  expectOnlyKnown(mm8);
 });
-
-test("오늘 것이면 현행 「30분 시작」 (50:52)", async ({ page }) => {
-  await open(page, "fix11-today");
-  const m = await measureCard(page);
-  const mm: Mismatch[] = [];
-  expect(m.writtenLine, "오늘 것이면 적은 날 줄 없음").toBeNull();
-  expect(m.mainButton!.text).toBe("30분 시작");
-  expect(m.buttonOrder).toEqual(["30분 시작", "넘기기"]);
-  checkCardCommon(m, mm);
-  await save(page, "오늘 것 → 30분 시작", { node: "50:52", data: "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-13(오늘) 적음", measured: m }, mm);
-  expectOnlyKnown(mm);
-});
-
 test("K9 타이머 탭 · 고르기 (157:899)", async ({ page }) => {
   await open(page, "fix11-k9");
   const notice = page.getByRole("status").filter({ hasText: "를 오늘 할 일에 넣었어요." });
@@ -402,6 +620,36 @@ test("K9 타이머 탭 · 고르기 (157:899)", async ({ page }) => {
       tags: tag,
       selectedRowBackground: getComputedStyle(selectedRow).backgroundColor,
       startButton: (document.querySelector(".timer-choose .btn-primary")?.textContent ?? "").trim(),
+      headingCss: (() => {
+        const h = document.querySelector<HTMLElement>(".timer-choose h2")!;
+        const cs = getComputedStyle(h);
+        return { fontSize: cs.fontSize, fontWeight: cs.fontWeight, color: cs.color };
+      })(),
+      selectedRow: (() => {
+        const l = document.querySelector<HTMLInputElement>(".timer-option input:checked")!.closest("label")!;
+        const r = l.getBoundingClientRect();
+        const cs = getComputedStyle(l);
+        const txt = l.querySelector<HTMLElement>(".timer-option-text")!;
+        const tcs = getComputedStyle(txt);
+        return { x: r.x, width: r.width, height: r.height, radius: cs.borderTopLeftRadius, textSize: tcs.fontSize, textWeight: tcs.fontWeight };
+      })(),
+      otherRowText: (() => {
+        const l = Array.from(document.querySelectorAll<HTMLInputElement>(".timer-option input")).find((i) => !i.checked)!.closest("label")!;
+        const tcs = getComputedStyle(l.querySelector<HTMLElement>(".timer-option-text")!);
+        return { size: tcs.fontSize, weight: tcs.fontWeight };
+      })(),
+      radio: (() => {
+        const i = document.querySelector<HTMLInputElement>(".timer-option input")!;
+        const r = i.getBoundingClientRect();
+        return { width: r.width, height: r.height };
+      })(),
+      hasListCard: !!document.querySelector(".timer-fieldset")?.closest("[class*=card], [class*=surface]"),
+      fieldsetBg: getComputedStyle(document.querySelector(".timer-fieldset")!).backgroundColor,
+      categoryDotInRow: !!document.querySelector(".timer-option .category-dot, .timer-option [class*=dot]"),
+      startButtonBox: (() => {
+        const b = document.querySelector<HTMLElement>(".timer-choose .btn-primary")!.getBoundingClientRect();
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+      })(),
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
     };
@@ -419,6 +667,17 @@ test("K9 타이머 탭 · 고르기 (157:899)", async ({ page }) => {
   check(mm, "안내 상자 위 → 목록 제목 아래로 내려옴", 56, r1(m.listHeadingY - m.notice.y));
   check(mm, "안내 상자 줄 높이", "20px", m.notice.lineHeight);
   check(mm, "안내 상자 굵기", "400", m.notice.fontWeight);
+  check(mm, "안내 상자 y", 110, r1(m.notice.y));
+  check(mm, "목록 제목 「무엇을 할까요?」 글자 크기(24 Bold)", "24px", m.headingCss.fontSize);
+  check(mm, "목록 제목 굵기", "700", m.headingCss.fontWeight);
+  check(mm, "고른 줄 크기(312×48 · x24)", "312×48@24", `${r1(m.selectedRow.width)}×${r1(m.selectedRow.height)}@${r1(m.selectedRow.x)}`);
+  check(mm, "고른 줄 모서리", "12px", m.selectedRow.radius);
+  check(mm, "고른 줄 글(14 Bold)", "14px/700", `${m.selectedRow.textSize}/${m.selectedRow.textWeight}`);
+  check(mm, "다른 줄 글(14 Regular)", "14px/400", `${m.otherRowText.size}/${m.otherRowText.weight}`);
+  check(mm, "라디오 20×20", "20×20", `${r1(m.radio.width)}×${r1(m.radio.height)}`);
+  check(mm, "오늘 할 일 목록 흰 카드(320 · 모서리 16)", "흰 바탕", m.fieldsetBg === "rgb(255, 255, 255)" ? "흰 바탕" : "없음");
+  check(mm, "줄 오른쪽 분야 점·분야 글", "있음", m.categoryDotInRow ? "있음" : "없음");
+  check(mm, "「30분 시작」 단추 320×48(x20)", "320×48@20", `${r1(m.startButtonBox.width)}×${r1(m.startButtonBox.height)}@${r1(m.startButtonBox.x)}`);
   check(mm, "「추천」 꼬리표 글자 크기", "12px", m.tags.find((t) => t.text === "추천")?.fontSize);
   check(mm, "「추천」 꼬리표 색", GRAY, m.tags.find((t) => t.text === "추천")?.color);
   expect(m.startButton, "타이머는 켜지지 않았다: 시작 단추가 그대로").toBe("30분 시작");
@@ -471,11 +730,21 @@ function checkTimerCommon(m: TimerM, mm: Mismatch[], opts: { ratio: number; sect
   check(mm, "끝내기 단추 모서리", "999px", m.endButton!.radius);
   check(mm, "끝내기 글", "끝내기", m.endButton!.text);
   check(mm, "위 글(할 일 · 분야)", opts.label, m.label);
+  check(mm, "위 글 분야 점 10×10(x36)", "있음", m.labelBox?.hasDot ? "있음" : "없음");
+  check(mm, "위 글 글자 크기", "14px", m.labelBox?.fontSize);
+  check(mm, "위 글 굵기", "400", m.labelBox?.fontWeight);
+  check(mm, "위 글 색", GRAY, m.labelBox?.color);
+  check(mm, "위 글 x(점 오른쪽, x52)", 52, r1(m.labelBox?.x ?? -1));
+  check(mm, "시계 판 가운데 x", 180.5, r1(m.center.x));
+  check(mm, "시계 판 가운데 y", 290.5, r1(m.center.y));
+  check(mm, "상태 글 y(판 가운데에서 아래로)", 171.5, r1(m.belowCenter.status!));
+  check(mm, "끝내기 단추 y(판 가운데에서 아래로)", 215.5, r1(m.belowCenter.button!));
+  check(mm, "끝내기 단추 x", 20, r1(m.belowCenter.buttonX!));
 }
 
 const TIMER_STATES = [
-  { id: "fix11-t1", file: "T1 타이머 도는 중(남은 24분 12초)", node: "158:60", data: "11-13 12:00 고정 · 「토익 단어 50개」 · 어학 · 남은 24:12(1452초) · 30분 한 바퀴", ratio: 1452 / 1800, color: "어학 #…", number: "24:12", status: "30분 타이머가 돌고 있어요", label: "토익 단어 50개" },
-  { id: "fix11-t5", file: "T5 30분이 다 됨(남은 0초)", node: "158:416", data: "11-13 12:00 고정 · 「토익 단어 50개」 · 어학 · 남은 00:00", ratio: 0, color: "", number: "00:00", status: "30분이 지났어요", label: "토익 단어 50개" },
+  { id: "fix11-t1", file: "T1 타이머 도는 중(남은 24분 12초)", node: "158:60", data: "11-13 12:00 고정 · 「토익 단어 50개」 · 어학 · 남은 24:12(1452초) · 30분 한 바퀴", ratio: 1452 / 1800, color: "어학 #…", number: "24:12", status: "30분 타이머가 돌고 있어요", label: "토익 단어 50개 · 어학" },
+  { id: "fix11-t5", file: "T5 30분이 다 됨(남은 0초)", node: "158:416", data: "11-13 12:00 고정 · 「토익 단어 50개」 · 어학 · 남은 00:00", ratio: 0, color: "", number: "00:00", status: "30분이 지났어요", label: "토익 단어 50개 · 어학" },
   { id: "fix11-t6", file: "T6 기타 색 시작 직후", node: "158:494", data: "11-13 12:00 고정 · 할 일 없음 · 분야 없음(기타) · 남은 29:48(1788초)", ratio: 1788 / 1800, color: OTHER, number: "29:48", status: "30분 타이머가 돌고 있어요", label: "기타" },
 ];
 
@@ -503,7 +772,7 @@ for (const t of TIMER_STATES) {
     expect(m.number!.ariaLabel).toBe("30분 타이머가 돌고 있어요");
     expect(m.svg.ariaHidden).toBe("true");
     expect(m.svg.focusable).toBe("false");
-    checkTimerCommon(m, mm, { ratio: t.ratio, sectorColor, number: t.number, status: t.status, label: t.id === "fix11-t1" ? "토익 단어 50개" : t.label });
+    checkTimerCommon(m, mm, { ratio: t.ratio, sectorColor, number: t.number, status: t.status, label: t.label });
     if (t.id === "fix11-t1") {
       // 4절 식: 남은 비율 = 1452 ÷ 1800, 시작 = −90 + (1 − 비율) × 360 = −20.4°
       expect(r1(m.sector!.startDeg as number)).toBe(-20.4);
