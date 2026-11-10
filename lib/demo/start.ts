@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { TodoKey } from "../todos/crypto";
+import { DEMO_SERVER_TIMEOUT_MS } from "./limits";
 import { demoCodeMatches, type DemoAttemptLimiter, type DemoLimitCheck } from "./access";
 import { DemoSeedError, type DemoSeedCounts, type DemoSeedInput } from "./seed";
 
@@ -14,6 +15,9 @@ import { DemoSeedError, type DemoSeedCounts, type DemoSeedInput } from "./seed";
  *    — 「시작」을 다시 눌러도(앞에서 예시 데이터가 실패한 뒤 등) 익명 사용자가 하나 더 생기지 않는다.
  *    정식 계정(익명 아님)으로 이미 로그인돼 있으면 예시 데이터를 넣지 않고 그대로 들여보낸다(남의 실제 계정에 예시가 섞이지 않게).
  * 5) 그 사용자 자기 세션으로 예시 데이터(처음 설정 끝 표시 포함)
+ * 6) 코드가 맞은 뒤의 일(4·5) 전체에 시간 상한(25초)이 있다: 넘으면 failed로 끝내고 로그 「[demo] timeout」 한 줄(값 없음).
+ *    예시 데이터 넣기는 같은 (사용자, 오늘)이면 늘 같은 id로 upsert(ignoreDuplicates)하고 처음 설정 끝 표시를 맨 끝에 쓰므로, 끊겨도 반쯤 넣은 채 망가지지 않는다
+ *    (다시 하면 빠진 것만 채운다). 끊긴 일은 뒤에서 끝까지 돈다.
  * 로그에는 정해진 짧은 코드와 Supabase 오류 status·code만 남긴다(코드 값·쓴 값·사용자 번호 없음).
  */
 
@@ -32,6 +36,8 @@ export type DemoStartDeps = {
   /** 오늘 두노 하루(새벽 4시 경계) */
   today: () => string;
   seed: (input: DemoSeedInput) => Promise<DemoSeedCounts>;
+  /** 서버 행동 전체의 상한(밀리초, 기본 DEMO_SERVER_TIMEOUT_MS). 시험이 짧게 준다 */
+  timeoutMs?: number;
 };
 
 const uuid = z.guid();
@@ -54,6 +60,7 @@ export async function startDemoCore(deps: DemoStartDeps, input: unknown): Promis
     return { ok: false, error: "wrong_code" };
   }
 
+  const work = (async (): Promise<DemoStartResult> => {
   try {
     const supabase = await deps.getSupabase();
     if (!supabase || !deps.key) {
@@ -87,5 +94,18 @@ export async function startDemoCore(deps: DemoStartDeps, input: unknown): Promis
     if (e instanceof DemoSeedError) log(`seed_failed_${e.step}`, { code: e.code ?? undefined });
     else log("unavailable");
     return { ok: false, error: "failed" };
+  }
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<DemoStartResult>((resolve) => {
+    timer = setTimeout(() => {
+      log("timeout");
+      resolve({ ok: false, error: "failed" });
+    }, deps.timeoutMs ?? DEMO_SERVER_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([work, limit]);
+  } finally {
+    clearTimeout(timer);
   }
 }

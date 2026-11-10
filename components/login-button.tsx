@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
+import { DEMO_CLIENT_TIMEOUT_MS } from "../lib/demo/limits";
 import type { DemoStartResult } from "../lib/demo/start";
 import { DEMO_TEXT, LOGIN_TEXT, toDemoCodeInput, type DemoNotice, type LoginNotice } from "../lib/login-text";
 import { createClient } from "../lib/supabase/client";
@@ -204,15 +205,29 @@ export function LoginButton({
     setDemoBusy(true);
     setDemoNotice(null);
     announce(DEMO_TEXT.busy);
-    let result: DemoStartResult;
-    try {
-      result = await startDemo(demoCode);
-    } catch {
-      result = { ok: false, error: "failed" };
+    const go = () => (onDemoStarted ?? (() => window.location.replace("/")))();
+    const pending: Promise<DemoStartResult> = startDemo(demoCode).catch((): DemoStartResult => ({ ok: false, error: "failed" }));
+    // 서버가 늦거나 답이 안 와도 「시작 중」에서 멈추지 않는다: 시간 상한(20초, 임시)을 넘기면 풀고 실패 글을 보인다
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), DEMO_CLIENT_TIMEOUT_MS);
+    });
+    const first = await Promise.race([pending, timeout]);
+    clearTimeout(timer);
+    if (first === "timeout") {
+      busyRef.current = false;
+      setDemoBusy(false);
+      showDemoNotice("failed");
+      // 늦게 온 응답이 ok이면(그 사이 세션 쿠키가 생겼다) 그때 이동한다. 실패면 이미 실패 글을 보였으니 무시한다
+      void pending.then((late) => {
+        if (late.ok) go();
+      });
+      return;
     }
+    const result = first;
     if (result.ok) {
       // 막힌 채로 이동한다(다시 누름 막기)
-      (onDemoStarted ?? (() => window.location.replace("/")))();
+      go();
       return;
     }
     busyRef.current = false;
