@@ -313,6 +313,7 @@ function MainShell({
   const [composeReq, setComposeReq] = useState<CardBridge["compose"]>(null);
   const requestSeqRef = useRef(0);
   const cardAddingRef = useRef(false);
+  const cardStartRef = useRef<string | null>(null);
   const cardRef = useRef<Offer | null>(null);
   useLayoutEffect(() => {
     cardRef.current = cardOffer;
@@ -428,6 +429,42 @@ function MainShell({
       alive = false;
     };
   }, [meActivation, local]);
+
+  /** 「30분 시작」(APP_CONFIG.cardStartEnabled를 켰을 때만 카드에 있다): 건넨 것으로 타이머를 켠다. offer_id = 카드 제시 id · surface card */
+  async function startFromCard() {
+    const offer = cardOffer;
+    if (!offer || cardBusy) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine && !local) {
+      setCardError("offline");
+      return;
+    }
+    // 같은 제시로 다시 누르면 같은 id(서버가 한 번만 만든다)
+    const id = cardStartRef.current ?? crypto.randomUUID();
+    cardStartRef.current = id;
+    setCardBusy(true);
+    setCardError(null);
+    const res = await apis.focus.start({
+      id,
+      todoId: offer.todoId,
+      categoryId: offer.categoryId,
+      offerId: offer.id,
+      surface: "card",
+      clientStartedAt: new Date().toISOString(),
+    });
+    setCardBusy(false);
+    if (res.ok) {
+      cardStartRef.current = null;
+      setCardOffer(null);
+      setTimerRunning(true);
+      openTab("timer");
+    } else if (res.error === "already_running") {
+      // 이미 돌고 있는 타이머가 있다: 「시작하지 못했어요」를 반복하지 않고 타이머 탭을 안내한다
+      cardStartRef.current = null;
+      setTimerRunning(true);
+    } else {
+      setCardError("failed");
+    }
+  }
 
   /** 「오늘 할 일에 추가」: 지난 날 할 일을 오늘 할 일로 복사한다. 할 일 탭에 머문다. 타이머는 켜지 않는다(시작은 사용자가, D-092) */
   const refreshCardNow = useCallback(async () => {
@@ -610,6 +647,7 @@ function MainShell({
                   running={timerRunning}
                   onOpenTimer={() => openTab("timer")}
                   added={cardAdded}
+                  onStart={() => void startFromCard()}
                   onAdd={() => void addFromCard()}
                   onStartInTimer={startInTimerFromCard}
                   onShowInList={showCardTodoInList}

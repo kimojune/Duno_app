@@ -19,6 +19,10 @@ import { Notice, PrimaryButton, TextButton } from "./ui";
 export const OFFER_TEXT = {
   title: (category: string) => `오늘 먼저 할 일 · ${category}`,
   skip: "넘기기",
+  start: (m: number) => `${m}분 시작`,
+  starting: "시작하는 중",
+  startFailed: "시작하지 못했어요. 다시 눌러 주세요.",
+  startOffline: "인터넷에 연결되면 시작할 수 있어요.",
   add: "오늘 할 일에 추가",
   adding: "추가하는 중",
   addFailed: "추가하지 못했어요. 다시 눌러 주세요.",
@@ -41,6 +45,8 @@ export function OfferCard({
   onShowInList,
   onCompose,
   onStartInTimer,
+  onStart,
+  startEnabled = APP_CONFIG.cardStartEnabled,
   added = false,
   running = false,
   onOpenTimer,
@@ -58,6 +64,10 @@ export function OfferCard({
   onCompose?: () => void;
   /** 「타이머에서 시작 ›」(추가한 뒤) */
   onStartInTimer?: () => void;
+  /** 「30분 시작」(APP_CONFIG.cardStartEnabled를 켰을 때만, 이미 목록에 있는 할 일 · 분야만): 타이머를 켠다 */
+  onStart?: () => void;
+  /** 카드 시작 길을 보일까(기본은 설정 값 APP_CONFIG.cardStartEnabled, 시험이 바꿔 준다) */
+  startEnabled?: boolean;
   /** 방금 「오늘 할 일에 추가」를 눌렀다(L5): 탭을 떠나거나 앱을 다시 열 때까지 */
   added?: boolean;
   /** 타이머가 이미 돌고 있다(B3): 단추 대신 안내와 타이머 탭 열기를 둔다 */
@@ -117,6 +127,27 @@ export function OfferCard({
         <div className="detail-actions">
           <PrimaryButton busy={busy} disabled={busy} onClick={onAdd}>
             {busy ? OFFER_TEXT.adding : OFFER_TEXT.add}
+          </PrimaryButton>
+          <TextButton className="offer-skip" disabled={busy} onClick={onDismiss}>
+            {OFFER_TEXT.skip}
+          </TextButton>
+        </div>
+      </section>
+    );
+  }
+  if (startEnabled) {
+    // 예전(고침 11) 꼴: 이미 목록에 있는 할 일 · 분야만 → 「30분 시작」 + 「넘기기」. 시작하는 동안 「넘기기」 막힘
+    return (
+      <section className="entry-card" aria-label="오늘 먼저 할 일">
+        {head}
+        {error && (
+          <Notice role="alert" className="notice-compact">
+            {error === "offline" ? OFFER_TEXT.startOffline : OFFER_TEXT.startFailed}
+          </Notice>
+        )}
+        <div className="detail-actions">
+          <PrimaryButton busy={busy} disabled={busy} onClick={onStart}>
+            {busy ? OFFER_TEXT.starting : OFFER_TEXT.start(minutes)}
           </PrimaryButton>
           <TextButton className="offer-skip" disabled={busy} onClick={onDismiss}>
             {OFFER_TEXT.skip}
