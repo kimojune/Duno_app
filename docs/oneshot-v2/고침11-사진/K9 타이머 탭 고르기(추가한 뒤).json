@@ -1,0 +1,97 @@
+{
+  "viewport": "360x800 @2x",
+  "node": "157:899",
+  "data": "11-13 12:00 · 넣은 할 일 「토익 단어 50개」 · 어학 · 11-12(어제) 적은 것을 추가",
+  "measured": {
+    "notice": {
+      "text": "「토익 단어 50개」를 오늘 할 일에 넣었어요.",
+      "x": 16,
+      "y": 74,
+      "width": 328,
+      "height": 72,
+      "background": "rgb(243, 238, 230)",
+      "radius": "8px",
+      "padding": "12px 16px",
+      "fontSize": "16px",
+      "color": "rgb(28, 35, 64)",
+      "role": "status"
+    },
+    "listHeadingY": 170,
+    "radios": [
+      {
+        "label": "토익 단어 50개어학추천",
+        "checked": true
+      },
+      {
+        "label": "글 한 편 초고 쓰기글쓰기",
+        "checked": false
+      },
+      {
+        "label": "정보처리기사 기출 1회자격증",
+        "checked": false
+      },
+      {
+        "label": "할 일 없이 시작",
+        "checked": false
+      }
+    ],
+    "tags": [
+      {
+        "text": "어학",
+        "fontSize": "14px",
+        "color": "rgb(94, 100, 120)"
+      },
+      {
+        "text": "추천",
+        "fontSize": "14px",
+        "color": "rgb(94, 100, 120)"
+      },
+      {
+        "text": "글쓰기",
+        "fontSize": "14px",
+        "color": "rgb(94, 100, 120)"
+      },
+      {
+        "text": "자격증",
+        "fontSize": "14px",
+        "color": "rgb(94, 100, 120)"
+      }
+    ],
+    "selectedRowBackground": "rgba(0, 0, 0, 0)",
+    "startButton": "30분 시작",
+    "scrollWidth": 360,
+    "clientWidth": 360
+  },
+  "mismatches": [
+    {
+      "item": "안내 상자 x",
+      "spec": "20",
+      "screen": "16"
+    },
+    {
+      "item": "안내 상자 너비",
+      "spec": "320",
+      "screen": "328"
+    },
+    {
+      "item": "안내 상자 안쪽",
+      "spec": "12px",
+      "screen": "12px 16px"
+    },
+    {
+      "item": "안내 상자 글자 크기",
+      "spec": "14px",
+      "screen": "16px"
+    },
+    {
+      "item": "고른 줄 바탕",
+      "spec": "rgb(243, 238, 230)",
+      "screen": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "item": "「추천」 꼬리표 글자 크기",
+      "spec": "12px",
+      "screen": "14px"
+    }
+  ]
+}

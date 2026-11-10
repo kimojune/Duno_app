@@ -5,6 +5,7 @@ import { CategoryPage } from "../../../components/category-page";
 import { EveningRecord } from "../../../components/evening-record";
 import { EveningTodoGallery } from "./evening-todo-gallery.dev";
 import { CONFIRM_GALLERY_IDS, ConfirmGallery, isConfirmGalleryId } from "./confirm-gallery.dev";
+import { FIX11_GALLERY_IDS, Fix11Gallery, isFix11GalleryId } from "./fix11-gallery.dev";
 import { FIX10B_GALLERY_IDS, Fix10BGallery, isFix10BGalleryId } from "./fix10-b-gallery.dev";
 import { GoalEditor } from "../../../components/goal";
 import { GrowthScreen } from "../../../components/growth-screen";
@@ -357,6 +358,7 @@ function Opener({ render }: { render: (close: () => void) => ReactNode }) {
 }
 
 export function V2Gallery({ id }: { id: string }) {
+  if (isFix11GalleryId(id)) return <Fix11Gallery id={id} />; // 고침11 사진(W2)
   if (isFix10BGalleryId(id)) return <Fix10BGallery id={id} />; // 고침10 W2b: 할 일 쪽 상태 모음(S2 · S2-b · 지난 날 · 시트 · 오늘 기록 나누기)
   if (isConfirmGalleryId(id)) return <ConfirmGallery id={id} />; // 고침10: 확인 창 쓰는 곳 다섯 + 막힘 · 머리 단추 두 변형
   if (id === "evening-todo" || id === "evening-todo-many") return <EveningTodoGallery many={id === "evening-todo-many"} />; // 고침 5바퀴: 오늘 기록의 「오늘 할 일」 줄·시트
@@ -597,6 +599,7 @@ export function V2Gallery({ id }: { id: string }) {
           "evening-split-blank",
           ...CONFIRM_GALLERY_IDS,
           ...FIX10B_GALLERY_IDS,
+          ...FIX11_GALLERY_IDS,
         ].map((s) => (
           <li key={s}>
             <a href={`/dev/v2?s=${s}`}>{s}</a>

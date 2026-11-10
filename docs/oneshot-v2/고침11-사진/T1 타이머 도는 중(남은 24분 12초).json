@@ -1,0 +1,136 @@
+{
+  "viewport": "360x800 @2x",
+  "node": "158:60",
+  "data": "11-13 12:00 고정 · 「토익 단어 50개」 · 어학 · 남은 24:12(1452초) · 30분 한 바퀴",
+  "remainingRatio": 0.806667,
+  "measured": {
+    "svg": {
+      "x": 20,
+      "y": 122,
+      "width": 320,
+      "height": 320,
+      "cx": 180,
+      "cy": 282,
+      "scale": 1,
+      "viewBox": "-160 -160 320 320",
+      "ariaHidden": "true",
+      "focusable": "false",
+      "tabIndex": null
+    },
+    "center": {
+      "x": 180,
+      "y": 282
+    },
+    "plate": {
+      "r": 132,
+      "diameterPx": 264,
+      "fill": "rgb(255, 255, 255)",
+      "stroke": "rgb(231, 225, 214)",
+      "strokeWidth": "1px"
+    },
+    "core": {
+      "r": 72,
+      "diameterPx": 144,
+      "fill": "rgb(255, 255, 255)"
+    },
+    "sector": {
+      "tag": "path",
+      "d": "M0 0L108.725 -40.434A116 116 0 1 1 0 -116Z",
+      "radius": 116,
+      "radiusPx": 116,
+      "fill": "rgb(115, 145, 255)",
+      "stroke": "rgb(28, 35, 64)",
+      "strokeWidth": "1px",
+      "startDeg": -20.39978470547826,
+      "endDeg": -90
+    },
+    "ticks": {
+      "total": 30,
+      "minor": 24,
+      "major": 6,
+      "minorStroke": "rgb(94, 100, 120)",
+      "minorWidth": "1px",
+      "majorStroke": "rgb(28, 35, 64)",
+      "majorWidth": "2px",
+      "labels": [
+        "0",
+        "5",
+        "10",
+        "15",
+        "20",
+        "25"
+      ],
+      "labelFont": "12px system-ui, -apple-system, \"Noto Sans KR\", sans-serif"
+    },
+    "label": "토익 단어 50개",
+    "name": {
+      "x": 153.890625,
+      "y": 254,
+      "width": 52.21875,
+      "height": 16,
+      "cx": 180,
+      "cy": 262,
+      "text": "남은 시간",
+      "fontSize": "12px",
+      "color": "rgb(94, 100, 120)",
+      "offsetFromCenterY": 20,
+      "topFromCenterY": 28
+    },
+    "number": {
+      "x": 138.71875,
+      "y": 270,
+      "width": 82.5625,
+      "height": 40,
+      "cx": 180,
+      "cy": 290,
+      "text": "24:12",
+      "fontSize": "32px",
+      "fontWeight": "700",
+      "lineHeight": "40px",
+      "color": "rgb(28, 35, 64)",
+      "tabular": "tabular-nums",
+      "role": "timer",
+      "ariaLabel": "30분 타이머가 돌고 있어요",
+      "topFromCenterY": 12
+    },
+    "statusText": {
+      "text": "30분 타이머가 돌고 있어요",
+      "fontSize": "14px",
+      "color": "rgb(94, 100, 120)",
+      "y": 450
+    },
+    "endButton": {
+      "x": 139,
+      "y": 478,
+      "width": 82,
+      "height": 48,
+      "cx": 180,
+      "cy": 502,
+      "text": "끝내기",
+      "background": "rgb(28, 35, 64)",
+      "color": "rgb(255, 255, 255)",
+      "radius": "999px",
+      "fontSize": "16px",
+      "fontWeight": "700"
+    },
+    "scrollWidth": 360,
+    "clientWidth": 360
+  },
+  "mismatches": [
+    {
+      "item": "「남은 시간」 상자 위쪽이 판 가운데에서 위로",
+      "spec": "29",
+      "screen": "28"
+    },
+    {
+      "item": "숫자 상자 위쪽이 판 가운데에서 위로",
+      "spec": "11",
+      "screen": "12"
+    },
+    {
+      "item": "끝내기 단추 너비",
+      "spec": "320",
+      "screen": "82"
+    }
+  ]
+}

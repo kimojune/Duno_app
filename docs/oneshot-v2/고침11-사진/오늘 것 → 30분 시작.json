@@ -1,0 +1,134 @@
+{
+  "viewport": "360x800 @2x",
+  "node": "50:52",
+  "data": "11-13 12:00 · 「토익 단어 50개」 · 어학 · 11-13(오늘) 적음",
+  "measured": {
+    "headerDay": "11월 13일 금요일",
+    "card": {
+      "x": 16,
+      "y": 190,
+      "width": 328,
+      "height": 84,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgb(243, 238, 230)",
+      "borderTop": "0px none rgb(28, 35, 64)",
+      "borderRadius": "16px",
+      "padding": "4px 16px"
+    },
+    "title": {
+      "text": "오늘 먼저 할 일 · 어학",
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "lineHeight": "24px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "0px none rgb(28, 35, 64)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    "todoText": {
+      "text": "토익 단어 50개",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "0px none rgb(28, 35, 64)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    "writtenLine": null,
+    "status": null,
+    "notice": null,
+    "mainButton": {
+      "x": 145.828125,
+      "y": 222,
+      "width": 106.171875,
+      "height": 48,
+      "text": "30분 시작",
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "lineHeight": "24px",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(28, 35, 64)",
+      "borderTop": "1px solid rgb(28, 35, 64)",
+      "borderRadius": "999px",
+      "padding": "0px 16px",
+      "disabled": false,
+      "ariaBusy": null
+    },
+    "skipButton": {
+      "x": 260,
+      "y": 222,
+      "width": 68,
+      "height": 48,
+      "text": "넘기기",
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "lineHeight": "20px",
+      "color": "rgb(28, 35, 64)",
+      "background": "rgba(0, 0, 0, 0)",
+      "borderTop": "1px solid rgba(0, 0, 0, 0)",
+      "borderRadius": "999px",
+      "padding": "0px 12px",
+      "disabled": false
+    },
+    "primaryClass": "btn btn-primary",
+    "buttonOrder": [
+      "30분 시작",
+      "넘기기"
+    ],
+    "scrollWidth": 360,
+    "clientWidth": 360
+  },
+  "mismatches": [
+    {
+      "item": "머리 날짜 글(요일)",
+      "spec": "11월 13일 목요일",
+      "screen": "11월 13일 금요일"
+    },
+    {
+      "item": "카드 x",
+      "spec": "20",
+      "screen": "16"
+    },
+    {
+      "item": "카드 너비",
+      "spec": "320",
+      "screen": "328"
+    },
+    {
+      "item": "카드 바탕(--color-surface)",
+      "spec": "#FFFFFF",
+      "screen": "rgb(243, 238, 230)"
+    },
+    {
+      "item": "제목 글자 크기",
+      "spec": "12px",
+      "screen": "16px"
+    },
+    {
+      "item": "제목 색",
+      "spec": "rgb(94, 100, 120)",
+      "screen": "rgb(28, 35, 64)"
+    },
+    {
+      "item": "건넨 할 일 굵기",
+      "spec": "700",
+      "screen": "400"
+    },
+    {
+      "item": "넘기기 누름 영역 너비",
+      "spec": "63",
+      "screen": "68"
+    },
+    {
+      "item": "넘기기 누름 영역 높이",
+      "spec": "40",
+      "screen": "48"
+    }
+  ]
+}
