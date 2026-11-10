@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG } from "../../lib/app-config";
@@ -235,9 +237,9 @@ describe("카드 「30분 시작」 — 설정으로 켠 경우(보관)", () => 
     config.cardStartEnabled = false;
   });
 
-  it("기본 값은 꺼짐이다(고침 11-2 화면)", () => {
-    config.cardStartEnabled = false;
-    expect(APP_CONFIG.cardStartEnabled).toBe(false);
+  it("기본 값은 꺼짐이다(고침 11-2 화면): 설정 파일(lib/app-config.ts)에 적힌 값을 그대로 읽는다", () => {
+    const source = readFileSync(join(__dirname, "../../lib/app-config.ts"), "utf8");
+    expect(source).toMatch(/cardStartEnabled:\s*false,/);
   });
 
   it("켜면 이미 목록에 있는 할 일 · 분야만 카드에 「30분 시작」 + 「넘기기」(지난 날 할 일은 여전히 「오늘 할 일에 추가」)", async () => {

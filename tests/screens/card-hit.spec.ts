@@ -90,3 +90,80 @@ for (const [state, width, height] of [
     expect(await owner(skip.visible.x + 0.5, mid)).toBe(skip.label);
   });
 }
+
+/** 고침11-2 검토 고침 1·2·7: 보이는 간격 · 카드 높이 · 포커스 고리 상자 · 누름 영역을 지난 날(L1) · 알림 붙음(L3) · 이미 목록(L6) · 분야만(L8) 카드로 잰다 */
+const STATES = [
+  { id: "fix11-k1", label: "L1" },
+  { id: "fix11-k3", label: "L3(알림 상자 붙음)" },
+  { id: "fix11-today", label: "L6" },
+  { id: "fix11-k6", label: "L8" },
+] as const;
+
+async function openGallery(page: Page, id: string) {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto(`/dev/v2?s=${id}`);
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator('.entry-card[aria-label="오늘 먼저 할 일"]')).toBeVisible();
+}
+
+type Boxes = { card: { y: number; h: number }; written: { b: number } | null; notice: { y: number; b: number } | null; btn: { y: number; h: number; hit: { y: number; h: number } }[] };
+
+async function boxes(page: Page): Promise<Boxes> {
+  return page.evaluate(() => {
+    const card = document.querySelector('.entry-card[aria-label="오늘 먼저 할 일"]')!;
+    const cr = card.getBoundingClientRect();
+    const w = card.querySelector(".offer-written")?.getBoundingClientRect();
+    const n = card.querySelector(".notice")?.getBoundingClientRect();
+    const btn = [...card.querySelectorAll<HTMLElement>("button")].map((el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const bt = parseFloat(cs.borderTopWidth);
+      const bb = parseFloat(cs.borderBottomWidth);
+      return { y: r.y + bt, h: r.height - bt - bb, hit: { y: r.y, h: r.height } };
+    });
+    return { card: { y: cr.y, h: cr.height }, written: w ? { b: w.bottom } : null, notice: n ? { y: n.y, b: n.bottom } : null, btn };
+  });
+}
+
+for (const s of STATES) {
+  test(`카드 ${s.label}: 보이는 간격(적은 날 줄 → 알림 12 · 알림/줄 → 단추 줄 16)과 누름 영역 48 · 겹침 없음`, async ({ page }) => {
+    await openGallery(page, s.id);
+    const b = await boxes(page);
+    const first = b.btn[0];
+    expect(Math.round(first.h), "보이는 높이 40").toBe(40);
+    expect(first.hit.h, "누름 높이").toBeGreaterThanOrEqual(47.5);
+    if (b.notice && b.written) {
+      expect(Math.round((b.notice.y - b.written.b) * 10) / 10, "적은 날 줄 → 알림 상자").toBe(12);
+      expect(Math.round((first.y - b.notice.b) * 10) / 10, "알림 상자 → 단추 줄").toBe(16);
+    } else if (b.written) {
+      expect(Math.round((first.y - b.written.b) * 10) / 10, "적은 날 줄 → 단추 줄").toBe(16);
+    }
+    console.log(`MEASURE ${s.label} cardH=${b.card.h} btnY=${first.y - b.card.y}`);
+  });
+}
+
+test("카드 L3은 L1보다 알림 상자(44) + 위 여백 12 = 56 높다(명세 198 − 142). 카드 전체 높이 142 · 198은 카드 틀(안쪽 여백 · 제목/글 줄 쌓기) 차이로 맞지 않는다 — 23 QA 몫(현재 L1 112)", async ({ page }) => {
+  await openGallery(page, "fix11-k1");
+  const l1 = (await boxes(page)).card.h;
+  await openGallery(page, "fix11-k3");
+  const l3 = (await boxes(page)).card.h;
+  expect(Math.round(l3 - l1), "L3 − L1").toBe(56);
+});
+
+test("카드 단추 포커스 고리: 보이는 40 채움 둘레(상자 안쪽 -2) · 2px", async ({ page }) => {
+  await openGallery(page, "fix11-k1");
+  const btn = page.locator('.entry-card[aria-label="오늘 먼저 할 일"] button').first();
+  await page.keyboard.press("Tab");
+  await btn.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  const ring = await btn.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    const off = parseFloat(cs.outlineOffset);
+    return { w: parseFloat(cs.outlineWidth), style: cs.outlineStyle, color: cs.outlineColor, boxH: r.height + 2 * off, visibleH: r.height - 8 };
+  });
+  expect(ring.style).toBe("solid");
+  expect(ring.w).toBe(2);
+  expect(ring.boxH, "고리 안쪽 상자 높이 = 보이는 40 + 위아래 2씩").toBeCloseTo(44, 0);
+});

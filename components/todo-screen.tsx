@@ -494,7 +494,7 @@ export function TodoScreen({
   // ---- 창 열고 닫기(C-D2, C-D8) ----
 
   /** 카드의 「{분야} 할 일 적기」로 연 창이 만들 첫 할 일의 id(제시 id에서 정한 식). 창을 닫으면 버린다 */
-  const composeIdRef = useRef<string | null>(null);
+  const composeIdRef = useRef<{ id: string; categoryId: string | null } | null>(null);
   const closeSheet = useCallback((via: "button" | "esc" | "popstate") => {
     if (!sheetOpenRef.current) return;
     sheetOpenRef.current = false;
@@ -549,7 +549,7 @@ export function TodoScreen({
     const c = card?.compose;
     if (!c || handledComposeRef.current === c.seq) return;
     handledComposeRef.current = c.seq;
-    composeIdRef.current = c.todoId;
+    composeIdRef.current = { id: c.todoId, categoryId: c.categoryId };
     setSelectedCategoryId(c.categoryId);
     selectedCategoryRef.current = c.categoryId;
     openSheet();
@@ -932,8 +932,7 @@ export function TodoScreen({
       // 기기 먼저 저장: 서버 왕복을 기다리지 않는다. 기기 거울에 먼저 적히고(목록이 바로 바뀐다) 서버에는 보낼 줄이 뒤에서 보낸다
       const categoryId =
         selectedCategoryId && readableChips().some((c) => c.id === selectedCategoryId) ? selectedCategoryId : null;
-      const id = composeIdRef.current ?? crypto.randomUUID(); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 첫 글은 제시 id에서 정한 id
-      composeIdRef.current = null;
+      const id = takeNewTodoId(categoryId); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 글은 조건이 맞으면 제시 id에서 정한 id
       scrollToRef.current = id;
       local.addTodo({ id, text: checked.text, categoryId });
       setDraft(""); // 첫 누름에 칸을 비운다: 연타하면 둘째부터 빈 칸
@@ -955,8 +954,7 @@ export function TodoScreen({
     // C-D6: 그때 고른 분야 번호(없거나 분야를 못 불러왔으면 기타). 칩에 보이는 분야만 보낸다
     const categoryId =
       selectedCategoryId && readableChips().some((c) => c.id === selectedCategoryId) ? selectedCategoryId : null;
-    const id = composeIdRef.current ?? crypto.randomUUID(); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 첫 글은 제시 id에서 정한 id
-    composeIdRef.current = null;
+    const id = takeNewTodoId(categoryId); // 새로 적는 글마다 새 id (D4). 카드에서 연 창의 글은 조건이 맞으면 제시 id에서 정한 id
     pendingTextRef.current.set(id, checked.text);
     pendingCategoryRef.current.set(id, categoryId);
     scrollToRef.current = id;
@@ -969,6 +967,19 @@ export function TodoScreen({
     announce(queueOffline ? TODO_TEXT.liveQueued : TODO_TEXT.liveSaving);
     input?.focus(); // 창은 열린 채, 포커스는 할 일 칸(C-D1)
     if (!queueOffline) void send(id, checked.text, categoryId);
+  }
+
+  /**
+   * 새 할 일의 id. 카드의 「{분야} 할 일 적기」로 연 창이면, 저장하는 때 고른 분야가 제시의 분야와 같고 그 id를 아직 쓰지 않았을 때만 제시 id에서 정한 id(서버가 그 id로 제시와 잇는다).
+   * 분야를 바꿨거나 이미 쓴 id면 새 uuid(같은 id로 다시 보내면 서버가 「이미 있음」으로 보아 새 글이 저장되지 않는다). 쓴 id만 비운다.
+   */
+  function takeNewTodoId(categoryId: string | null): string {
+    const c = composeIdRef.current;
+    if (c && c.categoryId === categoryId && !rowsRef.current.some((r) => r.id === c.id)) {
+      composeIdRef.current = null;
+      return c.id;
+    }
+    return crypto.randomUUID();
   }
 
   function changeDraft(value: string) {

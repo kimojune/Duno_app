@@ -345,6 +345,39 @@ describe("L8 「{분야} 할 일 적기」", () => {
   });
 });
 
+describe("L8 파생 id는 조건이 맞을 때만 쓴다(검토 고침 4)", () => {
+  const setupSheet = async () => {
+    hoisted.addTodo.mockImplementation(async (id: string, text: string, categoryId: string | null) => ({ ok: true, data: { day: DAY, todo: { id, readable: true, text, done: false, createdAt: "x", categoryId } } }));
+    await mount({ offers: offersApi(offer({ todoId: null, todoText: null, todoDay: null })), focus: focusApi() });
+    await press("어학 할 일 적기");
+  };
+  const write = async (text: string) => {
+    fireEvent.change(screen.getByRole("textbox", { name: "할 일 적기" }), { target: { value: text } });
+    await press("적기");
+  };
+
+  it("칩을 제시 분야와 다른 분야(기타)로 바꿔 저장하면 새 id, 그 뒤 같은 분야로 다시 적으면 파생 id로 글이 실제로 저장된다", async () => {
+    await setupSheet();
+    fireEvent.click(screen.getByRole("button", { name: "어학", pressed: true })); // 풀려서 기타
+    await write("다른 분야 글");
+    expect(hoisted.addTodo.mock.calls[0][0]).not.toBe(offerCopyId(OFFER_ID));
+    expect(hoisted.addTodo.mock.calls[0][2]).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "어학", pressed: false }));
+    await write("같은 분야 글");
+    expect(hoisted.addTodo.mock.calls[1]).toEqual([offerCopyId(OFFER_ID), "같은 분야 글", C1]);
+    expect(within(rowEl(offerCopyId(OFFER_ID)!)).getByText("오늘 먼저")).toBeTruthy(); // 글이 목록에 있고 카드가 이어진다
+  });
+
+  it("파생 id를 이미 쓴 뒤에 같은 분야로 또 적으면 새 id(같은 id 충돌로 새 글이 사라지지 않는다)", async () => {
+    await setupSheet();
+    await write("첫 글");
+    fireEvent.click(screen.getByRole("button", { name: "어학", pressed: false }));
+    await write("둘째 글");
+    expect(hoisted.addTodo.mock.calls[0][0]).toBe(offerCopyId(OFFER_ID));
+    expect(hoisted.addTodo.mock.calls[1][0]).not.toBe(offerCopyId(OFFER_ID));
+  });
+});
+
 describe("끝냄 · 지움 → 그날 카드를 접는다(K8 꼴)", () => {
   it("카드가 가리키는 오늘 할 일을 끝냄 체크하면 카드가 접히고 꼬리표도 떨어진다", async () => {
     hoisted.setTodoDone.mockResolvedValue({ ok: true, data: { id: T2, done: true } });
@@ -397,5 +430,78 @@ describe("아침 알림으로 열기(/?open=offer)", () => {
   it("저녁 알림(/?open=evening)은 그대로 저녁 기록을 연다", async () => {
     await mount({ offers: offersApi(), focus: focusApi() }, "evening");
     expect(await screen.findByRole("dialog", { name: "오늘 기록" })).toBeTruthy();
+  });
+});
+
+/** 고침11-2 검토 고침 1/3: 사라졌던 시험 둘을 되살리고(요구가 바뀌지 않았다), 빠졌던 시험을 더한다 */
+describe("되살린 시험 · 빠졌던 시험", () => {
+  it("서버가 not_found로 거절해도(넘긴·지난 제시) 실패 글 없이 카드를 다시 받는다", async () => {
+    const request = vi.fn().mockResolvedValueOnce({ ok: true, data: { offer: offer() } }).mockResolvedValue({ ok: true, data: { offer: null, reason: "no_target" } });
+    const addTodo = vi.fn(async () => ({ ok: false as const, error: "not_found" as const }));
+    await mount({ offers: { request, dismiss: vi.fn(), addTodo } as unknown as OffersApi, focus: focusApi() });
+    await press("오늘 할 일에 추가");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
+  });
+
+  it("타이머 탭을 떠나면 K9 안내(「…를 오늘 할 일에 넣었어요.」)가 사라진다", async () => {
+    await mount({ offers: offersApi(), focus: focusApi() });
+    await press("오늘 할 일에 추가");
+    await press("타이머에서 시작 ›");
+    expect(screen.getByText("「어제 적은 단어」를 오늘 할 일에 넣었어요.")).toBeTruthy();
+    await press("할 일");
+    await press("타이머");
+    expect(screen.queryByText(/를 오늘 할 일에 넣었어요/)).toBeNull();
+  });
+
+  it("카드를 넘기면 목록 줄의 꼬리표 「오늘 먼저」가 떨어진다", async () => {
+    await mount({ offers: offersApi(offer({ todoId: T2, todoDay: "2026-11-07" })), focus: focusApi() }, null, withCopy());
+    expect(within(rowEl(T2)).getByText("오늘 먼저")).toBeTruthy();
+    await press("넘기기");
+    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
+    expect(within(rowEl(T2)).queryByText("오늘 먼저")).toBeNull();
+  });
+
+  it("카드가 가리키는 할 일을 목록에서 지우면(자세히 → 더 보기 → 지우기) 그날 카드를 접는다", async () => {
+    const deleteTodo = vi.fn(async (id: string) => ({ ok: true as const, data: { id } }));
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/notes")) return Response.json({ ok: true, data: { notes: [] } });
+      return Response.json({ ok: false, error: "unavailable" });
+    });
+    const manage = await import("../../app/todos/manage-actions");
+    (manage.deleteTodo as unknown as ReturnType<typeof vi.fn>).mockImplementation(deleteTodo);
+    await mount({ offers: offersApi(offer({ todoId: T2, todoDay: "2026-11-07" })), focus: focusApi() }, null, withCopy());
+    expect(card()).toBeTruthy();
+    await press("자세히 보기: 어제 적은 단어");
+    await press("더 보기");
+    await act(async () => fireEvent.click(screen.getByRole("menuitem", { name: "지우기" })));
+    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog", { name: "이 할 일을 지울까요?" })).getByRole("button", { name: "지우기" }))); // 확인 창
+    await act(async () => {});
+    expect(deleteTodo).toHaveBeenCalledWith(T2);
+    expect(screen.queryByRole("region", { name: "오늘 먼저 할 일" })).toBeNull();
+    fetchSpy.mockRestore();
+  });
+
+  it("「어제 못 끝낸 할 일 n개 보기」의 n이 추가 뒤 하나 준다", async () => {
+    const todo = (id: string, text: string) => ({ id, readable: true, text, done: false, createdAt: "x", categoryId: C1 });
+    let calls = 0;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/todos/yesterday")) {
+        calls += 1;
+        const todos = calls === 1 ? [todo(T1, "어제 적은 단어"), todo("44444444-4444-4444-8444-444444444444", "또 하나")] : [todo("44444444-4444-4444-8444-444444444444", "또 하나")];
+        return Response.json({ ok: true, data: { todos } });
+      }
+      return Response.json({ ok: false, error: "unavailable" });
+    });
+    await mount({ offers: offersApi(), focus: focusApi() });
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: "어제 못 끝낸 할 일 2개 보기" })).toBeTruthy();
+    await press("오늘 할 일에 추가");
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: "어제 못 끝낸 할 일 1개 보기" })).toBeTruthy();
+    fetchSpy.mockRestore();
   });
 });
