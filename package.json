@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "notify:keys": "node scripts/notify-keys.mjs",
     "e2e": "playwright test",
-    "screens": "playwright test --config playwright.screens.config.ts"
+    "screens": "playwright test --config playwright.screens.config.ts",
+    "load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/load/run.ts"
   },
   "dependencies": {
     "next": "16.4.5",
