@@ -81,7 +81,7 @@ describe("requestOfferForUser (제시 기록)", () => {
     const res = await requestOfferForUser(deps(store), { surface: "card" });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.data.offer).toMatchObject({ surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어 외우기", state: "new" });
+    expect(res.data.offer).toMatchObject({ surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어 외우기", todoDay: "2026-11-07", state: "new" });
     expect(store.table("todo_offers")).toHaveLength(1);
     const row = store.table("todo_offers")[0];
     expect(row).toMatchObject({ user_id: ME, surface: "card", category_id: C1, todo_id: T1, day: "2026-11-07" });

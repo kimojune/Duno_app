@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "../lib/use-reduced-motion";
 import { APP_CONFIG } from "../lib/app-config";
 import type { FocusApi } from "../lib/focus-api";
 import { remainingSeconds } from "../lib/focus/logic";
@@ -11,6 +12,7 @@ import { useOnline } from "../lib/use-online";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, OtherChip } from "./todo-view";
 import { categoryColorValue } from "../lib/category-color";
+import { TimerClock } from "./timer-clock";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
 import { Wordmark } from "./wordmark";
 
@@ -46,6 +48,9 @@ export const TIMER_TEXT = {
   loadFailed: "타이머를 불러오지 못했어요.",
   reload: "다시 불러오기",
   unreadable: "읽을 수 없는 할 일",
+  remainingName: "남은 시간",
+  /** 「오늘 할 일에 추가」 뒤 안내(고침 11, K9) */
+  added: (text: string) => `「${text}」를 오늘 할 일에 넣었어요.`,
 } as const;
 
 type Entry = { id: string; name: string };
@@ -67,6 +72,7 @@ export function TimerScreen({
   now = Date.now,
   onActiveChange,
   recommended,
+  added,
 }: {
   api: FocusApi;
   fetchToday: () => Promise<TodayRead>;
@@ -79,6 +85,11 @@ export function TimerScreen({
   onActiveChange?: (session: FocusSession | null) => void;
   /** 앱의 추천(⑤): 있으면 목록 맨 앞에 놓고 처음에 골라 둔다 */
   recommended?: { offerId: string | null; todoId: string | null; categoryId: string | null; label: string } | null;
+  /**
+   * 「오늘 할 일에 추가」 뒤(고침 11, K9): 그 할 일을 골라 두고 안내 상자를 위에 보인다. 타이머는 켜지 않는다(시작은 사용자가, D-092).
+   * 새 객체가 오면 그때마다 골라 두고 포커스를 이 탭 제목으로 옮긴다. 사용자가 다른 줄을 고르면 안내는 사라진다.
+   */
+  added?: { todoId: string; text: string | null } | null;
 }) {
   // 기기 먼저 저장(api.localFirst)이면 끊겨 있어도 시작·끝내기를 막지 않는다(기기에 먼저 적고 서버에는 뒤에서 보낸다)
   const online = useOnline() || api.localFirst === true;
@@ -94,6 +105,8 @@ export function TimerScreen({
   const [busy, setBusy] = useState<"start" | "end" | null>(null);
   const [message, setMessage] = useState("");
   const [tick, setTick] = useState(0);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
   const startKeyRef = useRef<{ key: string; id: string } | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
@@ -131,6 +144,19 @@ export function TimerScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, fetchToday, active, activation]);
 
+  // 「오늘 할 일에 추가」 뒤: 새 added가 오면 넣은 할 일을 골라 두고 안내를 보인다(렌더 중에 맞추는 꼴 — 효과로 상태를 바꾸지 않는다)
+  const [seenAdded, setSeenAdded] = useState<typeof added>(null);
+  if (added && added !== seenAdded) {
+    setSeenAdded(added);
+    setChoice({ kind: "todo", id: added.todoId });
+    setNoticeOpen(true);
+    setMessage("");
+  }
+  // 포커스는 타이머 탭 제목으로(이 탭이 보일 때). 안내 상자는 role=status라 한 번 읽힌다
+  useEffect(() => {
+    if (added && active) titleRef.current?.focus();
+  }, [added, active]);
+
   // 도는 동안 1초마다 남은 시간을 다시 그린다(보이는 탭에서만)
   const isRunning = running !== null;
   useEffect(() => {
@@ -156,6 +182,7 @@ export function TimerScreen({
 
   function pick(next: Choice) {
     setChoice(next);
+    setNoticeOpen(false);
     setMessage("");
   }
 
@@ -229,6 +256,10 @@ export function TimerScreen({
   const remaining = running ? remainingSeconds(startedMs(running.session), now() + running.offsetMs, running.session.plannedMinutes) : 0;
   const runningTodo = running?.session.todoId ? todos.find((t) => t.id === running.session.todoId) : undefined;
   const runningLabel = runningTodo ? runningTodo.text : nameOf(running?.session.categoryId ?? null);
+  // 시계 부채꼴 색: 분야 순서의 색, 기타(분야 없음·모르는 분야)는 기타 색
+  const runningCategoryId = running?.session.categoryId ?? runningTodo?.categoryId ?? null;
+  const runningOrder = runningCategoryId === null ? -1 : categories.findIndex((c) => c.id === runningCategoryId);
+  const clockColor = categoryColorValue(runningOrder >= 0 ? runningOrder : null);
 
   return (
     <section className="timer" aria-labelledby="timer-title">
@@ -256,13 +287,18 @@ export function TimerScreen({
         {load === "ready" && running && (
           <div className="timer-running">
             <p className="timer-label">{runningLabel}</p>
-            <p className="timer-clock" role="timer" aria-label={TIMER_TEXT.running(running.session.plannedMinutes)}>
-              {formatTimer(remaining)}
-            </p>
-            {remaining === 0 && (
+            <TimerClock remainingSeconds={remaining} color={clockColor} reducedMotion={reducedMotion}>
+              <p className="timer-face-name">{TIMER_TEXT.remainingName}</p>
+              <p className="timer-clock" role="timer" aria-label={TIMER_TEXT.running(running.session.plannedMinutes)}>
+                {formatTimer(remaining)}
+              </p>
+            </TimerClock>
+            {remaining === 0 ? (
               <p className="todo-sub" role="status">
                 {TIMER_TEXT.over(running.session.plannedMinutes)}
               </p>
+            ) : (
+              <p className="todo-sub">{TIMER_TEXT.running(running.session.plannedMinutes)}</p>
             )}
             <div className="detail-actions">
               <PrimaryButton busy={busy === "end"} disabled={busy !== null} onClick={() => void end()}>
@@ -274,6 +310,9 @@ export function TimerScreen({
 
         {load === "ready" && !running && (
           <div className="timer-choose">
+            {noticeOpen && added && effectiveChoice.kind === "todo" && effectiveChoice.id === added.todoId && (
+              <Notice role="status">{TIMER_TEXT.added(added.text ?? TIMER_TEXT.unreadable)}</Notice>
+            )}
             <h2 className="growth-sub-title">{TIMER_TEXT.chooseHeading}</h2>
             {todosFailed && <p className="todo-sub">{TIMER_TEXT.todosFailed}</p>}
             <fieldset className="timer-fieldset">

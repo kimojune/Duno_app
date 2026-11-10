@@ -751,7 +751,9 @@ export function TodoView(props: TodoViewProps) {
   const header = (
     <header className="today-header">
       <Wordmark className="today-wordmark" />
-      <h1 className="today-title">{TODO_TEXT.title}</h1>
+      <h1 id="todo-title" className="today-title" tabIndex={-1}>
+        {TODO_TEXT.title}
+      </h1>
       {/* 고침10 E(50:52 · d-173): 머리의 「로그아웃」은 없다(로그아웃은 내 정보 한 곳). 날짜 줄 오른쪽에 원 단추 「‹」 하나 = 지난 날 보기
           (보이는 원 32 · 누름 48 — 공통 .step-btn). 「›」 하루 뒤는 없다 */}
       <div className="today-date-row">

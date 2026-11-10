@@ -5,7 +5,7 @@ import { createClient } from "../../lib/supabase/server";
 import { saveEveningLog } from "../evening/actions";
 import { endFocus, startFocus } from "../focus/actions";
 import { clearWeeklyGoal, saveWeeklyGoal } from "../goals/actions";
-import { dismissOffer } from "../offers/actions";
+import { addOfferTodo, dismissOffer } from "../offers/actions";
 import { saveRatios, saveSettings } from "../settings/actions";
 import { addCategory, addTodo, setTodoDone } from "../todos/actions";
 import { addNote, carryOverTodos, deleteNote, deleteTodo, editTodo, reorderTodos } from "../todos/manage-actions";
@@ -89,6 +89,8 @@ async function dispatch(op: Fields, clientAt: unknown): Promise<Reply> {
     }
     case "offer.dismiss":
       return dismissOffer(op.id);
+    case "offer.addTodo":
+      return addOfferTodo({ offerId: op.offerId });
     default:
       return { ok: false, error: "invalid_input" };
   }

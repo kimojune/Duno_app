@@ -45,3 +45,22 @@ export function pickOfferTodo(candidates: OfferTodoCandidate[], today: string): 
 export function offerKey(surface: string, categoryId: string | null, todoId: string | null): string {
   return `${surface}|${categoryId ?? "-"}|${todoId ?? "-"}`;
 }
+
+/**
+ * 카드의 「적은 날」 줄(고침 11, 23 명세 4절): 어제 것이면 「어제 적은 할 일」, 그 전이면 「{M}월 {D}일에 적은 할 일」.
+ * 오늘 것·날짜를 모르는 것(옛 기기 사본)·날짜 꼴이 틀린 것은 null(줄 없음, 「30분 시작」 꼴).
+ */
+export function writtenDayLine(todoDay: string | null | undefined, today: string): string | null {
+  if (!todoDay || todoDay >= today) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(todoDay);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)) - 1));
+  const yesterday = d.toISOString().slice(0, 10);
+  if (todoDay === yesterday) return "어제 적은 할 일";
+  return `${Number(m[2])}월 ${Number(m[3])}일에 적은 할 일`;
+}
+
+/** 카드가 「오늘 할 일에 추가」를 보일 때인가: 건넨 할 일이 있고 지난 날 것이다 */
+export function needsAddToToday(offer: { todoId: string | null; todoDay?: string | null }, today: string): boolean {
+  return offer.todoId !== null && typeof offer.todoDay === "string" && offer.todoDay < today;
+}

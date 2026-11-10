@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEvening, seoulHour } from "../../lib/app-config";
+import { seoulHour } from "../../lib/app-config";
 import { formatClock, formatDeltaMinutes, formatMinutes, formatTimer } from "../../lib/time-format";
 import { addDays, dayInRange, isDayString, monthStartFor, previousMonthRange, weekDates, weekStartFor } from "../../lib/week";
 
@@ -57,12 +57,11 @@ describe("time-format", () => {
   });
 });
 
-describe("저녁 판정(서울 오후 6시~새벽 4시)", () => {
+describe("서울 시각(저녁 판정은 없어졌다 — 고침 11, d-223)", () => {
   it("서울 시각으로 읽는다", () => {
     expect(seoulHour(new Date("2026-11-07T09:00:00.000Z"))).toBe(18);
-    expect(isEvening(new Date("2026-11-07T08:59:00.000Z"))).toBe(false); // 서울 17:59
-    expect(isEvening(new Date("2026-11-07T09:00:00.000Z"))).toBe(true); // 18:00
-    expect(isEvening(new Date("2026-11-07T18:59:00.000Z"))).toBe(true); // 03:59
-    expect(isEvening(new Date("2026-11-07T19:00:00.000Z"))).toBe(false); // 04:00
+    expect(seoulHour(new Date("2026-11-07T08:59:00.000Z"))).toBe(17);
+    expect(seoulHour(new Date("2026-11-07T18:59:00.000Z"))).toBe(3);
+    expect(seoulHour(new Date("2026-11-07T19:00:00.000Z"))).toBe(4);
   });
 });

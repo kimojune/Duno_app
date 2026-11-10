@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { APP_CONFIG, isEvening } from "../lib/app-config";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { APP_CONFIG } from "../lib/app-config";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
 import { defaultGoalsApi } from "../lib/goals-api";
@@ -45,6 +45,7 @@ import { Notice, TextButton } from "./ui";
  * - 처음 설정을 안 마쳤으면 처음 설정(Onboarding)부터 보여 준다(PRD ①). 설정을 못 읽었을 때는 강요하지 않고 앱을 보여 준다(임시).
  * - 아래 탭: 상태보기 · 할 일(처음 탭) · 타이머. 탭을 옮겨도 다른 탭은 지우지 않고 숨긴다(적던 글·도는 타이머가 살아 있게).
  * - 할 일 화면에는 고치기·지우기·순서·작업 기록·어제 것 가져오기(PRD 0·0-1번)와, 목록 위의 먼저 할 일 카드(⑤)·저녁 기록 입구(②)를 단다.
+ * - 알림을 눌러 들어온 주소: /?open=evening은 저녁 기록을 열고, /?open=offer(아침 알림)는 할 일 탭 맨 위(먼저 할 일 카드)로 온다.
  * - 저녁 기록(PRD ②)은 알림을 눌러 들어온 주소(/?open=evening)로도 열린다. 저장 직후 한 줄을 누르면 상태보기(입구 after_save)로 간다(③, G3).
  */
 
@@ -141,6 +142,11 @@ function readableCategories(initial: TodayRead): Entry[] {
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
 
+/** 카드가 사라진 뒤 포커스를 할 일 탭 제목(「오늘」)으로 옮긴다(포커스가 사라진 단추에 남지 않게) */
+function todoTitleFocus() {
+  if (typeof document !== "undefined") document.getElementById("todo-title")?.focus();
+}
+
 /**
  * 기기 먼저 저장(고침 3바퀴)의 묶음: 운영 장치(기기 거울·보낼 줄)와 그 위에서 화면이 쓰는 API들.
  * 있으면 화면은 서버 왕복을 기다리지 않고 기기 거울을 읽고 쓴다. 없으면 예전 방식(서버에서 읽어 받은 home을 쓰고 서버에 직접 쓴다) 그대로다.
@@ -162,7 +168,7 @@ export function AppShell({
   /** 기기 먼저 저장(고침 3바퀴, 선택): 있으면 화면이 기기 거울을 읽고 쓴다 */
   local?: LocalBundle;
   home: HomeRead;
-  initialOpen?: "evening" | null;
+  initialOpen?: "evening" | "offer" | null;
   apis?: Partial<ShellApis>;
   /** 사용자 번호(기기에 둘 오프라인 보관함의 열쇠. 화면에 내지 않는다). 없으면 보관함을 쓰지 않는다 */
   userKey?: string;
@@ -232,7 +238,7 @@ function MainShell({
 }: {
   local: LocalBundle | undefined;
   initial: TodayRead;
-  initialOpen: "evening" | null;
+  initialOpen: "evening" | "offer" | null;
   apis: ShellApis;
   settings: SettingsData | null;
   outbox: Outbox | undefined;
@@ -296,12 +302,22 @@ function MainShell({
   // 이번 주 목표(⑥): 한 줄은 저녁 기록·목표를 저장한 뒤 다시 읽는다
   const [goalVersion, setGoalVersion] = useState(0);
   const [goalEditor, setGoalEditor] = useState<GoalSummary | null>(null);
+  // 「오늘 할 일에 추가」 뒤 타이머 탭이 골라 둘 할 일과 안내(K9). 타이머 탭을 떠나면 비운다
+  const [addedTodo, setAddedTodo] = useState<{ todoId: string; text: string | null } | null>(null);
   const cardStartRef = useRef<string | null>(null);
+  const cardAddingRef = useRef(false);
   // 탭 줄의 실제 높이(B9): 글자가 커져 두 줄이 되면 본문 아래 여백도 따라 늘린다
   const { shellRef, shellStyle } = useTabbarHeight();
 
   // 카드 제시를 받는다(서버에서 가져오는 일). 앱을 열 때, 화면이 다시 보일 때, 새벽 4시를 넘길 때마다 다시 받는다(A13).
   // 같은 제시는 서버가 한 번만 센다. 받은 제시가 반응 없는(new) 오늘 것이 아니면 카드를 거둔다. 못 받았으면 지금 카드를 그대로 둔다.
+  // 아침 알림(/?open=offer)으로 열렸으면 할 일 탭 맨 위(카드가 보이는 자리)에서 시작한다
+  useEffect(() => {
+    if (initialOpen !== "offer") return;
+    // 앱은 늘 할 일 탭에서 시작한다(이미 열린 창은 서비스 워커가 그 주소로 옮겨 다시 열린다). 여기서는 맨 위로만 올린다
+    if (typeof window !== "undefined" && typeof window.scrollTo === "function") window.scrollTo(0, 0);
+  }, [initialOpen]);
+
   useEffect(() => {
     let alive = true;
     function refresh() {
@@ -372,6 +388,8 @@ function MainShell({
 
   /** 탭을 연다. 상태보기는 열 때마다 다시 읽고 본 것을 한 번 남긴다(입구와 함께) */
   function openTab(next: TabId, entry: ViewEntry = "self") {
+    // 타이머 탭을 떠나면 「오늘 할 일에 넣었어요」 안내는 사라진다(임시)
+    if (next !== "timer") setAddedTodo(null);
     if (next === "growth") {
       setGrowthEntry(entry);
       setGrowthActivation((n) => n + 1);
@@ -433,10 +451,50 @@ function MainShell({
     }
   }
 
+  /** 「오늘 할 일에 추가」: 지난 날 할 일을 오늘 할 일로 복사하고 타이머 탭에서 골라 둔다. 타이머는 켜지 않는다(시작은 사용자가, D-092) */
+  const refreshCardNow = useCallback(async () => {
+    const res = await apis.offers.request("card");
+    if (!res.ok) return;
+    const offer = res.data.offer;
+    setCardOffer(offer && offer.state === "new" && offer.day === todoDayFor(new Date()) ? offer : null);
+  }, [apis]);
+
+  async function addFromCard() {
+    const offer = cardOffer;
+    if (!offer || cardBusy || cardAddingRef.current) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine && !local) {
+      setCardError("offline");
+      return;
+    }
+    cardAddingRef.current = true; // 연타해도 한 번만 보낸다(서버도 같은 제시는 사본 하나)
+    setCardBusy(true);
+    setCardError(null);
+    try {
+      const res = await apis.offers.addTodo(offer.id);
+      if (res.ok && res.data.added) {
+        const { todoId, todoText, day } = res.data;
+        // 카드는 그 사본으로 현행 「30분 시작」 꼴이 된다(같은 제시)
+        setCardOffer((prev) => (prev && prev.id === offer.id ? { ...prev, todoId, todoText: todoText ?? prev.todoText, todoDay: day } : prev));
+        setAddedTodo({ todoId, text: todoText ?? offer.todoText });
+        openTab("timer");
+      } else if (res.ok || res.error === "not_found") {
+        // 원본이 그새 끝났거나 지워졌다(다른 탭·기기): 사본을 만들지 않고 카드를 다시 받는다
+        await refreshCardNow();
+      } else {
+        setCardError("failed");
+      }
+    } finally {
+      cardAddingRef.current = false;
+      setCardBusy(false);
+    }
+  }
+
   async function dismissCard() {
     const offer = cardOffer;
     if (!offer || cardBusy) return;
     setCardOffer(null); // 카드는 바로 거둔다. 넘김 기록이 실패해도 사용자는 넘긴 것이다
+    // 포커스가 사라진 단추에 남지 않게 할 일 탭 제목(「오늘」)으로 옮긴다
+    todoTitleFocus();
     await apis.offers.dismiss(offer.id);
   }
 
@@ -513,10 +571,11 @@ function MainShell({
                   running={timerRunning}
                   onOpenTimer={() => openTab("timer")}
                   onStart={() => void startFromCard()}
+                  onAdd={() => void addFromCard()}
                   onDismiss={() => void dismissCard()}
                 />
               )}
-              <EveningEntry evening={isEvening(new Date())} onOpen={() => setEveningOpen(true)} />
+              <EveningEntry onOpen={() => setEveningOpen(true)} />
             </>
           }
         />
@@ -528,6 +587,7 @@ function MainShell({
           active={tab === "timer"}
           activation={timerActivation}
           recommended={recommended}
+          added={addedTodo}
           onActiveChange={(session) => setTimerRunning(session !== null)}
         />
       </div>

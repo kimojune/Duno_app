@@ -398,9 +398,9 @@ describe("오늘 기록(옛 저녁 기록) (7-3, ②)", () => {
 });
 
 describe("EveningEntry", () => {
-  it("고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」는 저녁에도 낮에도 보인다", () => {
+  it("고침9 ⑬ 10: 입구 아래 「오늘 몇 시간 썼어요?」는 시간대와 상관없이 늘 보인다(고침 11: evening 값 없앰)", () => {
     const onOpen = vi.fn();
-    const { rerender } = render(<EveningEntry evening onOpen={onOpen} />);
+    const { rerender } = render(<EveningEntry onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "오늘 기록 남기기" }));
     expect(onOpen).toHaveBeenCalled();
@@ -410,9 +410,9 @@ describe("EveningEntry", () => {
     const card = screen.getByRole("button", { name: "오늘 기록 남기기" });
     expect(document.getElementById(card.getAttribute("aria-describedby")!)!.textContent).toBe("오늘 몇 시간 썼어요?");
     expect(card.querySelector(".entry-go")?.textContent).toBe("›");
-    rerender(<EveningEntry evening={false} onOpen={onOpen} />);
+    rerender(<EveningEntry onOpen={onOpen} />);
     expect(screen.getByText("오늘 몇 시간 썼어요?")).toBeTruthy(); // 옛판은 낮에 숨김 — Figma 50:28 · 50:52는 늘 보임
-    expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 낮에도 같은 글
+    expect(screen.getByRole("button", { name: "오늘 기록 남기기" })).toBeTruthy(); // 다시 그려도 같은 글
     expect(document.body.textContent).not.toContain("저녁 기록");
   });
 });

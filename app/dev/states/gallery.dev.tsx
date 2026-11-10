@@ -70,7 +70,7 @@ const LONG_OFFER_TEXT = "긴 할 일 글 ".repeat(40).slice(0, 200);
 function OfferOnly({ text }: { text: string | null }) {
   return (
     <OfferCard
-      offer={{ id: "o2", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: text ? "t-long" : null, todoText: text, state: "new" }}
+      offer={{ id: "o2", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: text ? "t-long" : null, todoText: text, todoDay: null, state: "new" }}
       busy={false}
       error={null}
       onStart={noop}
@@ -87,13 +87,13 @@ function TopCards() {
         이번 주 목표 15시간 중 9시간
       </button>
       <OfferCard
-        offer={{ id: "o1", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: null, todoText: null, state: "new" }}
+        offer={{ id: "o1", surface: "card", day: "2026-11-05", categoryId: null, categoryName: "영어", todoId: null, todoText: null, todoDay: null, state: "new" }}
         busy={false}
         error={null}
         onStart={noop}
         onDismiss={noop}
       />
-      <EveningEntry evening={false} onOpen={noop} />
+      <EveningEntry onOpen={noop} />
     </>
   );
 }

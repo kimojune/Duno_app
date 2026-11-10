@@ -6,6 +6,7 @@ import type { FocusSession } from "../focus/types";
 import type { NoteItem } from "../notes/types";
 import type { SettingsData } from "../settings/types";
 import { DEFAULT_NOTIFY } from "../settings/validation";
+import { offerCopyId } from "../offers/copy-id";
 import { todoDayFor } from "../todos/day";
 import { addDays, weekStartFor } from "../week";
 import type { Mirror, MirrorSnapshot, MirrorTodo, QueuedOp } from "./types";
@@ -181,6 +182,22 @@ export function applyOp(m: Mirror, queued: Pick<QueuedOp, "op" | "clientAt">): M
     }
     case "view.record":
       return m; // 쌓기만 하는 기록이라 거울이 바뀔 것이 없다
+    case "offer.addTodo": {
+      // 건넨 지난 날 할 일을 오늘 사본으로(사본 id는 제시 id에서 정해진 식, 서버와 같다). 이미 있으면 새로 만들지 않는다
+      const copyId = offerCopyId(op.offerId);
+      if (!copyId) return m;
+      const today = dayOf(clientAt);
+      const card = m.offers.card;
+      const withCard = (todos: MirrorTodo[], text: string | null): Mirror =>
+        card && card.id === op.offerId ? { ...m, todos, offers: { ...m.offers, card: { ...card, todoId: copyId, todoText: text, todoDay: today } } } : { ...m, todos };
+      const existing = m.todos.find((t) => t.id === copyId);
+      if (existing) return withCard(m.todos, existing.text);
+      const source = m.todos.find((t) => t.id === op.from && !t.done && t.day < today);
+      if (!source) return m;
+      const copy: MirrorTodo = { id: copyId, day: today, text: source.text, done: false, createdAt: clientAt, categoryId: source.categoryId, position: null };
+      const next = withCard([...m.todos, copy], source.text);
+      return { ...next, notes: { ...next.notes, [copyId]: next.notes[copyId] ?? [] } };
+    }
     case "offer.dismiss": {
       const card = m.offers.card?.id === op.id ? null : m.offers.card;
       const timer = m.offers.timer_tab?.id === op.id ? null : m.offers.timer_tab;

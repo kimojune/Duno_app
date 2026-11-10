@@ -7,8 +7,6 @@ export const APP_CONFIG = {
   categoryExamples: ["어학", "글쓰기", "CS 공부", "자격증"] as readonly string[],
   /** 처음 설정 목표 칸의 안내 예시 */
   goalPlaceholder: "예: 글 한 편 끝내고 토익 800점 넘기기",
-  /** 「저녁」의 시작 시각(서울 시). 끝은 새벽 4시(하루가 바뀔 때). 저녁 기록 입구 글(질문 글을 앞세움)에 쓴다. 먼저 할 일 카드는 시간대와 상관없이 건넨다 */
-  eveningStartHour: 18,
   /** 건네는 타이머 길이(분) */
   timerMinutes: 30,
   /** 알림 기본 시각(자정부터 분). 저녁 오후 7시 30분, 아침 오전 10시 */
@@ -26,10 +24,4 @@ export const APP_CONFIG = {
 export function seoulHour(now: Date): number {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
   return Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-}
-
-/** 지금이 저녁(오후 6시~새벽 4시 전)인가 */
-export function isEvening(now: Date): boolean {
-  const hour = seoulHour(now);
-  return hour >= APP_CONFIG.eveningStartHour || hour < 4;
 }

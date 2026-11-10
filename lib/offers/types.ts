@@ -13,6 +13,8 @@ export type Offer = {
   /** 건넨 할 일(없으면 분야만 건넨 것) */
   todoId: string | null;
   todoText: string | null;
+  /** 건넨 할 일을 적은 날(두노 하루). 오늘 것이면 오늘 날짜, 지난 날 것이면 그 날(카드가 「오늘 할 일에 추가」를 보일지 가른다). 할 일이 없으면 null */
+  todoDay: string | null;
   /** new = 아직 반응 없음, dismissed = 넘겼다, started = 그 제시로 타이머를 켰다 */
   state: "new" | "dismissed" | "started";
 };
@@ -20,3 +22,9 @@ export type Offer = {
 /** offer가 null이면 건네지 않은 것: no_target = 건넬 분야가 없음(비율·목표 없음) */
 export type OfferRequestResult = { offer: Offer | null; reason?: "no_target" };
 export type DismissedOffer = { id: string };
+
+/**
+ * 「오늘 할 일에 추가」(고침 11) 결과. added = true면 오늘 사본이 있다(todoId는 제시 id에서 정한 사본 id).
+ * added = false는 사본을 만들지 않은 것이다(원본이 그새 끝났거나 지워졌거나 이미 오늘 것): 화면은 카드를 다시 받는다.
+ */
+export type AddOfferTodoResult = { added: true; todoId: string; todoText: string | null; day: string } | { added: false };

@@ -389,6 +389,8 @@ export function v2Rules(): Record<string, TableRule> {
     },
     todos: {
       allowDelete: true,
+      // 실제 표는 done이 not null default false(마이그레이션 create_todos): 안 보낸 insert는 false로 채운다
+      defaults: (row) => (row.done === undefined ? { done: false } : {}),
       updateColumns: ["done", "text_encrypted", "category_id", "position"],
       fks: [{ cols: ["category_id", "user_id"], table: "categories", refCols: ["id", "user_id"] }],
     },

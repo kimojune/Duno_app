@@ -36,7 +36,7 @@ export function LocalAppShell({
   initialSnapshot = null,
 }: {
   userKey: string;
-  initialOpen?: "evening" | null;
+  initialOpen?: "evening" | "offer" | null;
   /** 이 기기에서 처음 여는 사용자에게만 서버가 첫 화면과 함께 싣는 서버 사본(그 밖에는 null: HTML에 개인 데이터가 없다) */
   initialSnapshot?: MirrorSnapshot | null;
 }) {

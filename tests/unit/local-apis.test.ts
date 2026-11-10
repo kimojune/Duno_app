@@ -9,6 +9,7 @@ import { createMemoryKv, kvKeys } from "../../lib/local/kv";
 import { emptyMirror } from "../../lib/local/reduce";
 import { createRuntime } from "../../lib/local/runtime";
 import type { Mirror, MirrorTodo, QueuedOp, SendResult } from "../../lib/local/types";
+import { offerCopyId } from "../../lib/offers/copy-id";
 import type { Offer } from "../../lib/offers/types";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -214,7 +215,7 @@ describe("설정 API (기기)", () => {
 });
 
 describe("먼저 할 일 건네기 API (제시는 서버만 정한다)", () => {
-  const offer = (over: Partial<Offer> = {}): Offer => ({ id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어", state: "new", ...over });
+  const offer = (over: Partial<Offer> = {}): Offer => ({ id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어", todoDay: "2026-11-07", state: "new", ...over });
   it("기기에 오늘 건넨 제시가 있으면 그것을 먼저 돌려주고, 뒤에서 서버에 다시 물어 바뀌면 거울을 바꾼다", async () => {
     const { runtime, apis } = await setup();
     runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: offer() } }));
@@ -246,6 +247,53 @@ describe("먼저 할 일 건네기 API (제시는 서버만 정한다)", () => {
   });
 });
 
+describe("「오늘 할 일에 추가」(고침 11): 기기 먼저 저장도 서버와 같은 사본 id 식", () => {
+  const YESTERDAY = "2026-11-06";
+  const offer = (over: Partial<Offer> = {}): Offer => ({ id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어", todoDay: "2026-11-07", state: "new", ...over });
+  const pastOffer = () => offer({ todoId: T1, todoText: "어제 단어", todoDay: YESTERDAY });
+  const withPast = (over: Partial<MirrorTodo> = {}) => setup({ todos: [todo(T1, "어제 단어", YESTERDAY, { categoryId: C1, ...over })] });
+
+  it("사본을 오늘 할 일로 거울에 먼저 입히고(제시 id에서 정한 id) 카드를 그 사본으로 바꾸며 보낼 줄에 넣는다. 원본은 그대로", async () => {
+    const { runtime, apis } = await withPast();
+    runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: pastOffer() } }));
+    const copyId = offerCopyId(offer().id)!;
+    const res = await apis.offers.addTodo(offer().id);
+    expect(res).toEqual({ ok: true, data: { added: true, todoId: copyId, todoText: "어제 단어", day: "2026-11-07" } });
+    const copy = runtime.getMirror().todos.find((t) => t.id === copyId);
+    expect(copy).toMatchObject({ day: "2026-11-07", text: "어제 단어", done: false, categoryId: C1 });
+    expect(runtime.getMirror().todos.find((t) => t.id === T1)).toMatchObject({ day: YESTERDAY, done: false });
+    expect(runtime.getMirror().offers.card).toMatchObject({ id: offer().id, todoId: copyId, todoDay: "2026-11-07" });
+    expect(runtime.pendingOps().map((o) => o.op)).toEqual([{ kind: "offer.addTodo", offerId: offer().id, from: T1 }]);
+  });
+  it("다시 눌러도 사본 하나(줄에 한 번만), 원본이 그새 끝났으면 사본 없이 added: false, 모르는 제시는 not_found", async () => {
+    const { runtime, apis } = await withPast();
+    runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: pastOffer() } }));
+    await apis.offers.addTodo(offer().id);
+    const again = await apis.offers.addTodo(offer().id);
+    expect(again.ok && again.data).toMatchObject({ added: true, todoId: offerCopyId(offer().id) });
+    expect(runtime.pendingOps()).toHaveLength(1);
+    expect(runtime.getMirror().todos.filter((t) => t.day === "2026-11-07")).toHaveLength(1);
+    expect(await apis.offers.addTodo("0a0a0a0a-0a0a-40a0-80a0-0a0a0a0a0a0a")).toEqual({ ok: false, error: "not_found" });
+    expect(await apis.offers.addTodo("nope")).toEqual({ ok: false, error: "not_found" });
+    const done = await withPast({ done: true });
+    done.runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card: pastOffer() } }));
+    expect(await done.apis.offers.addTodo(offer().id)).toEqual({ ok: true, data: { added: false } });
+    expect(done.runtime.pendingCount()).toBe(0);
+  });
+  it("쓰기(reduce)는 카드가 이미 사본을 가리켜도 같은 사본을 입힌다: 줄에 남은 쓰기를 다시 입혀도(replay) 한 번만", async () => {
+    const { applyOp } = await import("../../lib/local/reduce");
+    const copyId = offerCopyId(offer().id)!;
+    const base: Mirror = { ...emptyMirror(), todos: [todo(T1, "어제 단어", YESTERDAY, { categoryId: C1 })], offers: { card: { ...pastOffer(), todoId: copyId, todoDay: "2026-11-07" }, timer_tab: null } };
+    const q = { clientAt: iso(NOON), op: { kind: "offer.addTodo" as const, offerId: offer().id, from: T1 } };
+    const once = applyOp(base, q);
+    expect(once.todos.filter((t) => t.id === copyId)).toHaveLength(1);
+    expect(applyOp(once, q).todos.filter((t) => t.id === copyId)).toHaveLength(1);
+    expect(once.offers.card).toMatchObject({ todoId: copyId, todoDay: "2026-11-07", todoText: "어제 단어" });
+    // 원본이 없으면(줄 앞쪽 쓰기가 거절돼 지워졌을 때) 던지지 않고 그대로
+    expect(applyOp({ ...base, todos: [] }, q).todos).toHaveLength(0);
+  });
+});
+
 describe("분야 페이지", () => {
   it("처음 열 때는 서버를 기다리고, 열어 본 적이 있으면 그것을 먼저 보여 준다", async () => {
     const page = (text: string) => ({ ok: true, data: { categoryId: C1, days: [{ day: "2026-11-07", todos: [{ id: T1, text, done: false, notes: [] }] }] } });
@@ -271,7 +319,7 @@ describe("먼저 할 일 카드: 저녁·새벽에도 기기에 둔 오늘 제�
     await kv.set(kvKeys.base(USER), mirror);
     const runtime = createRuntime({ userKey: USER, kv, send: async () => ({ ok: true }), fetchSnapshot: async () => ({ ok: false, error: "unavailable" }), now: () => evening, online: () => false });
     await runtime.boot();
-    const card = { id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card" as const, day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: null, todoText: null, state: "new" as const };
+    const card = { id: "0f0f0f0f-0f0f-40f0-80f0-0f0f0f0f0f0f", surface: "card" as const, day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: null, todoText: null, todoDay: null, state: "new" as const };
     runtime.patchBase((m) => ({ ...m, offers: { ...m.offers, card } }));
     requestOffer.mockResolvedValue({ ok: true, data: { offer: card } });
     const res = await createLocalApis(runtime).offers.request("card");

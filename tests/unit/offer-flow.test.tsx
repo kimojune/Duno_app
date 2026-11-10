@@ -39,7 +39,7 @@ import { AppShell } from "../../components/app-shell";
 const home: HomeRead = { today: todayRead, settings: { ok: false, error: "unavailable" } };
 
 function offer(over: Partial<Offer> = {}): Offer {
-  return { id: OFFER_ID, surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어 외우기", state: "new", ...over };
+  return { id: OFFER_ID, surface: "card", day: "2026-11-07", categoryId: C1, categoryName: "어학", todoId: T1, todoText: "단어 외우기", todoDay: "2026-11-07", state: "new", ...over };
 }
 function session(over: Partial<FocusSession> = {}): FocusSession {
   return {
@@ -51,6 +51,7 @@ function offersApi(card: Offer | null = offer(), tab: Offer | null = offer({ sur
   return {
     request: vi.fn(async (surface) => ({ ok: true as const, data: { offer: surface === "card" ? card : tab } })),
     dismiss: vi.fn(async (id: string) => ({ ok: true as const, data: { id } })),
+    addTodo: vi.fn(async () => ({ ok: true as const, data: { added: false as const } })),
   };
 }
 function focusApi(over: Partial<FocusApi> = {}): FocusApi {
@@ -101,7 +102,7 @@ describe("오늘 먼저 할 일 카드 (7-5, ⑤)", () => {
     expect(screen.getByRole("region", { name: "오늘 먼저 할 일" }).textContent).toContain("어학 30분");
   });
 
-  it("건네지 않는 경우(저녁·건넬 분야 없음·이미 넘김·이미 켬)에는 카드가 없다", async () => {
+  it("건네지 않는 경우(건넬 분야 없음·이미 넘김·이미 켬)에는 카드가 없다", async () => {
     for (const card of [null, offer({ state: "dismissed" }), offer({ state: "started" })]) {
       cleanup();
       await mount({ offers: offersApi(card), focus: focusApi() });

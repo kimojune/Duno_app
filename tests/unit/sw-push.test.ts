@@ -56,7 +56,7 @@ afterEach(() => vi.useRealTimers());
 
 const answer = (items: unknown) => async () => Response.json({ ok: true, data: { items } });
 const EVENING_ITEM = { kind: "evening", title: "오늘 기록", body: "오늘 몇 시간 썼는지 적어 둘까요?", tag: "duno-evening", url: "/?open=evening" };
-const MORNING_ITEM = { kind: "morning", title: "오늘 먼저 할 일", body: "앱을 열어 오늘 할 일을 시작해 보세요", tag: "duno-morning", url: "/" };
+const MORNING_ITEM = { kind: "morning", title: "오늘 먼저 할 일", body: "앱을 열어 오늘 할 일을 시작해 보세요", tag: "duno-morning", url: "/?open=offer" };
 const BAD_WORDS = /빨리|꼭|안 하면|밀렸|부족|놓치/;
 
 describe("sw.js 알림 (7-8, ⑦, 고침 3바퀴: 서버에 묻는다)", () => {
@@ -78,7 +78,7 @@ describe("sw.js 알림 (7-8, ⑦, 고침 3바퀴: 서버에 묻는다)", () => {
     const sw = load(answer([MORNING_ITEM]));
     await fire(sw.handlers.push, {});
     expect(sw.shown[0].title).toBe("오늘 먼저 할 일");
-    expect(sw.shown[0].options).toMatchObject({ tag: "duno-morning", data: { url: "/" } });
+    expect(sw.shown[0].options).toMatchObject({ tag: "duno-morning", data: { url: "/?open=offer" } });
   });
   it("알림 종류는 시각이 아니라 서버의 답을 따른다: 서울 오전 10시에도 저녁 알림이 나온다(시각 범위를 막지 않는다)", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -143,6 +143,19 @@ describe("sw.js 알림 (7-8, ⑦, 고침 3바퀴: 서버에 묻는다)", () => {
     expect(navigate).toHaveBeenCalledWith("/?open=evening");
     expect(focus).toHaveBeenCalled();
     expect(sw.opened).toEqual([]);
+  });
+  it("아침 알림을 누르면 /?open=offer로 연다: 열린 창이 없으면 새 창, 있으면 그 창을 그 주소로 옮긴다(할 일 탭으로)", async () => {
+    const sw = load();
+    await fire(sw.handlers.notificationclick, { notification: { close: vi.fn(), data: { url: "/?open=offer" } } });
+    expect(sw.opened).toEqual(["/?open=offer"]);
+    const open = load();
+    const focus = vi.fn(async () => {});
+    const navigate = vi.fn(async () => ({ focus }));
+    open.setWindows([{ navigate, focus }]);
+    await fire(open.handlers.notificationclick, { notification: { close: vi.fn(), data: { url: "/?open=offer" } } });
+    expect(navigate).toHaveBeenCalledWith("/?open=offer");
+    expect(focus).toHaveBeenCalled();
+    expect(open.opened).toEqual([]);
   });
   it("주소가 앱 안(/로 시작)이 아니면 처음 화면으로만 간다", async () => {
     const sw = load();

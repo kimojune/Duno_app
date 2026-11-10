@@ -1,8 +1,8 @@
 "use server";
 
 import { getDeps } from "../../lib/deps";
-import { dismissOfferForUser, requestOfferForUser } from "../../lib/offers/core";
-import type { DismissedOffer, OfferRequestResult } from "../../lib/offers/types";
+import { addOfferTodoForUser, dismissOfferForUser, requestOfferForUser } from "../../lib/offers/core";
+import type { AddOfferTodoResult, DismissedOffer, OfferRequestResult } from "../../lib/offers/types";
 import type { RecordResult } from "../../lib/records/common";
 
 /**
@@ -24,6 +24,17 @@ export async function dismissOffer(id: unknown): Promise<RecordResult<DismissedO
     const deps = await getDeps();
     if (!deps) return { ok: false, error: "config" };
     return await dismissOfferForUser(deps, id);
+  } catch {
+    return { ok: false, error: "unavailable" };
+  }
+}
+
+/** 「오늘 할 일에 추가」: 카드로 건넨 지난 날 할 일을 오늘 할 일로 복사한다. 사본 id·날짜·권한은 모두 서버가 정하고 다시 확인한다(lib/offers/core.ts) */
+export async function addOfferTodo(input: unknown): Promise<RecordResult<AddOfferTodoResult>> {
+  try {
+    const deps = await getDeps();
+    if (!deps) return { ok: false, error: "config" };
+    return await addOfferTodoForUser(deps, input);
   } catch {
     return { ok: false, error: "unavailable" };
   }

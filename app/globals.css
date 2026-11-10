@@ -206,6 +206,7 @@ button, input { font: inherit; color: inherit; }
   padding: var(--space-6) var(--page-x) var(--space-4);
 }
 .today-title { font: var(--font-title); }
+.today-title:focus { outline: none; }
 /* 워드마크(components/wordmark.tsx, 명세 ② · Figma 50:139·50:140·60:2): 먹남색 고리 18 + 「duno」 16 Bold, 고리와 글 사이 6(Figma 15→39 − 18).
    조각은 고리 밖으로 2px 나와 그림 칸 밖에 그려진다(overflow: visible). 살구·빛 번짐 없음 */
 .wordmark { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); }
@@ -809,6 +810,8 @@ select.input { appearance: auto; }
 .entry-title { margin: 0; flex: 0 1 auto; min-width: 0; font: var(--font-body); font-weight: 700; overflow-wrap: anywhere; }
 .entry-card > .todo-sub, .entry-card > .offer-text { flex: 1 1 auto; min-width: 0; }
 .entry-card > .notice { flex: 1 1 100%; }
+/* 고침 11 K1: 적은 날 줄(14 보조)은 건넨 할 일 바로 아래 한 줄을 다 쓴다 */
+.entry-card > .offer-written { flex: 1 1 100%; margin: 0; }
 .entry-card .btn { margin-top: 0; }
 .entry-card > .btn { margin-left: auto; }
 
@@ -1028,6 +1031,17 @@ select.input { appearance: auto; }
 .timer-label { margin: 0; font: var(--font-body); overflow-wrap: anywhere; }
 .timer-clock { margin: var(--space-2) 0; font: var(--font-name); font-variant-numeric: tabular-nums; }
 .timer-running .detail-actions { justify-content: center; }
+/* 고침 11 T1: 시계 판(지름 264) · 눈금 30 · 분야 색 부채꼴(반지름 116, 윤곽 1 필수) · 가운데 판 144. SVG는 꾸밈이라 글(.timer-face-text)이 정보를 맡는다 */
+.timer-face { position: relative; inline-size: min(100%, 320px); aspect-ratio: 1; margin: var(--space-2) auto; }
+.timer-face-svg { display: block; inline-size: 100%; block-size: 100%; }
+.timer-face-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.timer-face-name { margin: 0; font: 400 0.75rem/1rem var(--font-family); color: var(--color-text-sub); }
+.timer-face-text .timer-clock { margin: 0; }
+.clock-plate, .clock-core { fill: var(--color-surface); stroke: var(--color-divider); stroke-width: 1; }
+.clock-tick-minor { stroke: var(--color-text-sub); stroke-width: 1; }
+.clock-tick-major { stroke: var(--color-text); stroke-width: 2; stroke-linecap: round; }
+.clock-num { fill: var(--color-text-sub); font: 400 12px var(--font-family); }
+/* 부채꼴 윤곽(1px --color-chart-outline)은 파일 끝의 공통 규칙 .chart-outline-svg가 건다 */
 .timer-fieldset { margin: 0; padding: 0; border: 0; }
 .timer-option { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap-min); padding: var(--space-1) 0; overflow-wrap: anywhere; }
 /* 고침10 G(d-172, 50:390): 할 일 고르기 둥근 단추 지름 24. 고른 것 = --color-text 채움 + 안 흰 점, 안 고른 것 = 테두리 1.5 --color-border-input(#7D8299) 빈 원.

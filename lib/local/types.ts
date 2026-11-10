@@ -89,7 +89,9 @@ export type Op =
   | { kind: "settings.save"; patch: { goal?: string | null; notify?: Partial<NotifySettings>; completeOnboarding?: boolean } }
   | { kind: "ratios.save"; ratios: RatioItem[] }
   | { kind: "view.record"; id: string; screen: ViewScreen; entry: ViewEntry }
-  | { kind: "offer.dismiss"; id: string };
+  | { kind: "offer.dismiss"; id: string }
+  /** 「오늘 할 일에 추가」(고침 11): from은 건넨 지난 날 할 일(기기 거울이 사본을 그리는 데만 쓴다. 서버는 제시 줄에서 다시 찾는다) */
+  | { kind: "offer.addTodo"; offerId: string; from: string };
 
 export type OpKind = Op["kind"];
 

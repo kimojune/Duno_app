@@ -82,7 +82,7 @@ export const SENT_MARK_TTL_MS = 24 * 60 * 60 * 1000;
 /** 서버가 이 오류로 답하면 일시 오류다(다시 해 볼 만한 것). 그 밖의 오류는 서버가 받지 않은 것(거절) */
 const TRANSIENT = new Set(["unavailable", "config"]);
 /** 이미 없는 것을 지우는 쓰기는 「없음」이어도 성공으로 본다(다른 탭이 먼저 보냈거나 재시도) */
-const IDEMPOTENT_NOT_FOUND = new Set<Op["kind"]>(["todo.delete", "note.delete", "offer.dismiss"]);
+const IDEMPOTENT_NOT_FOUND = new Set<Op["kind"]>(["todo.delete", "note.delete", "offer.dismiss", "offer.addTodo"]);
 
 type Listener = () => void;
 

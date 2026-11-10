@@ -12,6 +12,7 @@ import { STATUS_PREF_NAME } from "../growth/status-view-pref";
 import { getJson, type ManageApi } from "../manage-api";
 import { checkNoteText } from "../notes/public";
 import type { NoteItem } from "../notes/types";
+import { offerCopyId } from "../offers/copy-id";
 import type { OffersApi } from "../offers-api";
 import type { SettingsApi } from "../onboarding-api";
 import { defaultPushApi } from "../push/subscribe";
@@ -276,6 +277,24 @@ export function createLocalApis(runtime: Runtime): LocalApis {
     async dismiss(id) {
       runtime.enqueue({ kind: "offer.dismiss", id });
       return { ok: true, data: { id } };
+    },
+    // 「오늘 할 일에 추가」: 기기 거울에 사본을 먼저 입히고 보낼 줄에 넣는다(서버가 제시 줄에서 다시 확인한다). 사본 id는 서버와 같은 식
+    async addTodo(offerId) {
+      const card = mirror().offers.card;
+      const copyId = offerCopyId(offerId);
+      if (!card || card.id !== offerId || !card.todoId || !copyId) return { ok: false, error: "not_found" };
+      const today = todoDayFor(new Date(nowMs()));
+      if (card.todoId === copyId) return { ok: true, data: { added: true, todoId: copyId, todoText: card.todoText, day: today } };
+      const from = card.todoId;
+      const source = mirror().todos.find((t) => t.id === from && !t.done && t.day < today && t.day >= addDays(today, -7));
+      if (!source) return { ok: true, data: { added: false } };
+      runtime.enqueue({ kind: "offer.addTodo", offerId, from });
+      // 보낸 뒤 줄에서 빠져도 카드가 사본을 가리키게 서버 거울 쪽에도 적는다(다음에 서버가 제시를 다시 건네면 그 값으로 맞춘다)
+      runtime.patchBase((m) => {
+        const c = m.offers.card;
+        return c && c.id === offerId ? { ...m, offers: { ...m.offers, card: { ...c, todoId: copyId, todoText: source.text, todoDay: today } } } : m;
+      });
+      return { ok: true, data: { added: true, todoId: copyId, todoText: source.text, day: today } };
     },
   };
 
