@@ -6,6 +6,7 @@ import {
   countStatuses,
   decideStop,
   isLimitText,
+  isScreenErrorText,
   median,
   parseArgs,
   percentile,
@@ -155,5 +156,25 @@ describe("부하 시험 — 값 가리기", () => {
     expect(readEnvValue("A=1\nDEMO_ACCESS_CODE=\"Q1\"\n", "DEMO_ACCESS_CODE")).toBe("Q1");
     expect(readEnvValue("DEMO_ACCESS_CODE= \r\nB=2", "DEMO_ACCESS_CODE")).toBe("");
     expect(readEnvValue("B=2", "DEMO_ACCESS_CODE")).toBe("");
+  });
+  it("export 앞머리 · 따옴표 · 줄 끝 주석 · 앞 공백(가짜 값)", () => {
+    const n = "DEMO_ACCESS_CODE";
+    expect(readEnvValue(`export ${n}=FAKE1`, n)).toBe("FAKE1");
+    expect(readEnvValue(`  export   ${n}="FAKE 2" # 메모`, n)).toBe("FAKE 2");
+    expect(readEnvValue(`${n}='FA#KE3'`, n)).toBe("FA#KE3");
+    expect(readEnvValue(`${n}=FAKE4 # 주석`, n)).toBe("FAKE4");
+    expect(readEnvValue(`${n}=FAKE#5`, n)).toBe("FAKE#5");
+    expect(readEnvValue(`#${n}=FAKE6
+OTHER_${n}=x`, n)).toBe("");
+  });
+});
+
+describe("부하 시험 — 화면 오류 판정", () => {
+  it("빈 글(Next 경로 안내기 같은 빈 알림)은 실패가 아니고, 글이 있으면 실패", () => {
+    expect(isScreenErrorText("")).toBe(false);
+    expect(isScreenErrorText("   \t ")).toBe(false);
+    expect(isScreenErrorText(null)).toBe(false);
+    expect(isScreenErrorText(undefined)).toBe(false);
+    expect(isScreenErrorText("체험을 시작하지 못했어요.")).toBe(true);
   });
 });

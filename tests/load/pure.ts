@@ -129,11 +129,30 @@ export function oneLine(text: string, max = 200): string {
   return first.length > max ? first.slice(0, max) + "…" : first;
 }
 
-/** .env 한 줄 묶음에서 NAME 값을 꺼낸다(따옴표·앞뒤 공백 정리). 없거나 비면 "". 값을 돌려줄 뿐 어디에도 쓰지 않는다. */
+/**
+ * .env 글에서 NAME 값을 꺼낸다. 처리: 앞 공백 · `export ` 앞머리 · 앞뒤 따옴표(짝이 맞을 때, 안의 #은 값) ·
+ * 따옴표 없는 값의 줄 끝 주석(공백 뒤 #). 없거나 비면 "". 값을 돌려줄 뿐 어디에도 쓰지 않는다.
+ */
 export function readEnvValue(fileText: string, name: string): string {
-  const line = fileText.split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
-  if (line === undefined) return "";
-  return line.slice(name.length + 1).trim().replace(/^["']|["']$/g, "").trim();
+  for (const raw of fileText.split(/\r?\n/)) {
+    const line = raw.trim().replace(/^export\s+/, "");
+    if (!line.startsWith(`${name}=`)) continue;
+    let v = line.slice(name.length + 1).trim();
+    const q = v[0];
+    if (q === '"' || q === "'") {
+      const end = v.indexOf(q, 1);
+      return end === -1 ? v.slice(1).trim() : v.slice(1, end);
+    }
+    const hash = v.search(/\s#/);
+    if (hash !== -1) v = v.slice(0, hash);
+    return v.trim();
+  }
+  return "";
+}
+
+/** 체험 화면의 오류 글이 정말 있는가: 글이 공백뿐이거나 비면(Next 경로 안내기 같은 빈 알림) 실패로 보지 않는다. */
+export function isScreenErrorText(text: string | null | undefined): boolean {
+  return typeof text === "string" && text.trim() !== "";
 }
 
 // ---------- 응답 코드 ----------

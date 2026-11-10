@@ -55,7 +55,8 @@ async function runContext(
     const clickedAt = Date.now();
     await page.locator("button.demo-start").click({ timeout: 30_000 });
     const todoTab = page.getByRole("button", { name: "할 일 적기" });
-    const alert = page.getByRole("alert");
+    // 체험 화면의 오류 글 자리(components/login-button.tsx: p.demo-error, role=alert). 글이 있는 것만(Next 경로 안내기의 빈 알림은 잡지 않는다)
+    const alert = page.locator("p.demo-error[role=alert]").filter({ hasText: /\S/ });
     const which = await Promise.race([
       todoTab.waitFor({ timeout: 60_000 }).then(() => "ok" as const),
       alert.first().waitFor({ timeout: 60_000 }).then(() => "alert" as const),
@@ -63,7 +64,7 @@ async function runContext(
     if (which === "ok") return { ok: true, enterMs: Date.now() - clickedAt, failKind: null, limitHit, statuses };
     const text = (await alert.first().innerText().catch(() => "")) ?? "";
     if (P.isLimitText(text)) limitHit = true;
-    return { ok: false, enterMs: null, failKind: "screen_error", limitHit, statuses };
+    return { ok: false, enterMs: null, failKind: P.isScreenErrorText(text) ? "screen_error" : "other", limitHit, statuses };
   })();
   work.catch(() => undefined); // 시간 초과로 문맥을 닫은 뒤 늦게 나는 오류가 처리 안 된 거절이 되지 않게
   try {
