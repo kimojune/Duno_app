@@ -11,7 +11,7 @@ PM 결정(11-17 「추천대로 진행해」): ① 데이터 안 옮김 ② 무�
 ## 2. 마이그레이션 15개 적용(20261104160723 ~ 20261109150000)
 
 **어디서**: Duno_app 메인 작업 폴더의 터미널(이 저장소 루트)
-**먼저 볼 것**: `supabase/migrations/`에 15개(20261104160723 … 20261109150000, 마이그레이션.md의 1~11번과 그 앞 4개 create_todos·todos_total_row_limit·todos_grant_insert_id·categories)만 있는 판인지 본다. `ls supabase/migrations | wc -l`(PowerShell: `(Get-ChildItem supabase/migrations).Count`)가 15여야 한다. 12번(`20261117100000_goal_bundles.sql`)이 있는 판이면 이번에는 적용하지 않는다(결정 ⑥) — 그 파일이 없는 main에서 한다.
+**먼저 볼 것**: `supabase/migrations/`에 15개(20261104160723 … 20261109150000, 마이그레이션.md의 1~11번과 그 앞 4개 create_todos·todos_total_row_limit·todos_grant_insert_id·categories)만 있는 판인지 본다. bash는 `ls supabase/migrations/*.sql | wc -l`, PowerShell은 `(Get-ChildItem supabase/migrations -Filter *.sql).Count`가 둘 다 15여야 한다(폴더에 `.gitkeep`이 있어 `.sql`만 센다). 12번(`20261117100000_goal_bundles.sql`)이 있는 판이면 이번에는 적용하지 않는다(결정 ⑥) — 그 파일이 없는 main에서 한다.
 
 ```bash
 # 2-1. 새 프로젝트에 잇는다(로그인이 필요하면 supabase login 먼저)
@@ -37,7 +37,7 @@ supabase unlink
   - PowerShell(Windows): 변수는 `$env:PROD_DB_URL = "<Session pooler 연결 문자열>"`로 넣고 `--db-url $env:PROD_DB_URL`로 준다.
   - **변수가 비어 있으면 명령을 돌리지 않는다 — 먼저 값이 있는지 길이만 본다**(값은 찍지 않는다):
     - bash: `echo ${#PROD_DB_URL}` → 0보다 커야 한다
-    - PowerShell: `$env:PROD_DB_URL.Length` → 0보다 커야 한다(변수가 없으면 오류가 난다 = 비어 있다)
+    - PowerShell: `$env:PROD_DB_URL.Length` → 0보다 커야 한다(0이 나오거나 오류가 나면 비어 있다)
 - **2-1b 확인**: `supabase projects list` 출력에서 연결 표시(●)가 붙은 줄의 ref가 새 운영 ref여야 한다. 아니면 2-3으로 가지 않는다. 표시 모양이 다르면(22 미실행) `supabase/.temp/project-ref` 파일 내용을 본다 — 새 운영 ref여야 한다.
 - **마이그레이션.md의 11번**(category_ratio_history)도 같이 적용한다. 빼면 뒤 번호가 꼬인다.
 - **확인**: 2-2가 15줄, 2-4에서 15개가 로컬·원격 둘 다에 있다.
@@ -126,7 +126,7 @@ supabase db dump --db-url "$PROD_DB_URL" -f <날짜>-schema.sql
 supabase db dump --db-url "$PROD_DB_URL" -f <날짜>-data.sql --use-copy --data-only
 ```
 
-PowerShell(Windows) 판 — 먼저 길이만 본다(값은 찍지 않는다). 비어 있으면 명령을 돌리지 않는다. bash는 `echo ${#PROD_DB_URL}`, PowerShell은 `$env:PROD_DB_URL.Length`가 0보다 커야 한다.
+PowerShell(Windows) 판 — 먼저 길이만 본다(값은 찍지 않는다). 비어 있으면 명령을 돌리지 않는다. bash는 `echo ${#PROD_DB_URL}`, PowerShell은 `$env:PROD_DB_URL.Length`가 0보다 커야 한다(0이 나오거나 오류가 나면 비어 있다).
 
 ```powershell
 supabase db dump --db-url $env:PROD_DB_URL -f <날짜>-roles.sql --role-only
