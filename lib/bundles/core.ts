@@ -34,7 +34,7 @@ export function mapBundleDbError(error: DbError): BundleErrorCode {
 function toResult(data: unknown): BundleApplyResult {
   const v = (data ?? null) as { revision?: unknown; past?: unknown } | null;
   if (!v || typeof v.revision !== "number") return { ok: false, error: "unavailable" };
-  return { ok: true, data: { revision: v.revision, pastSkipped: v.past === "limit" || v.past === "invalid" } };
+  return { ok: true, data: { revision: v.revision, pastSkipped: v.past === "limit" || v.past === "invalid" ? v.past : null } };
 }
 
 type CategoryRow = { id: string; name_encrypted: string; archived_at: string | null };
@@ -150,11 +150,12 @@ export async function saveLegacyBundleForUser(
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
-    if (!deps.key) return { ok: false, error: "config" };
+    // 암호화 키는 목표 글을 암호화할 때만 필요하다(비율만 저장할 때는 전처럼 키 없이도 된다)
+    if (change.goal !== undefined && change.goal.value !== null && !deps.key) return { ok: false, error: "config" };
     const items = change.ratios?.filter((r) => r.categoryId !== null).map((r) => ({ id: r.categoryId, percent: r.percent }));
     const other = change.ratios?.find((r) => r.categoryId === null)?.percent ?? 0;
     const goalEncrypted =
-      change.goal && change.goal.value !== null ? encryptTodoText(change.goal.value, user.data, deps.key, "goal_text") : null;
+      change.goal && change.goal.value !== null && deps.key ? encryptTodoText(change.goal.value, user.data, deps.key, "goal_text") : null;
     const res = await deps.supabase.rpc("save_goal_bundle", {
       p_op_id: null,
       p_expected_revision: null,

@@ -1,5 +1,6 @@
 "use client";
 
+import { toReadable } from "../lib/categories/readable";
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "../lib/use-reduced-motion";
 import { APP_CONFIG } from "../lib/app-config";
@@ -11,7 +12,7 @@ import { formatTimer } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { ChipScroller } from "./chip-scroller";
 import { CategoryChip, OtherChip } from "./todo-view";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { TimerClock } from "./timer-clock";
 import { Notice, PrimaryButton, SecondaryButton } from "./ui";
 import { Wordmark } from "./wordmark";
@@ -53,7 +54,7 @@ export const TIMER_TEXT = {
   added: (text: string) => `「${text}」를 오늘 할 일에 넣었어요.`,
 } as const;
 
-type Entry = { id: string; name: string };
+type Entry = { id: string; name: string; colorOrder?: number };
 type TodoOption = { id: string; text: string; categoryId: string | null };
 type Choice = { kind: "todo"; id: string } | { kind: "none" };
 
@@ -134,7 +135,7 @@ export function TimerScreen({
         setTodosFailed(true);
       }
       if (read.categories.ok) {
-        setCategories(read.categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])));
+        setCategories(toReadable(read.categories.data.categories));
       }
     });
     return () => {
@@ -260,8 +261,7 @@ export function TimerScreen({
   const runningLabel = runningTodo ? runningTodo.text : nameOf(running?.session.categoryId ?? null);
   // 시계 부채꼴 색: 분야 순서의 색, 기타(분야 없음·모르는 분야)는 기타 색
   const runningCategoryId = running?.session.categoryId ?? runningTodo?.categoryId ?? null;
-  const runningOrder = runningCategoryId === null ? -1 : categories.findIndex((c) => c.id === runningCategoryId);
-  const clockColor = categoryColorValue(runningOrder >= 0 ? runningOrder : null);
+  const clockColor = categoryColorValue(colorOrderIn(categories, runningCategoryId));
 
   return (
     <section className="timer" aria-labelledby="timer-title">
@@ -352,8 +352,8 @@ export function TimerScreen({
                 </span>
                 <ChipScroller aria-labelledby="timer-category-label">
                   <OtherChip pressed={noneCategory === null} onSelect={() => setNoneCategory(null)} />
-                  {categories.map((c, index) => (
-                    <CategoryChip key={c.id} chip={c} color={categoryColorValue(index)} pressed={noneCategory === c.id} onToggle={(id) => setNoneCategory(noneCategory === id ? null : id)} />
+                  {categories.map((c) => (
+                    <CategoryChip key={c.id} chip={c} color={categoryColorValue(colorOrderIn(categories, c.id))} pressed={noneCategory === c.id} onToggle={(id) => setNoneCategory(noneCategory === id ? null : id)} />
                   ))}
                 </ChipScroller>
               </>

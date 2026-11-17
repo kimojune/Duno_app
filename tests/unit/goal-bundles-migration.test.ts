@@ -140,6 +140,18 @@ describe("goal_bundles 마이그레이션: 정적 안전 장치", () => {
     expect(idem).toBeLessThan(conflict); // 같은 op 재전송이 충돌보다 먼저
   });
 
+  it("항목 검사는 null에 안전하다: 빠진 키(id·percent)는 is distinct from·coalesce로 거절한다(일반 <> 비교는 null이라 if를 건너뛴다)", () => {
+    const body = DEFINERS.find((f) => f.name === "public.save_goal_bundle")!.body;
+    expect(body).toMatch(/jsonb_typeof\(v_item\)\s+is\s+distinct\s+from\s+'object'/);
+    expect(body).toMatch(/jsonb_typeof\(v_item\s*->\s*'id'\)\s+is\s+distinct\s+from\s+'string'/);
+    expect(body).toMatch(/coalesce\(\(v_item\s*->>\s*'id'\)\s*!~\s*c_uuid_re,\s*true\)/);
+    expect(body).toMatch(/jsonb_typeof\(v_item\s*->\s*'percent'\)\s+is\s+distinct\s+from\s+'number'/);
+    expect(body).toMatch(/coalesce\(\(v_item\s*->>\s*'percent'\)\s*!~\s*'\^\[0-9\]\{1,3\}\$',\s*true\)/);
+    // null이 새면 안 되는 필수 키 비교에 단순 <> 를 쓰지 않는다
+    expect(body).not.toMatch(/jsonb_typeof\(v_item(\s*->\s*'(id|percent)')?\)\s*<>\s*'/);
+    expect(body).not.toMatch(/\(v_item\s*->>\s*'(id|percent)'\)\s*!~[^,]*\s+then/);
+  });
+
   it("되돌리는 SQL이 함수·표·새 칸·색 칸을 모두 지우고 dump 안내가 머리에 있다", () => {
     expect(DOWN.split("\n").slice(0, 8).join("\n")).toMatch(/dump/);
     for (const needle of [

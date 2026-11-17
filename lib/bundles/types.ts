@@ -65,7 +65,14 @@ export type BundleErrorCode =
   | "config"
   | "unavailable";
 
-/** 저장 결과: pastSkipped=true면 저장은 됐지만 지난 목표 기록을 남기지 못했다(상한 닿음, 화면이 알린다) */
+/**
+ * 지난 목표 기록을 못 남긴 까닭. 저장은 된 채로 남기기만 건너뛴다.
+ * - limit: 지난 목표가 상한(사용자당 1000, 임시)에 닿았다 → 화면은 「지난 목표가 너무 많아 더 남기지 못했어요」
+ * - invalid: 옛 데이터의 비율 합이 100이 아니라 판 행 규칙을 못 지켰다 → 「너무 많아」가 아니다(다른 안내)
+ */
+export type PastSkipReason = "limit" | "invalid";
+
+/** 저장 결과: pastSkipped가 null이 아니면 저장은 됐지만 지난 목표 기록을 남기지 못했다(까닭이 값이다) */
 export type BundleApplyResult =
-  | { ok: true; data: { revision: number; pastSkipped: boolean } }
+  | { ok: true; data: { revision: number; pastSkipped: PastSkipReason | null } }
   | { ok: false; error: BundleErrorCode; existing?: { id: string; name: string } };

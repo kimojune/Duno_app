@@ -29,7 +29,9 @@ vi.mock("../../app/local/actions", async (orig) => orig());
 import { sendLocalOp } from "../../app/local/actions";
 import { applyBundleForUser, saveLegacyBundleForUser, setRestartRequestedForUser } from "../../lib/bundles/core";
 import { checkBundleApply } from "../../lib/bundles/validation";
-import { categoryColorNumber, resolveColorOrder } from "../../lib/category-color";
+import { categoryColorNumber, colorNumbersIn, resolveColorOrder } from "../../lib/category-color";
+import { readableCategories } from "../../lib/local/derive";
+import { readSettingsForUser, saveRatiosForUser, saveSettingsForUser } from "../../lib/settings/core";
 import { createCategoryForUser } from "../../lib/categories/core";
 import { createMemoryKv } from "../../lib/local/kv";
 import { applyOp, emptyMirror, replay } from "../../lib/local/reduce";
@@ -87,7 +89,7 @@ describe("bundle.apply 서버 행동: 함수를 한 번만 부른다", () => {
       deps(store),
       base({ items: [{ id: C1, percent: 50 }, { id: C2, percent: 30 }, { id: C3, isNew: true, name: "독서", percent: 20 }] }),
     );
-    expect(res).toEqual({ ok: true, data: { revision: 1, pastSkipped: false } });
+    expect(res).toEqual({ ok: true, data: { revision: 1, pastSkipped: null } });
     expect(rpcs(store)).toHaveLength(1);
     expect(store.rpcCalls).toHaveLength(1); // 다른 함수 호출 없음
     const args = rpcs(store)[0].args;
@@ -109,7 +111,7 @@ describe("bundle.apply 서버 행동: 함수를 한 번만 부른다", () => {
     const input = base();
     expect((await applyBundleForUser(deps(store), input)).ok).toBe(true);
     const again = await applyBundleForUser(deps(store), input);
-    expect(again).toEqual({ ok: true, data: { revision: 1, pastSkipped: false } });
+    expect(again).toEqual({ ok: true, data: { revision: 1, pastSkipped: null } });
     expect(store.table("goal_bundles")).toHaveLength(1); // 사흘 전 묶음 한 줄뿐
     expect(store.table("user_settings")[0].bundle_revision).toBe(1);
   });
@@ -138,7 +140,7 @@ describe("bundle.apply 서버 행동: 함수를 한 번만 부른다", () => {
     const store = setup();
     for (let i = 0; i < 1000; i += 1) store.seed("goal_bundles", { user_id: ME, started_at: "2026-01-01T00:00:00.000Z", ended_at: "2026-01-02T00:00:00.000Z", ratios: [{ category_id: null, percent: 100 }], categories: [] });
     const res = await applyBundleForUser(deps(store), base());
-    expect(res).toEqual({ ok: true, data: { revision: 1, pastSkipped: true } });
+    expect(res).toEqual({ ok: true, data: { revision: 1, pastSkipped: "limit" } });
     expect(store.table("goal_bundles")).toHaveLength(1000);
     expect(store.table("user_settings")[0]).toMatchObject({ bundle_revision: 1 });
   });
@@ -299,7 +301,7 @@ describe("보낼 줄 입구(sendLocalOp)", () => {
     const op = { kind: "bundle.apply", ...input };
     expect(await sendLocalOp(ME, { ...op, expectedRevision: 5 }, NOW.toISOString())).toEqual({ ok: false, error: "bundle_conflict" });
     for (let i = 0; i < 1000; i += 1) store.seed("goal_bundles", { user_id: ME, started_at: "2026-01-01T00:00:00.000Z", ended_at: "2026-01-02T00:00:00.000Z", ratios: [{ category_id: null, percent: 100 }], categories: [] });
-    expect(await sendLocalOp(ME, op, NOW.toISOString())).toEqual({ ok: true, pastSkipped: true });
+    expect(await sendLocalOp(ME, op, NOW.toISOString())).toEqual({ ok: true, pastSkipped: "limit" });
   });
   it("bundle.apply의 archived_exists는 그 분야(existing)와 함께 돌아온다", async () => {
     const store = setup();
@@ -455,21 +457,22 @@ describe("색 함수: 고정 칸 우선", () => {
     expect(resolveColorOrder(null, null)).toBeNull(); // 기타
     expect(resolveColorOrder(-1, 2)).toBe(2); // 이상한 값은 버린다
   });
-  it("분야 하나를 보관해도 다른 분야의 색 번호가 그대로다(고정 칸이라 순서가 당겨지지 않는다)", () => {
-    const cats = [
-      { id: "a", colorOrder: 0 },
-      { id: "b", colorOrder: 1 },
-      { id: "c", colorOrder: 2 },
-    ];
-    const colorsOf = (list: { id: string; colorOrder: number }[]) =>
-      Object.fromEntries(list.map((c, screenOrder) => [c.id, categoryColorNumber(resolveColorOrder(c.colorOrder, screenOrder) as number)]));
-    const before = colorsOf(cats);
-    const afterArchive = colorsOf(cats.filter((c) => c.id !== "b")); // b를 보관해 화면 순서가 당겨져도
-    expect(afterArchive.a).toBe(before.a);
-    expect(afterArchive.c).toBe(before.c);
-    // 고정 칸이 없었다면(옛 방식) c의 색이 바뀌었을 것이다 — 이 시험이 막으려는 것
-    const legacy = (list: { id: string }[]) => Object.fromEntries(list.map((c, i) => [c.id, categoryColorNumber(i)]));
-    expect(legacy(cats.filter((c) => c.id !== "b")).c).not.toBe(legacy(cats).c);
+  it("분야 하나를 보관해도 다른 분야의 색 번호가 그대로다 — 분야 목록(보관 포함) → 거울에 입힌 뒤 → 화면이 쓰는 색 번호(실제 경로)", () => {
+    const cat = (id: string, name: string, colorOrder: number) => ({ id, readable: true as const, name, createdAt: "2026-11-01T00:00:00.000Z", colorOrder });
+    const settings = { goal: null, goalReadable: true, onboardingDone: true, notify: { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 }, ratios: [{ categoryId: "a", percent: 40 }, { categoryId: "b", percent: 30 }, { categoryId: "c", percent: 30 }] };
+    const m: Mirror = { ...emptyMirror(), synced: true, categories: [cat("a", "가", 0), cat("b", "나", 1), cat("c", "다", 2)], archivedCategories: [], settings, bundle: { revision: 0, startedAt: null, restartRequestedAt: null } };
+    // 화면이 읽는 목록(derive.readableCategories) → 색 번호(lib/category-color의 colorNumbersIn). 화면은 이 순서·색 순서로 칠한다
+    const before = colorNumbersIn(readableCategories(m));
+    expect(before).toEqual({ a: 1, b: 2, c: 3 });
+    // b를 보관하는 bundle.apply를 거울에 입힌다(같은 reduce 경로)
+    const after = applyOp(m, { clientAt: NOW.toISOString(), op: { kind: "bundle.apply", id: OP1, expectedRevision: 0, reason: "edit", goal: null, other: 0, items: [{ id: "a", percent: 40 }, { id: "b", percent: 30, archived: true }, { id: "c", percent: 30 }] } as Op });
+    expect(after.categories.map((c) => c.id)).toEqual(["a", "c"]); // 화면 목록에서 b가 빠져 c의 화면 순서는 1로 당겨졌다
+    const colors = colorNumbersIn(readableCategories(after));
+    expect(colors.a).toBe(before.a);
+    expect(colors.c).toBe(before.c); // 고정 칸이라 3 그대로(옛 방식이면 2로 바뀐다)
+    // 고정 칸이 없던 옛 사본(colorOrder 없음)은 화면 순서로 폴백한다 — 이 경우 c의 색이 당겨진다(옛 동작 그대로)
+    const legacy = (list: { id: string }[]) => colorNumbersIn(list.map(({ id }) => ({ id })));
+    expect(legacy(readableCategories(after)).c).toBe(2);
     // 9번째부터 돌려 쓴다
     expect(categoryColorNumber(8)).toBe(1);
   });
@@ -489,5 +492,121 @@ describe("mirror: 서버 사본에 묶음 상태·보관 분야·분야 색 순�
     expect(res.data.categories?.map((c) => [c.id, c.colorOrder])).toEqual([[C1, 0], [C2, 1]]);
     expect(Object.keys(res.data)).not.toContain("bundles"); // 지난 판 목록은 싣지 않는다
     expect(JSON.stringify(res.data)).not.toContain("ended_at");
+  });
+});
+
+describe("고침 1/3: 빠진 키 거절(흉내)·옛 op 번호·지난 묶음 못 남긴 까닭·키 없이 비율·반쪽 저장·처음 설정 문", () => {
+  const rpcDirect = (store: FakeStore, args: Record<string, unknown>) =>
+    fakeTablesClient(store, { sub: ME }).rpc("save_goal_bundle", { p_op_id: null, p_expected_revision: 0, p_reason: "edit", p_set_goal: false, p_goal_encrypted: null, p_other: 0, p_items: null, ...args }) as unknown as Promise<{ data: unknown; error: { hint?: string; code?: string } | null }>;
+
+  it("함수에 id 빠짐·percent 빠짐·archived:true+percent 빠짐을 직접 넣으면 모두 bundle_invalid로 거절되고 아무것도 안 바뀐다", async () => {
+    const store = setup();
+    const before = structuredClone(store.tables);
+    for (const items of [[{ percent: 10 }], [{ id: C1 }], [{ id: C1, archived: true }], [{ id: null, percent: 100 }], ["문자열"]]) {
+      const res = await rpcDirect(store, { p_items: items, p_other: 100 });
+      expect(res.error?.hint, JSON.stringify(items)).toBe("bundle_invalid");
+    }
+    expect(store.tables).toEqual(before);
+    // 정상 입력은 통과(양성 대조)
+    expect((await rpcDirect(store, { p_items: [{ id: C1, percent: 60 }, { id: C2, percent: 40 }] })).error).toBeNull();
+  });
+
+  it("옛 op(ratios.save·settings.save goal)도 서버가 고침 번호를 올리고 거울도 같이 올려, 뒤따르는 bundle.apply는 충돌 없이 저장된다", async () => {
+    const store = setup();
+    store.table("user_settings")[0].bundle_revision = 4;
+    session.sub = ME;
+    getDeps.mockImplementation(async () => ({ ...deps(store), now: () => NOW }));
+    let m: Mirror = { ...emptyMirror(), synced: true, categories: [{ id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" }, { id: C2, readable: true, name: "운동", createdAt: "2026-11-01T00:00:00.000Z" }], bundle: { revision: 4, startedAt: null, restartRequestedAt: null } };
+    const legacyOps: Op[] = [
+      { kind: "ratios.save", ratios: [{ categoryId: C1, percent: 70 }, { categoryId: C2, percent: 30 }] },
+      { kind: "settings.save", patch: { goal: "옛 목표" } },
+      { kind: "settings.save", patch: { notify: { eveningEnabled: true } } }, // 함수를 부르지 않는다 → 번호도 그대로
+    ];
+    for (const op of legacyOps) {
+      m = applyOp(m, { op, clientAt: NOW.toISOString() });
+      expect((await sendLocalOp(ME, op, NOW.toISOString())).ok).toBe(true);
+    }
+    expect(store.table("user_settings")[0].bundle_revision).toBe(6);
+    expect(m.bundle?.revision).toBe(6); // 거울이 서버와 같은 번호
+    // 이제 거울의 번호로 bundle.apply를 보내면 가짜 충돌이 없다
+    const res = await applyBundleForUser(deps(store), base({ expectedRevision: m.bundle!.revision }));
+    expect(res.ok).toBe(true);
+  });
+
+  it("줄에 옛 op 다음 bundle.apply가 있어도(replay) 두 번째 apply가 기대하는 번호가 거울에서 이어진다", () => {
+    const m: Mirror = { ...emptyMirror(), synced: true, categories: [{ id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" }], bundle: { revision: 4, startedAt: null, restartRequestedAt: null } };
+    const q = (key: string, op: Op) => ({ key, clientAt: NOW.toISOString(), attempts: 0, op });
+    const next = replay(m, [q("1", { kind: "ratios.save", ratios: [{ categoryId: C1, percent: 100 }] }), q("2", { kind: "bundle.apply", ...base({ expectedRevision: 5, items: [{ id: C1, percent: 100 }] }) } as Op)]);
+    expect(next.bundle?.revision).toBe(6); // 옛 op +1, bundle.apply +1
+  });
+
+  it("지난 묶음을 못 남긴 까닭을 갈라 돌려준다: 상한은 limit, 옛 데이터 합≠100은 invalid", async () => {
+    const limited = setup();
+    for (let i = 0; i < 1000; i += 1) limited.seed("goal_bundles", { user_id: ME, started_at: "2026-01-01T00:00:00.000Z", ended_at: "2026-01-02T00:00:00.000Z", ratios: [{ category_id: null, percent: 100 }], categories: [] });
+    expect(await applyBundleForUser(deps(limited), base())).toEqual({ ok: true, data: { revision: 1, pastSkipped: "limit" } });
+    const invalid = setup();
+    invalid.table("category_ratios").find((r) => r.category_id === C1)!.percent = 30; // 옛 데이터: 합 70
+    expect(await applyBundleForUser(deps(invalid), base())).toEqual({ ok: true, data: { revision: 1, pastSkipped: "invalid" } });
+    expect(invalid.table("goal_bundles")).toHaveLength(0);
+    // 남겼으면 null
+    expect(await applyBundleForUser(deps(setup()), base())).toEqual({ ok: true, data: { revision: 1, pastSkipped: null } });
+  });
+
+  it("비율만 저장할 때는 암호화 키가 없어도 된다(전과 같다). 목표 글은 키가 필요해 config", async () => {
+    const store = setup();
+    const noKey = { supabase: fakeTablesClient(store, { sub: ME }), key: null };
+    expect((await saveRatiosForUser(noKey, [{ categoryId: C1, percent: 70 }, { categoryId: C2, percent: 30 }])).ok).toBe(true);
+    expect(store.table("category_ratios").find((r) => r.category_id === C1)?.percent).toBe(70);
+    expect(await saveLegacyBundleForUser(noKey, { goal: { value: "글" } })).toEqual({ ok: false, error: "config" });
+    expect((await saveLegacyBundleForUser(noKey, { goal: { value: null } })).ok).toBe(true); // 목표를 비우는 것은 키가 필요 없다
+  });
+
+  it("settings.save가 알림과 목표를 함께 받아 목표(함수)만 실패하면, 알림은 저장돼 있고 결과가 partial: notify_saved로 정확히 말한다", async () => {
+    const store = setup();
+    store.rpcError = { code: "XX000", message: "boom" };
+    const res = await saveSettingsForUser({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY, now: () => NOW }, { notify: { eveningEnabled: true }, goal: "새 목표" });
+    expect(res).toEqual({ ok: false, error: "unavailable", partial: "notify_saved" });
+    expect(store.table("user_settings")[0].notify_evening_enabled).toBe(true); // 알림은 먼저 저장됐다
+    expect(store.table("user_settings")[0].goal_encrypted).toBeNull(); // 목표 글은 저장되지 않았다
+    expect(store.rpcCalls).toHaveLength(1);
+    // 순서: 알림 upsert가 함수 호출보다 먼저
+    const upsertAt = store.calls.findIndex((c) => c.table === "user_settings" && c.op === "upsert");
+    expect(upsertAt).toBeGreaterThanOrEqual(0);
+    // 알림 저장이 실패하면 목표 함수를 부르지 않는다(아무것도 저장 안 됨)
+    const store2 = setup();
+    store2.alwaysError = { code: "XX000" };
+    const res2 = await saveSettingsForUser({ supabase: fakeTablesClient(store2, { sub: ME }), key: KEY, now: () => NOW }, { notify: { eveningEnabled: true }, goal: "새 목표" });
+    expect(res2).toEqual({ ok: false, error: "unavailable" });
+    expect(store2.rpcCalls).toHaveLength(0);
+    // 목표만 보내고 실패하면 partial 없이 그냥 실패
+    const store3 = setup();
+    store3.rpcError = { code: "XX000" };
+    expect(await saveSettingsForUser({ supabase: fakeTablesClient(store3, { sub: ME }), key: KEY, now: () => NOW }, { goal: "새 목표" })).toEqual({ ok: false, error: "unavailable" });
+    // 둘 다 성공하면 새 설정을 돌려준다
+    const store4 = setup();
+    const ok = await saveSettingsForUser({ supabase: fakeTablesClient(store4, { sub: ME }), key: KEY, now: () => NOW }, { notify: { eveningEnabled: true }, goal: "새 목표" });
+    expect(ok).toMatchObject({ ok: true, data: { goal: "새 목표", notify: { eveningEnabled: true } } });
+  });
+
+  it("처음 설정 문: onboarding_done_at이 비었거나 restart_requested_at이 있으면 열린다(서버 읽기·거울·다시 시작 끝)", async () => {
+    const store = setup();
+    const read = () => readSettingsForUser({ supabase: fakeTablesClient(store, { sub: ME }), key: KEY });
+    const done = await read();
+    expect(done.ok && done.data.onboardingDone).toBe(true); // 마쳤고 표시 없음 → 닫힘
+    store.table("user_settings")[0].restart_requested_at = NOW.toISOString();
+    const asked = await read();
+    expect(asked.ok && asked.data.onboardingDone).toBe(false); // 표시가 있으면 열림
+    expect(store.table("user_settings")[0].onboarding_done_at).not.toBeNull(); // DB의 마친 시각은 지우지 않는다
+    store.table("user_settings")[0].restart_requested_at = null;
+    store.table("user_settings")[0].onboarding_done_at = null;
+    const fresh = await read();
+    expect(fresh.ok && fresh.data.onboardingDone).toBe(false); // 마친 시각이 비면 열림
+    // 거울: bundle.restart → 열림, 취소 → 닫힘, 다시 시작 끝(bundle.apply restart) → 닫힘
+    const m: Mirror = { ...emptyMirror(), synced: true, categories: [{ id: C1, readable: true, name: "어학", createdAt: "2026-11-01T00:00:00.000Z" }], settings: { goal: null, goalReadable: true, onboardingDone: true, notify: { eveningEnabled: false, eveningMinute: 1170, morningEnabled: false, morningMinute: 600 }, ratios: [] }, bundle: { revision: 1, startedAt: null, restartRequestedAt: null } };
+    const opened = applyOp(m, { op: { kind: "bundle.restart" }, clientAt: NOW.toISOString() });
+    expect(opened.settings?.onboardingDone).toBe(false);
+    expect(applyOp(opened, { op: { kind: "bundle.restartCancel" }, clientAt: NOW.toISOString() }).settings?.onboardingDone).toBe(true);
+    const finished = applyOp(opened, { op: { kind: "bundle.apply", ...base({ reason: "restart", items: [{ id: C1, percent: 100 }] }) } as Op, clientAt: NOW.toISOString() });
+    expect(finished.settings?.onboardingDone).toBe(true);
   });
 });

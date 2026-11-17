@@ -120,7 +120,7 @@ export type QueuedOp = { key: string; clientAt: string; attempts: number; op: Op
  * existing은 분야 만들기가 duplicate일 때 서버가 알려 준 같은 이름의 내 분야(고침 4바퀴: 뒤의 쓰기의 분야 번호를 이것으로 바꿔 보낸다).
  * account_mismatch는 서버의 세션 사용자가 이 기기 운영 장치의 사용자와 다르다는 뜻이다(보내지 않고 이 사용자 것을 지운다).
  */
-export type SendResult = { ok: true; pastSkipped?: boolean } | { ok: false; error: string; network?: boolean; existing?: { id: string; name: string } };
+export type SendResult = { ok: true; pastSkipped?: "limit" | "invalid" } | { ok: false; error: string; network?: boolean; existing?: { id: string; name: string } };
 export type Sender = (queued: QueuedOp) => Promise<SendResult>;
 
 /** 서버가 거절한 쓰기(기기 것은 되돌렸다). 화면이 한 줄로 알린다 */

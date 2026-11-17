@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { APP_CONFIG } from "../lib/app-config";
 import { checkCategoryName, sameCategoryName } from "../lib/categories/validation";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import type { EnableOutcome, SettingsApi } from "../lib/onboarding-api";
 import type { NotifySettings, RatioItem } from "../lib/settings/types";
 import { evenRatios } from "../lib/settings/validation";
@@ -66,7 +66,7 @@ export const ONBOARDING_TEXT = {
   tooLong: GOAL_FIELD_TEXT.tooLong,
 } as const;
 
-type CategoryEntry = { id: string; name: string };
+type CategoryEntry = { id: string; name: string; colorOrder?: number };
 type Step = 1 | 2 | 3 | 4;
 const TOTAL_STEPS = 4;
 
@@ -159,7 +159,7 @@ export function Onboarding({
     selected
       .map((id) => catalog.find((c) => c.id === id))
       .filter((c): c is CategoryEntry => c !== undefined)
-      .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: catalog.findIndex((x) => x.id === c.id) })),
+      .map((c) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: colorOrderIn(catalog, c.id) ?? catalog.findIndex((x) => x.id === c.id) })),
     percents,
   );
   const total = entries.reduce((s, e) => s + e.percent, 0);
@@ -338,11 +338,11 @@ export function Onboarding({
             <p className="onboarding-sub">{ONBOARDING_TEXT.categorySub}</p>
             <ChipScroller aria-label={ONBOARDING_TEXT.categoryGroup}>
               {/* 고침10 J(49:194): 칩 = 색 점 10 + 이름. 안 고른 칩 앞에 「+」를 붙이지 않는다 */}
-              {catalog.map((c, index) => (
+              {catalog.map((c) => (
                 <button key={c.id} type="button" className="chip" aria-pressed={selected.includes(c.id)} onClick={() => toggleCategory(c.id)}>
                   <span className="chip-face">
                     {selected.includes(c.id) && <ChipCheck />}
-                    <span className="chip-dot" style={{ background: categoryColorValue(index) }} aria-hidden="true" />
+                    <span className="chip-dot" style={{ background: categoryColorValue(colorOrderIn(catalog, c.id)) }} aria-hidden="true" />
                     <span className="chip-label">{c.name}</span>
                   </span>
                 </button>

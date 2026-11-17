@@ -6,7 +6,7 @@ import type { PushApi } from "../lib/push/subscribe";
 import type { NotifySettings, RatioItem, SettingsData } from "../lib/settings/types";
 import { evenRatios } from "../lib/settings/validation";
 import { useOnline } from "../lib/use-online";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { GoalSentenceEditor } from "./goal-sentence";
 import { NotifyRow } from "./onboarding";
 import { normalizedPercents, OTHER_RATIO_ID, ratioKey, withOtherEntry, type RatioEntry } from "./ratio-editor";
@@ -55,7 +55,7 @@ export const ME_TEXT = {
   morningName: "아침 알림",
 } as const;
 
-type Entry = { id: string; name: string };
+type Entry = { id: string; name: string; colorOrder?: number };
 
 export function MeScreen({
   settings,
@@ -162,7 +162,7 @@ function MeBody({
 
   // 분야 줄들 뒤에 기타 줄이 하나 더 있다(기타도 비율에 넣을 수 있다)
   const entries: RatioEntry[] = withOtherEntry(
-    categories.map((c, i) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: i })),
+    categories.map((c, i) => ({ id: c.id, name: c.name, percent: percents[c.id] ?? 0, colorOrder: colorOrderIn(categories, c.id) ?? i })),
     percents,
   );
   // 띠 칸: S8-a가 그릴 값(합 100으로 맞춘 값)과 같은 값. 0% 칸은 그리지 않는다

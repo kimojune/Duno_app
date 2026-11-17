@@ -74,3 +74,28 @@ export function resolveColorOrder(colorOrder: number | null | undefined, fallbac
   if (typeof colorOrder === "number" && Number.isFinite(colorOrder) && colorOrder >= 0) return colorOrder;
   return fallbackOrder;
 }
+
+/** 색 순서를 가진 분야 한 줄(분야 목록 항목 모두가 이 모양을 만족한다) */
+export type ColorOrdered = { id: string; colorOrder?: number | null };
+
+/**
+ * 화면이 쓰는 색 순서: 분야 목록(화면 순서 = 보관하지 않은 분야를 만든 순서)에서 id의 색 순서.
+ * 고정 칸(colorOrder)이 있으면 그것을, 없으면 목록에서의 자리를 쓴다. 목록에 없거나 기타(null)면 null(기타 색).
+ * 화면은 categoryColorValue에 순서를 넘길 때 항상 이 함수를 거친다(목록의 자리를 직접 넘기지 않는다).
+ */
+export function colorOrderIn(list: readonly ColorOrdered[], id: string | null): number | null {
+  if (id === null) return null;
+  const at = list.findIndex((c) => c.id === id);
+  if (at < 0) return null;
+  return resolveColorOrder(list[at].colorOrder, at);
+}
+
+/** 목록의 모든 분야 → 색 순서(고정 칸이 있으면 그것, 없으면 목록에서의 자리). 상태보기 조각 색이 쓴다 */
+export function colorOrderRecord(list: readonly ColorOrdered[]): Record<string, number> {
+  return Object.fromEntries(list.map((c, at) => [c.id, resolveColorOrder(c.colorOrder, at) as number]));
+}
+
+/** 목록의 모든 분야 → 색 번호(1~8) */
+export function colorNumbersIn(list: readonly ColorOrdered[]): Record<string, number> {
+  return Object.fromEntries(list.map((c, at) => [c.id, categoryColorNumber(resolveColorOrder(c.colorOrder, at) as number)]));
+}

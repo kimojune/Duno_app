@@ -20,8 +20,10 @@ import { recordView } from "../views/actions";
  * 예상 못 한 예외는 unavailable로 바꾸고 원문을 내지 않는다.
  */
 
-/** pastSkipped: 저장은 됐지만 지난 목표 기록을 남기지 못했다(상한, 화면이 알린다) */
-export type LocalOpReply = { ok: true; pastSkipped?: true } | { ok: false; error: string; existing?: { id: string; name: string } };
+/** pastSkipped: 저장은 됐지만 지난 목표 기록을 남기지 못한 까닭(limit 상한 · invalid 옛 데이터). partial: 설정 저장이 반쪽(알림은 저장, 목표 글은 안 됨) */
+export type LocalOpReply =
+  | { ok: true; pastSkipped?: "limit" | "invalid" }
+  | { ok: false; error: string; existing?: { id: string; name: string }; partial?: "notify_saved" };
 
 type Fields = Record<string, unknown>;
 
@@ -33,19 +35,22 @@ export async function sendLocalOp(expectedUser: unknown, op: unknown, clientAt: 
     if (!account.ok) return { ok: false, error: account.error };
     if (op === null || typeof op !== "object" || typeof (op as Fields).kind !== "string") return { ok: false, error: "invalid_input" };
     const res = await dispatch(op as Fields, clientAt);
-    if (res.ok) return (res as { pastSkipped?: unknown }).pastSkipped === true ? { ok: true, pastSkipped: true } : { ok: true };
+    if (res.ok) {
+      const skipped = (res as { pastSkipped?: unknown }).pastSkipped;
+      return skipped === "limit" || skipped === "invalid" ? { ok: true, pastSkipped: skipped } : { ok: true };
+    }
     const existing = (res as { existing?: unknown }).existing;
     if ((res.error === "duplicate" || res.error === "archived_exists") && existing && typeof existing === "object") {
       const e = existing as { id?: unknown; name?: unknown };
       if (typeof e.id === "string" && typeof e.name === "string") return { ok: false, error: res.error, existing: { id: e.id, name: e.name } };
     }
-    return { ok: false, error: res.error };
+    return (res as { partial?: unknown }).partial === "notify_saved" ? { ok: false, error: res.error, partial: "notify_saved" } : { ok: false, error: res.error };
   } catch {
     return { ok: false, error: "unavailable" };
   }
 }
 
-type Reply = { ok: true; pastSkipped?: boolean } | { ok: false; error: string };
+type Reply = { ok: true; pastSkipped?: "limit" | "invalid" } | { ok: false; error: string; partial?: "notify_saved" };
 
 async function dispatch(op: Fields, clientAt: unknown): Promise<Reply & { existing?: unknown }> {
   switch (op.kind) {
@@ -89,7 +94,7 @@ async function dispatch(op: Fields, clientAt: unknown): Promise<Reply & { existi
       void _kind;
       const res = await applyBundle(input);
       if (!res.ok) return res.existing ? { ok: false, error: res.error, existing: res.existing } as Reply : { ok: false, error: res.error };
-      return res.data.pastSkipped ? { ok: true, pastSkipped: true } : { ok: true };
+      return res.data.pastSkipped ? { ok: true, pastSkipped: res.data.pastSkipped } : { ok: true };
     }
     case "bundle.restart":
       return setRestartRequested(true);

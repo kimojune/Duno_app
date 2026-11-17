@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { colorOrderRecord } from "../lib/category-color";
 import { buildGoalChart, buildStatusChart, type ChartCategoryId, type GoalChart, type StatusChart } from "../lib/growth/status-chart";
 import {
   DEFAULT_STATUS_PREF,
@@ -389,6 +390,7 @@ function GoalPanel({
     );
   }
   const categoryIds = data.categories.map((c) => c.id);
+  const goalColorOrders = colorOrderRecord(data.categories);
   const chart = buildGoalChart({ categoryIds, goalItems: data.goal.items, totals: data.thisWeek });
   const nameOf = (id: ChartCategoryId) => nameFor(data, id);
   const head = GROWTH_TEXT.goalHead(chart.targetMinutes, chart.doneMinutes);
@@ -408,7 +410,7 @@ function GoalPanel({
         <GoalBars
           chart={chart}
           text={GROWTH_TEXT}
-          colorOrder={(id) => categoryIds.indexOf(id)}
+          colorOrder={(id) => goalColorOrders[id] ?? categoryIds.indexOf(id)}
           nameOf={nameOf}
           onOpenCategory={onOpenCategory}
         />
@@ -441,8 +443,9 @@ function RatioPanel({
 }) {
   const categoryIds = data.categories.map((c) => c.id);
   // 두 기간의 그림 값(지금 앱의 이번 주 · 총 시간 계산 그대로). 처음 기간은 두 합계로 정한다
-  const weekChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.thisWeek });
-  const totalChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.cumulative });
+  const colorOrders = colorOrderRecord(data.categories);
+  const weekChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.thisWeek, colorOrders });
+  const totalChart = buildStatusChart({ categoryIds, ratios: data.ratios, totals: data.cumulative, colorOrders });
   const period = initialStatusPeriod(pref, data.weekStart, { week: weekChart.spentTotalMinutes, total: totalChart.spentTotalMinutes });
   const week = period === "week";
   const chart = week ? weekChart : totalChart;

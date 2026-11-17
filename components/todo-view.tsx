@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { CATEGORY_LIMIT, CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import type { TodoDay } from "../lib/todos/types";
 import { addDays } from "../lib/week";
 import { countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
@@ -187,7 +187,7 @@ export type RowView = {
 export const FIRST_TAG_TEXT = "오늘 먼저";
 
 /** 칩 하나(풀 수 있는 이름만. 풀 수 없는 분야는 칩에 보이지 않는다, 12-7) */
-export type ChipView = { id: string; name: string };
+export type ChipView = { id: string; name: string; colorOrder?: number };
 
 /** 새 분야 칸 아래 자리에 띄우는 안내 */
 export type NewCategoryHelp = "failed" | "offline" | "limit" | null;
@@ -581,11 +581,11 @@ export function CategoryChipRow(
           if (props.selectedCategoryId !== null) props.onToggleChip(props.selectedCategoryId);
         }}
       />
-      {props.chips.map((chip, index) => (
+      {props.chips.map((chip) => (
         <CategoryChip
           key={chip.id}
           chip={chip}
-          color={categoryColorValue(index)}
+          color={categoryColorValue(colorOrderIn(props.chips, chip.id))}
           pressed={chip.id === props.selectedCategoryId}
           onToggle={props.onToggleChip}
         />

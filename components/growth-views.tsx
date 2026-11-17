@@ -45,7 +45,7 @@ export type StatusViewProps = {
 const keyOf = (id: ChartCategoryId) => id ?? "other";
 /** 조각 색: 분야는 줄 안의 자리(받은 분야 순서 = 만든 순서), 기타는 기타 색 */
 const colorOf = (order: (id: ChartCategoryId) => number, id: ChartCategoryId) => categoryColorValue(id === null ? null : order(id));
-const chartOrder = (chart: StatusChart) => (id: ChartCategoryId) => chart.rows.findIndex((r) => r.categoryId === id);
+const chartOrder = (chart: StatusChart) => (id: ChartCategoryId) => (id !== null ? chart.colorOrders?.[id] : undefined) ?? chart.rows.findIndex((r) => r.categoryId === id);
 
 /** 이 줄에 붙일 목표 비율(%). 목표 비율 줄이 비었거나, 기타가 목표 비율에 없으면 null(「목표 n%」를 붙이지 않는다) */
 export function ratioOf(chart: StatusChart, id: ChartCategoryId): number | null {

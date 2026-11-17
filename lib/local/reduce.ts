@@ -20,6 +20,12 @@ import type { Mirror, MirrorSnapshot, MirrorTodo, QueuedOp } from "./types";
  * 하루 경계(서울 새벽 4시)는 쓰기를 누른 때(clientAt)로 정한다. 입력 검사(글 길이 등)는 쓰기를 줄에 넣기 전에 끝낸 값만 들어온다.
  */
 
+/** 고침 번호를 하나 올린 묶음 상태(없으면 처음 상태에서) */
+function bumpRevision(bundle: BundleState | undefined): BundleState {
+  const b = bundle ?? EMPTY_BUNDLE_STATE;
+  return { ...b, revision: b.revision + 1 };
+}
+
 export function emptyMirror(): Mirror {
   return {
     synced: false,
@@ -176,11 +182,13 @@ export function applyOp(m: Mirror, queued: Pick<QueuedOp, "op" | "clientAt">): M
         ...(patch.notify ? { notify: { ...current.notify, ...patch.notify } } : {}),
         ...(patch.completeOnboarding ? { onboardingDone: true } : {}),
       };
-      return { ...m, settings: next };
+      // 옛 op도 목표 글이 있으면 서버가 save_goal_bundle(고침 번호 +1)을 부른다 → 사본도 같이 올려, 뒤따르는 bundle.apply가 가짜 충돌이 나지 않게 한다
+      return { ...m, settings: next, ...(patch.goal !== undefined ? { bundle: bumpRevision(m.bundle) } : {}) };
     }
     case "ratios.save": {
       const current = m.settings ?? defaultSettings();
-      return { ...m, settings: { ...current, ratios: op.ratios } };
+      // 옛 ratios.save도 서버에서 고침 번호가 오른다(save_goal_bundle) → 사본도 올린다(위 settings.save와 같은 까닭)
+      return { ...m, settings: { ...current, ratios: op.ratios }, bundle: bumpRevision(m.bundle) };
     }
     case "bundle.apply": {
       // 새 묶음을 거울에 입힌다(서버 함수 save_goal_bundle과 같은 규칙). 거절되면 줄에서 빠져 다시 입히면 되돌려진다.
@@ -228,14 +236,15 @@ export function applyOp(m: Mirror, queued: Pick<QueuedOp, "op" | "clientAt">): M
         ...m,
         categories: nextActive,
         archivedCategories: nextArchived,
-        settings: { ...current, goal: op.goal, goalReadable: true, ratios, ...(op.completeOnboarding ? { onboardingDone: true } : {}) },
+        settings: { ...current, goal: op.goal, goalReadable: true, ratios, ...(op.completeOnboarding || op.reason === "restart" ? { onboardingDone: true } : {}) },
         bundle,
       };
     }
     case "bundle.restart":
-      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: clientAt } };
+      // 다시 시작을 누르면 처음 설정 문이 열린다(서버 읽기와 같은 규칙: onboardingDone=false). 지금 표는 그대로
+      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: clientAt }, settings: { ...(m.settings ?? defaultSettings()), onboardingDone: false } };
     case "bundle.restartCancel":
-      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: null } };
+      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: null }, settings: { ...(m.settings ?? defaultSettings()), onboardingDone: true } };
     case "view.record":
       return m; // 쌓기만 하는 기록이라 거울이 바뀔 것이 없다
     case "offer.addTodo": {

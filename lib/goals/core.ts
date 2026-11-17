@@ -1,4 +1,5 @@
 import "server-only";
+import { toReadable } from "../categories/readable";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { listCategoriesForUser } from "../categories/core";
@@ -121,7 +122,7 @@ export async function readGoalSummaryForUser(deps: { supabase: SupabaseClient; k
       data: computeGoalSummary({
         today,
         logs: logs.data,
-        categories: categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])),
+        categories: toReadable(categories.data.categories),
         goalItems: goal.data,
       }),
     };

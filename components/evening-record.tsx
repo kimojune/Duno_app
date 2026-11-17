@@ -12,7 +12,7 @@ import { useOnline } from "../lib/use-online";
 import { addDays } from "../lib/week";
 import { useOverlayWindow } from "../lib/use-overlay-window";
 import { rescaleSplit } from "../lib/ratio-dial-calc";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { RatioDial, type DialSlice } from "./ratio-dial";
 import { EveningTodoLine, type EveningTodos } from "./evening-todo-sheet";
 import { ChipScroller } from "./chip-scroller";
@@ -279,7 +279,7 @@ export function EveningRecord({
   // 칩 목록 = 고를 수 있는 분야(만든 순서) + 이번에 더한 분야. 색은 이 목록의 자리(lib/category-color.ts — 다른 화면과 같은 순서)
   const catalog = state ? [...state.categories, ...added.filter((a) => !state.categories.some((c) => c.id === a.id))] : [];
   const catalogIds = catalog.map((c) => c.id);
-  const colorOf = (id: string) => categoryColorValue(catalogIds.indexOf(id));
+  const colorOf = (id: string) => categoryColorValue(colorOrderIn(catalog, id));
   const names = new Map(catalog.map((c) => [c.id, c.name]));
   const timerSum = state ? state.timerByCategory.reduce((s, t) => s + t.minutes, 0) : 0;
   // 타이머로 잰 분야별 시간(분야 없이 켠 타이머는 기타라 뺀다)

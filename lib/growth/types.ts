@@ -11,7 +11,7 @@ export type GrowthData = {
   /** 지난 달력 달 전체 */
   lastMonthRange: { from: string; to: string };
   /** 고를 수 있는 분야(보관 안 한 것, 이름을 풀 수 있는 것) */
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; colorOrder?: number }[];
   /** 처음 정한 비율(부족 기준) */
   ratios: RatioItem[];
   /** 이번 주(달력 주 월~일, 두노 하루 기준)에 분야별로 쓴 시간(기타는 categoryId null). 상태보기 「이번 주」·놓친 분야·채울 시간이 쓴다 */

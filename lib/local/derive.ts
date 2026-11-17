@@ -59,8 +59,8 @@ export function categoryList(m: Mirror): { categories: CategoryItem[] } {
   return { categories: m.categories };
 }
 
-export function readableCategories(m: Mirror): { id: string; name: string }[] {
-  return m.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : []));
+export function readableCategories(m: Mirror): { id: string; name: string; colorOrder?: number }[] {
+  return m.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name, ...(c.colorOrder !== undefined ? { colorOrder: c.colorOrder } : {}) }] : []));
 }
 
 /** 오늘 화면(할 일 + 분야) */

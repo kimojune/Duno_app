@@ -15,6 +15,8 @@ insert into const values
   ('A', '00000000-0000-4000-8000-00000000000a'),
   ('B', '00000000-0000-4000-8000-00000000000b'),
   ('C', '00000000-0000-4000-8000-00000000000c'),
+  ('D', '00000000-0000-4000-8000-00000000000d'),
+  ('D1', 'd1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1'),
   ('A1', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'),
   ('A2', 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2'),
   ('A3', 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3'),
@@ -48,6 +50,7 @@ select ok((select proconfig::text from pg_proc where oid = 'public.save_goal_bun
 
 -- 자료 심기(postgres 권한) -------------------------------------------------------
 insert into auth.users (id, aud, role, email) values
+  ((select v::uuid from const where k = 'D'), 'authenticated', 'authenticated', 'd@example.test'),
   ((select v::uuid from const where k = 'A'), 'authenticated', 'authenticated', 'a@example.test'),
   ((select v::uuid from const where k = 'B'), 'authenticated', 'authenticated', 'b@example.test'),
   ((select v::uuid from const where k = 'C'), 'authenticated', 'authenticated', 'c@example.test');
@@ -139,7 +142,8 @@ select is(
 select is((select count(*)::int from public.goal_bundles), 2, '다른 날: 지난 묶음이 한 줄 늘었다(전 1 → 2)');
 select is((select goal_encrypted from public.goal_bundles order by ended_at desc limit 1), (select v from const where k = 'G1'), '판 행에 바꾸기 전 목표 글 암호문이 담긴다');
 select is((select categories -> 0 ->> 'name_encrypted' from public.goal_bundles order by ended_at desc limit 1), (select v from const where k = 'N1'), '판 행에 그때 이름 암호문이 담긴다');
-select is((select private.goal_bundle_ratios_sum(ratios) from public.goal_bundles order by ended_at desc limit 1), 100, '판 행의 비율 합은 100');
+-- 주의: 이 구간은 authenticated 흉내 중이라 private 스키마 함수(goal_bundle_ratios_sum)를 못 부른다(42501). pg_catalog 함수로 합을 센다.
+select is((select sum((e ->> 'percent')::int)::int from public.goal_bundles g, jsonb_array_elements(g.ratios) e where g.id = (select id from public.goal_bundles order by ended_at desc limit 1)), 100, '판 행의 비율 합은 100');
 
 -- 행동 5: 같은 op 두 번이면 한 번만(멱등) ------------------------------------------------------
 select is(
@@ -189,12 +193,14 @@ select is((select color_order from public.categories where id = (select v::uuid 
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', (select v from const where k = 'A'), 'role', 'authenticated')::text, true);
 select lives_ok(
-  format($q$ select public.save_goal_bundle(%L::uuid, 3, 'edit', false, null, 0::smallint,
+  -- 기타 50(앞 단계에서 보관한 A2 몫)을 그대로 보낸다: A1 50 + A2 0 + 기타 50 = 100. 기대 고침 번호 3(OP4 뒤)
+  format($q$ select public.save_goal_bundle(%L::uuid, 3, 'edit', false, null, 50::smallint,
     '[{"id":"%s","percent":50},{"id":"%s","percent":0,"archived":false}]'::jsonb) $q$,
     (select v from const where k = 'OP5'), (select v from const where k = 'A1'), (select v from const where k = 'A2')),
   '보관한 분야를 되살린다(같은 id)');
 reset role;
 select is((select archived_at is null from public.categories where id = (select v::uuid from const where k = 'A2')), true, '되살아났다');
+select is((select bundle_revision from public.user_settings where user_id = (select v::uuid from const where k = 'A')), 4, '되살린 뒤 고침 번호는 4(OP1·OP2·OP4·OP5)');
 
 -- 행동 8: 다시 시작. 넘긴 묶음에 없는 분야는 보관되고, 할 일·저녁 기록·이번 주 목표 행은 줄지 않는다 ----------
 set local role authenticated;
@@ -250,7 +256,38 @@ select throws_ok($q$ select public.save_goal_bundle(null, 1, 'bogus', false, nul
 select throws_ok(
   $q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 0::smallint, jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'new', true, 'name_encrypted', 'x', 'percent', 100))) $q$,
   '22023', null, '암호문 형식이 아닌 분야 이름은 거절');
+-- 빠진 키는 모두 bundle_invalid(null에 안전한 검사). 기존 분야 id(C의 분야)로 시험한다
+select throws_ok($q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 100::smallint, '[{"percent":0}]'::jsonb) $q$, '22023', null, 'id가 빠진 칸은 거절');
+select throws_ok($q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 0::smallint, '[{"id":"c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1"}]'::jsonb) $q$, '22023', null, 'percent가 빠진 칸은 거절');
+select throws_ok($q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 0::smallint, '[{"id":"c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1","archived":true}]'::jsonb) $q$, '22023', null, 'archived:true인 기존 분야도 percent가 없으면 거절');
+select throws_ok($q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 0::smallint, '[{"id":null,"percent":100}]'::jsonb) $q$, '22023', null, 'id가 null인 칸은 거절');
+select throws_ok($q$ select public.save_goal_bundle(null, 1, 'edit', false, null, 0::smallint, '["문자열 칸"]'::jsonb) $q$, '22023', null, '객체가 아닌 칸은 거절');
 reset role;
+select is((select bundle_revision from public.user_settings where user_id = (select v::uuid from const where k = 'C')), 1, '거절된 입력은 C의 고침 번호를 올리지 않았다');
+select is((select archived_at is null from public.categories where id = 'c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1'), true, '거절된 archived:true는 분야를 보관하지 않았다');
+
+-- 비율 바뀐 기록 예외 블록: 기록 표가 상한(1000)에 닿아도 save_goal_bundle은 성공하고 묶음·비율은 바뀌고 기록만 안 는다 --------
+insert into public.user_settings (user_id, onboarding_done_at, goal_encrypted)
+  values ((select v::uuid from const where k = 'D'), now(), (select v from const where k = 'G1'));
+insert into public.categories (id, user_id, name_encrypted) values ((select v::uuid from const where k = 'D1'), (select v::uuid from const where k = 'D'), (select v from const where k = 'N1'));
+insert into public.category_ratios (user_id, category_id, percent) values ((select v::uuid from const where k = 'D'), (select v::uuid from const where k = 'D1'), 100);
+insert into public.category_ratio_history (user_id, ratios)
+  select (select v::uuid from const where k = 'D'), '[{"category_id":null,"percent":100}]'::jsonb from generate_series(1, 1000);
+select is((select count(*)::int from public.category_ratio_history where user_id = (select v::uuid from const where k = 'D')), 1000, '준비: D의 기록 표가 상한(1000)에 찼다');
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', (select v from const where k = 'D'), 'role', 'authenticated')::text, true);
+select is(auth.uid(), (select v::uuid from const where k = 'D'), '흉내 가드(D): auth.uid()');
+select is(
+  (select public.save_goal_bundle(null, 0, 'edit', true, (select v from const where k = 'G2'), 40::smallint,
+    format('[{"id":"%s","percent":60}]', (select v from const where k = 'D1'))::jsonb) ->> 'history'),
+  'skipped', '기록 표가 상한이어도 저장은 성공하고 기록만 skipped로 알린다');
+reset role;
+select is((select percent::int from public.category_ratios where user_id = (select v::uuid from const where k = 'D') and category_id = (select v::uuid from const where k = 'D1')), 60, '상한: 비율은 바뀌었다');
+select is((select ratio_other_percent from public.user_settings where user_id = (select v::uuid from const where k = 'D')), 40::smallint, '상한: 기타는 바뀌었다');
+select is((select goal_encrypted from public.user_settings where user_id = (select v::uuid from const where k = 'D')), (select v from const where k = 'G2'), '상한: 목표 글은 바뀌었다');
+select is((select bundle_revision from public.user_settings where user_id = (select v::uuid from const where k = 'D')), 1, '상한: 고침 번호는 올랐다');
+select is((select count(*)::int from public.category_ratio_history where user_id = (select v::uuid from const where k = 'D')), 1000, '상한: 기록은 늘지 않았다');
+-- (표가 없는 경우는 트랜잭션 안에서 표를 지울 수 없어 이 시험에서 덮지 않는다: 같은 when others 갈래다)
 
 select * from finish();
 rollback;

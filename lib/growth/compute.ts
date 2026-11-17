@@ -12,7 +12,7 @@ import type { GoalSummary } from "../goals/types";
  * 서버 읽기(lib/growth/core.ts, lib/goals/core.ts)는 DB에서 재료를 읽어 여기에 넘기고, 기기는 기기에 둔 재료를 넘긴다.
  */
 
-export type NamedCategory = { id: string; name: string };
+export type NamedCategory = { id: string; name: string; colorOrder?: number };
 
 export function computeGrowth(args: {
   today: string;

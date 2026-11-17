@@ -5,7 +5,7 @@ import { mapRecordDbError, recordFail, type RecordErrorCode, type RecordResult }
 import { requireUserId } from "../session";
 import { decryptTodoText, type TodoKey } from "../todos/crypto";
 import { saveLegacyBundleForUser } from "../bundles/core";
-import type { BundleErrorCode } from "../bundles/types";
+import type { BundleErrorCode, PastSkipReason } from "../bundles/types";
 import type { NotifySettings, RatioItem, SettingsData, SettingsPatch } from "./types";
 import { checkGoal, checkRatios, DEFAULT_NOTIFY, notifyPatchSchema } from "./validation";
 
@@ -70,21 +70,41 @@ function toSettings(row: SettingsRow | undefined, userId: string, key: TodoKey):
   };
 }
 
-/** 내 설정과 처음 정한 비율. 행이 없으면 처음 설정을 안 마친 기본값 */
+/**
+ * 다시 시작을 눌렀는가(user_settings.restart_requested_at). 열을 못 읽으면(마이그레이션 적용 전) 눌렀다고 보지 않는다.
+ */
+async function readRestartRequested(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  try {
+    const res = await supabase.from("user_settings").select("restart_requested_at").eq("user_id", userId);
+    if (res.error) return false;
+    const value = ((res.data ?? []) as { restart_requested_at?: string | null }[])[0]?.restart_requested_at;
+    return typeof value === "string";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 내 설정과 처음 정한 비율. 행이 없으면 처음 설정을 안 마친 기본값.
+ * 처음 설정 문(onboardingDone가 false면 열린다)은 onboarding_done_at이 비었거나 restart_requested_at이 있을 때 열린다(MO-46):
+ * 다시 시작을 눌렀으면 onboardingDone은 false다(DB의 onboarding_done_at은 지우지 않는다).
+ */
 export async function readSettingsForUser(deps: SettingsDeps): Promise<RecordResult<SettingsData>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     if (!deps.key) return recordFail("config");
     const key = deps.key;
-    const [settings, ratios, other] = await Promise.all([
+    const [settings, ratios, other, restartRequested] = await Promise.all([
       deps.supabase.from("user_settings").select(SETTINGS_COLUMNS).eq("user_id", user.data),
       deps.supabase.from("category_ratios").select("category_id, percent").eq("user_id", user.data),
       readOtherPercent(deps.supabase, user.data),
+      readRestartRequested(deps.supabase, user.data),
     ]);
     if (settings.error) return recordFail(mapRecordDbError(settings.error));
     if (ratios.error) return recordFail(mapRecordDbError(ratios.error));
     const base = toSettings(((settings.data ?? []) as SettingsRow[])[0], user.data, key);
+    if (restartRequested) base.onboardingDone = false;
     const items: RatioItem[] = ((ratios.data ?? []) as RatioRow[]).map((r) => ({ categoryId: r.category_id, percent: r.percent }));
     if (other !== null) items.push({ categoryId: null, percent: other }); // 기타는 맨 끝
     return { ok: true, data: { ...base, ratios: items } };
@@ -99,7 +119,7 @@ export async function readSettingsForUser(deps: SettingsDeps): Promise<RecordRes
  * 그 함수가 같은 트랜잭션에서 남긴다(그래서 여기서는 category_ratio_history에 쓰지 않는다).
  * categoryId가 null인 항목은 기타다. 남의 분야·없는 분야면 not_found. 같은 요청을 여러 번 보내도 결과가 같다.
  */
-export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Promise<RecordResult<{ ratios: RatioItem[]; pastSkipped?: boolean }>> {
+export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Promise<RecordResult<{ ratios: RatioItem[]; pastSkipped?: PastSkipReason }>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
@@ -107,7 +127,7 @@ export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Pro
     if (!checked.ok) return recordFail("invalid_input");
     const saved = await saveLegacyBundleForUser({ supabase: deps.supabase, key: deps.key }, { ratios: checked.ratios });
     if (!saved.ok) return recordFail(toRecordError(saved.error));
-    return { ok: true, data: { ratios: checked.ratios, ...(saved.data.pastSkipped ? { pastSkipped: true } : {}) } };
+    return { ok: true, data: { ratios: checked.ratios, ...(saved.data.pastSkipped ? { pastSkipped: saved.data.pastSkipped } : {}) } };
   } catch {
     return recordFail("unavailable");
   }
@@ -142,10 +162,12 @@ const patchSchema = z
  * 목표 글·알림 설정을 바꾸고, 원하면 처음 설정을 마친 것으로 표시한다(안 보낸 것은 그대로).
  * 행이 없으면 만든다. 처음 설정을 마친 시각은 서버 시계로 한 번만 정하고 다시 마쳐도 바뀌지 않는다.
  */
+export type SettingsSaveResult = RecordResult<Omit<SettingsData, "ratios">> | { ok: false; error: RecordErrorCode; partial: "notify_saved" };
+
 export async function saveSettingsForUser(
   deps: SettingsDeps,
   input: unknown,
-): Promise<RecordResult<Omit<SettingsData, "ratios">>> {
+): Promise<SettingsSaveResult> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
@@ -156,15 +178,11 @@ export async function saveSettingsForUser(
     const patch = parsed.data as SettingsPatch & { goal?: unknown; notify?: unknown };
 
     const values: Record<string, unknown> = { user_id: user.data };
-    let goalSaved = false;
+    let goalValue: string | null | undefined;
     if (patch.goal !== undefined) {
       const goal = checkGoal(patch.goal);
       if (!goal.ok) return recordFail(goal.error);
-      // MO-46: 목표 글은 save_goal_bundle(옛 op 길)로 저장한다. 판 기록을 남기려고 표를 직접 쓰지 않는다.
-      // 처음 설정 마침(onboarding_done_at)은 아래 기존 길이 서버 시계(deps.now)로 정한다.
-      const saved = await saveLegacyBundleForUser({ supabase: deps.supabase, key }, { goal: { value: goal.goal } });
-      if (!saved.ok) return recordFail(toRecordError(saved.error));
-      goalSaved = true;
+      goalValue = goal.goal;
     }
     if (patch.notify !== undefined) {
       const notify = notifyPatchSchema.safeParse(patch.notify);
@@ -181,19 +199,29 @@ export async function saveSettingsForUser(
       const row = ((existing.data ?? []) as { onboarding_done_at: string | null }[])[0];
       if (!row || row.onboarding_done_at === null) values.onboarding_done_at = (deps.now ?? serverNow)().toISOString();
     }
-    if (Object.keys(values).length === 1) {
-      if (!goalSaved) return recordFail("invalid_input"); // 바꿀 것이 없다
+    const hasRowWrite = Object.keys(values).length > 1;
+    if (!hasRowWrite && goalValue === undefined) return recordFail("invalid_input"); // 바꿀 것이 없다
+
+    // 순서(MO-46): 알림·처음 설정 마침을 **먼저** 저장하고, 목표 글(DB 함수)을 뒤에 한다. 둘째가 실패하면 첫째는 이미 저장된 상태라
+    // 실패 결과에 partial: "notify_saved"를 실어 어느 쪽이 저장됐는지 정확히 말한다(목표 글은 저장되지 않았다).
+    let written: SettingsRow | undefined;
+    if (hasRowWrite) {
+      const { data, error } = await deps.supabase.from("user_settings").upsert(values, { onConflict: "user_id" }).select(SETTINGS_COLUMNS);
+      if (error) return recordFail(mapRecordDbError(error));
+      written = ((data ?? []) as SettingsRow[])[0];
+    }
+    if (goalValue !== undefined) {
+      // 목표 글은 save_goal_bundle(옛 op 길)로 저장한다. 판 기록을 남기려고 표를 직접 쓰지 않는다.
+      const saved = await saveLegacyBundleForUser({ supabase: deps.supabase, key }, { goal: { value: goalValue } });
+      if (!saved.ok) {
+        const error = toRecordError(saved.error);
+        return hasRowWrite ? ({ ok: false, error, partial: "notify_saved" } as const) : recordFail(error);
+      }
       const row = await deps.supabase.from("user_settings").select(SETTINGS_COLUMNS).eq("user_id", user.data);
       if (row.error) return recordFail(mapRecordDbError(row.error));
-      return { ok: true, data: toSettings(((row.data ?? []) as SettingsRow[])[0], user.data, key) };
+      written = ((row.data ?? []) as SettingsRow[])[0];
     }
-
-    const { data, error } = await deps.supabase
-      .from("user_settings")
-      .upsert(values, { onConflict: "user_id" })
-      .select(SETTINGS_COLUMNS);
-    if (error) return recordFail(mapRecordDbError(error));
-    return { ok: true, data: toSettings(((data ?? []) as SettingsRow[])[0], user.data, key) };
+    return { ok: true, data: toSettings(written, user.data, key) };
   } catch {
     return recordFail("unavailable");
   }

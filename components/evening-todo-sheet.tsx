@@ -1,9 +1,10 @@
 "use client";
 
+import { toReadable } from "../lib/categories/readable";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
 import { addTodo, setTodoDone } from "../app/todos/actions";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import type { LocalTodos } from "../lib/local/todos";
 import { fetchToday } from "../lib/read-client";
 import type { TodayRead } from "../lib/today-types";
@@ -237,14 +238,13 @@ function EveningTodoSheet({
   const rows = read?.todos.ok ? read.todos.data.todos : [];
   const categoriesOk = read?.categories.ok === true;
   const allCategories = read?.categories.ok ? read.categories.data.categories : [];
-  const readable = allCategories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : []));
-  const order = new Map(readable.map((c, i) => [c.id, i]));
+  const readable = toReadable(allCategories);
   const chips: ChipView[] = readable;
 
   function categoryOf(id: string | null): { name: string; color: string | null } | null {
     if (id === null) return null;
     const c = readable.find((x) => x.id === id);
-    if (c) return { name: c.name, color: categoryColorValue(order.get(id) ?? 0) };
+    if (c) return { name: c.name, color: categoryColorValue(colorOrderIn(readable, id) ?? 0) };
     // 분야 목록을 받았는데 풀 수 없거나 없는 분야면 「읽을 수 없는 분야」(할 일 탭과 같다). 목록을 못 받았으면 붙이지 않는다
     return categoriesOk ? { name: TODO_TEXT.unreadableCategory, color: null } : null;
   }
@@ -482,8 +482,8 @@ function EveningTodoSheet({
               <ChipScroller className="evening-chips" aria-labelledby="evening-todo-category-label">
                 {/* 고침9 ④-2 · Figma 88:73: 맨 앞 「기타」(공용 OtherChip, 분야 없음 = 저장 값 null)가 골라진 채 시작 */}
                 <OtherChip pressed={selected === null} onSelect={() => setSelected(null)} />
-                {chips.map((chip, index) => (
-                  <CategoryChip key={chip.id} chip={chip} color={categoryColorValue(index)} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
+                {chips.map((chip) => (
+                  <CategoryChip key={chip.id} chip={chip} color={categoryColorValue(colorOrderIn(chips, chip.id))} pressed={chip.id === selected} onToggle={(id) => setSelected((prev) => (prev === id ? null : id))} />
                 ))}
               </ChipScroller>
               <PrimaryButton type="submit" className="evening-todo-submit" busy={adding}>

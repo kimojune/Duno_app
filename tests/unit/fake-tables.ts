@@ -41,6 +41,8 @@ export class FakeStore {
   /** DB 함수(rpc) 호출 기록: 「함수를 한 번만 불렀다」를 확인한다 */
   rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   alwaysError: FakeError | null = null;
+  /** DB 함수(rpc) 호출만 이 오류로 실패시킨다(표 호출은 그대로) — 반쪽 저장 시험용 */
+  rpcError: FakeError | null = null;
   private clock = Date.parse("2026-11-07T00:00:00.000Z");
   private seq = 0;
 
@@ -84,7 +86,7 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
     /** DB 함수 호출(tests/unit/fake-bundle-rpc.ts가 save_goal_bundle 등을 흉내 낸다) */
     rpc(name: string, args: Record<string, unknown> = {}) {
       store.rpcCalls.push({ name, args });
-      const run = () => (store.alwaysError ? { data: null, error: store.alwaysError } : emulateRpc(store, viewer, name, args));
+      const run = () => (store.alwaysError ? { data: null, error: store.alwaysError } : store.rpcError ? { data: null, error: store.rpcError } : emulateRpc(store, viewer, name, args));
       return { then: <T>(resolve: (v: { data: unknown; error: FakeError | null }) => T, reject?: (e: unknown) => T) => Promise.resolve().then(run).then(resolve, reject) };
     },
     from(table: string) {

@@ -26,7 +26,7 @@ export type EveningState = {
   /** 그 날 타이머로 진행한 시간(분야별, null은 기타) */
   timerByCategory: { categoryId: string | null; minutes: number }[];
   /** 고를 수 있는 분야(보관 안 한 것, 이름을 풀 수 있는 것) */
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; colorOrder?: number }[];
 };
 
 export type SavedEvening = {

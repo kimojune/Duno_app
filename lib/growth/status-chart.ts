@@ -86,6 +86,8 @@ export type StatusChart = {
   spentEmpty: boolean;
   /** 분야마다 한 줄(막대·눈금). ratio·spent와 같은 순서 */
   rows: StatusRow[];
+  /** 분야 id → 색 순서(고정 칸 color_order, 없으면 목록 자리). 안 주면 rows의 자리로 칠한다 */
+  colorOrders?: Record<string, number>;
   /** 쓴 시간 합계(큰 숫자). 보관했거나 이름을 못 푸는 분야의 시간도 든다 — 지금 앱의 합계와 같다 */
   spentTotalMinutes: number;
   /** spentTotalMinutes 가운데 분야 줄·조각이 없는 분야(보관·이름 못 품)의 분 */
@@ -99,7 +101,7 @@ export type StatusChart = {
  * @param ratios 처음 정한 비율(합이 100이 아니어도 된다). 보이는 분야·기타가 아닌 분야의 몫은 줄에서 뺀다
  * @param totals 분야별로 쓴 시간(GrowthData.thisWeek 또는 cumulative). 기타는 categoryId null
  */
-export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioItem[]; totals: CategoryMinutes[] }): StatusChart {
+export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioItem[]; totals: CategoryMinutes[]; colorOrders?: Record<string, number> }): StatusChart {
   const ids: ChartCategoryId[] = [];
   for (const id of args.categoryIds) if (typeof id === "string" && !ids.includes(id)) ids.push(id);
   ids.push(null);
@@ -152,6 +154,7 @@ export function buildStatusChart(args: { categoryIds: string[]; ratios: RatioIte
     ratioEmpty,
     spentEmpty,
     rows,
+    ...(args.colorOrders ? { colorOrders: args.colorOrders } : {}),
     spentTotalMinutes,
     hiddenMinutes: spentTotalMinutes - visibleMinutes,
     missed,

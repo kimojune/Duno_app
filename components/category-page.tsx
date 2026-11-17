@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import type { GrowthApi } from "../lib/growth-api";
 import { minutesOf } from "../lib/growth/logic";
 import { buildStatusChart, polarPoint } from "../lib/growth/status-chart";
@@ -78,7 +78,7 @@ export function categorySummary(growth: GrowthData, categoryId: string | null): 
     percent: row ? row.spentPercent : 0,
     weekMinutes: clean(minutesOf(growth.thisWeek, categoryId)),
     ratioPercent: ratio,
-    color: categoryColorValue(categoryId === null || index < 0 ? null : index),
+    color: categoryColorValue(categoryId === null || index < 0 ? null : colorOrderIn(growth.categories, categoryId)),
   };
 }
 

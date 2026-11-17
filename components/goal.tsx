@@ -9,7 +9,7 @@ import type { CategoryMinutes } from "../lib/growth/logic";
 import { formatMinutes } from "../lib/time-format";
 import { useOnline } from "../lib/use-online";
 import { useOverlayWindow } from "../lib/use-overlay-window";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { BackHeader, BottomActions } from "./back-header";
 import { CloseConfirm, CONFIRM_TEXT, ConfirmDialog } from "./close-confirm";
 import { Stepper } from "./stepper";
@@ -95,7 +95,7 @@ export function GoalEditor({
   onSaved,
 }: {
   api: GoalsApi;
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; colorOrder?: number }[];
   goal: CategoryMinutes[] | null;
   onClose: () => void;
   onSaved: () => void;
@@ -203,9 +203,9 @@ export function GoalEditor({
           <p className="todo-sub">{GOAL_TEXT.empty}</p>
         ) : (
           <ul className="ratio-list card-box goal-list">
-            {categories.map((c, index) => (
+            {categories.map((c) => (
               <li key={c.id} className="ratio-row">
-                <span className="chip-dot" style={{ background: categoryColorValue(index) }} aria-hidden="true" />
+                <span className="chip-dot" style={{ background: categoryColorValue(colorOrderIn(categories, c.id)) }} aria-hidden="true" />
                 <Stepper
                   id={`goal-${c.id}`}
                   label={c.name}

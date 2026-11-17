@@ -16,7 +16,10 @@ import { loadIntegrationEnv } from "./load-env";
  *     -- 시험 분야는 todos 등이 가리키지 않으면 지워도 된다(보관 표시가 있는 시험 분야만):
  *     delete from public.categories where user_id in ('<A id>', '<B id>') and archived_at is not null;
  *     update public.user_settings set bundle_started_at = null, restart_requested_at = null where user_id in ('<A id>', '<B id>');
- * - 양성 대조(A는 자기 기록이 읽힌다)를 먼저 단언하고, 그 뒤에 「B에게 안 보임·거절」을 통과로 삼는다.
+ * - 준비 SQL(양성 대조용, 사람이 SQL 편집기에서 한 번만. 시험 계정 A의 id):
+ *     insert into public.goal_bundles (user_id, started_at, ended_at, reason, categories, ratios)
+ *     values ('<A id>', now() - interval '10 days', now() - interval '9 days', 'edit', '[]', '[{"category_id":null,"percent":100}]');
+ * - 양성 대조(A는 자기 기록이 1줄 이상 읽힌다)를 먼저 단언하고, 그 뒤에 「B에게 안 보임·거절」을 통과로 삼는다.
  * - 날짜가 다른 경우(다른 날이면 한 줄)는 서버 시계를 못 바꿔 여기서 못 본다: pgTAP(supabase/tests/goal_bundles.test.sql)이 본다.
  *
  * 시험 이름 목록:
@@ -123,10 +126,13 @@ describe("goal_bundles · save_goal_bundle (지난 목표 묶음)", () => {
 
   it("A는 자기 지난 묶음 읽기가 된다(양성 대조) · B는 A의 지난 묶음을 못 본다", async () => {
     const { c1 } = await resetA();
-    // 날짜가 같으면 판이 안 남을 수 있어 개수는 단언하지 않는다. 읽기 자체가 에러 없이 되는지(grant select)와 B에게 A 행이 없는지를 본다.
+    // 양성 대조: A에게 지난 묶음이 1줄 이상 있어야 「B에게 안 보임」이 뜻을 가진다. every()는 0행이어도 참이라 개수를 먼저 단언한다.
+    // 지난 묶음은 함수가 다른 날 저장할 때만 생긴다(같은 날이면 0줄). 시험 계정 A에 한 줄도 없으면 파일 머리의 「준비 SQL」로 한 줄 심은 뒤 다시 돈다.
     const mine = await a.from("goal_bundles").select("id, user_id");
     expect(mine.error).toBeNull();
-    expect((mine.data ?? []).every((r) => (r as { user_id: string }).user_id === aId)).toBe(true);
+    const mineRows = (mine.data ?? []) as { user_id: string }[];
+    expect(mineRows.length, "A의 지난 묶음이 0줄이다: 파일 머리의 준비 SQL로 한 줄 심는다(양성 대조 불가)").toBeGreaterThanOrEqual(1);
+    expect(mineRows.every((r) => r.user_id === aId)).toBe(true);
     const theirs = await b.from("goal_bundles").select("id, user_id");
     expect(theirs.error).toBeNull();
     expect((theirs.data ?? []).filter((r) => (r as { user_id: string }).user_id === aId)).toEqual([]);

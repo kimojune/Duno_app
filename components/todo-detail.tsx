@@ -8,7 +8,7 @@ import { describeTodoDay } from "../lib/todos/day";
 import type { TodoItem } from "../lib/todos/types";
 import { checkTodoText, countTodoChars, TODO_TEXT_MAX_LENGTH } from "../lib/todos/validation";
 import { useOverlayWindow } from "../lib/use-overlay-window";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { CATEGORY_NAME_MAX_LENGTH, countCategoryChars } from "../lib/categories/validation";
 import { categoryOverLimitText, TODO_TEXT } from "./todo-view";
 import { BackHeader } from "./back-header";
@@ -75,7 +75,7 @@ export type DetailTodo = {
   canMoveDown: boolean;
 };
 
-type Chip = { id: string; name: string };
+type Chip = { id: string; name: string; colorOrder?: number };
 
 /** 시트 「+ 분야」의 결과. category가 null이면 기타(「기타」라는 이름을 적었을 때 — 분야 행을 만들지 않는다) */
 export type DetailCategoryAdd =
@@ -654,8 +654,7 @@ function noteDayText(day: string): string {
 /** 분야 순서(0부터) → 색. 칩 목록은 이름을 읽을 수 있는 분야를 만든 순서로 담고 있다(상태보기·다이얼과 같은 순서). 기타는 기타 색 */
 function colorOf(chips: Chip[], id: string | null): string {
   if (id === null) return categoryColorValue(null);
-  const index = chips.findIndex((c) => c.id === id);
-  return categoryColorValue(index < 0 ? null : index);
+  return categoryColorValue(colorOrderIn(chips, id));
 }
 
 function CheckMark() {

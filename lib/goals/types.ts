@@ -9,5 +9,5 @@ export type GoalSummary = {
   /** 이번 주 분야별로 쓴 시간(기타는 categoryId null) */
   thisWeek: CategoryMinutes[];
   /** 고를 수 있는 분야(보관 안 한 것, 이름을 풀 수 있는 것) */
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; colorOrder?: number }[];
 };

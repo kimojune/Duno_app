@@ -33,7 +33,7 @@ import {
   type NewCategoryHelp,
   type RowView,
 } from "./todo-view";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { CarryOver } from "./carry-over";
 import { CloseConfirm } from "./close-confirm";
 import { PastDays } from "./past-days";
@@ -72,7 +72,7 @@ type LocalRow = {
 };
 
 /** 화면이 아는 분야 하나. name이 null이면 이름을 풀 수 없다(칩에 보이지 않고, 목록 표시는 「읽을 수 없는 분야」) */
-type CategoryEntry = { id: string; name: string | null };
+type CategoryEntry = { id: string; name: string | null; colorOrder?: number };
 type CategoryState = "loading" | "ready" | "error";
 
 function fromItem(item: TodoItem): LocalRow {
@@ -88,7 +88,7 @@ function fromItem(item: TodoItem): LocalRow {
 }
 
 function toEntry(item: CategoryItem): CategoryEntry {
-  return { id: item.id, name: item.readable ? item.name : null };
+  return { id: item.id, name: item.readable ? item.name : null, ...(item.colorOrder !== undefined ? { colorOrder: item.colorOrder } : {}) };
 }
 
 /** 임시, 결정 필요: 저장 요청이 이 시간 안에 답이 없으면 그 줄을 「저장하지 못했어요」로 바꾼다 */
@@ -1311,11 +1311,11 @@ export function TodoScreen({
   }
 
   /** 분야 점 색(Figma 50:52): 이름을 읽을 수 있는 분야의 만든 순서 자리 → 분야 색. 모르는 분야는 점 없음(이름만) */
-  const readableOrder = new Map(categories.filter((c) => c.name !== null).map((c, i) => [c.id, i]));
+  const readableList = categories.filter((c) => c.name !== null);
   function categoryColorOf(categoryId: string | null): string | undefined {
     if (!categoryId) return undefined;
-    const order = readableOrder.get(categoryId);
-    return order === undefined ? undefined : categoryColorValue(order);
+    const order = colorOrderIn(readableList, categoryId);
+    return order === null ? undefined : categoryColorValue(order);
   }
 
   const rowViews: RowView[] = rows.map((r) => ({

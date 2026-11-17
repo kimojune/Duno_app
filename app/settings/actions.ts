@@ -2,8 +2,8 @@
 
 import { getDeps } from "../../lib/deps";
 import type { RecordResult } from "../../lib/records/common";
-import { saveRatiosForUser, saveSettingsForUser } from "../../lib/settings/core";
-import type { RatioItem, SettingsData } from "../../lib/settings/types";
+import { saveRatiosForUser, saveSettingsForUser, type SettingsSaveResult } from "../../lib/settings/core";
+import type { RatioItem } from "../../lib/settings/types";
 
 /**
  * 처음 설정·알림 설정 쓰기 Server Action(PRD ①). 공개 HTTP 엔드포인트라 인자는 unknown으로 받아 서버에서 다시 검증한다.
@@ -20,7 +20,7 @@ export async function saveRatios(ratios: unknown): Promise<RecordResult<{ ratios
   }
 }
 
-export async function saveSettings(patch: unknown): Promise<RecordResult<Omit<SettingsData, "ratios">>> {
+export async function saveSettings(patch: unknown): Promise<SettingsSaveResult> {
   try {
     const deps = await getDeps();
     if (!deps) return { ok: false, error: "config" };

@@ -333,14 +333,16 @@ begin
   -- 지금 표 반영: 분야·비율·기타
   if p_items is not null then
     for v_item in select e.value from pg_catalog.jsonb_array_elements(p_items) e loop
-      if pg_catalog.jsonb_typeof(v_item) <> 'object'
-         or pg_catalog.jsonb_typeof(v_item -> 'id') <> 'string'
-         or (v_item ->> 'id') !~ c_uuid_re
-         or pg_catalog.jsonb_typeof(v_item -> 'percent') <> 'number'
-         or (v_item ->> 'percent') !~ '^[0-9]{1,3}$'
-         or (v_item ? 'new' and pg_catalog.jsonb_typeof(v_item -> 'new') not in ('boolean', 'null'))
-         or (v_item ? 'archived' and pg_catalog.jsonb_typeof(v_item -> 'archived') not in ('boolean', 'null'))
-         or (v_item ? 'name_encrypted' and pg_catalog.jsonb_typeof(v_item -> 'name_encrypted') not in ('string', 'null')) then
+      -- null에 안전한 검사: 키가 없으면 jsonb_typeof가 null이라 일반 비교는 null(if를 건너뜀)이 된다.
+      -- is distinct from·coalesce로 빠진 키(id·percent)를 모두 거절한다. 있어도 되는 키(new·archived·name_encrypted)는 있으면 타입을 본다.
+      if pg_catalog.jsonb_typeof(v_item) is distinct from 'object'
+         or pg_catalog.jsonb_typeof(v_item -> 'id') is distinct from 'string'
+         or coalesce((v_item ->> 'id') !~ c_uuid_re, true)
+         or pg_catalog.jsonb_typeof(v_item -> 'percent') is distinct from 'number'
+         or coalesce((v_item ->> 'percent') !~ '^[0-9]{1,3}$', true)
+         or (v_item ? 'new' and pg_catalog.jsonb_typeof(v_item -> 'new') <> all (array['boolean', 'null']))
+         or (v_item ? 'archived' and pg_catalog.jsonb_typeof(v_item -> 'archived') <> all (array['boolean', 'null']))
+         or (v_item ? 'name_encrypted' and pg_catalog.jsonb_typeof(v_item -> 'name_encrypted') <> all (array['string', 'null'])) then
         raise exception 'invalid item' using errcode = '22023', hint = 'bundle_invalid';
       end if;
       v_id := (v_item ->> 'id')::uuid;

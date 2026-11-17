@@ -1,8 +1,9 @@
 "use client";
 
+import { toReadable } from "../lib/categories/readable";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { APP_CONFIG } from "../lib/app-config";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import { defaultEveningApi } from "../lib/evening-api";
 import { defaultFocusApi, type FocusApi } from "../lib/focus-api";
 import { defaultGoalsApi } from "../lib/goals-api";
@@ -52,7 +53,7 @@ import { Notice, TextButton } from "./ui";
  * - 저녁 기록(PRD ②)은 알림을 눌러 들어온 주소(/?open=evening)로도 열린다. 저장 직후 한 줄을 누르면 상태보기(입구 after_save)로 간다(③, G3).
  */
 
-type Entry = { id: string; name: string };
+type Entry = { id: string; name: string; colorOrder?: number };
 
 /**
  * 기기 먼저 저장의 화면 글(고침 4바퀴): 서버가 받지 않은 쓰기 보관 자리 · 「보내지 못함」 · 계정 바뀜 안내.
@@ -141,12 +142,11 @@ export function withCategories(initial: TodayRead, added: Entry[]): TodayRead {
 /** 읽을 수 있는 분야(보관 안 한 것) */
 /** 먼저 할 일 카드 분야 점 색: 읽을 수 있는 분야 목록에서의 자리(없으면 기타 색) */
 function cardCategoryColor(categoryId: string | null, list: Entry[]): string {
-  const at = categoryId === null ? -1 : list.findIndex((c) => c.id === categoryId);
-  return categoryColorValue(at >= 0 ? at : null);
+  return categoryColorValue(colorOrderIn(list, categoryId));
 }
 
 function readableCategories(initial: TodayRead): Entry[] {
-  return initial.categories.ok ? initial.categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : [])) : [];
+  return initial.categories.ok ? toReadable(initial.categories.data.categories) : [];
 }
 
 const TABS: TabId[] = ["growth", "todo", "timer", "me"];
@@ -205,7 +205,7 @@ export function AppShell({
 
   if (needsOnboarding && settings) {
     const readable: Entry[] = home.today.categories.ok
-      ? home.today.categories.data.categories.flatMap((c) => (c.readable ? [{ id: c.id, name: c.name }] : []))
+      ? toReadable(home.today.categories.data.categories)
       : [];
     return (
       <Onboarding

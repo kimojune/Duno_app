@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { categoryColorValue } from "../lib/category-color";
+import { categoryColorValue, colorOrderIn } from "../lib/category-color";
 import type { ItemDelta } from "../lib/evening/logic";
 import { barWidth, buildAfterSave, type AfterSaveRow } from "../lib/growth/after-save";
 import type { GrowthData } from "../lib/growth/types";
@@ -47,20 +47,18 @@ export const AFTER_SAVE_FILL_MS = 400;
 
 type Names = { name: (id: string | null) => string; color: (id: string | null) => string };
 
-function namesFrom(data: GrowthData | null, fallback: readonly { id: string; name: string }[]): Names {
+function namesFrom(data: GrowthData | null, fallback: readonly { id: string; name: string; colorOrder?: number }[]): Names {
   const list = data ? data.categories : fallback;
   return {
     name: (id) => (id === null ? AFTER_SAVE_TEXT.other : (list.find((c) => c.id === id)?.name ?? fallback.find((c) => c.id === id)?.name ?? AFTER_SAVE_TEXT.other)),
     color: (id) => {
-      if (id === null) return categoryColorValue(null);
-      const at = list.findIndex((c) => c.id === id);
-      return categoryColorValue(at >= 0 ? at : null);
+      return categoryColorValue(colorOrderIn(list, id));
     },
   };
 }
 
 /** 화면 읽기 한 문장 */
-export function afterSaveAnnouncement(delta: readonly ItemDelta[], data: GrowthData | null, fallback: readonly { id: string; name: string }[]): string {
+export function afterSaveAnnouncement(delta: readonly ItemDelta[], data: GrowthData | null, fallback: readonly { id: string; name: string; colorOrder?: number }[]): string {
   const names = namesFrom(data, fallback);
   const changed = delta.filter((d) => d.minutes !== 0);
   if (changed.length === 0) return `${AFTER_SAVE_TEXT.announceHead} ${AFTER_SAVE_TEXT.noChange}.`;
@@ -103,7 +101,7 @@ export function AfterSaveCard({
 }: {
   delta: readonly ItemDelta[];
   data: GrowthData | null;
-  fallback: readonly { id: string; name: string }[];
+  fallback: readonly { id: string; name: string; colorOrder?: number }[];
   /** 상태보기 데이터를 읽는 중(상태 알림은 다 읽은 뒤 한 번만) */
   pending?: boolean;
 }) {
@@ -180,7 +178,7 @@ export function AfterSaveCard({
 }
 
 /** 저장 뒤 상태보기 데이터를 한 번 읽어 카드를 그린다(app-shell의 renderAfterSave) */
-export function AfterSave({ api, delta, fallback }: { api: GrowthApi; delta: readonly ItemDelta[]; fallback: readonly { id: string; name: string }[] }) {
+export function AfterSave({ api, delta, fallback }: { api: GrowthApi; delta: readonly ItemDelta[]; fallback: readonly { id: string; name: string; colorOrder?: number }[] }) {
   const [load, setLoad] = useState<{ pending: boolean; data: GrowthData | null }>({ pending: true, data: null });
   useEffect(() => {
     let alive = true;
