@@ -2,6 +2,7 @@
 
 import { checkExpectedUser } from "../../lib/mirror/account";
 import { createClient } from "../../lib/supabase/server";
+import { applyBundle, setRestartRequested } from "../bundles/actions";
 import { saveEveningLog } from "../evening/actions";
 import { endFocus, startFocus } from "../focus/actions";
 import { clearWeeklyGoal, saveWeeklyGoal } from "../goals/actions";
@@ -19,7 +20,8 @@ import { recordView } from "../views/actions";
  * 예상 못 한 예외는 unavailable로 바꾸고 원문을 내지 않는다.
  */
 
-export type LocalOpReply = { ok: true } | { ok: false; error: string; existing?: { id: string; name: string } };
+/** pastSkipped: 저장은 됐지만 지난 목표 기록을 남기지 못했다(상한, 화면이 알린다) */
+export type LocalOpReply = { ok: true; pastSkipped?: true } | { ok: false; error: string; existing?: { id: string; name: string } };
 
 type Fields = Record<string, unknown>;
 
@@ -31,11 +33,11 @@ export async function sendLocalOp(expectedUser: unknown, op: unknown, clientAt: 
     if (!account.ok) return { ok: false, error: account.error };
     if (op === null || typeof op !== "object" || typeof (op as Fields).kind !== "string") return { ok: false, error: "invalid_input" };
     const res = await dispatch(op as Fields, clientAt);
-    if (res.ok) return { ok: true };
+    if (res.ok) return (res as { pastSkipped?: unknown }).pastSkipped === true ? { ok: true, pastSkipped: true } : { ok: true };
     const existing = (res as { existing?: unknown }).existing;
-    if (res.error === "duplicate" && existing && typeof existing === "object") {
+    if ((res.error === "duplicate" || res.error === "archived_exists") && existing && typeof existing === "object") {
       const e = existing as { id?: unknown; name?: unknown };
-      if (typeof e.id === "string" && typeof e.name === "string") return { ok: false, error: "duplicate", existing: { id: e.id, name: e.name } };
+      if (typeof e.id === "string" && typeof e.name === "string") return { ok: false, error: res.error, existing: { id: e.id, name: e.name } };
     }
     return { ok: false, error: res.error };
   } catch {
@@ -43,9 +45,9 @@ export async function sendLocalOp(expectedUser: unknown, op: unknown, clientAt: 
   }
 }
 
-type Reply = { ok: true } | { ok: false; error: string };
+type Reply = { ok: true; pastSkipped?: boolean } | { ok: false; error: string };
 
-async function dispatch(op: Fields, clientAt: unknown): Promise<Reply> {
+async function dispatch(op: Fields, clientAt: unknown): Promise<Reply & { existing?: unknown }> {
   switch (op.kind) {
     case "todo.add":
       return addTodo(op.id, op.text, op.categoryId ?? null, clientAt);
@@ -80,7 +82,19 @@ async function dispatch(op: Fields, clientAt: unknown): Promise<Reply> {
     case "goal.clear":
       return clearWeeklyGoal(clientAt);
     case "settings.save":
-      return saveSettings(op.patch);
+      return saveSettings(op.patch); // 옛 op: 목표 글은 서버가 save_goal_bundle(충돌 검사 건너뜀)로 보낸다
+    case "bundle.apply": {
+      // 사용자 번호는 싣지 않는다(서버가 세션에서 정한다). op id가 곧 멱등 열쇠다
+      const { kind: _kind, ...input } = op;
+      void _kind;
+      const res = await applyBundle(input);
+      if (!res.ok) return res.existing ? { ok: false, error: res.error, existing: res.existing } as Reply : { ok: false, error: res.error };
+      return res.data.pastSkipped ? { ok: true, pastSkipped: true } : { ok: true };
+    }
+    case "bundle.restart":
+      return setRestartRequested(true);
+    case "bundle.restartCancel":
+      return setRestartRequested(false);
     case "ratios.save":
       return saveRatios(op.ratios);
     case "view.record": {

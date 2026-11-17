@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { listCategoriesForUser } from "../categories/core";
+import type { BundleState } from "../bundles/types";
+import { listArchivedCategoriesForUser, listCategoriesForUser } from "../categories/core";
 import { listEveningLogs } from "../evening/core";
 import { listFocusSessionsSince } from "../focus/core";
 import { readWeeklyGoalItems } from "../goals/core";
@@ -24,6 +25,25 @@ export type MirrorDeps = { supabase: SupabaseClient; key: TodoKey | null; now?: 
 const serverNow = () => new Date();
 
 /**
+ * 지금 묶음의 상태(고침 번호·시작·다시 시작 표시, MO-46). user_settings에서 읽는다. 행이 없으면 처음 상태.
+ * 칸을 못 읽으면(마이그레이션 적용 전 등) null: 기기가 옛 값을 그대로 둔다.
+ */
+async function readBundleState(supabase: SupabaseClient, userId: string): Promise<BundleState | null> {
+  try {
+    const res = await supabase.from("user_settings").select("bundle_revision, bundle_started_at, restart_requested_at").eq("user_id", userId);
+    if (res.error) return null;
+    const row = ((res.data ?? []) as { bundle_revision?: number | null; bundle_started_at?: string | null; restart_requested_at?: string | null }[])[0];
+    return {
+      revision: typeof row?.bundle_revision === "number" ? row.bundle_revision : 0,
+      startedAt: row?.bundle_started_at ?? null,
+      restartRequestedAt: row?.restart_requested_at ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * expectedUser(고침 4바퀴): 기기가 실어 보낸 「이 기기 장치의 사용자」. 주어졌는데 세션 사용자와 다르면 account_mismatch로 거절한다.
  * 거절에만 쓴다(같아도 권한을 넓히지 않는다. 읽기는 늘 세션 사용자로). 사본에는 주인(userId = 세션 사용자)을 싣는다.
  */
@@ -42,15 +62,17 @@ export async function readMirrorForUser(
     const fromDay = addDays(today, -(MIRROR_TODO_DAYS - 1));
     const weekStart = weekStartFor(today);
 
-    const [todos, categories, settings, logs, goal, sessions] = await Promise.all([
+    const [todos, categories, settings, logs, goal, sessions, archived, bundle] = await Promise.all([
       listTodosWindow({ supabase: deps.supabase, key, now: () => now }, fromDay, today),
       listCategoriesForUser({ supabase: deps.supabase, key }),
       readSettingsForUser({ supabase: deps.supabase, key }),
       listEveningLogs({ supabase: deps.supabase }),
       readWeeklyGoalItems({ supabase: deps.supabase, weekStart }),
       listFocusSessionsSince({ supabase: deps.supabase, now: () => now }, fromDay),
+      listArchivedCategoriesForUser({ supabase: deps.supabase, key }),
+      readBundleState(deps.supabase, user.data),
     ]);
-    const parts = [todos, categories, settings, logs, goal, sessions];
+    const parts = [todos, categories, settings, logs, goal, sessions, archived];
     // 세션이 도중에 풀렸으면 통째로 알린다(칸마다 같은 코드)
     if (parts.some((p) => !p.ok && p.error === "unauthenticated")) return recordFail("unauthenticated");
     return {
@@ -64,6 +86,8 @@ export async function readMirrorForUser(
         logs: logs.ok ? logs.data : null,
         goal: goal.ok ? { weekStart, items: goal.data } : null,
         sessions: sessions.ok ? sessions.data : null,
+        archivedCategories: archived.ok ? archived.data.categories : null,
+        bundle,
       },
     };
   } catch {

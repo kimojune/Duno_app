@@ -9,6 +9,8 @@ import { DEFAULT_NOTIFY } from "../settings/validation";
 import { offerCopyId } from "../offers/copy-id";
 import { todoDayFor } from "../todos/day";
 import { addDays, weekStartFor } from "../week";
+import { EMPTY_BUNDLE_STATE, type BundleState } from "../bundles/types";
+import type { CategoryItem } from "../categories/types";
 import type { Mirror, MirrorSnapshot, MirrorTodo, QueuedOp } from "./types";
 
 /**
@@ -180,6 +182,60 @@ export function applyOp(m: Mirror, queued: Pick<QueuedOp, "op" | "clientAt">): M
       const current = m.settings ?? defaultSettings();
       return { ...m, settings: { ...current, ratios: op.ratios } };
     }
+    case "bundle.apply": {
+      // 새 묶음을 거울에 입힌다(서버 함수 save_goal_bundle과 같은 규칙). 거절되면 줄에서 빠져 다시 입히면 되돌려진다.
+      const current = m.settings ?? defaultSettings();
+      const state = m.bundle ?? EMPTY_BUNDLE_STATE;
+      const all = [...m.categories, ...(m.archivedCategories ?? [])];
+      const listed = new Set(op.items.map((i) => i.id));
+      const nextActive: CategoryItem[] = [];
+      const nextArchived: CategoryItem[] = [];
+      let moved = 0;
+      const ratios: { categoryId: string | null; percent: number }[] = [];
+      for (const item of op.items) {
+        const existing = all.find((c) => c.id === item.id);
+        const wasArchived = existing ? !m.categories.some((c) => c.id === item.id) : false;
+        const base: CategoryItem | undefined = existing
+          ? item.name !== undefined && existing.readable ? { ...existing, name: item.name } : existing
+          : item.isNew && item.name !== undefined
+            ? { id: item.id, readable: true, name: item.name, createdAt: clientAt, colorOrder: all.length }
+            : undefined;
+        if (!base) continue; // 모르는 분야: 서버가 거절한다
+        const archivedNow = item.archived === true || (item.archived === undefined && wasArchived);
+        if (archivedNow) {
+          if (item.archived === true && !wasArchived) moved += current.ratios.find((r) => r.categoryId === item.id)?.percent ?? 0;
+          nextArchived.push(base);
+        } else {
+          nextActive.push(base);
+          ratios.push({ categoryId: item.id, percent: item.percent });
+        }
+      }
+      // 목록에 없는 분야: 다시 시작이면 보관, 아니면 그대로(몫 이동 없음)
+      for (const c of m.categories) {
+        if (listed.has(c.id)) continue;
+        (op.reason === "restart" ? nextArchived : nextActive).push(c);
+      }
+      for (const c of m.archivedCategories ?? []) if (!listed.has(c.id)) nextArchived.push(c);
+      const other = Math.min(op.other + moved, 100);
+      if (other > 0) ratios.push({ categoryId: null, percent: other });
+      const sameDay = state.startedAt !== null && dayOf(state.startedAt) === dayOf(clientAt);
+      const bundle: BundleState = {
+        revision: state.revision + 1,
+        startedAt: sameDay || state.startedAt === null ? (state.startedAt ?? (op.completeOnboarding ? clientAt : null)) : clientAt,
+        restartRequestedAt: op.reason === "restart" ? null : state.restartRequestedAt,
+      };
+      return {
+        ...m,
+        categories: nextActive,
+        archivedCategories: nextArchived,
+        settings: { ...current, goal: op.goal, goalReadable: true, ratios, ...(op.completeOnboarding ? { onboardingDone: true } : {}) },
+        bundle,
+      };
+    }
+    case "bundle.restart":
+      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: clientAt } };
+    case "bundle.restartCancel":
+      return { ...m, bundle: { ...(m.bundle ?? EMPTY_BUNDLE_STATE), restartRequestedAt: null } };
     case "view.record":
       return m; // 쌓기만 하는 기록이라 거울이 바뀔 것이 없다
     case "offer.addTodo": {
@@ -237,5 +293,7 @@ export function mergeSnapshot(base: Mirror, snapshot: MirrorSnapshot): Mirror {
     logs: snapshot.logs ?? base.logs,
     goals,
     sessions: snapshot.sessions ?? base.sessions,
+    archivedCategories: snapshot.archivedCategories ?? base.archivedCategories,
+    bundle: snapshot.bundle ?? base.bundle,
   };
 }

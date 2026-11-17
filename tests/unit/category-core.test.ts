@@ -149,12 +149,22 @@ describe("악용 6: 큰 입력·이상한 입력 (DB 쓰기 전에 거절)", () 
     expect(db.categories).toHaveLength(2);
   });
 
-  it("보관한 분야·남의 분야와 이름이 같은 것은 duplicate가 아니다", async () => {
-    seedCategory({ user_id: me, name: "운동", archived_at: "2026-11-01T00:00:00.000Z" });
+  it("남의 분야와 이름이 같은 것은 duplicate가 아니다", async () => {
     seedCategory({ user_id: other, name: "독서" });
     const deps = { supabase: signedIn(), key };
-    expect((await createCategoryForUser(deps, randomUUID(), "운동")).ok).toBe(true);
     expect((await createCategoryForUser(deps, randomUUID(), "독서")).ok).toBe(true);
+  });
+
+  it("보관한 같은 이름 분야가 있으면 새로 만들지 않고 그 id와 함께 archived_exists로 알린다(MO-46 규칙 11)", async () => {
+    // 바뀐 규칙: 전에는 보관한 분야와 이름이 같아도 새로 만들었다. 이제는 되살리기를 권할 수 있게 그 분야를 알린다(권하는 것은 화면 몫).
+    const archived = seedCategory({ user_id: me, name: "운동", archived_at: "2026-11-01T00:00:00.000Z" });
+    const deps = { supabase: signedIn(), key };
+    const before = db.categories.length;
+    expect(await createCategoryForUser(deps, randomUUID(), " 운동 ")).toEqual({ ok: false, error: "archived_exists", existing: { id: archived.id, name: "운동" } });
+    expect(db.categories).toHaveLength(before);
+    // 쓰는 분야와 겹치면 지금처럼 duplicate가 먼저다
+    const active = seedCategory({ user_id: me, name: "운동" });
+    expect(await createCategoryForUser(deps, randomUUID(), "운동")).toEqual({ ok: false, error: "duplicate", existing: { id: active.id, name: "운동" } });
   });
 
   it("checkCategoryName은 앞뒤 공백을 지운 이름을 돌려준다", () => {

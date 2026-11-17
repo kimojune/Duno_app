@@ -25,7 +25,7 @@ const fail = <E extends CategoryErrorCode>(error: E) => ({ ok: false, error }) a
 type DbError = { code?: string | null; hint?: string | null } | null | undefined;
 
 /** DB 오류를 짧은 코드로. 원문은 버린다. */
-function mapDbError(error: DbError): Exclude<CategoryErrorCode, "duplicate"> {
+function mapDbError(error: DbError): Exclude<CategoryErrorCode, "duplicate" | "archived_exists"> {
   if (!error) return "unavailable";
   if (error.code === "P0001" && error.hint === "categories_limit") return "category_limit";
   if (error.code === "23514") return "invalid_input"; // check 제약(형식·길이)
@@ -34,14 +34,62 @@ function mapDbError(error: DbError): Exclude<CategoryErrorCode, "duplicate"> {
   return "unavailable";
 }
 
-type CategoryRow = { id: string; name_encrypted: string; archived_at: string | null; created_at: string };
-const ROW_COLUMNS = "id, name_encrypted, archived_at, created_at";
+type CategoryRow = { id: string; name_encrypted: string; archived_at: string | null; created_at: string; color_order?: number | null };
+const ROW_COLUMNS = "id, name_encrypted, archived_at, created_at, color_order";
 
 function toItem(row: CategoryRow, userId: string, key: TodoKey): CategoryItem {
   const opened = decryptCategoryName(row.name_encrypted, userId, key);
+  const color = typeof row.color_order === "number" ? { colorOrder: row.color_order } : {};
   return opened.ok
-    ? { id: row.id, readable: true, name: opened.text, createdAt: row.created_at }
-    : { id: row.id, readable: false, name: null, createdAt: row.created_at };
+    ? { id: row.id, readable: true, name: opened.text, createdAt: row.created_at, ...color }
+    : { id: row.id, readable: false, name: null, createdAt: row.created_at, ...color };
+}
+
+/**
+ * 보관한 내 분야 목록(이름 찾기용, MO-46). created_at 오름차순, 같으면 id. 기기 사본이 지난 이름을 찾고,
+ * 같은 이름의 새 분야를 만들려 할 때 「보관한 같은 이름이 있다」를 알리는 데 쓴다.
+ */
+export async function listArchivedCategoriesForUser(deps: CategoryDeps): Promise<CategoryResult<CategoryList>> {
+  try {
+    const user = await requireUserId(deps.supabase);
+    if (!user.ok) return user;
+    if (!deps.key) return fail("config");
+    const key = deps.key;
+    const { data, error } = await deps.supabase
+      .from("categories")
+      .select(ROW_COLUMNS)
+      .eq("user_id", user.data)
+      .not("archived_at", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (error) return fail(mapDbError(error));
+    return { ok: true, data: { categories: ((data ?? []) as CategoryRow[]).map((row) => toItem(row, user.data, key)) } };
+  } catch {
+    return fail("unavailable");
+  }
+}
+
+/**
+ * 같은 이름의 내 분야 찾기(암호문이라 서버가 푼다). 쓰는 분야가 먼저, 없으면 보관한 분야. skip에 든 id는 건너뛴다.
+ * 풀 수 없는 이름은 건너뛴다.
+ */
+export function findSameNamedCategory(
+  rows: { id: string; name_encrypted: string; archived_at: string | null }[],
+  userId: string,
+  key: TodoKey,
+  name: string,
+  skip: ReadonlySet<string> = new Set(),
+): { active: { id: string; name: string } | null; archived: { id: string; name: string } | null } {
+  let active: { id: string; name: string } | null = null;
+  let archived: { id: string; name: string } | null = null;
+  for (const row of rows) {
+    if (skip.has(row.id)) continue;
+    const opened = decryptCategoryName(row.name_encrypted, userId, key);
+    if (!opened.ok || !sameCategoryName(opened.text, name)) continue;
+    if (row.archived_at === null) active ??= { id: row.id, name: opened.text };
+    else archived ??= { id: row.id, name: opened.text };
+  }
+  return { active, archived };
 }
 
 /** 보관하지 않은 내 분야 목록. created_at 오름차순, 같으면 id. 풀 수 없는 이름은 그 행만 readable=false. */
@@ -96,17 +144,14 @@ export async function createCategoryForUser(
     if (mine.error) return fail(mapDbError(mine.error));
     const rows = (mine.data ?? []) as CategoryRow[];
 
-    const same = rows.find((row) => row.id === parsedId.data);
-    if (same) return { ok: true, data: { category: toItem(same, user.data, key) } };
+    const sameId = rows.find((row) => row.id === parsedId.data);
+    if (sameId) return { ok: true, data: { category: toItem(sameId, user.data, key) } };
 
     // 같은 이름: 서버가 보관 안 한 내 분야 이름을 풀어 비교한다(최대 50개). 풀 수 없는 이름은 건너뛴다.
-    for (const row of rows) {
-      if (row.archived_at !== null) continue;
-      const opened = decryptCategoryName(row.name_encrypted, user.data, key);
-      if (opened.ok && sameCategoryName(opened.text, checked.name)) {
-        return { ok: false, error: "duplicate", existing: { id: row.id, name: opened.text } };
-      }
-    }
+    const same = findSameNamedCategory(rows, user.data, key, checked.name);
+    if (same.active) return { ok: false, error: "duplicate", existing: same.active };
+    // 보관한 같은 이름이 있으면 새로 만들지 않고 그 분야를 알린다(되살리기를 권하는 것은 화면 몫, MO-46 규칙 11)
+    if (same.archived) return { ok: false, error: "archived_exists", existing: same.archived };
 
     const nameEncrypted = encryptCategoryName(checked.name, user.data, key);
     if (nameEncrypted.length > CATEGORY_CIPHERTEXT_MAX_LENGTH) return fail("too_long");

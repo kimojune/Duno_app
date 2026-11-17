@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { emulateRpc } from "./fake-bundle-rpc";
 
 /**
  * 원샷 v2 표(todos·todo_notes·user_settings·evening_logs 등)를 흉내 내는 시험용 가짜 Supabase.
@@ -37,6 +38,8 @@ export class FakeStore {
   tables: Record<string, Row[]> = {};
   rules: Record<string, TableRule> = {};
   calls: FakeCall[] = [];
+  /** DB 함수(rpc) 호출 기록: 「함수를 한 번만 불렀다」를 확인한다 */
+  rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   alwaysError: FakeError | null = null;
   private clock = Date.parse("2026-11-07T00:00:00.000Z");
   private seq = 0;
@@ -78,6 +81,12 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
         return auth.sub ? { data: { claims: { sub: auth.sub } }, error: null } : { data: null, error: null };
       },
     },
+    /** DB 함수 호출(tests/unit/fake-bundle-rpc.ts가 save_goal_bundle 등을 흉내 낸다) */
+    rpc(name: string, args: Record<string, unknown> = {}) {
+      store.rpcCalls.push({ name, args });
+      const run = () => (store.alwaysError ? { data: null, error: store.alwaysError } : emulateRpc(store, viewer, name, args));
+      return { then: <T>(resolve: (v: { data: unknown; error: FakeError | null }) => T, reject?: (e: unknown) => T) => Promise.resolve().then(run).then(resolve, reject) };
+    },
     from(table: string) {
       const rule = store.rules[table] ?? {};
       const call: FakeCall = { table, op: "select", filters: [] };
@@ -97,6 +106,7 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
           const v = r[col];
           if (op === "eq") return v === val;
           if (op === "is") return (v ?? null) === val;
+          if (op === "not_is") return (v ?? null) !== val;
           if (op === "in") return (val as unknown[]).includes(v);
           if (op === "gte") return String(v) >= String(val);
           if (op === "lte") return String(v) <= String(val);
@@ -248,6 +258,11 @@ export function fakeTablesClient(store: FakeStore, auth: AuthMode): SupabaseClie
         },
         is(column: string, value: null) {
           call.filters.push(["is", column, value]);
+          return builder;
+        },
+        not(column: string, operator: string, value: null) {
+          if (operator !== "is") throw new Error("fake: not() supports only 'is'");
+          call.filters.push(["not_is", column, value]);
           return builder;
         },
         in(column: string, values: unknown[]) {

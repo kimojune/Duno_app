@@ -64,3 +64,13 @@ export function categoryColor(order: number | null): CategoryColor {
 export function categoryColorValue(order: number | null): string {
   return categoryColor(order).cssValue;
 }
+
+/**
+ * 분야의 색 순서 정하기(MO-46). 서버가 정한 고정 칸(categories.color_order: 보관한 분야까지 포함한 만든 순서, 0부터)이 있으면 그것을,
+ * 없으면(null·undefined: 마이그레이션 전 사본 등) 화면 순서(fallbackOrder)를 쓴다. 기타(분야 없음)는 둘 다 null이다.
+ * 고정 칸 덕에 분야 하나를 보관해도 다른 분야의 색 번호가 바뀌지 않는다. 색 번호는 categoryColorNumber(결과)다.
+ */
+export function resolveColorOrder(colorOrder: number | null | undefined, fallbackOrder: number | null): number | null {
+  if (typeof colorOrder === "number" && Number.isFinite(colorOrder) && colorOrder >= 0) return colorOrder;
+  return fallbackOrder;
+}

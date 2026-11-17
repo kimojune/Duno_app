@@ -51,7 +51,6 @@ function setup() {
 }
 const deps = (store: FakeStore, sub: string | null = ME) => ({ supabase: fakeTablesClient(store, { sub }), key: KEY, now: () => NOW });
 const historyInserts = (store: FakeStore) => store.calls.filter((c) => c.table === HISTORY && c.op === "insert");
-const historyCalls = (store: FakeStore) => store.calls.filter((c) => c.table === HISTORY);
 
 let warn: MockInstance<typeof console.warn>;
 beforeEach(() => {
@@ -89,26 +88,24 @@ describe("기록 묶음 만들기·비교(순수 함수)", () => {
   });
 });
 
-describe("saveRatiosForUser → 바뀐 기록", () => {
-  it("저장이 성공하면 기록 한 줄을 넣는다: user_id = 세션, ratios = 저장한 묶음(기타 포함), 시각은 보내지 않는다(서버 기본값)", async () => {
+describe("saveRatiosForUser → 바뀐 기록 (MO-46: 기록은 DB 함수 save_goal_bundle이 같은 트랜잭션에서 쓴다)", () => {
+  const rpcOf = (store: FakeStore) => store.rpcCalls.filter((c) => c.name === "save_goal_bundle");
+
+  it("저장이 성공하면 함수를 한 번 부르고 기록 한 줄이 남는다: user_id = 세션, ratios = 저장한 묶음(기타 포함), 시각은 보내지 않는다(서버 기본값)", async () => {
     const store = setup();
     const ratios = [{ categoryId: C2, percent: 30 }, { categoryId: C1, percent: 50 }, { categoryId: null, percent: 20 }];
     expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
-
-    const inserts = historyInserts(store);
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0].payload).toEqual({
+    expect(rpcOf(store)).toHaveLength(1);
+    expect(rpcOf(store)[0].args).toMatchObject({ p_legacy: true, p_op_id: null }); // 옛 길: 충돌 검사 건너뜀
+    expect(Object.keys(rpcOf(store)[0].args)).not.toContain("p_user_id"); // 사용자 id는 보내지 않는다(DB가 auth.uid()로 정한다)
+    expect(historyInserts(store)).toHaveLength(0); // 앱이 직접 쓰지 않는다
+    const rows = store.table(HISTORY);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
       user_id: ME,
       ratios: [{ category_id: C1, percent: 50 }, { category_id: C2, percent: 30 }, { category_id: null, percent: 20 }],
     });
-    expect(Object.keys(inserts[0].payload as object)).not.toContain("recorded_at");
-    const rows = store.table(HISTORY);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ user_id: ME });
     expect(typeof rows[0].recorded_at).toBe("string");
-    // 직전 기록 읽기는 자기 행으로 거른다
-    const read = historyCalls(store).find((c) => c.op === "select");
-    expect(read?.filters).toContainEqual(["eq", "user_id", ME]);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -118,7 +115,6 @@ describe("saveRatiosForUser → 바뀐 기록", () => {
     expect(store.table(HISTORY)).toHaveLength(1);
     expect((await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 60 }, { categoryId: C2, percent: 40 }])).ok).toBe(true);
     expect((await saveRatiosForUser(deps(store), [{ categoryId: C2, percent: 40 }, { categoryId: C1, percent: 60 }])).ok).toBe(true);
-    expect(historyInserts(store)).toHaveLength(1);
     expect(store.table(HISTORY)).toHaveLength(1);
   });
 
@@ -127,7 +123,7 @@ describe("saveRatiosForUser → 바뀐 기록", () => {
     const ratios = [{ categoryId: C1, percent: 70 }, { categoryId: null, percent: 30 }];
     for (let i = 0; i < 100; i += 1) expect((await saveRatiosForUser(deps(store), ratios)).ok).toBe(true);
     expect(store.table(HISTORY)).toHaveLength(1);
-    expect(historyInserts(store)).toHaveLength(1);
+    expect(rpcOf(store)).toHaveLength(100);
   });
 
   it("바뀐 묶음은 새 줄로 쌓이고, 되돌아간 값(가 → 나 → 가)도 바뀐 것이라 세 줄", async () => {
@@ -164,68 +160,28 @@ describe("saveRatiosForUser → 바뀐 기록", () => {
     expect(store.table(HISTORY).filter((r) => r.user_id === OTHER)).toHaveLength(1);
   });
 
-  it("비율 저장이 실패하면 기록을 읽지도 쓰지도 않는다(남의 분야·형식 오류·로그인 없음·DB 오류)", async () => {
+  it("비율 저장이 실패하면 아무것도 안 바뀌고 기록도 없다(남의 분야·형식 오류·로그인 없음·DB 오류)", async () => {
     const store = setup();
     expect(await saveRatiosForUser(deps(store), [{ categoryId: C3, percent: 100 }])).toEqual({ ok: false, error: "not_found" });
     expect(await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 0 }])).toEqual({ ok: false, error: "invalid_input" });
     expect(await saveRatiosForUser(deps(store, null), [{ categoryId: C1, percent: 100 }])).toEqual({ ok: false, error: "unauthenticated" });
-    // 기타 열 쓰기만 실패(분야 행은 이미 들어감): 저장 실패로 돌려주고 기록은 안 쓴다
-    store.rules.user_settings.insertColumns = store.rules.user_settings.insertColumns!.filter((c) => c !== "ratio_other_percent");
+    expect(store.table(HISTORY)).toHaveLength(0);
+    expect(store.table("category_ratios")).toHaveLength(0);
+    // 함수 호출이 DB 오류로 실패: 저장 실패로 돌려주고 기록은 없다
+    store.alwaysError = { code: "XX000" };
     expect((await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 50 }, { categoryId: null, percent: 50 }])).ok).toBe(false);
-    expect(historyCalls(store)).toEqual([]);
     expect(store.table(HISTORY)).toHaveLength(0);
   });
 
-  it("기록 쓰기가 실패해도(권한 거절) 비율 저장은 성공으로 돌려주고, 로그에는 짧은 코드만 남긴다(값·사용자 번호 없음)", async () => {
-    const store = setup();
-    store.rules[HISTORY].insertColumns = []; // insert 거절(42501)
-    const ratios = [{ categoryId: C1, percent: 75 }, { categoryId: null, percent: 25 }];
-    expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
-    expect(store.table("category_ratios").map((r) => [r.category_id, r.percent])).toEqual([[C1, 75]]);
-    expect(store.table("user_settings")[0]).toMatchObject({ ratio_other_percent: 25 });
-    expect(historyInserts(store)).toHaveLength(1);
-    expect(store.table(HISTORY)).toHaveLength(0);
-    expect(warn).toHaveBeenCalledTimes(1);
-    const line = String(warn.mock.calls[0][0]);
-    expect(line).toBe("[ratio_history] write_failed code=42501");
-    expect(warn.mock.calls[0]).toHaveLength(1);
-    expect(line).not.toContain(ME);
-    expect(line).not.toContain(C1);
-  });
-
-  it("표가 없는 DB(적용 전)에서도 비율 저장은 성공한다: 직전 기록 읽기가 실패하면 쓰지 않고 로그만", async () => {
-    const store = setup();
-    const real = fakeTablesClient(store, { sub: ME });
-    const supabase = new Proxy(real, {
-      get(target, prop, receiver) {
-        if (prop !== "from") return Reflect.get(target, prop, receiver);
-        return (table: string) => {
-          if (table !== HISTORY) return target.from(table);
-          const missing = { data: null, error: { code: "42P01", message: 'relation "public.category_ratio_history" does not exist' } };
-          const chain: Record<string, unknown> = {};
-          for (const m of ["select", "eq", "order", "limit", "insert"]) chain[m] = () => chain;
-          chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(missing).then(resolve);
-          store.calls.push({ table, op: "select", filters: [] });
-          return chain;
-        };
-      },
-    });
-    const ratios = [{ categoryId: C1, percent: 100 }];
-    expect(await saveRatiosForUser({ supabase: supabase as never, key: KEY, now: () => NOW }, ratios)).toEqual({ ok: true, data: { ratios } });
-    expect(store.table("category_ratios").map((r) => [r.category_id, r.percent])).toEqual([[C1, 100]]);
-    expect(warn.mock.calls.map((c) => c[0])).toEqual(["[ratio_history] read_failed code=42P01"]);
-  });
-
-  it("합이 100이 아닌 묶음(화면 밖 길)은 저장은 그대로 하고 기록만 건너뛴다", async () => {
+  it("합이 100이 아닌 묶음(옛 길)은 저장은 그대로 하고 기록만 건너뛴다", async () => {
     const store = setup();
     const ratios = [{ categoryId: C1, percent: 30 }, { categoryId: C2, percent: 10 }];
     expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
     expect(store.table("category_ratios")).toHaveLength(2);
-    expect(historyCalls(store)).toEqual([]);
-    expect(warn.mock.calls.map((c) => c[0])).toEqual(["[ratio_history] skipped_invalid"]);
+    expect(store.table(HISTORY)).toHaveLength(0);
   });
 
-  it("사용자 행 수 상한(1000)에 닿으면 기록만 실패하고(로그 code=P0001) 비율 저장은 성공한다", async () => {
+  it("사용자 행 수 상한(1000)에 닿으면 기록만 건너뛰고 비율 저장은 성공한다", async () => {
     const store = setup();
     for (let i = 0; i < 1000; i += 1) {
       store.seed(HISTORY, { user_id: ME, recorded_at: `2026-11-01T00:00:00.${String(i).padStart(3, "0")}Z`, ratios: [{ category_id: C1, percent: i % 2 === 0 ? 60 : 40 }, { category_id: C2, percent: i % 2 === 0 ? 40 : 60 }] });
@@ -236,9 +192,7 @@ describe("saveRatiosForUser → 바뀐 기록", () => {
     expect(await saveRatiosForUser(deps(store), ratios)).toEqual({ ok: true, data: { ratios } });
     expect(store.table("category_ratios").map((r) => [r.category_id, r.percent])).toEqual([[C1, 75]]);
     expect(store.table("user_settings")[0]).toMatchObject({ ratio_other_percent: 25 });
-    expect(historyInserts(store)).toHaveLength(1); // 넣으려 했고
     expect(store.table(HISTORY).filter((r) => r.user_id === ME)).toHaveLength(1000); // 늘지 않았다
-    expect(warn.mock.calls.map((c) => c[0])).toEqual(["[ratio_history] write_failed code=P0001"]);
   });
 });
 
@@ -287,7 +241,7 @@ describe("기기 먼저 저장(보낼 줄) → 같은 서버 저장 길", () => 
       user_id: ME,
       ratios: [{ category_id: C1, percent: 40 }, { category_id: C2, percent: 40 }, { category_id: null, percent: 20 }],
     });
-    expect(historyInserts(store)).toHaveLength(1);
+    expect(store.rpcCalls.filter((c) => c.name === "save_goal_bundle")).toHaveLength(2); // 옛 op도 함수로 간다(거절하지 않는다)
   });
   it("다른 사용자 세션으로 온 줄은 계정 확인에서 거절되어 기록이 생기지 않는다", async () => {
     const store = setup();

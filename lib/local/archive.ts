@@ -27,6 +27,8 @@ export function archivedText(op: Op, mirror: Mirror): string | null {
       return op.name;
     case "settings.save":
       return typeof op.patch.goal === "string" && op.patch.goal.length > 0 ? op.patch.goal : null;
+    case "bundle.apply":
+      return typeof op.goal === "string" && op.goal.length > 0 ? op.goal : null;
     case "evening.save": {
       const { input } = op;
       const items = input.items.map((i) => `${categoryName(mirror, i.categoryId)} ${formatMinutes(i.minutes)}`).join(" · ");
@@ -69,6 +71,17 @@ export function remapCategory(op: Op, from: string, to: string): Op {
     case "ratios.save": {
       const merged = mergeBy(op.ratios, from, to, (a, b) => ({ ...a, percent: a.percent + b.percent }));
       return merged.changed ? { ...op, ratios: merged.items } : op;
+    }
+    case "bundle.apply": {
+      // 묶음 칸은 id 열쇠다(mergeBy는 categoryId 열쇠). 같은 분야가 둘이 되면 하나로 더한다
+      const items: typeof op.items = [];
+      for (const i of op.items) {
+        const next = i.id === from ? { ...i, id: to } : i;
+        const at = items.findIndex((o) => o.id === next.id);
+        if (at >= 0) items[at] = { ...items[at], percent: items[at].percent + next.percent };
+        else items.push(next);
+      }
+      return items.some((i, n) => i !== op.items[n]) ? { ...op, items } : op;
     }
     default:
       return op;

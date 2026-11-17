@@ -14,6 +14,7 @@ export type CategoryErrorCode =
   | "too_long" // 글자 수 넘음: 정규화한 이름이 20자(코드 포인트, 임시)를 넘음
   | "reserved" // 「기타」(분야 번호가 비면 기타라 겹친다. 임시, 결정 필요)
   | "duplicate" // 같은 이름: 보관하지 않은 내 분야에 이미 있음. 실패 응답에 그 분야(existing)가 실린다(임시, 결정 필요)
+  | "archived_exists" // 보관한 같은 이름 분야가 있음: 실패 응답에 그 분야(existing)가 실린다(되살리기를 권하는 것은 화면 몫)
   | "conflict" // id가 이미 쓰였는데 내 분야로 보이지 않음(화면이 만든 uuid가 남의 것과 겹침. 사실상 없다)
   | "category_limit" // 개수 상한: 한 사용자 분야 개수(DB, 임시 50)
   | "config" // 설정 오류: 암호화 키 없음·길이 틀림, Supabase 주소·키 없음
@@ -23,8 +24,8 @@ export type CategoryResult<T> = { ok: true; data: T } | { ok: false; error: Cate
 
 /** 화면에 넘기는 분야 하나. 풀 수 없는 이름은 readable=false, name=null. createdAt은 ISO 문자열. */
 export type CategoryItem =
-  | { id: string; readable: true; name: string; createdAt: string }
-  | { id: string; readable: false; name: null; createdAt: string };
+  | { id: string; readable: true; name: string; createdAt: string; colorOrder?: number }
+  | { id: string; readable: false; name: null; createdAt: string; colorOrder?: number };
 
 export type CategoryList = { categories: CategoryItem[] };
 export type AddedCategory = { category: CategoryItem };
@@ -35,5 +36,5 @@ export type AddedCategory = { category: CategoryItem };
  */
 export type AddCategoryResult =
   | { ok: true; data: AddedCategory }
-  | { ok: false; error: "duplicate"; existing: { id: string; name: string } }
-  | { ok: false; error: Exclude<CategoryErrorCode, "duplicate"> };
+  | { ok: false; error: "duplicate" | "archived_exists"; existing: { id: string; name: string } }
+  | { ok: false; error: Exclude<CategoryErrorCode, "duplicate" | "archived_exists"> };

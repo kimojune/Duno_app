@@ -1,3 +1,4 @@
+import type { BundleApplyInput, BundleState } from "../bundles/types";
 import type { CategoryItem } from "../categories/types";
 import type { EveningLog } from "../evening/types";
 import type { EveningSaveInput } from "../evening-api";
@@ -51,6 +52,10 @@ export type Mirror = {
   notes: Record<string, NoteItem[]>;
   /** 마지막으로 받은 먼저 할 일 제시(제시는 서버만 정한다: 기록 위조 막기) */
   offers: MirrorOffers;
+  /** 보관한 분야(이름 찾기용, MO-46). 없으면(옛 사본) 빈 목록으로 본다 */
+  archivedCategories?: CategoryItem[];
+  /** 지금 묶음의 상태(고침 번호·시작·다시 시작 표시, MO-46). 없으면(옛 사본) 처음 상태로 본다. 지난 목표 목록은 싣지 않는다 */
+  bundle?: BundleState;
 };
 
 /** 서버가 한 번에 내려주는 사본. 칸이 null이면 그 칸을 못 읽은 것이라 기기의 옛 값을 그대로 둔다 */
@@ -65,6 +70,10 @@ export type MirrorSnapshot = {
   logs: EveningLog[] | null;
   goal: { weekStart: string; items: CategoryMinutes[] | null } | null;
   sessions: FocusSession[] | null;
+  /** 보관한 분야(MO-46). 옛 서버가 주는 사본에는 없을 수 있다 */
+  archivedCategories?: CategoryItem[] | null;
+  /** 지금 묶음의 상태(MO-46). 옛 서버가 주는 사본에는 없을 수 있다 */
+  bundle?: BundleState | null;
 };
 
 /** 기기 거울이 담는 할 일의 기간(오늘부터 거슬러 이만큼 날). 저녁 기록 대상 날(7일)과 지난 날 보기가 읽는다 */
@@ -88,6 +97,11 @@ export type Op =
   | { kind: "goal.clear" }
   | { kind: "settings.save"; patch: { goal?: string | null; notify?: Partial<NotifySettings>; completeOnboarding?: boolean } }
   | { kind: "ratios.save"; ratios: RatioItem[] }
+  /** 새 목표 묶음 전체(목표 글·기타 비율·분야 목록)와 기대 고침 번호·op id(MO-46). 서버가 save_goal_bundle을 한 번 부른다 */
+  | ({ kind: "bundle.apply" } & BundleApplyInput)
+  /** 다시 시작 표시(1단계)·취소. 지금 표를 바꾸지 않는다 */
+  | { kind: "bundle.restart" }
+  | { kind: "bundle.restartCancel" }
   | { kind: "view.record"; id: string; screen: ViewScreen; entry: ViewEntry }
   | { kind: "offer.dismiss"; id: string }
   /** 「오늘 할 일에 추가」(고침 11): from은 건넨 지난 날 할 일(기기 거울이 사본을 그리는 데만 쓴다. 서버는 제시 줄에서 다시 찾는다) */
@@ -106,7 +120,7 @@ export type QueuedOp = { key: string; clientAt: string; attempts: number; op: Op
  * existing은 분야 만들기가 duplicate일 때 서버가 알려 준 같은 이름의 내 분야(고침 4바퀴: 뒤의 쓰기의 분야 번호를 이것으로 바꿔 보낸다).
  * account_mismatch는 서버의 세션 사용자가 이 기기 운영 장치의 사용자와 다르다는 뜻이다(보내지 않고 이 사용자 것을 지운다).
  */
-export type SendResult = { ok: true } | { ok: false; error: string; network?: boolean; existing?: { id: string; name: string } };
+export type SendResult = { ok: true; pastSkipped?: boolean } | { ok: false; error: string; network?: boolean; existing?: { id: string; name: string } };
 export type Sender = (queued: QueuedOp) => Promise<SendResult>;
 
 /** 서버가 거절한 쓰기(기기 것은 되돌렸다). 화면이 한 줄로 알린다 */

@@ -230,11 +230,12 @@ describe("기타를 처음 정한 비율에 넣기 (고침 3바퀴, PM 답 d-69)
     const read = await readSettingsForUser({ supabase: supabase as never, key: KEY, now: () => NOW });
     expect(read.ok && read.data.ratios).toEqual([{ categoryId: C1, percent: 100 }]);
   });
-  it("열이 없는 DB에서 기타를 저장하려 하면 거절된다(짧은 코드, 앱은 되돌린다)", async () => {
+  it("함수 호출이 실패하면(예: 마이그레이션 적용 전이라 함수가 없음) 거절되고 아무것도 안 바뀐다(짧은 코드, 앱은 되돌린다)", async () => {
+    // MO-46: 비율·기타 저장은 DB 함수 save_goal_bundle 한 번이라 열 단위 grant 흉내는 뜻이 없다. 함수가 없으면 통째로 실패한다.
     const store = setup();
-    store.rules.user_settings.insertColumns = store.rules.user_settings.insertColumns!.filter((c) => c !== "ratio_other_percent");
-    store.rules.user_settings.updateColumns = store.rules.user_settings.updateColumns!.filter((c) => c !== "ratio_other_percent");
+    store.alwaysError = { code: "42883", message: "function public.save_goal_bundle does not exist" };
     const res = await saveRatiosForUser(deps(store), [{ categoryId: C1, percent: 50 }, { categoryId: null, percent: 50 }]);
     expect(res.ok).toBe(false);
+    expect(store.table("category_ratios")).toHaveLength(0);
   });
 });

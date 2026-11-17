@@ -1,10 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { mapRecordDbError, recordFail, type RecordResult } from "../records/common";
+import { mapRecordDbError, recordFail, type RecordErrorCode, type RecordResult } from "../records/common";
 import { requireUserId } from "../session";
-import { decryptTodoText, encryptTodoText, type TodoKey } from "../todos/crypto";
-import { recordRatioHistory } from "./ratio-history";
+import { decryptTodoText, type TodoKey } from "../todos/crypto";
+import { saveLegacyBundleForUser } from "../bundles/core";
+import type { BundleErrorCode } from "../bundles/types";
 import type { NotifySettings, RatioItem, SettingsData, SettingsPatch } from "./types";
 import { checkGoal, checkRatios, DEFAULT_NOTIFY, notifyPatchSchema } from "./validation";
 
@@ -94,48 +95,38 @@ export async function readSettingsForUser(deps: SettingsDeps): Promise<RecordRes
 
 /**
  * 처음 정한 비율을 통째로 바꾼다(처음 설정과 「비율 고치기」가 같이 쓴다). 받은 목록에 없는 분야의 비율은 지운다.
- * categoryId가 null인 항목은 기타다: 0보다 크면 user_settings.ratio_other_percent에 두고, 없거나 0이면 비운다(열이 없는 DB에서는 건드리지 않는다).
- * 남의 분야·없는 분야면 not_found(DB 복합 외래 키가 거절). 같은 요청을 여러 번 보내도 결과가 같다.
- * 저장이 성공하면 바뀐 기록(category_ratio_history)에 한 줄 남긴다(같은 묶음이면 안 남김, 기록 실패는 저장 결과를 바꾸지 않음 — ratio-history.ts).
+ * MO-46: 저장은 DB 함수 save_goal_bundle 한 번(한 트랜잭션)으로 간다(옛 op 길: 충돌 검사는 건너뛴다). 지난 목표 기록·비율 바뀐 기록은
+ * 그 함수가 같은 트랜잭션에서 남긴다(그래서 여기서는 category_ratio_history에 쓰지 않는다).
+ * categoryId가 null인 항목은 기타다. 남의 분야·없는 분야면 not_found. 같은 요청을 여러 번 보내도 결과가 같다.
  */
-export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Promise<RecordResult<{ ratios: RatioItem[] }>> {
+export async function saveRatiosForUser(deps: SettingsDeps, input: unknown): Promise<RecordResult<{ ratios: RatioItem[]; pastSkipped?: boolean }>> {
   try {
     const user = await requireUserId(deps.supabase);
     if (!user.ok) return user;
     const checked = checkRatios(input);
     if (!checked.ok) return recordFail("invalid_input");
-
-    const categoryItems = checked.ratios.filter((r): r is { categoryId: string; percent: number } => r.categoryId !== null);
-    const otherItem = checked.ratios.find((r) => r.categoryId === null);
-    if (categoryItems.length > 0) {
-      const rows = categoryItems.map((r) => ({ user_id: user.data, category_id: r.categoryId, percent: r.percent }));
-      const upsert = await deps.supabase.from("category_ratios").upsert(rows, { onConflict: "user_id,category_id" }).select("category_id, percent");
-      if (upsert.error) return recordFail(mapRecordDbError(upsert.error));
-    }
-
-    const keep = new Set(categoryItems.map((r) => r.categoryId));
-    const existing = await deps.supabase.from("category_ratios").select("category_id").eq("user_id", user.data);
-    if (existing.error) return recordFail(mapRecordDbError(existing.error));
-    const removed = ((existing.data ?? []) as { category_id: string }[]).map((r) => r.category_id).filter((id) => !keep.has(id));
-    if (removed.length > 0) {
-      const del = await deps.supabase.from("category_ratios").delete().eq("user_id", user.data).in("category_id", removed).select("category_id");
-      if (del.error) return recordFail(mapRecordDbError(del.error));
-    }
-
-    // 기타 몫: 지금 값과 다를 때만 쓴다(기타를 안 쓰는 사용자는 이 열을 건드리지 않아, 마이그레이션 전에도 저장이 된다)
-    const wantedOther = otherItem && otherItem.percent > 0 ? otherItem.percent : null;
-    const currentOther = await readOtherPercent(deps.supabase, user.data);
-    if (wantedOther !== currentOther) {
-      const write = await deps.supabase.from("user_settings").upsert({ user_id: user.data, ratio_other_percent: wantedOther }, { onConflict: "user_id" }).select("user_id");
-      if (write.error) return recordFail(mapRecordDbError(write.error));
-    }
-
-    // 바뀐 기록(고침 9바퀴): 위 저장이 모두 성공한 뒤에만 한 줄. 직전 기록과 같은 묶음이면 안 쓴다.
-    // 실패해도 비율 저장은 이미 끝났으니 성공으로 돌려준다(로그만). 트랜잭션으로 묶지 않는다: 위 저장 자체가 여러 요청이라 이미 트랜잭션이 없다.
-    await recordRatioHistory(deps.supabase, user.data, checked.ratios);
-    return { ok: true, data: { ratios: checked.ratios } };
+    const saved = await saveLegacyBundleForUser({ supabase: deps.supabase, key: deps.key }, { ratios: checked.ratios });
+    if (!saved.ok) return recordFail(toRecordError(saved.error));
+    return { ok: true, data: { ratios: checked.ratios, ...(saved.data.pastSkipped ? { pastSkipped: true } : {}) } };
   } catch {
     return recordFail("unavailable");
+  }
+}
+
+/** 묶음 오류 → 기록 오류(옛 호출자가 아는 코드로) */
+function toRecordError(error: BundleErrorCode): RecordErrorCode {
+  switch (error) {
+    case "unauthenticated":
+    case "invalid_input":
+    case "not_found":
+    case "conflict":
+    case "config":
+    case "unavailable":
+      return error;
+    case "category_limit":
+      return "limit";
+    default:
+      return "invalid_input";
   }
 }
 
@@ -165,10 +156,15 @@ export async function saveSettingsForUser(
     const patch = parsed.data as SettingsPatch & { goal?: unknown; notify?: unknown };
 
     const values: Record<string, unknown> = { user_id: user.data };
+    let goalSaved = false;
     if (patch.goal !== undefined) {
       const goal = checkGoal(patch.goal);
       if (!goal.ok) return recordFail(goal.error);
-      values.goal_encrypted = goal.goal === null ? null : encryptTodoText(goal.goal, user.data, key, "goal_text");
+      // MO-46: 목표 글은 save_goal_bundle(옛 op 길)로 저장한다. 판 기록을 남기려고 표를 직접 쓰지 않는다.
+      // 처음 설정 마침(onboarding_done_at)은 아래 기존 길이 서버 시계(deps.now)로 정한다.
+      const saved = await saveLegacyBundleForUser({ supabase: deps.supabase, key }, { goal: { value: goal.goal } });
+      if (!saved.ok) return recordFail(toRecordError(saved.error));
+      goalSaved = true;
     }
     if (patch.notify !== undefined) {
       const notify = notifyPatchSchema.safeParse(patch.notify);
@@ -185,7 +181,12 @@ export async function saveSettingsForUser(
       const row = ((existing.data ?? []) as { onboarding_done_at: string | null }[])[0];
       if (!row || row.onboarding_done_at === null) values.onboarding_done_at = (deps.now ?? serverNow)().toISOString();
     }
-    if (Object.keys(values).length === 1) return recordFail("invalid_input"); // 바꿀 것이 없다
+    if (Object.keys(values).length === 1) {
+      if (!goalSaved) return recordFail("invalid_input"); // 바꿀 것이 없다
+      const row = await deps.supabase.from("user_settings").select(SETTINGS_COLUMNS).eq("user_id", user.data);
+      if (row.error) return recordFail(mapRecordDbError(row.error));
+      return { ok: true, data: toSettings(((row.data ?? []) as SettingsRow[])[0], user.data, key) };
+    }
 
     const { data, error } = await deps.supabase
       .from("user_settings")
