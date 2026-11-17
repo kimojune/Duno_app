@@ -1,29 +1,32 @@
 # 운영 DB 분리(MO-23) — PM이 붙여 쓰는 명령과 확인 쿼리
 
-**결론**: 새 Supabase 프로젝트(운영)에 마이그레이션 1~11번을 적용하고, Vercel Production 값만 그쪽으로 바꿔 다시 배포한다. 데이터는 옮기지 않는다. duno-dev는 개발·시험 전용으로 남는다. 이 문서의 명령은 **22가 돌려 보지 않았다(미실행)**. 값은 적지 않는다 — `<…>` 자리에 PM이 넣는다.
+**결론**: 새 Supabase 프로젝트(운영)에 마이그레이션 15개(20261104160723 ~ 20261109150000, 마이그레이션.md의 1~11번과 그 앞 4개)를 적용하고, Vercel Production 값만 그쪽으로 바꿔 다시 배포한다. 데이터는 옮기지 않는다. duno-dev는 개발·시험 전용으로 남는다. 이 문서의 명령은 **22가 돌려 보지 않았다(미실행)**. 값은 적지 않는다 — `<…>` 자리에 PM이 넣는다.
 
-PM 결정(11-17 「추천대로 진행해」): ① 데이터 안 옮김 ② 무료 + 주 1회 손 dump, 실사용 날 Pro ③ 지금 Google OAuth 클라이언트에 새 콜백 주소만 더함 ④ 운영 이메일 로그인 끔 ⑤ 운영용 새 암호화 키 ⑥ 분리 때 1~11번만, 12번(MO-46)은 검토 통과 뒤 duno-dev 먼저 → 운영
+PM 결정(11-17 「추천대로 진행해」): ① 데이터 안 옮김 ② 무료 + 주 1회 손 dump, 실사용 날 Pro ③ 지금 Google OAuth 클라이언트에 새 콜백 주소만 더함 ④ 운영 이메일 로그인 끔 ⑤ 운영용 새 암호화 키 ⑥ 분리 때 지금 있는 마이그레이션 15개(마이그레이션.md의 1~11번과 그 앞 4개)만, 12번(MO-46)은 검토 통과 뒤 duno-dev 먼저 → 운영
 
 전체 순서: 1 새 프로젝트 → **2 마이그레이션(이 문서)** → 3 Auth 설정 → 4 값 만들기 → 5 Vercel Production 값·다시 배포 → 6 알림 예약 → **7 확인(이 문서)**
 
 ---
 
-## 2. 마이그레이션 1~11번 적용
+## 2. 마이그레이션 15개 적용(20261104160723 ~ 20261109150000)
 
 **어디서**: Duno_app 메인 작업 폴더의 터미널(이 저장소 루트)
-**먼저 볼 것**: `supabase/migrations/`에 1~11번(20261104160723 … 20261109150000)만 있는 판인지 본다. 12번(`20261117100000_goal_bundles.sql`)이 있는 판이면 이번에는 적용하지 않는다(결정 ⑥) — 그 파일이 없는 main에서 한다.
+**먼저 볼 것**: `supabase/migrations/`에 15개(20261104160723 … 20261109150000, 마이그레이션.md의 1~11번과 그 앞 4개 create_todos·todos_total_row_limit·todos_grant_insert_id·categories)만 있는 판인지 본다. `ls supabase/migrations | wc -l`(PowerShell: `(Get-ChildItem supabase/migrations).Count`)가 15여야 한다. 12번(`20261117100000_goal_bundles.sql`)이 있는 판이면 이번에는 적용하지 않는다(결정 ⑥) — 그 파일이 없는 main에서 한다.
 
 ```bash
 # 2-1. 새 프로젝트에 잇는다(로그인이 필요하면 supabase login 먼저)
 supabase link --project-ref <새 운영 project ref>
 
-# 2-2. 무엇이 적용될지만 본다. 1~11번이 시각 순서대로 11줄 나와야 한다
+# 2-1b. 지금 연결된 프로젝트가 새 운영인지 본다
+supabase projects list
+
+# 2-2. 무엇이 적용될지만 본다. 15개가 시각 순서대로 15줄 나와야 한다
 supabase db push --dry-run
 
 # 2-3. 적용한다
 supabase db push
 
-# 2-4. 로컬·원격 열이 1~11번 모두 같은지 본다
+# 2-4. 로컬·원격 열이 15개 모두 같은지 본다
 supabase migration list
 
 # 2-5. 끝나면 반드시 끊는다. 안 끊으면 다음 supabase 명령이 운영으로 간다
@@ -31,8 +34,13 @@ supabase unlink
 ```
 
 - **연결이 안 되면**(직접 연결은 IPv6): 대시보드 Connect → Session pooler 연결 문자열을 환경 변수에 넣고 `--db-url "$PROD_DB_URL"`로 준다. 비밀번호가 든 문자열을 명령줄에 직접 치지 않는다.
-- **11번**(category_ratio_history)도 같이 적용한다. 빼면 뒤 번호가 꼬인다.
-- **확인**: 2-2가 11줄, 2-4에서 1~11번이 로컬·원격 둘 다에 있다.
+  - PowerShell(Windows): 변수는 `$env:PROD_DB_URL = "<Session pooler 연결 문자열>"`로 넣고 `--db-url $env:PROD_DB_URL`로 준다.
+  - **변수가 비어 있으면 명령을 돌리지 않는다 — 먼저 값이 있는지 길이만 본다**(값은 찍지 않는다):
+    - bash: `echo ${#PROD_DB_URL}` → 0보다 커야 한다
+    - PowerShell: `$env:PROD_DB_URL.Length` → 0보다 커야 한다(변수가 없으면 오류가 난다 = 비어 있다)
+- **2-1b 확인**: `supabase projects list` 출력에서 연결 표시(●)가 붙은 줄의 ref가 새 운영 ref여야 한다. 아니면 2-3으로 가지 않는다. 표시 모양이 다르면(22 미실행) `supabase/.temp/project-ref` 파일 내용을 본다 — 새 운영 ref여야 한다.
+- **마이그레이션.md의 11번**(category_ratio_history)도 같이 적용한다. 빼면 뒤 번호가 꼬인다.
+- **확인**: 2-2가 15줄, 2-4에서 15개가 로컬·원격 둘 다에 있다.
 - **되돌리기**: 빈 새 프로젝트라 지우고 1단계부터 다시 하는 것이 가장 쉽다.
 
 ### 2-6. 적용 직후 SQL Editor(새 프로젝트)에서
@@ -43,10 +51,15 @@ select c.relname
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where c.relkind in ('r','p') and not c.relrowsecurity and n.nspname = 'public';
 
--- anon에 준 표 권한: 0행이어야 한다
-select table_name, privilege_type
-from information_schema.role_table_grants
-where grantee = 'anon' and table_schema = 'public';
+-- anon이 public 표에 SELECT·INSERT·UPDATE·DELETE 중 하나라도 가진 표: 0행이어야 한다
+-- (information_schema.role_table_grants는 현재 역할이 주거나 받은 권한만 보여 거짓 0행이 날 수 있어 쓰지 않는다)
+select c.relname
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind in ('r','p')
+  and (has_table_privilege('anon', c.oid, 'SELECT')
+    or has_table_privilege('anon', c.oid, 'INSERT')
+    or has_table_privilege('anon', c.oid, 'UPDATE')
+    or has_table_privilege('anon', c.oid, 'DELETE'));
 
 -- 표 목록: todos, categories, todo_notes, user_settings, category_ratios, evening_logs,
 -- view_events, focus_sessions, todo_offers, weekly_goals, push_subscriptions, category_ratio_history 12개
@@ -113,6 +126,15 @@ supabase db dump --db-url "$PROD_DB_URL" -f <날짜>-schema.sql
 supabase db dump --db-url "$PROD_DB_URL" -f <날짜>-data.sql --use-copy --data-only
 ```
 
+PowerShell(Windows) 판 — 먼저 길이만 본다(값은 찍지 않는다). 비어 있으면 명령을 돌리지 않는다. bash는 `echo ${#PROD_DB_URL}`, PowerShell은 `$env:PROD_DB_URL.Length`가 0보다 커야 한다.
+
+```powershell
+supabase db dump --db-url $env:PROD_DB_URL -f <날짜>-roles.sql --role-only
+supabase db dump --db-url $env:PROD_DB_URL -f <날짜>-schema.sql
+supabase db dump --db-url $env:PROD_DB_URL -f <날짜>-data.sql --use-copy --data-only
+```
+
 - **확인**: 세 파일이 생기고 비어 있지 않다. data 파일에 `COPY public.todos`가 있다.
+- `push_subscriptions`의 구독 주소·키(endpoint·p256dh·auth)는 평문으로 dump에 들어간다. 그래서 dump 파일 자체를 비밀처럼 다룬다(공유 폴더·클라우드 동기화 폴더에 두지 않는다).
 - dump 속 할 일·분야·목표 글은 암호문이다. 되살리려면 **운영 TODO_ENCRYPTION_KEY를 따로 보관**해야 한다(결정 ⑤의 새 키).
 - 무료 프로젝트는 1주 활동이 없으면 멈춘다. 멈추면 알림도 선다. 실사용자를 받는 날 Pro로 바꾼다.
