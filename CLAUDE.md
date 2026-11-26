@@ -24,7 +24,8 @@
 
 ## 마이그레이션 적용
 
-- AI는 개발 DB에만 적용한다. 연결은 `.mcp.json`의 `duno-dev`다. 주소의 `project_ref`가 개발 DB(`tkowlkdkghhmdhhyyhwg`)로 묶여 있다. 이 주소를 바꾸지 않는다
+- AI는 개발 DB에만 적용한다. `npm run db:push:dev`(미리 보기는 `-- --dry-run`)를 쓴다. 이 명령은 `.env.local`의 `DEV_DB_URL`이 개발 DB(`tkowlkdkghhmdhhyyhwg`)가 아니면 멈춘다
+- Supabase 연결(MCP)은 두지 않는다. 승인이 org 단위라 토큰이 운영 DB에도 닿기 때문이다(2026-11-26 결정)
 - 적용한 뒤 `npm run test:rls`와 관련 시험으로 확인한다
 - AI는 `supabase link`와 `--linked`가 붙은 명령을 돌리지 않는다. 연결된 프로젝트가 운영 DB다
 - 운영 DB는 사용자가 적용한다. 처음 한 번 `supabase link --project-ref <운영 ref>`로 연결한다
