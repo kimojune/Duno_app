@@ -25,15 +25,20 @@
 ## 마이그레이션 적용
 
 - 두노는 개발 DB(duno-dev, ref `tkowlkdkghhmdhhyyhwg`) 하나만 쓴다. 배포 사이트도 개발 DB를 본다. 운영 DB(duno-prod, ref `nsucccmnrnkkuyvjnvyw`)는 쓰지 않고 그대로 둔다(2026-11-27 결정, DU-d16)
-- 적용은 Supabase CLI 로그인 토큰으로 한다(DU-d23). 사용자가 처음 한 번 `npx supabase login`(과 `npx supabase link --project-ref tkowlkdkghhmdhhyyhwg`)을 한다. 그 뒤 적용은 AI가 한다
-- AI는 개발 DB에만 적용한다. 명령에는 대상 ref를 늘 적는다
-  1. 미리 보기: `npx supabase db push --project-ref tkowlkdkghhmdhhyyhwg --dry-run`
-  2. 적용: `npx supabase db push --project-ref tkowlkdkghhmdhhyyhwg`
-- 적용 전에 마이그레이션이 「더하기만」(새 표·열·정책 추가)인지 본다. 기존 표·열·정책을 바꾸거나 지우는 마이그레이션은 사용자에게 묻는다
+- 개발 DB 연결은 Supabase MCP로 한다(DU-d31). 서버는 `.mcp.json`의 `duno-dev`다. 주소의 `project_ref`가 개발 DB(`tkowlkdkghhmdhhyyhwg`)로 묶여 있다. 이 주소를 바꾸지 않는다
+- 사용자가 처음 한 번 허락한다. 일반 터미널에서 `claude`를 열고 `/mcp` → `duno-dev` → 「Authenticate」를 고르면 브라우저가 열린다. Supabase에 로그인하고 개발 DB가 든 org를 고른다
+- AI는 개발 DB에만 적용한다. MCP 서버 `duno-dev`만 쓴다. 운영 DB(`nsucccmnrnkkuyvjnvyw`)에는 붙지 않는다. 그 ref를 어디에도 쓰지 않는다
+- 적용하는 법
+  1. `supabase/migrations`의 새 파일이 「더하기만」(새 표·열·정책 추가)인지 본다. 기존 표·열·정책을 바꾸거나 지우는 마이그레이션, 데이터를 지우는 SQL은 사용자에게 묻는다
+  2. MCP `list_migrations`로 원격 기록을 보고, 이미 적용된 파일은 건너뛴다
+  3. 파일 내용을 MCP `apply_migration`으로 적용한다. `name`은 파일 이름에서 앞 숫자와 `.sql`을 뺀 것이다
+  4. 적용 뒤 `list_migrations`로 기록이 생겼는지 본다
+- 원격 기록과 파일 이름이 어긋날 수 있다. `apply_migration`은 `name`과 `query`만 받고 version(파일 이름 앞 숫자)을 받지 않는다. 원격 version은 서버가 정한다[미확인: 어떤 값으로 정하는지 문서에 없다]. 적용 뒤 `list_migrations`의 version이 파일 앞 숫자와 다르면, 아직 `dev`에 합치지 않은 그 파일의 이름 앞 숫자를 원격 version으로 바꿔 맞춘다
+- MCP의 SQL 실행 도구(`execute_sql`)는 읽기에만 쓴다. 이 도구로 데이터를 바꾸거나 지우지 않는다
 - 진짜 데이터가 쌓인 뒤에는 적용 전에 백업한다
-- AI는 운영 DB(`nsucccmnrnkkuyvjnvyw`)에 붙지 않는다. 그 ref를 명령에 쓰지 않는다
-- Supabase 연결(MCP)은 두지 않는다. 승인이 org 단위라 토큰이 운영 DB에도 닿기 때문이다(2026-11-26 결정)
+- MCP 도구 호출은 shell-guard와 홈 deny가 보지 못한다. 위 규칙은 AI가 스스로 지킨다
 - 적용한 뒤 `npm run test:rls`와 관련 시험으로 확인한다
+- Supabase 연결(MCP)을 두지 않는다던 2026-11-26 결정(WS-d32)은 DU-d31 가로 되살림. 승인이 org 단위라 토큰이 운영 DB에도 닿는 위험은 사용자가 알고 골랐다
 
 ## 기록
 
