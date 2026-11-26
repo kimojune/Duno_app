@@ -6,6 +6,7 @@
 
 - `main`은 배포판이다. Vercel이 여기를 배포한다. 직접 커밋하지 않는다
 - 작업은 `dev`에 모은다. 작업 브랜치는 `dev`에서 따고, GitHub PR로 `dev`에 squash merge한다. 이 PC에서 `dev`로 바로 합치지 않는다
+- 작업 브랜치는 따로 만든 작업 폴더(Orca worktree, `orca worktree create`)에서 연다. 본 폴더 `duno-app`은 늘 `dev`에 두고, 본 폴더에서 브랜치를 바꾸지 않는다
 - 작업 브랜치는 PR을 여는 동안만 GitHub에 둔다. 합칠 때 `--delete-branch`로 지운다(GitHub 자동 삭제는 꺼 두었다. 켜면 배포 PR 때 `dev`가 지워진다)
 - `dev`를 `main`에 합치는 배포 PR은 squash가 아니라 `gh pr merge --merge`로 합친다. squash로 합치면 두 가지의 이력이 갈라진다
 - `dev`를 `main`에 합치는 것과 push는 사용자 승인으로만 한다. 순서: 검사 통과 → 운영 DB 마이그레이션 → 합치기 → 배포 확인
