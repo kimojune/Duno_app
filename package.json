@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "notify:keys": "node scripts/notify-keys.mjs",
-    "db:push:dev": "node scripts/db-push-dev.mjs",
     "e2e": "playwright test",
     "screens": "playwright test --config playwright.screens.config.ts",
     "load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/load/run.ts"
